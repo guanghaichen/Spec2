@@ -1,0 +1,105 @@
+Task suite: libero_goal
+
+Task: open the middle drawer of the cabinet
+Starting episode 1...
+Success: False
+# episodes completed so far: 1
+# successes: 0 (0.0%)
+DFlash stats: avg_accept_length=0.004, overall_hit_rate=0.001
+DFlash per-position hit rate: p1=0.004, p2=0.009, p3=0.005, p4=0.003, p5=0.000, p6=0.020
+
+Task: open the middle drawer of the cabinet
+Starting episode 2...
+Success: False
+# episodes completed so far: 2
+# successes: 0 (0.0%)
+DFlash stats: avg_accept_length=0.016, overall_hit_rate=0.005
+DFlash per-position hit rate: p1=0.017, p2=0.024, p3=0.018, p4=0.009, p5=0.010, p6=0.063
+
+Task: open the middle drawer of the cabinet
+Starting episode 3...
+Success: False
+# episodes completed so far: 3
+# successes: 0 (0.0%)
+DFlash stats: avg_accept_length=0.004, overall_hit_rate=0.001
+DFlash per-position hit rate: p1=0.004, p2=0.007, p3=0.004, p4=0.002, p5=0.000, p6=0.010
+
+Task: open the middle drawer of the cabinet
+Starting episode 4...
+Success: False
+# episodes completed so far: 4
+# successes: 0 (0.0%)
+DFlash stats: avg_accept_length=0.002, overall_hit_rate=0.001
+DFlash per-position hit rate: p1=0.003, p2=0.003, p3=0.001, p4=0.000, p5=0.003, p6=0.007
+
+Task: open the middle drawer of the cabinet
+Starting episode 5...
+Success: False
+# episodes completed so far: 5
+# successes: 0 (0.0%)
+DFlash stats: avg_accept_length=0.020, overall_hit_rate=0.007
+DFlash per-position hit rate: p1=0.020, p2=0.026, p3=0.024, p4=0.026, p5=0.032, p6=0.070
+
+Task: open the middle drawer of the cabinet
+Starting episode 6...
+Success: False
+# episodes completed so far: 6
+# successes: 0 (0.0%)
+DFlash stats: avg_accept_length=0.003, overall_hit_rate=0.001
+DFlash per-position hit rate: p1=0.003, p2=0.004, p3=0.000, p4=0.001, p5=0.003, p6=0.023
+
+Task: open the middle drawer of the cabinet
+Starting episode 7...
+Success: False
+# episodes completed so far: 7
+# successes: 0 (0.0%)
+DFlash stats: avg_accept_length=0.001, overall_hit_rate=0.000
+DFlash per-position hit rate: p1=0.002, p2=0.002, p3=0.002, p4=0.000, p5=0.002, p6=0.010
+
+Task: open the middle drawer of the cabinet
+Starting episode 8...
+Success: False
+# episodes completed so far: 8
+# successes: 0 (0.0%)
+DFlash stats: avg_accept_length=0.020, overall_hit_rate=0.007
+DFlash per-position hit rate: p1=0.021, p2=0.031, p3=0.013, p4=0.007, p5=0.010, p6=0.033
+
+Task: open the middle drawer of the cabinet
+Starting episode 9...
+Success: False
+# episodes completed so far: 9
+# successes: 0 (0.0%)
+DFlash stats: avg_accept_length=0.005, overall_hit_rate=0.002
+DFlash per-position hit rate: p1=0.006, p2=0.014, p3=0.006, p4=0.004, p5=0.005, p6=0.023
+
+Task: open the middle drawer of the cabinet
+Starting episode 10...
+Success: False
+# episodes completed so far: 10
+# successes: 0 (0.0%)
+DFlash stats: avg_accept_length=0.005, overall_hit_rate=0.002
+DFlash per-position hit rate: p1=0.006, p2=0.004, p3=0.003, p4=0.001, p5=0.008, p6=0.033
+
+Task: open the middle drawer of the cabinet
+Starting episode 11...
+Success: False
+# episodes completed so far: 11
+# successes: 0 (0.0%)
+DFlash stats: avg_accept_length=0.006, overall_hit_rate=0.002
+DFlash per-position hit rate: p1=0.007, p2=0.011, p3=0.005, p4=0.006, p5=0.010, p6=0.027
+
+Task: open the middle drawer of the cabinet
+Starting episode 12...
+Success: False
+# episodes completed so far: 12
+# successes: 0 (0.0%)
+DFlash stats: avg_accept_length=0.012, overall_hit_rate=0.004
+DFlash per-position hit rate: p1=0.011, p2=0.021, p3=0.021, p4=0.011, p5=0.025, p6=0.063
+
+Task: open the middle drawer of the cabinet
+Starting episode 13...
+Success: False
+# episodes completed so far: 13
+# successes: 0 (0.0%)
+DFlash stats: avg_accept_length=0.003, overall_hit_rate=0.001
+DFlash per-position hit rate: p1=0.004, p2=0.007, p3=0.002, p4=0.001, p5=0.002, p6=0.043

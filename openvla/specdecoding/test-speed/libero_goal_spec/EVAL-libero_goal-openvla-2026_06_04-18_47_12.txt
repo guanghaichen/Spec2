@@ -1,0 +1,3021 @@
+Task suite: libero_goal
+
+Task: open the middle drawer of the cabinet
+Starting episode 1...
+Success: False
+# episodes completed so far: 1
+# successes: 0 (0.0%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 2...
+Success: False
+# episodes completed so far: 2
+# successes: 0 (0.0%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 3...
+Success: True
+# episodes completed so far: 3
+# successes: 1 (33.3%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 4...
+Success: True
+# episodes completed so far: 4
+# successes: 2 (50.0%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 5...
+Success: True
+# episodes completed so far: 5
+# successes: 3 (60.0%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 6...
+Success: False
+# episodes completed so far: 6
+# successes: 3 (50.0%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 7...
+Success: False
+# episodes completed so far: 7
+# successes: 3 (42.9%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 8...
+Success: True
+# episodes completed so far: 8
+# successes: 4 (50.0%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 9...
+Success: False
+# episodes completed so far: 9
+# successes: 4 (44.4%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 10...
+Success: True
+# episodes completed so far: 10
+# successes: 5 (50.0%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 11...
+Success: True
+# episodes completed so far: 11
+# successes: 6 (54.5%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 12...
+Success: False
+# episodes completed so far: 12
+# successes: 6 (50.0%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 13...
+Success: False
+# episodes completed so far: 13
+# successes: 6 (46.2%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 14...
+Success: True
+# episodes completed so far: 14
+# successes: 7 (50.0%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 15...
+Success: True
+# episodes completed so far: 15
+# successes: 8 (53.3%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 16...
+Success: True
+# episodes completed so far: 16
+# successes: 9 (56.2%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 17...
+Success: True
+# episodes completed so far: 17
+# successes: 10 (58.8%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 18...
+Success: False
+# episodes completed so far: 18
+# successes: 10 (55.6%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 19...
+Success: False
+# episodes completed so far: 19
+# successes: 10 (52.6%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 20...
+Success: False
+# episodes completed so far: 20
+# successes: 10 (50.0%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 21...
+Success: True
+# episodes completed so far: 21
+# successes: 11 (52.4%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 22...
+Success: True
+# episodes completed so far: 22
+# successes: 12 (54.5%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 23...
+Success: False
+# episodes completed so far: 23
+# successes: 12 (52.2%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 24...
+Success: True
+# episodes completed so far: 24
+# successes: 13 (54.2%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 25...
+Success: True
+# episodes completed so far: 25
+# successes: 14 (56.0%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 26...
+Success: False
+# episodes completed so far: 26
+# successes: 14 (53.8%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 27...
+Success: True
+# episodes completed so far: 27
+# successes: 15 (55.6%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 28...
+Success: True
+# episodes completed so far: 28
+# successes: 16 (57.1%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 29...
+Success: True
+# episodes completed so far: 29
+# successes: 17 (58.6%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 30...
+Success: False
+# episodes completed so far: 30
+# successes: 17 (56.7%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 31...
+Success: True
+# episodes completed so far: 31
+# successes: 18 (58.1%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 32...
+Success: False
+# episodes completed so far: 32
+# successes: 18 (56.2%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 33...
+Success: True
+# episodes completed so far: 33
+# successes: 19 (57.6%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 34...
+Success: True
+# episodes completed so far: 34
+# successes: 20 (58.8%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 35...
+Success: False
+# episodes completed so far: 35
+# successes: 20 (57.1%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 36...
+Success: True
+# episodes completed so far: 36
+# successes: 21 (58.3%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 37...
+Success: False
+# episodes completed so far: 37
+# successes: 21 (56.8%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 38...
+Success: False
+# episodes completed so far: 38
+# successes: 21 (55.3%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 39...
+Success: False
+# episodes completed so far: 39
+# successes: 21 (53.8%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 40...
+Success: True
+# episodes completed so far: 40
+# successes: 22 (55.0%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 41...
+Success: True
+# episodes completed so far: 41
+# successes: 23 (56.1%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 42...
+Success: True
+# episodes completed so far: 42
+# successes: 24 (57.1%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 43...
+Success: False
+# episodes completed so far: 43
+# successes: 24 (55.8%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 44...
+Success: True
+# episodes completed so far: 44
+# successes: 25 (56.8%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 45...
+Success: True
+# episodes completed so far: 45
+# successes: 26 (57.8%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 46...
+Success: False
+# episodes completed so far: 46
+# successes: 26 (56.5%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 47...
+Success: True
+# episodes completed so far: 47
+# successes: 27 (57.4%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 48...
+Success: True
+# episodes completed so far: 48
+# successes: 28 (58.3%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 49...
+Success: False
+# episodes completed so far: 49
+# successes: 28 (57.1%)
+
+Task: open the middle drawer of the cabinet
+Starting episode 50...
+Success: True
+# episodes completed so far: 50
+# successes: 29 (58.0%)
+Current task success rate: 0.58
+Current total success rate: 0.58
+
+Task: put the bowl on the stove
+Starting episode 1...
+Success: True
+# episodes completed so far: 51
+# successes: 30 (58.8%)
+
+Task: put the bowl on the stove
+Starting episode 2...
+Success: True
+# episodes completed so far: 52
+# successes: 31 (59.6%)
+
+Task: put the bowl on the stove
+Starting episode 3...
+Success: True
+# episodes completed so far: 53
+# successes: 32 (60.4%)
+
+Task: put the bowl on the stove
+Starting episode 4...
+Success: True
+# episodes completed so far: 54
+# successes: 33 (61.1%)
+
+Task: put the bowl on the stove
+Starting episode 5...
+Success: True
+# episodes completed so far: 55
+# successes: 34 (61.8%)
+
+Task: put the bowl on the stove
+Starting episode 6...
+Success: True
+# episodes completed so far: 56
+# successes: 35 (62.5%)
+
+Task: put the bowl on the stove
+Starting episode 7...
+Success: True
+# episodes completed so far: 57
+# successes: 36 (63.2%)
+
+Task: put the bowl on the stove
+Starting episode 8...
+Success: True
+# episodes completed so far: 58
+# successes: 37 (63.8%)
+
+Task: put the bowl on the stove
+Starting episode 9...
+Success: True
+# episodes completed so far: 59
+# successes: 38 (64.4%)
+
+Task: put the bowl on the stove
+Starting episode 10...
+Success: True
+# episodes completed so far: 60
+# successes: 39 (65.0%)
+
+Task: put the bowl on the stove
+Starting episode 11...
+Success: True
+# episodes completed so far: 61
+# successes: 40 (65.6%)
+
+Task: put the bowl on the stove
+Starting episode 12...
+Success: True
+# episodes completed so far: 62
+# successes: 41 (66.1%)
+
+Task: put the bowl on the stove
+Starting episode 13...
+Success: False
+# episodes completed so far: 63
+# successes: 41 (65.1%)
+
+Task: put the bowl on the stove
+Starting episode 14...
+Success: True
+# episodes completed so far: 64
+# successes: 42 (65.6%)
+
+Task: put the bowl on the stove
+Starting episode 15...
+Success: True
+# episodes completed so far: 65
+# successes: 43 (66.2%)
+
+Task: put the bowl on the stove
+Starting episode 16...
+Success: True
+# episodes completed so far: 66
+# successes: 44 (66.7%)
+
+Task: put the bowl on the stove
+Starting episode 17...
+Success: True
+# episodes completed so far: 67
+# successes: 45 (67.2%)
+
+Task: put the bowl on the stove
+Starting episode 18...
+Success: True
+# episodes completed so far: 68
+# successes: 46 (67.6%)
+
+Task: put the bowl on the stove
+Starting episode 19...
+Success: True
+# episodes completed so far: 69
+# successes: 47 (68.1%)
+
+Task: put the bowl on the stove
+Starting episode 20...
+Success: False
+# episodes completed so far: 70
+# successes: 47 (67.1%)
+
+Task: put the bowl on the stove
+Starting episode 21...
+Success: True
+# episodes completed so far: 71
+# successes: 48 (67.6%)
+
+Task: put the bowl on the stove
+Starting episode 22...
+Success: True
+# episodes completed so far: 72
+# successes: 49 (68.1%)
+
+Task: put the bowl on the stove
+Starting episode 23...
+Success: True
+# episodes completed so far: 73
+# successes: 50 (68.5%)
+
+Task: put the bowl on the stove
+Starting episode 24...
+Success: True
+# episodes completed so far: 74
+# successes: 51 (68.9%)
+
+Task: put the bowl on the stove
+Starting episode 25...
+Success: True
+# episodes completed so far: 75
+# successes: 52 (69.3%)
+
+Task: put the bowl on the stove
+Starting episode 26...
+Success: True
+# episodes completed so far: 76
+# successes: 53 (69.7%)
+
+Task: put the bowl on the stove
+Starting episode 27...
+Success: True
+# episodes completed so far: 77
+# successes: 54 (70.1%)
+
+Task: put the bowl on the stove
+Starting episode 28...
+Success: True
+# episodes completed so far: 78
+# successes: 55 (70.5%)
+
+Task: put the bowl on the stove
+Starting episode 29...
+Success: True
+# episodes completed so far: 79
+# successes: 56 (70.9%)
+
+Task: put the bowl on the stove
+Starting episode 30...
+Success: True
+# episodes completed so far: 80
+# successes: 57 (71.2%)
+
+Task: put the bowl on the stove
+Starting episode 31...
+Success: True
+# episodes completed so far: 81
+# successes: 58 (71.6%)
+
+Task: put the bowl on the stove
+Starting episode 32...
+Success: True
+# episodes completed so far: 82
+# successes: 59 (72.0%)
+
+Task: put the bowl on the stove
+Starting episode 33...
+Success: False
+# episodes completed so far: 83
+# successes: 59 (71.1%)
+
+Task: put the bowl on the stove
+Starting episode 34...
+Success: True
+# episodes completed so far: 84
+# successes: 60 (71.4%)
+
+Task: put the bowl on the stove
+Starting episode 35...
+Success: True
+# episodes completed so far: 85
+# successes: 61 (71.8%)
+
+Task: put the bowl on the stove
+Starting episode 36...
+Success: True
+# episodes completed so far: 86
+# successes: 62 (72.1%)
+
+Task: put the bowl on the stove
+Starting episode 37...
+Success: True
+# episodes completed so far: 87
+# successes: 63 (72.4%)
+
+Task: put the bowl on the stove
+Starting episode 38...
+Success: True
+# episodes completed so far: 88
+# successes: 64 (72.7%)
+
+Task: put the bowl on the stove
+Starting episode 39...
+Success: True
+# episodes completed so far: 89
+# successes: 65 (73.0%)
+
+Task: put the bowl on the stove
+Starting episode 40...
+Success: True
+# episodes completed so far: 90
+# successes: 66 (73.3%)
+
+Task: put the bowl on the stove
+Starting episode 41...
+Success: False
+# episodes completed so far: 91
+# successes: 66 (72.5%)
+
+Task: put the bowl on the stove
+Starting episode 42...
+Success: True
+# episodes completed so far: 92
+# successes: 67 (72.8%)
+
+Task: put the bowl on the stove
+Starting episode 43...
+Success: True
+# episodes completed so far: 93
+# successes: 68 (73.1%)
+
+Task: put the bowl on the stove
+Starting episode 44...
+Success: True
+# episodes completed so far: 94
+# successes: 69 (73.4%)
+
+Task: put the bowl on the stove
+Starting episode 45...
+Success: True
+# episodes completed so far: 95
+# successes: 70 (73.7%)
+
+Task: put the bowl on the stove
+Starting episode 46...
+Success: True
+# episodes completed so far: 96
+# successes: 71 (74.0%)
+
+Task: put the bowl on the stove
+Starting episode 47...
+Success: False
+# episodes completed so far: 97
+# successes: 71 (73.2%)
+
+Task: put the bowl on the stove
+Starting episode 48...
+Success: False
+# episodes completed so far: 98
+# successes: 71 (72.4%)
+
+Task: put the bowl on the stove
+Starting episode 49...
+Success: True
+# episodes completed so far: 99
+# successes: 72 (72.7%)
+
+Task: put the bowl on the stove
+Starting episode 50...
+Success: True
+# episodes completed so far: 100
+# successes: 73 (73.0%)
+Current task success rate: 0.88
+Current total success rate: 0.73
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 1...
+Success: True
+# episodes completed so far: 101
+# successes: 74 (73.3%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 2...
+Success: True
+# episodes completed so far: 102
+# successes: 75 (73.5%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 3...
+Success: True
+# episodes completed so far: 103
+# successes: 76 (73.8%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 4...
+Success: True
+# episodes completed so far: 104
+# successes: 77 (74.0%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 5...
+Success: True
+# episodes completed so far: 105
+# successes: 78 (74.3%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 6...
+Success: True
+# episodes completed so far: 106
+# successes: 79 (74.5%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 7...
+Success: True
+# episodes completed so far: 107
+# successes: 80 (74.8%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 8...
+Success: True
+# episodes completed so far: 108
+# successes: 81 (75.0%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 9...
+Success: True
+# episodes completed so far: 109
+# successes: 82 (75.2%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 10...
+Success: True
+# episodes completed so far: 110
+# successes: 83 (75.5%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 11...
+Success: True
+# episodes completed so far: 111
+# successes: 84 (75.7%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 12...
+Success: True
+# episodes completed so far: 112
+# successes: 85 (75.9%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 13...
+Success: True
+# episodes completed so far: 113
+# successes: 86 (76.1%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 14...
+Success: True
+# episodes completed so far: 114
+# successes: 87 (76.3%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 15...
+Success: True
+# episodes completed so far: 115
+# successes: 88 (76.5%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 16...
+Success: True
+# episodes completed so far: 116
+# successes: 89 (76.7%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 17...
+Success: True
+# episodes completed so far: 117
+# successes: 90 (76.9%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 18...
+Success: False
+# episodes completed so far: 118
+# successes: 90 (76.3%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 19...
+Success: True
+# episodes completed so far: 119
+# successes: 91 (76.5%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 20...
+Success: True
+# episodes completed so far: 120
+# successes: 92 (76.7%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 21...
+Success: True
+# episodes completed so far: 121
+# successes: 93 (76.9%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 22...
+Success: True
+# episodes completed so far: 122
+# successes: 94 (77.0%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 23...
+Success: False
+# episodes completed so far: 123
+# successes: 94 (76.4%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 24...
+Success: False
+# episodes completed so far: 124
+# successes: 94 (75.8%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 25...
+Success: True
+# episodes completed so far: 125
+# successes: 95 (76.0%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 26...
+Success: True
+# episodes completed so far: 126
+# successes: 96 (76.2%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 27...
+Success: False
+# episodes completed so far: 127
+# successes: 96 (75.6%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 28...
+Success: True
+# episodes completed so far: 128
+# successes: 97 (75.8%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 29...
+Success: False
+# episodes completed so far: 129
+# successes: 97 (75.2%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 30...
+Success: True
+# episodes completed so far: 130
+# successes: 98 (75.4%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 31...
+Success: True
+# episodes completed so far: 131
+# successes: 99 (75.6%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 32...
+Success: True
+# episodes completed so far: 132
+# successes: 100 (75.8%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 33...
+Success: True
+# episodes completed so far: 133
+# successes: 101 (75.9%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 34...
+Success: True
+# episodes completed so far: 134
+# successes: 102 (76.1%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 35...
+Success: True
+# episodes completed so far: 135
+# successes: 103 (76.3%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 36...
+Success: True
+# episodes completed so far: 136
+# successes: 104 (76.5%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 37...
+Success: True
+# episodes completed so far: 137
+# successes: 105 (76.6%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 38...
+Success: True
+# episodes completed so far: 138
+# successes: 106 (76.8%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 39...
+Success: True
+# episodes completed so far: 139
+# successes: 107 (77.0%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 40...
+Success: False
+# episodes completed so far: 140
+# successes: 107 (76.4%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 41...
+Success: True
+# episodes completed so far: 141
+# successes: 108 (76.6%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 42...
+Success: True
+# episodes completed so far: 142
+# successes: 109 (76.8%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 43...
+Success: True
+# episodes completed so far: 143
+# successes: 110 (76.9%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 44...
+Success: True
+# episodes completed so far: 144
+# successes: 111 (77.1%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 45...
+Success: True
+# episodes completed so far: 145
+# successes: 112 (77.2%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 46...
+Success: True
+# episodes completed so far: 146
+# successes: 113 (77.4%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 47...
+Success: True
+# episodes completed so far: 147
+# successes: 114 (77.6%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 48...
+Success: True
+# episodes completed so far: 148
+# successes: 115 (77.7%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 49...
+Success: True
+# episodes completed so far: 149
+# successes: 116 (77.9%)
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 50...
+Success: True
+# episodes completed so far: 150
+# successes: 117 (78.0%)
+Current task success rate: 0.88
+Current total success rate: 0.78
+
+Task: open the top drawer and put the bowl inside
+Starting episode 1...
+Success: False
+# episodes completed so far: 151
+# successes: 117 (77.5%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 2...
+Success: True
+# episodes completed so far: 152
+# successes: 118 (77.6%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 3...
+Success: True
+# episodes completed so far: 153
+# successes: 119 (77.8%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 4...
+Success: False
+# episodes completed so far: 154
+# successes: 119 (77.3%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 5...
+Success: False
+# episodes completed so far: 155
+# successes: 119 (76.8%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 6...
+Success: False
+# episodes completed so far: 156
+# successes: 119 (76.3%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 7...
+Success: True
+# episodes completed so far: 157
+# successes: 120 (76.4%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 8...
+Success: False
+# episodes completed so far: 158
+# successes: 120 (75.9%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 9...
+Success: True
+# episodes completed so far: 159
+# successes: 121 (76.1%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 10...
+Success: False
+# episodes completed so far: 160
+# successes: 121 (75.6%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 11...
+Success: False
+# episodes completed so far: 161
+# successes: 121 (75.2%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 12...
+Success: False
+# episodes completed so far: 162
+# successes: 121 (74.7%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 13...
+Success: False
+# episodes completed so far: 163
+# successes: 121 (74.2%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 14...
+Success: False
+# episodes completed so far: 164
+# successes: 121 (73.8%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 15...
+Success: True
+# episodes completed so far: 165
+# successes: 122 (73.9%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 16...
+Success: False
+# episodes completed so far: 166
+# successes: 122 (73.5%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 17...
+Success: False
+# episodes completed so far: 167
+# successes: 122 (73.1%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 18...
+Success: False
+# episodes completed so far: 168
+# successes: 122 (72.6%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 19...
+Success: False
+# episodes completed so far: 169
+# successes: 122 (72.2%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 20...
+Success: False
+# episodes completed so far: 170
+# successes: 122 (71.8%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 21...
+Success: False
+# episodes completed so far: 171
+# successes: 122 (71.3%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 22...
+Success: True
+# episodes completed so far: 172
+# successes: 123 (71.5%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 23...
+Success: False
+# episodes completed so far: 173
+# successes: 123 (71.1%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 24...
+Success: False
+# episodes completed so far: 174
+# successes: 123 (70.7%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 25...
+Success: True
+# episodes completed so far: 175
+# successes: 124 (70.9%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 26...
+Success: False
+# episodes completed so far: 176
+# successes: 124 (70.5%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 27...
+Success: True
+# episodes completed so far: 177
+# successes: 125 (70.6%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 28...
+Success: False
+# episodes completed so far: 178
+# successes: 125 (70.2%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 29...
+Success: True
+# episodes completed so far: 179
+# successes: 126 (70.4%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 30...
+Success: True
+# episodes completed so far: 180
+# successes: 127 (70.6%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 31...
+Success: True
+# episodes completed so far: 181
+# successes: 128 (70.7%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 32...
+Success: True
+# episodes completed so far: 182
+# successes: 129 (70.9%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 33...
+Success: True
+# episodes completed so far: 183
+# successes: 130 (71.0%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 34...
+Success: False
+# episodes completed so far: 184
+# successes: 130 (70.7%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 35...
+Success: True
+# episodes completed so far: 185
+# successes: 131 (70.8%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 36...
+Success: True
+# episodes completed so far: 186
+# successes: 132 (71.0%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 37...
+Success: False
+# episodes completed so far: 187
+# successes: 132 (70.6%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 38...
+Success: True
+# episodes completed so far: 188
+# successes: 133 (70.7%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 39...
+Success: True
+# episodes completed so far: 189
+# successes: 134 (70.9%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 40...
+Success: False
+# episodes completed so far: 190
+# successes: 134 (70.5%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 41...
+Success: True
+# episodes completed so far: 191
+# successes: 135 (70.7%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 42...
+Success: False
+# episodes completed so far: 192
+# successes: 135 (70.3%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 43...
+Success: True
+# episodes completed so far: 193
+# successes: 136 (70.5%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 44...
+Success: True
+# episodes completed so far: 194
+# successes: 137 (70.6%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 45...
+Success: False
+# episodes completed so far: 195
+# successes: 137 (70.3%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 46...
+Success: False
+# episodes completed so far: 196
+# successes: 137 (69.9%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 47...
+Success: False
+# episodes completed so far: 197
+# successes: 137 (69.5%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 48...
+Success: True
+# episodes completed so far: 198
+# successes: 138 (69.7%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 49...
+Success: False
+# episodes completed so far: 199
+# successes: 138 (69.3%)
+
+Task: open the top drawer and put the bowl inside
+Starting episode 50...
+Success: True
+# episodes completed so far: 200
+# successes: 139 (69.5%)
+Current task success rate: 0.44
+Current total success rate: 0.695
+
+Task: put the bowl on top of the cabinet
+Starting episode 1...
+Success: True
+# episodes completed so far: 201
+# successes: 140 (69.7%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 2...
+Success: True
+# episodes completed so far: 202
+# successes: 141 (69.8%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 3...
+Success: True
+# episodes completed so far: 203
+# successes: 142 (70.0%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 4...
+Success: True
+# episodes completed so far: 204
+# successes: 143 (70.1%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 5...
+Success: True
+# episodes completed so far: 205
+# successes: 144 (70.2%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 6...
+Success: True
+# episodes completed so far: 206
+# successes: 145 (70.4%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 7...
+Success: True
+# episodes completed so far: 207
+# successes: 146 (70.5%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 8...
+Success: True
+# episodes completed so far: 208
+# successes: 147 (70.7%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 9...
+Success: True
+# episodes completed so far: 209
+# successes: 148 (70.8%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 10...
+Success: True
+# episodes completed so far: 210
+# successes: 149 (71.0%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 11...
+Success: True
+# episodes completed so far: 211
+# successes: 150 (71.1%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 12...
+Success: True
+# episodes completed so far: 212
+# successes: 151 (71.2%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 13...
+Success: True
+# episodes completed so far: 213
+# successes: 152 (71.4%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 14...
+Success: True
+# episodes completed so far: 214
+# successes: 153 (71.5%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 15...
+Success: True
+# episodes completed so far: 215
+# successes: 154 (71.6%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 16...
+Success: True
+# episodes completed so far: 216
+# successes: 155 (71.8%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 17...
+Success: True
+# episodes completed so far: 217
+# successes: 156 (71.9%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 18...
+Success: True
+# episodes completed so far: 218
+# successes: 157 (72.0%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 19...
+Success: True
+# episodes completed so far: 219
+# successes: 158 (72.1%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 20...
+Success: True
+# episodes completed so far: 220
+# successes: 159 (72.3%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 21...
+Success: True
+# episodes completed so far: 221
+# successes: 160 (72.4%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 22...
+Success: True
+# episodes completed so far: 222
+# successes: 161 (72.5%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 23...
+Success: True
+# episodes completed so far: 223
+# successes: 162 (72.6%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 24...
+Success: True
+# episodes completed so far: 224
+# successes: 163 (72.8%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 25...
+Success: True
+# episodes completed so far: 225
+# successes: 164 (72.9%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 26...
+Success: True
+# episodes completed so far: 226
+# successes: 165 (73.0%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 27...
+Success: True
+# episodes completed so far: 227
+# successes: 166 (73.1%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 28...
+Success: True
+# episodes completed so far: 228
+# successes: 167 (73.2%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 29...
+Success: False
+# episodes completed so far: 229
+# successes: 167 (72.9%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 30...
+Success: True
+# episodes completed so far: 230
+# successes: 168 (73.0%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 31...
+Success: False
+# episodes completed so far: 231
+# successes: 168 (72.7%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 32...
+Success: True
+# episodes completed so far: 232
+# successes: 169 (72.8%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 33...
+Success: True
+# episodes completed so far: 233
+# successes: 170 (73.0%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 34...
+Success: True
+# episodes completed so far: 234
+# successes: 171 (73.1%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 35...
+Success: True
+# episodes completed so far: 235
+# successes: 172 (73.2%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 36...
+Success: True
+# episodes completed so far: 236
+# successes: 173 (73.3%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 37...
+Success: True
+# episodes completed so far: 237
+# successes: 174 (73.4%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 38...
+Success: True
+# episodes completed so far: 238
+# successes: 175 (73.5%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 39...
+Success: True
+# episodes completed so far: 239
+# successes: 176 (73.6%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 40...
+Success: True
+# episodes completed so far: 240
+# successes: 177 (73.8%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 41...
+Success: True
+# episodes completed so far: 241
+# successes: 178 (73.9%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 42...
+Success: True
+# episodes completed so far: 242
+# successes: 179 (74.0%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 43...
+Success: True
+# episodes completed so far: 243
+# successes: 180 (74.1%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 44...
+Success: True
+# episodes completed so far: 244
+# successes: 181 (74.2%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 45...
+Success: True
+# episodes completed so far: 245
+# successes: 182 (74.3%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 46...
+Success: True
+# episodes completed so far: 246
+# successes: 183 (74.4%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 47...
+Success: True
+# episodes completed so far: 247
+# successes: 184 (74.5%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 48...
+Success: True
+# episodes completed so far: 248
+# successes: 185 (74.6%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 49...
+Success: True
+# episodes completed so far: 249
+# successes: 186 (74.7%)
+
+Task: put the bowl on top of the cabinet
+Starting episode 50...
+Success: True
+# episodes completed so far: 250
+# successes: 187 (74.8%)
+Current task success rate: 0.96
+Current total success rate: 0.748
+
+Task: push the plate to the front of the stove
+Starting episode 1...
+Success: True
+# episodes completed so far: 251
+# successes: 188 (74.9%)
+
+Task: push the plate to the front of the stove
+Starting episode 2...
+Success: True
+# episodes completed so far: 252
+# successes: 189 (75.0%)
+
+Task: push the plate to the front of the stove
+Starting episode 3...
+Success: True
+# episodes completed so far: 253
+# successes: 190 (75.1%)
+
+Task: push the plate to the front of the stove
+Starting episode 4...
+Success: True
+# episodes completed so far: 254
+# successes: 191 (75.2%)
+
+Task: push the plate to the front of the stove
+Starting episode 5...
+Success: True
+# episodes completed so far: 255
+# successes: 192 (75.3%)
+
+Task: push the plate to the front of the stove
+Starting episode 6...
+Success: True
+# episodes completed so far: 256
+# successes: 193 (75.4%)
+
+Task: push the plate to the front of the stove
+Starting episode 7...
+Success: True
+# episodes completed so far: 257
+# successes: 194 (75.5%)
+
+Task: push the plate to the front of the stove
+Starting episode 8...
+Success: True
+# episodes completed so far: 258
+# successes: 195 (75.6%)
+
+Task: push the plate to the front of the stove
+Starting episode 9...
+Success: False
+# episodes completed so far: 259
+# successes: 195 (75.3%)
+
+Task: push the plate to the front of the stove
+Starting episode 10...
+Success: True
+# episodes completed so far: 260
+# successes: 196 (75.4%)
+
+Task: push the plate to the front of the stove
+Starting episode 11...
+Success: True
+# episodes completed so far: 261
+# successes: 197 (75.5%)
+
+Task: push the plate to the front of the stove
+Starting episode 12...
+Success: True
+# episodes completed so far: 262
+# successes: 198 (75.6%)
+
+Task: push the plate to the front of the stove
+Starting episode 13...
+Success: True
+# episodes completed so far: 263
+# successes: 199 (75.7%)
+
+Task: push the plate to the front of the stove
+Starting episode 14...
+Success: True
+# episodes completed so far: 264
+# successes: 200 (75.8%)
+
+Task: push the plate to the front of the stove
+Starting episode 15...
+Success: True
+# episodes completed so far: 265
+# successes: 201 (75.8%)
+
+Task: push the plate to the front of the stove
+Starting episode 16...
+Success: False
+# episodes completed so far: 266
+# successes: 201 (75.6%)
+
+Task: push the plate to the front of the stove
+Starting episode 17...
+Success: False
+# episodes completed so far: 267
+# successes: 201 (75.3%)
+
+Task: push the plate to the front of the stove
+Starting episode 18...
+Success: True
+# episodes completed so far: 268
+# successes: 202 (75.4%)
+
+Task: push the plate to the front of the stove
+Starting episode 19...
+Success: True
+# episodes completed so far: 269
+# successes: 203 (75.5%)
+
+Task: push the plate to the front of the stove
+Starting episode 20...
+Success: True
+# episodes completed so far: 270
+# successes: 204 (75.6%)
+
+Task: push the plate to the front of the stove
+Starting episode 21...
+Success: False
+# episodes completed so far: 271
+# successes: 204 (75.3%)
+
+Task: push the plate to the front of the stove
+Starting episode 22...
+Success: True
+# episodes completed so far: 272
+# successes: 205 (75.4%)
+
+Task: push the plate to the front of the stove
+Starting episode 23...
+Success: True
+# episodes completed so far: 273
+# successes: 206 (75.5%)
+
+Task: push the plate to the front of the stove
+Starting episode 24...
+Success: True
+# episodes completed so far: 274
+# successes: 207 (75.5%)
+
+Task: push the plate to the front of the stove
+Starting episode 25...
+Success: True
+# episodes completed so far: 275
+# successes: 208 (75.6%)
+
+Task: push the plate to the front of the stove
+Starting episode 26...
+Success: True
+# episodes completed so far: 276
+# successes: 209 (75.7%)
+
+Task: push the plate to the front of the stove
+Starting episode 27...
+Success: True
+# episodes completed so far: 277
+# successes: 210 (75.8%)
+
+Task: push the plate to the front of the stove
+Starting episode 28...
+Success: True
+# episodes completed so far: 278
+# successes: 211 (75.9%)
+
+Task: push the plate to the front of the stove
+Starting episode 29...
+Success: False
+# episodes completed so far: 279
+# successes: 211 (75.6%)
+
+Task: push the plate to the front of the stove
+Starting episode 30...
+Success: True
+# episodes completed so far: 280
+# successes: 212 (75.7%)
+
+Task: push the plate to the front of the stove
+Starting episode 31...
+Success: True
+# episodes completed so far: 281
+# successes: 213 (75.8%)
+
+Task: push the plate to the front of the stove
+Starting episode 32...
+Success: True
+# episodes completed so far: 282
+# successes: 214 (75.9%)
+
+Task: push the plate to the front of the stove
+Starting episode 33...
+Success: True
+# episodes completed so far: 283
+# successes: 215 (76.0%)
+
+Task: push the plate to the front of the stove
+Starting episode 34...
+Success: False
+# episodes completed so far: 284
+# successes: 215 (75.7%)
+
+Task: push the plate to the front of the stove
+Starting episode 35...
+Success: True
+# episodes completed so far: 285
+# successes: 216 (75.8%)
+
+Task: push the plate to the front of the stove
+Starting episode 36...
+Success: True
+# episodes completed so far: 286
+# successes: 217 (75.9%)
+
+Task: push the plate to the front of the stove
+Starting episode 37...
+Success: True
+# episodes completed so far: 287
+# successes: 218 (76.0%)
+
+Task: push the plate to the front of the stove
+Starting episode 38...
+Success: True
+# episodes completed so far: 288
+# successes: 219 (76.0%)
+
+Task: push the plate to the front of the stove
+Starting episode 39...
+Success: True
+# episodes completed so far: 289
+# successes: 220 (76.1%)
+
+Task: push the plate to the front of the stove
+Starting episode 40...
+Success: True
+# episodes completed so far: 290
+# successes: 221 (76.2%)
+
+Task: push the plate to the front of the stove
+Starting episode 41...
+Success: True
+# episodes completed so far: 291
+# successes: 222 (76.3%)
+
+Task: push the plate to the front of the stove
+Starting episode 42...
+Success: True
+# episodes completed so far: 292
+# successes: 223 (76.4%)
+
+Task: push the plate to the front of the stove
+Starting episode 43...
+Success: True
+# episodes completed so far: 293
+# successes: 224 (76.5%)
+
+Task: push the plate to the front of the stove
+Starting episode 44...
+Success: True
+# episodes completed so far: 294
+# successes: 225 (76.5%)
+
+Task: push the plate to the front of the stove
+Starting episode 45...
+Success: False
+# episodes completed so far: 295
+# successes: 225 (76.3%)
+
+Task: push the plate to the front of the stove
+Starting episode 46...
+Success: True
+# episodes completed so far: 296
+# successes: 226 (76.4%)
+
+Task: push the plate to the front of the stove
+Starting episode 47...
+Success: True
+# episodes completed so far: 297
+# successes: 227 (76.4%)
+
+Task: push the plate to the front of the stove
+Starting episode 48...
+Success: True
+# episodes completed so far: 298
+# successes: 228 (76.5%)
+
+Task: push the plate to the front of the stove
+Starting episode 49...
+Success: False
+# episodes completed so far: 299
+# successes: 228 (76.3%)
+
+Task: push the plate to the front of the stove
+Starting episode 50...
+Success: True
+# episodes completed so far: 300
+# successes: 229 (76.3%)
+Current task success rate: 0.84
+Current total success rate: 0.7633333333333333
+
+Task: put the cream cheese in the bowl
+Starting episode 1...
+Success: False
+# episodes completed so far: 301
+# successes: 229 (76.1%)
+
+Task: put the cream cheese in the bowl
+Starting episode 2...
+Success: False
+# episodes completed so far: 302
+# successes: 229 (75.8%)
+
+Task: put the cream cheese in the bowl
+Starting episode 3...
+Success: False
+# episodes completed so far: 303
+# successes: 229 (75.6%)
+
+Task: put the cream cheese in the bowl
+Starting episode 4...
+Success: True
+# episodes completed so far: 304
+# successes: 230 (75.7%)
+
+Task: put the cream cheese in the bowl
+Starting episode 5...
+Success: False
+# episodes completed so far: 305
+# successes: 230 (75.4%)
+
+Task: put the cream cheese in the bowl
+Starting episode 6...
+Success: False
+# episodes completed so far: 306
+# successes: 230 (75.2%)
+
+Task: put the cream cheese in the bowl
+Starting episode 7...
+Success: False
+# episodes completed so far: 307
+# successes: 230 (74.9%)
+
+Task: put the cream cheese in the bowl
+Starting episode 8...
+Success: False
+# episodes completed so far: 308
+# successes: 230 (74.7%)
+
+Task: put the cream cheese in the bowl
+Starting episode 9...
+Success: True
+# episodes completed so far: 309
+# successes: 231 (74.8%)
+
+Task: put the cream cheese in the bowl
+Starting episode 10...
+Success: True
+# episodes completed so far: 310
+# successes: 232 (74.8%)
+
+Task: put the cream cheese in the bowl
+Starting episode 11...
+Success: True
+# episodes completed so far: 311
+# successes: 233 (74.9%)
+
+Task: put the cream cheese in the bowl
+Starting episode 12...
+Success: True
+# episodes completed so far: 312
+# successes: 234 (75.0%)
+
+Task: put the cream cheese in the bowl
+Starting episode 13...
+Success: True
+# episodes completed so far: 313
+# successes: 235 (75.1%)
+
+Task: put the cream cheese in the bowl
+Starting episode 14...
+Success: True
+# episodes completed so far: 314
+# successes: 236 (75.2%)
+
+Task: put the cream cheese in the bowl
+Starting episode 15...
+Success: True
+# episodes completed so far: 315
+# successes: 237 (75.2%)
+
+Task: put the cream cheese in the bowl
+Starting episode 16...
+Success: False
+# episodes completed so far: 316
+# successes: 237 (75.0%)
+
+Task: put the cream cheese in the bowl
+Starting episode 17...
+Success: True
+# episodes completed so far: 317
+# successes: 238 (75.1%)
+
+Task: put the cream cheese in the bowl
+Starting episode 18...
+Success: False
+# episodes completed so far: 318
+# successes: 238 (74.8%)
+
+Task: put the cream cheese in the bowl
+Starting episode 19...
+Success: True
+# episodes completed so far: 319
+# successes: 239 (74.9%)
+
+Task: put the cream cheese in the bowl
+Starting episode 20...
+Success: True
+# episodes completed so far: 320
+# successes: 240 (75.0%)
+
+Task: put the cream cheese in the bowl
+Starting episode 21...
+Success: False
+# episodes completed so far: 321
+# successes: 240 (74.8%)
+
+Task: put the cream cheese in the bowl
+Starting episode 22...
+Success: True
+# episodes completed so far: 322
+# successes: 241 (74.8%)
+
+Task: put the cream cheese in the bowl
+Starting episode 23...
+Success: False
+# episodes completed so far: 323
+# successes: 241 (74.6%)
+
+Task: put the cream cheese in the bowl
+Starting episode 24...
+Success: False
+# episodes completed so far: 324
+# successes: 241 (74.4%)
+
+Task: put the cream cheese in the bowl
+Starting episode 25...
+Success: True
+# episodes completed so far: 325
+# successes: 242 (74.5%)
+
+Task: put the cream cheese in the bowl
+Starting episode 26...
+Success: True
+# episodes completed so far: 326
+# successes: 243 (74.5%)
+
+Task: put the cream cheese in the bowl
+Starting episode 27...
+Success: True
+# episodes completed so far: 327
+# successes: 244 (74.6%)
+
+Task: put the cream cheese in the bowl
+Starting episode 28...
+Success: True
+# episodes completed so far: 328
+# successes: 245 (74.7%)
+
+Task: put the cream cheese in the bowl
+Starting episode 29...
+Success: True
+# episodes completed so far: 329
+# successes: 246 (74.8%)
+
+Task: put the cream cheese in the bowl
+Starting episode 30...
+Success: True
+# episodes completed so far: 330
+# successes: 247 (74.8%)
+
+Task: put the cream cheese in the bowl
+Starting episode 31...
+Success: True
+# episodes completed so far: 331
+# successes: 248 (74.9%)
+
+Task: put the cream cheese in the bowl
+Starting episode 32...
+Success: True
+# episodes completed so far: 332
+# successes: 249 (75.0%)
+
+Task: put the cream cheese in the bowl
+Starting episode 33...
+Success: True
+# episodes completed so far: 333
+# successes: 250 (75.1%)
+
+Task: put the cream cheese in the bowl
+Starting episode 34...
+Success: True
+# episodes completed so far: 334
+# successes: 251 (75.1%)
+
+Task: put the cream cheese in the bowl
+Starting episode 35...
+Success: True
+# episodes completed so far: 335
+# successes: 252 (75.2%)
+
+Task: put the cream cheese in the bowl
+Starting episode 36...
+Success: True
+# episodes completed so far: 336
+# successes: 253 (75.3%)
+
+Task: put the cream cheese in the bowl
+Starting episode 37...
+Success: True
+# episodes completed so far: 337
+# successes: 254 (75.4%)
+
+Task: put the cream cheese in the bowl
+Starting episode 38...
+Success: True
+# episodes completed so far: 338
+# successes: 255 (75.4%)
+
+Task: put the cream cheese in the bowl
+Starting episode 39...
+Success: True
+# episodes completed so far: 339
+# successes: 256 (75.5%)
+
+Task: put the cream cheese in the bowl
+Starting episode 40...
+Success: True
+# episodes completed so far: 340
+# successes: 257 (75.6%)
+
+Task: put the cream cheese in the bowl
+Starting episode 41...
+Success: False
+# episodes completed so far: 341
+# successes: 257 (75.4%)
+
+Task: put the cream cheese in the bowl
+Starting episode 42...
+Success: True
+# episodes completed so far: 342
+# successes: 258 (75.4%)
+
+Task: put the cream cheese in the bowl
+Starting episode 43...
+Success: True
+# episodes completed so far: 343
+# successes: 259 (75.5%)
+
+Task: put the cream cheese in the bowl
+Starting episode 44...
+Success: False
+# episodes completed so far: 344
+# successes: 259 (75.3%)
+
+Task: put the cream cheese in the bowl
+Starting episode 45...
+Success: True
+# episodes completed so far: 345
+# successes: 260 (75.4%)
+
+Task: put the cream cheese in the bowl
+Starting episode 46...
+Success: True
+# episodes completed so far: 346
+# successes: 261 (75.4%)
+
+Task: put the cream cheese in the bowl
+Starting episode 47...
+Success: True
+# episodes completed so far: 347
+# successes: 262 (75.5%)
+
+Task: put the cream cheese in the bowl
+Starting episode 48...
+Success: True
+# episodes completed so far: 348
+# successes: 263 (75.6%)
+
+Task: put the cream cheese in the bowl
+Starting episode 49...
+Success: True
+# episodes completed so far: 349
+# successes: 264 (75.6%)
+
+Task: put the cream cheese in the bowl
+Starting episode 50...
+Success: False
+# episodes completed so far: 350
+# successes: 264 (75.4%)
+Current task success rate: 0.7
+Current total success rate: 0.7542857142857143
+
+Task: turn on the stove
+Starting episode 1...
+Success: True
+# episodes completed so far: 351
+# successes: 265 (75.5%)
+
+Task: turn on the stove
+Starting episode 2...
+Success: True
+# episodes completed so far: 352
+# successes: 266 (75.6%)
+
+Task: turn on the stove
+Starting episode 3...
+Success: False
+# episodes completed so far: 353
+# successes: 266 (75.4%)
+
+Task: turn on the stove
+Starting episode 4...
+Success: True
+# episodes completed so far: 354
+# successes: 267 (75.4%)
+
+Task: turn on the stove
+Starting episode 5...
+Success: True
+# episodes completed so far: 355
+# successes: 268 (75.5%)
+
+Task: turn on the stove
+Starting episode 6...
+Success: True
+# episodes completed so far: 356
+# successes: 269 (75.6%)
+
+Task: turn on the stove
+Starting episode 7...
+Success: True
+# episodes completed so far: 357
+# successes: 270 (75.6%)
+
+Task: turn on the stove
+Starting episode 8...
+Success: True
+# episodes completed so far: 358
+# successes: 271 (75.7%)
+
+Task: turn on the stove
+Starting episode 9...
+Success: True
+# episodes completed so far: 359
+# successes: 272 (75.8%)
+
+Task: turn on the stove
+Starting episode 10...
+Success: True
+# episodes completed so far: 360
+# successes: 273 (75.8%)
+
+Task: turn on the stove
+Starting episode 11...
+Success: True
+# episodes completed so far: 361
+# successes: 274 (75.9%)
+
+Task: turn on the stove
+Starting episode 12...
+Success: True
+# episodes completed so far: 362
+# successes: 275 (76.0%)
+
+Task: turn on the stove
+Starting episode 13...
+Success: True
+# episodes completed so far: 363
+# successes: 276 (76.0%)
+
+Task: turn on the stove
+Starting episode 14...
+Success: True
+# episodes completed so far: 364
+# successes: 277 (76.1%)
+
+Task: turn on the stove
+Starting episode 15...
+Success: True
+# episodes completed so far: 365
+# successes: 278 (76.2%)
+
+Task: turn on the stove
+Starting episode 16...
+Success: True
+# episodes completed so far: 366
+# successes: 279 (76.2%)
+
+Task: turn on the stove
+Starting episode 17...
+Success: True
+# episodes completed so far: 367
+# successes: 280 (76.3%)
+
+Task: turn on the stove
+Starting episode 18...
+Success: True
+# episodes completed so far: 368
+# successes: 281 (76.4%)
+
+Task: turn on the stove
+Starting episode 19...
+Success: True
+# episodes completed so far: 369
+# successes: 282 (76.4%)
+
+Task: turn on the stove
+Starting episode 20...
+Success: True
+# episodes completed so far: 370
+# successes: 283 (76.5%)
+
+Task: turn on the stove
+Starting episode 21...
+Success: True
+# episodes completed so far: 371
+# successes: 284 (76.5%)
+
+Task: turn on the stove
+Starting episode 22...
+Success: True
+# episodes completed so far: 372
+# successes: 285 (76.6%)
+
+Task: turn on the stove
+Starting episode 23...
+Success: True
+# episodes completed so far: 373
+# successes: 286 (76.7%)
+
+Task: turn on the stove
+Starting episode 24...
+Success: True
+# episodes completed so far: 374
+# successes: 287 (76.7%)
+
+Task: turn on the stove
+Starting episode 25...
+Success: True
+# episodes completed so far: 375
+# successes: 288 (76.8%)
+
+Task: turn on the stove
+Starting episode 26...
+Success: True
+# episodes completed so far: 376
+# successes: 289 (76.9%)
+
+Task: turn on the stove
+Starting episode 27...
+Success: True
+# episodes completed so far: 377
+# successes: 290 (76.9%)
+
+Task: turn on the stove
+Starting episode 28...
+Success: True
+# episodes completed so far: 378
+# successes: 291 (77.0%)
+
+Task: turn on the stove
+Starting episode 29...
+Success: True
+# episodes completed so far: 379
+# successes: 292 (77.0%)
+
+Task: turn on the stove
+Starting episode 30...
+Success: True
+# episodes completed so far: 380
+# successes: 293 (77.1%)
+
+Task: turn on the stove
+Starting episode 31...
+Success: True
+# episodes completed so far: 381
+# successes: 294 (77.2%)
+
+Task: turn on the stove
+Starting episode 32...
+Success: True
+# episodes completed so far: 382
+# successes: 295 (77.2%)
+
+Task: turn on the stove
+Starting episode 33...
+Success: True
+# episodes completed so far: 383
+# successes: 296 (77.3%)
+
+Task: turn on the stove
+Starting episode 34...
+Success: False
+# episodes completed so far: 384
+# successes: 296 (77.1%)
+
+Task: turn on the stove
+Starting episode 35...
+Success: True
+# episodes completed so far: 385
+# successes: 297 (77.1%)
+
+Task: turn on the stove
+Starting episode 36...
+Success: True
+# episodes completed so far: 386
+# successes: 298 (77.2%)
+
+Task: turn on the stove
+Starting episode 37...
+Success: True
+# episodes completed so far: 387
+# successes: 299 (77.3%)
+
+Task: turn on the stove
+Starting episode 38...
+Success: True
+# episodes completed so far: 388
+# successes: 300 (77.3%)
+
+Task: turn on the stove
+Starting episode 39...
+Success: True
+# episodes completed so far: 389
+# successes: 301 (77.4%)
+
+Task: turn on the stove
+Starting episode 40...
+Success: True
+# episodes completed so far: 390
+# successes: 302 (77.4%)
+
+Task: turn on the stove
+Starting episode 41...
+Success: True
+# episodes completed so far: 391
+# successes: 303 (77.5%)
+
+Task: turn on the stove
+Starting episode 42...
+Success: True
+# episodes completed so far: 392
+# successes: 304 (77.6%)
+
+Task: turn on the stove
+Starting episode 43...
+Success: True
+# episodes completed so far: 393
+# successes: 305 (77.6%)
+
+Task: turn on the stove
+Starting episode 44...
+Success: True
+# episodes completed so far: 394
+# successes: 306 (77.7%)
+
+Task: turn on the stove
+Starting episode 45...
+Success: True
+# episodes completed so far: 395
+# successes: 307 (77.7%)
+
+Task: turn on the stove
+Starting episode 46...
+Success: True
+# episodes completed so far: 396
+# successes: 308 (77.8%)
+
+Task: turn on the stove
+Starting episode 47...
+Success: True
+# episodes completed so far: 397
+# successes: 309 (77.8%)
+
+Task: turn on the stove
+Starting episode 48...
+Success: True
+# episodes completed so far: 398
+# successes: 310 (77.9%)
+
+Task: turn on the stove
+Starting episode 49...
+Success: True
+# episodes completed so far: 399
+# successes: 311 (77.9%)
+
+Task: turn on the stove
+Starting episode 50...
+Success: True
+# episodes completed so far: 400
+# successes: 312 (78.0%)
+Current task success rate: 0.96
+Current total success rate: 0.78
+
+Task: put the bowl on the plate
+Starting episode 1...
+Success: False
+# episodes completed so far: 401
+# successes: 312 (77.8%)
+
+Task: put the bowl on the plate
+Starting episode 2...
+Success: True
+# episodes completed so far: 402
+# successes: 313 (77.9%)
+
+Task: put the bowl on the plate
+Starting episode 3...
+Success: True
+# episodes completed so far: 403
+# successes: 314 (77.9%)
+
+Task: put the bowl on the plate
+Starting episode 4...
+Success: True
+# episodes completed so far: 404
+# successes: 315 (78.0%)
+
+Task: put the bowl on the plate
+Starting episode 5...
+Success: True
+# episodes completed so far: 405
+# successes: 316 (78.0%)
+
+Task: put the bowl on the plate
+Starting episode 6...
+Success: True
+# episodes completed so far: 406
+# successes: 317 (78.1%)
+
+Task: put the bowl on the plate
+Starting episode 7...
+Success: True
+# episodes completed so far: 407
+# successes: 318 (78.1%)
+
+Task: put the bowl on the plate
+Starting episode 8...
+Success: True
+# episodes completed so far: 408
+# successes: 319 (78.2%)
+
+Task: put the bowl on the plate
+Starting episode 9...
+Success: True
+# episodes completed so far: 409
+# successes: 320 (78.2%)
+
+Task: put the bowl on the plate
+Starting episode 10...
+Success: True
+# episodes completed so far: 410
+# successes: 321 (78.3%)
+
+Task: put the bowl on the plate
+Starting episode 11...
+Success: True
+# episodes completed so far: 411
+# successes: 322 (78.3%)
+
+Task: put the bowl on the plate
+Starting episode 12...
+Success: True
+# episodes completed so far: 412
+# successes: 323 (78.4%)
+
+Task: put the bowl on the plate
+Starting episode 13...
+Success: True
+# episodes completed so far: 413
+# successes: 324 (78.5%)
+
+Task: put the bowl on the plate
+Starting episode 14...
+Success: False
+# episodes completed so far: 414
+# successes: 324 (78.3%)
+
+Task: put the bowl on the plate
+Starting episode 15...
+Success: True
+# episodes completed so far: 415
+# successes: 325 (78.3%)
+
+Task: put the bowl on the plate
+Starting episode 16...
+Success: True
+# episodes completed so far: 416
+# successes: 326 (78.4%)
+
+Task: put the bowl on the plate
+Starting episode 17...
+Success: True
+# episodes completed so far: 417
+# successes: 327 (78.4%)
+
+Task: put the bowl on the plate
+Starting episode 18...
+Success: True
+# episodes completed so far: 418
+# successes: 328 (78.5%)
+
+Task: put the bowl on the plate
+Starting episode 19...
+Success: True
+# episodes completed so far: 419
+# successes: 329 (78.5%)
+
+Task: put the bowl on the plate
+Starting episode 20...
+Success: True
+# episodes completed so far: 420
+# successes: 330 (78.6%)
+
+Task: put the bowl on the plate
+Starting episode 21...
+Success: True
+# episodes completed so far: 421
+# successes: 331 (78.6%)
+
+Task: put the bowl on the plate
+Starting episode 22...
+Success: False
+# episodes completed so far: 422
+# successes: 331 (78.4%)
+
+Task: put the bowl on the plate
+Starting episode 23...
+Success: True
+# episodes completed so far: 423
+# successes: 332 (78.5%)
+
+Task: put the bowl on the plate
+Starting episode 24...
+Success: True
+# episodes completed so far: 424
+# successes: 333 (78.5%)
+
+Task: put the bowl on the plate
+Starting episode 25...
+Success: False
+# episodes completed so far: 425
+# successes: 333 (78.4%)
+
+Task: put the bowl on the plate
+Starting episode 26...
+Success: True
+# episodes completed so far: 426
+# successes: 334 (78.4%)
+
+Task: put the bowl on the plate
+Starting episode 27...
+Success: True
+# episodes completed so far: 427
+# successes: 335 (78.5%)
+
+Task: put the bowl on the plate
+Starting episode 28...
+Success: True
+# episodes completed so far: 428
+# successes: 336 (78.5%)
+
+Task: put the bowl on the plate
+Starting episode 29...
+Success: True
+# episodes completed so far: 429
+# successes: 337 (78.6%)
+
+Task: put the bowl on the plate
+Starting episode 30...
+Success: True
+# episodes completed so far: 430
+# successes: 338 (78.6%)
+
+Task: put the bowl on the plate
+Starting episode 31...
+Success: True
+# episodes completed so far: 431
+# successes: 339 (78.7%)
+
+Task: put the bowl on the plate
+Starting episode 32...
+Success: True
+# episodes completed so far: 432
+# successes: 340 (78.7%)
+
+Task: put the bowl on the plate
+Starting episode 33...
+Success: False
+# episodes completed so far: 433
+# successes: 340 (78.5%)
+
+Task: put the bowl on the plate
+Starting episode 34...
+Success: True
+# episodes completed so far: 434
+# successes: 341 (78.6%)
+
+Task: put the bowl on the plate
+Starting episode 35...
+Success: False
+# episodes completed so far: 435
+# successes: 341 (78.4%)
+
+Task: put the bowl on the plate
+Starting episode 36...
+Success: True
+# episodes completed so far: 436
+# successes: 342 (78.4%)
+
+Task: put the bowl on the plate
+Starting episode 37...
+Success: True
+# episodes completed so far: 437
+# successes: 343 (78.5%)
+
+Task: put the bowl on the plate
+Starting episode 38...
+Success: True
+# episodes completed so far: 438
+# successes: 344 (78.5%)
+
+Task: put the bowl on the plate
+Starting episode 39...
+Success: True
+# episodes completed so far: 439
+# successes: 345 (78.6%)
+
+Task: put the bowl on the plate
+Starting episode 40...
+Success: True
+# episodes completed so far: 440
+# successes: 346 (78.6%)
+
+Task: put the bowl on the plate
+Starting episode 41...
+Success: False
+# episodes completed so far: 441
+# successes: 346 (78.5%)
+
+Task: put the bowl on the plate
+Starting episode 42...
+Success: True
+# episodes completed so far: 442
+# successes: 347 (78.5%)
+
+Task: put the bowl on the plate
+Starting episode 43...
+Success: True
+# episodes completed so far: 443
+# successes: 348 (78.6%)
+
+Task: put the bowl on the plate
+Starting episode 44...
+Success: True
+# episodes completed so far: 444
+# successes: 349 (78.6%)
+
+Task: put the bowl on the plate
+Starting episode 45...
+Success: True
+# episodes completed so far: 445
+# successes: 350 (78.7%)
+
+Task: put the bowl on the plate
+Starting episode 46...
+Success: False
+# episodes completed so far: 446
+# successes: 350 (78.5%)
+
+Task: put the bowl on the plate
+Starting episode 47...
+Success: True
+# episodes completed so far: 447
+# successes: 351 (78.5%)
+
+Task: put the bowl on the plate
+Starting episode 48...
+Success: True
+# episodes completed so far: 448
+# successes: 352 (78.6%)
+
+Task: put the bowl on the plate
+Starting episode 49...
+Success: True
+# episodes completed so far: 449
+# successes: 353 (78.6%)
+
+Task: put the bowl on the plate
+Starting episode 50...
+Success: True
+# episodes completed so far: 450
+# successes: 354 (78.7%)
+Current task success rate: 0.84
+Current total success rate: 0.7866666666666666
+
+Task: put the wine bottle on the rack
+Starting episode 1...
+Success: True
+# episodes completed so far: 451
+# successes: 355 (78.7%)
+
+Task: put the wine bottle on the rack
+Starting episode 2...
+Success: True
+# episodes completed so far: 452
+# successes: 356 (78.8%)
+
+Task: put the wine bottle on the rack
+Starting episode 3...
+Success: True
+# episodes completed so far: 453
+# successes: 357 (78.8%)
+
+Task: put the wine bottle on the rack
+Starting episode 4...
+Success: True
+# episodes completed so far: 454
+# successes: 358 (78.9%)
+
+Task: put the wine bottle on the rack
+Starting episode 5...
+Success: False
+# episodes completed so far: 455
+# successes: 358 (78.7%)
+
+Task: put the wine bottle on the rack
+Starting episode 6...
+Success: False
+# episodes completed so far: 456
+# successes: 358 (78.5%)
+
+Task: put the wine bottle on the rack
+Starting episode 7...
+Success: False
+# episodes completed so far: 457
+# successes: 358 (78.3%)
+
+Task: put the wine bottle on the rack
+Starting episode 8...
+Success: True
+# episodes completed so far: 458
+# successes: 359 (78.4%)
+
+Task: put the wine bottle on the rack
+Starting episode 9...
+Success: False
+# episodes completed so far: 459
+# successes: 359 (78.2%)
+
+Task: put the wine bottle on the rack
+Starting episode 10...
+Success: True
+# episodes completed so far: 460
+# successes: 360 (78.3%)
+
+Task: put the wine bottle on the rack
+Starting episode 11...
+Success: True
+# episodes completed so far: 461
+# successes: 361 (78.3%)
+
+Task: put the wine bottle on the rack
+Starting episode 12...
+Success: False
+# episodes completed so far: 462
+# successes: 361 (78.1%)
+
+Task: put the wine bottle on the rack
+Starting episode 13...
+Success: False
+# episodes completed so far: 463
+# successes: 361 (78.0%)
+
+Task: put the wine bottle on the rack
+Starting episode 14...
+Success: True
+# episodes completed so far: 464
+# successes: 362 (78.0%)
+
+Task: put the wine bottle on the rack
+Starting episode 15...
+Success: False
+# episodes completed so far: 465
+# successes: 362 (77.8%)
+
+Task: put the wine bottle on the rack
+Starting episode 16...
+Success: True
+# episodes completed so far: 466
+# successes: 363 (77.9%)
+
+Task: put the wine bottle on the rack
+Starting episode 17...
+Success: True
+# episodes completed so far: 467
+# successes: 364 (77.9%)
+
+Task: put the wine bottle on the rack
+Starting episode 18...
+Success: True
+# episodes completed so far: 468
+# successes: 365 (78.0%)
+
+Task: put the wine bottle on the rack
+Starting episode 19...
+Success: False
+# episodes completed so far: 469
+# successes: 365 (77.8%)
+
+Task: put the wine bottle on the rack
+Starting episode 20...
+Success: True
+# episodes completed so far: 470
+# successes: 366 (77.9%)
+
+Task: put the wine bottle on the rack
+Starting episode 21...
+Success: False
+# episodes completed so far: 471
+# successes: 366 (77.7%)
+
+Task: put the wine bottle on the rack
+Starting episode 22...
+Success: True
+# episodes completed so far: 472
+# successes: 367 (77.8%)
+
+Task: put the wine bottle on the rack
+Starting episode 23...
+Success: True
+# episodes completed so far: 473
+# successes: 368 (77.8%)
+
+Task: put the wine bottle on the rack
+Starting episode 24...
+Success: False
+# episodes completed so far: 474
+# successes: 368 (77.6%)
+
+Task: put the wine bottle on the rack
+Starting episode 25...
+Success: False
+# episodes completed so far: 475
+# successes: 368 (77.5%)
+
+Task: put the wine bottle on the rack
+Starting episode 26...
+Success: True
+# episodes completed so far: 476
+# successes: 369 (77.5%)
+
+Task: put the wine bottle on the rack
+Starting episode 27...
+Success: False
+# episodes completed so far: 477
+# successes: 369 (77.4%)
+
+Task: put the wine bottle on the rack
+Starting episode 28...
+Success: False
+# episodes completed so far: 478
+# successes: 369 (77.2%)
+
+Task: put the wine bottle on the rack
+Starting episode 29...
+Success: True
+# episodes completed so far: 479
+# successes: 370 (77.2%)
+
+Task: put the wine bottle on the rack
+Starting episode 30...
+Success: True
+# episodes completed so far: 480
+# successes: 371 (77.3%)
+
+Task: put the wine bottle on the rack
+Starting episode 31...
+Success: False
+# episodes completed so far: 481
+# successes: 371 (77.1%)
+
+Task: put the wine bottle on the rack
+Starting episode 32...
+Success: False
+# episodes completed so far: 482
+# successes: 371 (77.0%)
+
+Task: put the wine bottle on the rack
+Starting episode 33...
+Success: True
+# episodes completed so far: 483
+# successes: 372 (77.0%)
+
+Task: put the wine bottle on the rack
+Starting episode 34...
+Success: True
+# episodes completed so far: 484
+# successes: 373 (77.1%)
+
+Task: put the wine bottle on the rack
+Starting episode 35...
+Success: True
+# episodes completed so far: 485
+# successes: 374 (77.1%)
+
+Task: put the wine bottle on the rack
+Starting episode 36...
+Success: True
+# episodes completed so far: 486
+# successes: 375 (77.2%)
+
+Task: put the wine bottle on the rack
+Starting episode 37...
+Success: True
+# episodes completed so far: 487
+# successes: 376 (77.2%)
+
+Task: put the wine bottle on the rack
+Starting episode 38...
+Success: False
+# episodes completed so far: 488
+# successes: 376 (77.0%)
+
+Task: put the wine bottle on the rack
+Starting episode 39...
+Success: True
+# episodes completed so far: 489
+# successes: 377 (77.1%)
+
+Task: put the wine bottle on the rack
+Starting episode 40...
+Success: True
+# episodes completed so far: 490
+# successes: 378 (77.1%)
+
+Task: put the wine bottle on the rack
+Starting episode 41...
+Success: False
+# episodes completed so far: 491
+# successes: 378 (77.0%)
+
+Task: put the wine bottle on the rack
+Starting episode 42...
+Success: True
+# episodes completed so far: 492
+# successes: 379 (77.0%)
+
+Task: put the wine bottle on the rack
+Starting episode 43...
+Success: True
+# episodes completed so far: 493
+# successes: 380 (77.1%)
+
+Task: put the wine bottle on the rack
+Starting episode 44...
+Success: True
+# episodes completed so far: 494
+# successes: 381 (77.1%)
+
+Task: put the wine bottle on the rack
+Starting episode 45...
+Success: False
+# episodes completed so far: 495
+# successes: 381 (77.0%)
+
+Task: put the wine bottle on the rack
+Starting episode 46...
+Success: True
+# episodes completed so far: 496
+# successes: 382 (77.0%)
+
+Task: put the wine bottle on the rack
+Starting episode 47...
+Success: True
+# episodes completed so far: 497
+# successes: 383 (77.1%)
+
+Task: put the wine bottle on the rack
+Starting episode 48...
+Success: True
+# episodes completed so far: 498
+# successes: 384 (77.1%)
+
+Task: put the wine bottle on the rack
+Starting episode 49...
+Success: False
+# episodes completed so far: 499
+# successes: 384 (77.0%)
+
+Task: put the wine bottle on the rack
+Starting episode 50...
+Success: True
+# episodes completed so far: 500
+# successes: 385 (77.0%)
+Current task success rate: 0.62
+Current total success rate: 0.77

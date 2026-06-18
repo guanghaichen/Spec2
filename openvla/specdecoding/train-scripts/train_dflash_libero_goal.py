@@ -745,9 +745,9 @@ def main():
         torch_dtype=torch.bfloat16,
         quantization_config=None,# 不量化
         low_cpu_mem_usage=True,# 在加载模型时优化 CPU 内存使用
-        trust_remote_code=True,# 允许加载模型时执行远程代码
+        trust_remote_code=False,# 使用本仓库已注册的本地 OpenVLA 类，避免联网拉 HF dynamic module
     )
-    processor = AutoProcessor.from_pretrained(args.vla_path, trust_remote_code=True)# 加载与 OpenVLA 模型配套的处理器（包含图像处理器和 tokenizer）
+    processor = AutoProcessor.from_pretrained(args.vla_path, trust_remote_code=False)# 加载本地 PrismaticProcessor，避免联网拉 HF dynamic module
     # 如果用户没有通过命令行参数指定噪声掩码
     if args.mask_token_id is None:
         args.mask_token_id = processor.tokenizer.pad_token_id# 则使用加载的 OpenVLA 模型对应的 tokenizer 的 pad_token_id 作为默认值

@@ -108,7 +108,7 @@ torch.cuda.empty_cache()
 
 cfg=DataGenerationConfig()
 # 加载投影器和动作分词器
-processor = AutoProcessor.from_pretrained(cfg.vla_path, trust_remote_code=True)# 包含 image_processor（图像变换）和 tokenizer（文本分词）
+processor = AutoProcessor.from_pretrained(cfg.vla_path, trust_remote_code=False)# 使用已注册的本地 PrismaticProcessor，避免联网拉 HF dynamic module
 action_tokenizer = ActionTokenizer(processor.tokenizer)
 #Load大模型
 quantization_config = None# 不量化

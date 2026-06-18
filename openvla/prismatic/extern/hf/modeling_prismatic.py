@@ -635,17 +635,18 @@ class OpenVLAForActionPrediction(PrismaticForConditionalGeneration):# 继承核�
         # 如果需要返回隐藏状态
         if return_hidden_states or return_all_hidden_states:
             if hidden_layer_ids is not None:
-                # DFlash v3 数据格式：
-                #   step 0 是 prefill forward，最后一个位置的 hidden 用于预测第一个 action token；
+                # DFlash v4 数据格式：
+                #   step 0 是完整 prefill/prefix forward，保存整段 prefix 的多层 hidden；
                 #   step 1..N-1 是已生成 action token 的 cached forward hidden，用于预测后续 token。
                 # 因此 action_hidden 的长度应为 action_token_len - 1。
                 prompt_step_hidden = outputs.hidden_states[0]
                 prompt_selected = torch.cat(
-                    [prompt_step_hidden[layer_id + 1].cpu()[0, -1] for layer_id in hidden_layer_ids],
+                    [prompt_step_hidden[layer_id + 1].cpu()[0] for layer_id in hidden_layer_ids],
                     dim=-1,
                 )
-                prompt_last = prompt_step_hidden[-1].cpu()[0, -1]
-                prompt_position_id = prompt_step_hidden[-1].shape[1] - 1
+                prompt_last = prompt_step_hidden[-1].cpu()[0]
+                prompt_length = prompt_step_hidden[-1].shape[1]
+                prompt_position_ids = torch.arange(prompt_length, dtype=torch.long)
 
                 action_selected_hidden = []
                 action_last_hidden = []
@@ -656,7 +657,8 @@ class OpenVLAForActionPrediction(PrismaticForConditionalGeneration):# 继承核�
                 return actions, predicted_action_token_ids, {
                     "prompt_selected": prompt_selected,
                     "prompt_last": prompt_last,
-                    "prompt_position_id": prompt_position_id,
+                    "prompt_position_ids": prompt_position_ids,
+                    "prompt_length": prompt_length,
                     "action_selected": action_selected_hidden,
                     "action_last": action_last_hidden,
                     "layer_ids": hidden_layer_ids,# 所选层索引，用于训练和推理标识

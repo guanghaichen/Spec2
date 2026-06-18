@@ -764,8 +764,12 @@ class SpecVLAforActionPrediction(nn.Module):
 
         past_key_values = outputs.past_key_values
         prefill_hidden = extract_context_feature(outputs.hidden_states, self.ea_layer.target_layer_ids)
-        prompt_context = prefill_hidden[:, -1:, :]
-        prompt_position_id = prefill_hidden.shape[1] - 1
+        prompt_context = prefill_hidden
+        prompt_position_ids = torch.arange(
+            prefill_hidden.shape[1],
+            device=input_ids.device,
+            dtype=torch.long,
+        ).unsqueeze(0)
         action_base_position = prefill_hidden.shape[1]
         action_context = prefill_hidden[:, :0, :]
 
@@ -801,13 +805,13 @@ class SpecVLAforActionPrediction(nn.Module):
                 ).unsqueeze(0)
                 ctx_position_ids = torch.cat(
                     [
-                        torch.tensor([[prompt_position_id]], device=input_ids.device, dtype=torch.long),
+                        prompt_position_ids,
                         action_ctx_position_ids,
                     ],
                     dim=1,
                 )
             else:
-                ctx_position_ids = torch.tensor([[prompt_position_id]], device=input_ids.device, dtype=torch.long)
+                ctx_position_ids = prompt_position_ids
             noise_position_ids = torch.arange(
                 action_base_position + anchor_idx,
                 action_base_position + anchor_idx + q_len,
@@ -820,6 +824,7 @@ class SpecVLAforActionPrediction(nn.Module):
                 target_hidden=target_hidden,
                 ctx_position_ids=ctx_position_ids,
                 noise_position_ids=noise_position_ids,
+                ctx_attention_mask=None,
             )
             draft_logits = self.base_model.language_model.lm_head(draft_hidden)
             proposed_tokens = dflash_sample(draft_logits, temperature=0.0)

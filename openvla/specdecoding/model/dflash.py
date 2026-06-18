@@ -109,6 +109,7 @@ class LlamaDFlashAttention(nn.Module):
         sin: torch.Tensor,
         ctx_position_ids: torch.LongTensor,# 上下文的位置 IDs
         noise_position_ids: torch.LongTensor,# 草稿 token 的位置 IDs
+        ctx_attention_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         bsz, q_len, _ = hidden_states.shape
         ctx_len = target_hidden.shape[1]
@@ -129,11 +130,22 @@ class LlamaDFlashAttention(nn.Module):
         k = repeat_kv(k, self.num_key_value_groups)
         v = repeat_kv(v, self.num_key_value_groups)
 
-        # Step 7: 计算注意力输出
+        # Step 7: 计算注意力输出；完整 prefix batch padding 位置需要 mask 掉。
+        attn_mask = None
+        if ctx_attention_mask is not None:
+            noise_attention_mask = torch.ones(
+                bsz,
+                q_len,
+                device=hidden_states.device,
+                dtype=torch.bool,
+            )
+            key_attention_mask = torch.cat([ctx_attention_mask.bool(), noise_attention_mask], dim=1)
+            attn_mask = key_attention_mask[:, None, None, :]
         attn_output = F.scaled_dot_product_attention(
             q,
             k,
             v,
+            attn_mask=attn_mask,
             dropout_p=0.0,
             is_causal=False,# 必须False（块内全可见），块内非因果并行生成，即无内置 mask，block 内所有 token 互相可见；如果是True，则上三角 mask（token i 只能看到 0~i）
         )
@@ -160,6 +172,7 @@ class LlamaDFlashDecoderLayer(nn.Module):
         sin: torch.Tensor,
         ctx_position_ids: torch.LongTensor,
         noise_position_ids: torch.LongTensor,
+        ctx_attention_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """与Llama一致：Norm → Attention → Residual → Norm → MLP → Residual"""
         residual = hidden_states
@@ -171,6 +184,7 @@ class LlamaDFlashDecoderLayer(nn.Module):
             sin=sin,
             ctx_position_ids=ctx_position_ids,
             noise_position_ids=noise_position_ids,
+            ctx_attention_mask=ctx_attention_mask,
         )
         hidden_states = residual + hidden_states
 
@@ -214,6 +228,7 @@ class DFlashDraftModel(nn.Module):
         target_hidden: torch.Tensor,# 目标模型上下文hidden
         ctx_position_ids: torch.LongTensor,
         noise_position_ids: torch.LongTensor,
+        ctx_attention_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         hidden_states = noise_embedding
         # Step 1: 将上下文特征压缩到 hidden_size
@@ -238,6 +253,7 @@ class DFlashDraftModel(nn.Module):
                 sin=sin,
                 ctx_position_ids=ctx_position_ids,
                 noise_position_ids=noise_position_ids,
+                ctx_attention_mask=ctx_attention_mask,
             )
         hidden_states = self.norm(hidden_states)
         return hidden_states

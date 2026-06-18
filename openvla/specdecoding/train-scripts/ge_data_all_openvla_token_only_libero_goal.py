@@ -180,7 +180,7 @@ for batch_idx, batch in enumerate(pbar):
             "hidden_state": hidden,
             "loss_mask": batch["attention_mask"].cpu()[0],
             "predicted_tokens": token,
-            "dflash_data_format": "prompt_last_plus_action_hidden_v3",
+            "dflash_data_format": "full_prefix_plus_action_hidden_v4",
         }
         if isinstance(td["hidden_state"], dict) and "action_last" in td["hidden_state"]:
             # v3 格式保存的是 prefill 最后位置 hidden + action token0..token5 hidden。

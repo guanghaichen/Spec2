@@ -150,10 +150,10 @@ class OfflineDFlashDataset(Dataset):
         tokens = torch.tensor(data["predicted_tokens"], dtype=torch.long)# 目标模型生成的 token 序列
         data_format = data.get("dflash_data_format")
 
-        if data_format != "prompt_last_plus_action_hidden_v3":
+        if data_format != "full_prefix_plus_action_hidden_v4":
             raise ValueError(
                 f"{self.data[index]} uses unsupported dflash_data_format={data_format!r}. "
-                "Please regenerate the offline DFlash dataset with prompt_last_plus_action_hidden_v3 format."
+                "Please regenerate the offline DFlash dataset with full_prefix_plus_action_hidden_v4 format."
             )
 
         if not isinstance(hidden_state, dict):
@@ -161,7 +161,7 @@ class OfflineDFlashDataset(Dataset):
                 f"{self.data[index]} uses an unsupported legacy hidden_state format. "
                 "Please regenerate the offline DFlash dataset with the current exporter."
             )
-        required_keys = {"prompt_selected", "prompt_position_id", "action_last", "action_selected"}
+        required_keys = {"prompt_selected", "prompt_position_ids", "prompt_length", "action_last", "action_selected"}
         if not required_keys.issubset(hidden_state):
             raise ValueError(
                 f"{self.data[index]} is missing one of {sorted(required_keys)} in hidden_state. "
@@ -190,10 +190,22 @@ class OfflineDFlashDataset(Dataset):
                     f"{self.data[index]} prompt_selected dim={hidden_state['prompt_selected'].shape[-1]} "
                     f"!= expected {expected_hidden}. Please regenerate data with matching hidden_layer_ids."
                 )
+        prompt_length = int(hidden_state["prompt_length"])
+        if hidden_state["prompt_selected"].shape[0] != prompt_length:
+            raise ValueError(
+                f"{self.data[index]} prompt_length={prompt_length} but "
+                f"prompt_selected has length={hidden_state['prompt_selected'].shape[0]}."
+            )
+        if hidden_state["prompt_position_ids"].shape[0] != prompt_length:
+            raise ValueError(
+                f"{self.data[index]} prompt_position_ids length={hidden_state['prompt_position_ids'].shape[0]} "
+                f"!= prompt_length={prompt_length}."
+            )
         # 返回单个样本的dict
         return {
-            "prompt_selected": hidden_state["prompt_selected"],# prefill 最后位置目标层
-            "prompt_position_id": int(hidden_state["prompt_position_id"]),
+            "prompt_selected": hidden_state["prompt_selected"],# 完整 prefill/prefix 目标层 [prefix_len, L*hidden]
+            "prompt_position_ids": hidden_state["prompt_position_ids"].long(),
+            "prompt_length": prompt_length,
             "action_selected": action_selected_hidden,# token0..token5 的目标层
             "target_hidden": action_last_hidden,# token0..token5 的最后层，用于预测 token1..token6
             "tokens": tokens,# 目标模型生成的 token 序列
@@ -204,12 +216,15 @@ class OfflineDFlashDataset(Dataset):
 class DataCollatorForOfflineDFlash:
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
         max_len = max(item["length"] for item in features)
+        max_prompt_len = max(item["prompt_length"] for item in features)
         selected_dim = features[0]["action_selected"].shape[-1]
         hidden_dim = features[0]["target_hidden"].shape[-1]
 
         # 创建 padding 后的 batch 张量
-        batch_prompt_selected = torch.zeros(len(features), selected_dim)
-        batch_prompt_position_ids = torch.zeros(len(features), dtype=torch.long)
+        batch_prompt_selected = torch.zeros(len(features), max_prompt_len, selected_dim)
+        batch_prompt_position_ids = torch.zeros(len(features), max_prompt_len, dtype=torch.long)
+        batch_prompt_attention_mask = torch.zeros(len(features), max_prompt_len, dtype=torch.bool)
+        batch_prompt_lengths = torch.zeros(len(features), dtype=torch.long)
         batch_selected = torch.zeros(len(features), max_len, selected_dim)
         batch_target = torch.zeros(len(features), max_len, hidden_dim)
         batch_tokens = torch.zeros(len(features), max_len + 1, dtype=torch.long)
@@ -217,16 +232,21 @@ class DataCollatorForOfflineDFlash:
 
         for i, item in enumerate(features):
             length = item["length"]
-            batch_prompt_selected[i] = item["prompt_selected"]
-            batch_prompt_position_ids[i] = item["prompt_position_id"]
+            prompt_length = item["prompt_length"]
+            batch_prompt_selected[i, :prompt_length] = item["prompt_selected"]
+            batch_prompt_position_ids[i, :prompt_length] = item["prompt_position_ids"]
+            batch_prompt_attention_mask[i, :prompt_length] = True
+            batch_prompt_lengths[i] = prompt_length
             batch_selected[i, :length] = item["action_selected"]
             batch_target[i, :length] = item["target_hidden"]
             batch_tokens[i, : length + 1] = item["tokens"]
             batch_lengths[i] = length
 
         return {
-            "prompt_selected": batch_prompt_selected,# prefill 最后位置目标层
+            "prompt_selected": batch_prompt_selected,# 完整 prefill/prefix 目标层
             "prompt_position_ids": batch_prompt_position_ids,
+            "prompt_attention_mask": batch_prompt_attention_mask,
+            "prompt_lengths": batch_prompt_lengths,
             "action_selected": batch_selected,# token0..token5 目标层
             "target_hidden": batch_target,# token0..token5 最后一层
             "tokens": batch_tokens,# 目标模型生成的 token 序列
@@ -422,8 +442,10 @@ def compute_loss_and_accuracy(
     args,# 训练参数
     device: torch.device,
 ) -> Dict[str, torch.Tensor]:
-    prompt_selected = batch["prompt_selected"].to(device=device, dtype=torch.bfloat16)# prefill最后位置上下文[B, L*hidden]
-    prompt_position_ids = batch["prompt_position_ids"].to(device=device)# prefill最后位置的绝对position
+    prompt_selected = batch["prompt_selected"].to(device=device, dtype=torch.bfloat16)# 完整 prefill/prefix 上下文 [B, P, L*hidden]
+    prompt_position_ids = batch["prompt_position_ids"].to(device=device)# 完整 prefill/prefix 的绝对 position [B, P]
+    prompt_attention_mask = batch["prompt_attention_mask"].to(device=device)# prefix padding mask [B, P]
+    prompt_lengths = batch["prompt_lengths"].to(device=device)# 每条样本真实 prefix 长度 [B]
     action_selected = batch["action_selected"].to(device=device, dtype=torch.bfloat16)# action历史上下文[B, seq, L*hidden]
     target_hidden = batch["target_hidden"].to(device=device, dtype=torch.bfloat16)# token0..token5最后层[B, seq, hidden]
     tokens = batch["tokens"].to(device=device)# 目标模型生成的 token 序列[B, seq]
@@ -454,21 +476,30 @@ def compute_loss_and_accuracy(
         noise_embedding = embed_tokens(block_ids)# 加噪
 
         ctx_hidden = torch.cat(
-            [prompt_selected.unsqueeze(1), action_selected[:, :anchor, :]],
+            [prompt_selected, action_selected[:, :anchor, :]],
             dim=1,
-        )# [B, 1+anchor, L*hidden] 上下文：prefill最后位置 + anchor前action hidden
+        )# [B, prefix_len+anchor, L*hidden] 上下文：完整 prefill/prefix + anchor前action hidden
+        if anchor > 0:
+            action_ctx_mask = (
+                torch.arange(anchor, device=device, dtype=torch.long).unsqueeze(0)
+                < lengths.unsqueeze(1)
+            )
+            ctx_attention_mask = torch.cat([prompt_attention_mask, action_ctx_mask], dim=1)
+        else:
+            ctx_attention_mask = prompt_attention_mask
         # 数据增强：训练时给 context hidden 加噪，防止模型死记 exact hidden（效仿 SpecVLA）
         if model.training and args.hidden_noise > 0:
-            ctx_hidden = ctx_hidden + torch.randn_like(ctx_hidden) * args.hidden_noise
-        action_base_positions = prompt_position_ids + 1
+            noise = torch.randn_like(ctx_hidden) * args.hidden_noise
+            ctx_hidden = torch.where(ctx_attention_mask.unsqueeze(-1), ctx_hidden + noise, ctx_hidden)
+        action_base_positions = prompt_lengths
         if anchor > 0:
             action_ctx_positions = (
                 action_base_positions.unsqueeze(1)
                 + torch.arange(anchor, device=device, dtype=torch.long).unsqueeze(0)
             )
-            ctx_position_ids = torch.cat([prompt_position_ids.unsqueeze(1), action_ctx_positions], dim=1)
+            ctx_position_ids = torch.cat([prompt_position_ids, action_ctx_positions], dim=1)
         else:
-            ctx_position_ids = prompt_position_ids.unsqueeze(1)
+            ctx_position_ids = prompt_position_ids
         noise_position_ids = (
             action_base_positions.unsqueeze(1)
             + anchor
@@ -478,9 +509,10 @@ def compute_loss_and_accuracy(
         # Draft 模型推理
         pred_hidden = model(# 输出去噪序列[B, block_size, hidden]
             noise_embedding=noise_embedding, # [B, max_block_len, hidden]
-            target_hidden=ctx_hidden,# [B, anchor, L*hidden]
-            ctx_position_ids=ctx_position_ids,# [B, anchor]
+            target_hidden=ctx_hidden,# [B, prefix_len+anchor, L*hidden]
+            ctx_position_ids=ctx_position_ids,# [B, prefix_len+anchor]
             noise_position_ids=noise_position_ids,# [B, max_block_len]
+            ctx_attention_mask=ctx_attention_mask,# [B, prefix_len+anchor]
         )
 
         student_hidden = pred_hidden[:, :max_block_len, :].float()# 草稿预测的最终层 hidden [B, block, hidden]

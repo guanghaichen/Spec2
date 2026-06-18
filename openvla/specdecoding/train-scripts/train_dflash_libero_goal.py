@@ -1,6 +1,7 @@
 import argparse
 import copy
 import json
+import math
 import os
 import random
 import sys
@@ -427,6 +428,32 @@ def safe_swanlab_log(run, payload: Dict[str, Any], step: Optional[int] = None):
     except Exception as exc:  # pragma: no cover - 防御性降级
         print(f"SwanLab 记录失败（已忽略，训练继续）：{exc}")
         return run
+
+
+def numeric_payload_for_swanlab(payload: Dict[str, Any], default_prefix: str = "run") -> Dict[str, float]:
+    """把 jsonl payload 中所有数值字段转换成 SwanLab 可记录的 metric。
+
+    已经带 "/" 的 key 会原样保留，例如 train/loss、val/anchor_0_acc。
+    不带 "/" 的运行状态字段会挂到 default_prefix 下，例如 epoch -> train/epoch。
+    """
+    swan_payload: Dict[str, float] = {}
+    for key, value in payload.items():
+        if torch.is_tensor(value):
+            if value.numel() != 1:
+                continue
+            value = value.item()
+        if isinstance(value, bool):
+            value = float(value)
+        elif isinstance(value, int):
+            value = float(value)
+        elif isinstance(value, float):
+            value = float(value)
+        else:
+            continue
+        if math.isfinite(value):
+            metric_key = key if "/" in key else f"{default_prefix}/{key}"
+            swan_payload[metric_key] = value
+    return swan_payload
 
 
 def count_trainable_parameters(model: nn.Module) -> int:
@@ -893,6 +920,22 @@ def main():
             print(f"SwanLab 已启动: mode={args.swanlab_mode}, run_id={swanlab_run_id}")
         else:
             print(f"SwanLab 已启动: mode={args.swanlab_mode}")
+        swanlab_run = safe_swanlab_log(
+            swanlab_run,
+            numeric_payload_for_swanlab(
+                {
+                    "train_files": len(train_files),
+                    "val_files": len(val_files),
+                    "trainable_params": trainable_params,
+                    "trainable_params_m": round(trainable_params / 1e6, 2),
+                    "steps_per_epoch": steps_per_epoch,
+                    "total_optimizer_steps": total_optimizer_steps,
+                    "effective_batch": args.batch_size * args.gradient_accumulation_steps,
+                },
+                default_prefix="run",
+            ),
+            step=global_step,
+        )
 
     try:
         for epoch in range(start_epoch, args.num_epochs + 1):
@@ -944,8 +987,8 @@ def main():
                         train_payload.update(detail_metrics_to_log("train", train_detail_accumulator))
                         append_jsonl(metrics_log_path, train_payload)
                         if swanlab_run is not None:
-                            swan_payload = {k: v for k, v in train_payload.items() if k.startswith("train/")}
-                            swan_payload["train/epoch"] = epoch
+                            swan_payload = numeric_payload_for_swanlab(train_payload, default_prefix="train")
+                            swan_payload["train/log_steps"] = float(train_log_steps)
                             swanlab_run = safe_swanlab_log(
                                 swanlab_run,
                                 swan_payload,
@@ -976,35 +1019,44 @@ def main():
             )
             if do_eval:
                 val_metrics = evaluate(model, embed_tokens, lm_head, val_loader, args, device)
+
+                current_val_loss = val_metrics["val/loss"]
+                current_val_acc = val_metrics["val/accuracy"]
+
+                # 最优权重保存：按 accuracy（越高越好）
+                is_best_acc = best_val_acc is None or current_val_acc > best_val_acc
+                if is_best_acc:
+                    best_val_acc = current_val_acc
+                    save_best_checkpoint(args.output_dir, epoch, global_step, model)
+
+                # 早停：按 loss（越低越好）
+                is_best_loss = best_val_loss is None or current_val_loss < best_val_loss
+                if is_best_loss:
+                    best_val_loss = current_val_loss
+                    patience_counter = 0
+                else:
+                    patience_counter += 1
+
                 val_payload = {
                     "event": "val_epoch",
                     "timestamp": datetime.now().isoformat(),
                     "epoch": epoch,
                     "global_step": global_step,
                     **val_metrics,
+                    "val/best_loss": best_val_loss,
+                    "val/best_accuracy": best_val_acc,
+                    "val/patience_counter": patience_counter,
+                    "val/patience": args.patience,
+                    "val/is_best_accuracy": is_best_acc,
+                    "val/is_best_loss": is_best_loss,
                 }
                 append_jsonl(metrics_log_path, val_payload)
                 if swanlab_run is not None:
                     swanlab_run = safe_swanlab_log(
                         swanlab_run,
-                        {**val_metrics, "val/epoch": epoch},
+                        numeric_payload_for_swanlab(val_payload, default_prefix="val"),
                         step=global_step,
                     )
-
-                current_val_loss = val_metrics["val/loss"]
-                current_val_acc = val_metrics["val/accuracy"]
-
-                # 最优权重保存：按 accuracy（越高越好）
-                if best_val_acc is None or current_val_acc > best_val_acc:
-                    best_val_acc = current_val_acc
-                    save_best_checkpoint(args.output_dir, epoch, global_step, model)
-
-                # 早停：按 loss（越低越好）
-                if best_val_loss is None or current_val_loss < best_val_loss:
-                    best_val_loss = current_val_loss
-                    patience_counter = 0
-                else:
-                    patience_counter += 1
 
                 print(
                     f"验证 epoch={epoch} | loss={current_val_loss:.4f} ce={val_metrics['val/ce_loss']:.4f} "

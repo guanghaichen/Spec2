@@ -66,8 +66,18 @@ def parse_args():
     parser.add_argument("--num_draft_layers", type=int, default=3, help="DFlash Draft 层数（原默认 5）")
     parser.add_argument("--target_layer_ids", type=int, nargs="*", default=[1, 8, 15, 22, 29], help="捕捉的 OpenVLA 目标层；留空时按 Draft 层数均匀选取，恢复 5 层时用 [1,8,15,22,29]")
     parser.add_argument("--mask_token_id", type=int, default=None, help="加噪声的 token ID，不指定也会自适应取pad_token_id")
-    parser.add_argument("--hidden_w", type=float, default=0.3, help="hidden states 蒸馏权重")
+    parser.add_argument("--hidden_w", type=float, default=0.03, help="hidden states 蒸馏权重")
     parser.add_argument("--ce_w", type=float, default=1.0, help="token CE 权重")
+    parser.add_argument("--kl_w", type=float, default=0.05, help="teacher soft distribution KL 蒸馏权重")
+    parser.add_argument("--kl_temperature", type=float, default=1.0, help="KL 蒸馏温度")
+    parser.add_argument(
+        "--hidden_loss_type",
+        type=str,
+        default="cosine",
+        choices=["cosine", "norm_mse", "raw_mse"],
+        help="hidden 蒸馏损失类型；默认 cosine，避免 raw MSE 过度约束 hidden 幅值",
+    )
+    parser.add_argument("--action_dim", type=int, default=7, help="OpenVLA action token 维度数，用于 action-dimension embedding")
     parser.add_argument("--hidden_noise", type=float, default=0.03, help="训练时 context hidden 加噪标准差（0=不加，推荐 0.02）")
     parser.add_argument("--grad_clip", type=float, default=0.5)
     parser.add_argument("--log_every_steps", type=int, default=20, help="每多少个 optimizer step 记录一次训练日志")
@@ -262,6 +272,10 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "mask_token_id": args.mask_token_id,
         "hidden_w": args.hidden_w,
         "ce_w": args.ce_w,
+        "kl_w": args.kl_w,
+        "kl_temperature": args.kl_temperature,
+        "hidden_loss_type": args.hidden_loss_type,
+        "action_dim": args.action_dim,
         "hidden_noise": args.hidden_noise,
         "batch_size": args.batch_size,
         "gradient_accumulation_steps": args.gradient_accumulation_steps,
@@ -433,6 +447,60 @@ def build_scheduler(optimizer: AdamW, total_steps: int, warmup_steps: int, warmu
 
     return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
+
+def new_detail_accumulator(num_positions: int) -> Dict[str, torch.Tensor]:
+    return {
+        "anchor_correct": torch.zeros(num_positions, dtype=torch.float32),
+        "anchor_total": torch.zeros(num_positions, dtype=torch.float32),
+        "position_correct": torch.zeros(num_positions, dtype=torch.float32),
+        "position_total": torch.zeros(num_positions, dtype=torch.float32),
+        "anchor_position_correct": torch.zeros(num_positions, num_positions, dtype=torch.float32),
+        "anchor_position_total": torch.zeros(num_positions, num_positions, dtype=torch.float32),
+    }
+
+
+def accumulate_detail_metrics(accumulator: Optional[Dict[str, torch.Tensor]], metrics: Dict[str, torch.Tensor]):
+    detail_keys = [
+        "anchor_correct",
+        "anchor_total",
+        "position_correct",
+        "position_total",
+        "anchor_position_correct",
+        "anchor_position_total",
+    ]
+    if accumulator is None:
+        accumulator = new_detail_accumulator(metrics["anchor_correct"].numel())
+    for key in detail_keys:
+        accumulator[key] += metrics[key].detach().float().cpu()
+    return accumulator
+
+
+def detail_metrics_to_log(prefix: str, accumulator: Optional[Dict[str, torch.Tensor]]) -> Dict[str, float]:
+    if accumulator is None:
+        return {}
+    payload: Dict[str, float] = {}
+    anchor_correct = accumulator["anchor_correct"]
+    anchor_total = accumulator["anchor_total"]
+    position_correct = accumulator["position_correct"]
+    position_total = accumulator["position_total"]
+    anchor_position_correct = accumulator["anchor_position_correct"]
+    anchor_position_total = accumulator["anchor_position_total"]
+
+    for idx in range(anchor_total.numel()):
+        if anchor_total[idx] > 0:
+            payload[f"{prefix}/anchor_{idx}_acc"] = (anchor_correct[idx] / anchor_total[idx]).item()
+        if position_total[idx] > 0:
+            payload[f"{prefix}/position_{idx + 1}_acc"] = (position_correct[idx] / position_total[idx]).item()
+
+    for anchor in range(anchor_position_total.shape[0]):
+        for position in range(anchor_position_total.shape[1]):
+            if anchor_position_total[anchor, position] > 0:
+                payload[f"{prefix}/anchor_{anchor}_to_position_{position + 1}_acc"] = (
+                    anchor_position_correct[anchor, position] / anchor_position_total[anchor, position]
+                ).item()
+    return payload
+
+
 # 损失函数与准确计算函数
 def compute_loss_and_accuracy(
     model: DFlashDraftModel,# Draft Model
@@ -453,9 +521,16 @@ def compute_loss_and_accuracy(
 
     batch_size, seq_len, _ = target_hidden.shape
     ce_sum = torch.zeros((), device=device, dtype=torch.float32)
+    kl_sum = torch.zeros((), device=device, dtype=torch.float32)
     hidden_sum = torch.zeros((), device=device, dtype=torch.float32)
     total_positions = torch.zeros((), device=device, dtype=torch.float32)
     total_correct = torch.zeros((), device=device, dtype=torch.float32)
+    anchor_correct = torch.zeros(seq_len, device=device, dtype=torch.float32)
+    anchor_total = torch.zeros(seq_len, device=device, dtype=torch.float32)
+    position_correct = torch.zeros(seq_len, device=device, dtype=torch.float32)
+    position_total = torch.zeros(seq_len, device=device, dtype=torch.float32)
+    anchor_position_correct = torch.zeros(seq_len, seq_len, device=device, dtype=torch.float32)
+    anchor_position_total = torch.zeros(seq_len, seq_len, device=device, dtype=torch.float32)
     # 主循环：anchor token 作为当前已知 token，DFLASH 并行预测 anchor+1 开始的若干 token。
     # 输出槽位 0 对齐 teacher H(token_anchor)，经 lm_head 预测 token_{anchor+1}。
     for anchor in range(seq_len):# anchor：一个滑动窗口的起始位置
@@ -505,6 +580,9 @@ def compute_loss_and_accuracy(
             + anchor
             + torch.arange(max_block_len, device=device, dtype=torch.long).unsqueeze(0)
         )
+        action_position_ids = (
+            anchor + torch.arange(max_block_len, device=device, dtype=torch.long).unsqueeze(0)
+        ).expand(batch_size, -1)
 
         # Draft 模型推理
         pred_hidden = model(# 输出去噪序列[B, block_size, hidden]
@@ -513,6 +591,7 @@ def compute_loss_and_accuracy(
             ctx_position_ids=ctx_position_ids,# [B, prefix_len+anchor]
             noise_position_ids=noise_position_ids,# [B, max_block_len]
             ctx_attention_mask=ctx_attention_mask,# [B, prefix_len+anchor]
+            action_position_ids=action_position_ids,# [B, max_block_len] action维度/槽位位置
         )
 
         student_hidden = pred_hidden[:, :max_block_len, :].float()# 草稿预测的最终层 hidden [B, block, hidden]
@@ -535,25 +614,65 @@ def compute_loss_and_accuracy(
             reduction="none",
         ).view(batch_size, -1)
         ce_sum += (ce * valid_mask).sum()
-        # hidden蒸馏损失（MSE）：让草稿模型的输出隐状态逼近目标模型的真实最终层隐状态
-        hidden_reg = F.mse_loss(student_hidden, teacher_hidden, reduction="none").mean(dim=-1)
+        # soft distribution 蒸馏：不只逼近argmax token，也让草稿学习目标模型的相对偏好。
+        if args.kl_w > 0:
+            with torch.no_grad():
+                teacher_logits = lm_head(teacher_hidden.to(torch.bfloat16)).float()
+                teacher_probs = F.softmax(teacher_logits / args.kl_temperature, dim=-1)
+            student_log_probs = F.log_softmax(student_logits / args.kl_temperature, dim=-1)
+            kl = F.kl_div(student_log_probs, teacher_probs, reduction="none").sum(dim=-1)
+            kl_sum += (kl * (args.kl_temperature ** 2) * valid_mask).sum()
+
+        # hidden蒸馏默认用cosine，避免raw MSE强行匹配幅值；必要时可切回norm_mse/raw_mse做消融。
+        if args.hidden_loss_type == "cosine":
+            hidden_reg = 1.0 - F.cosine_similarity(student_hidden, teacher_hidden, dim=-1)
+        elif args.hidden_loss_type == "norm_mse":
+            hidden_reg = F.mse_loss(
+                F.normalize(student_hidden, dim=-1),
+                F.normalize(teacher_hidden, dim=-1),
+                reduction="none",
+            ).sum(dim=-1)
+        else:
+            hidden_reg = F.mse_loss(student_hidden, teacher_hidden, reduction="none").mean(dim=-1)
         hidden_sum += (hidden_reg * valid_mask).sum()
 
         pred_tokens = student_logits.argmax(dim=-1)# 草稿模型走贪婪解码
-        total_correct += ((pred_tokens == target_tokens) * valid_mask.bool()).sum().float()
+        correct_mask = (pred_tokens == target_tokens) & valid_mask.bool()
+        total_correct += correct_mask.sum().float()
         total_positions += valid_count
+        anchor_total[anchor] += valid_count
+        anchor_correct[anchor] += correct_mask.sum().float()
+        for local_pos in range(max_block_len):
+            target_pos = anchor + local_pos
+            pos_mask = valid_mask[:, local_pos].bool()
+            pos_count = pos_mask.sum().float()
+            if pos_count.item() == 0:
+                continue
+            pos_correct = correct_mask[:, local_pos].sum().float()
+            position_total[target_pos] += pos_count
+            position_correct[target_pos] += pos_correct
+            anchor_position_total[anchor, target_pos] += pos_count
+            anchor_position_correct[anchor, target_pos] += pos_correct
 
     denom = total_positions.clamp_min(1.0)
     ce_loss = ce_sum / denom
+    kl_loss = kl_sum / denom
     hidden_loss = hidden_sum / denom
-    total_loss = args.ce_w * ce_loss + args.hidden_w * hidden_loss
+    total_loss = args.ce_w * ce_loss + args.kl_w * kl_loss + args.hidden_w * hidden_loss
     accuracy = total_correct / denom
 
     return {
         "loss": total_loss,
         "ce_loss": ce_loss,
+        "kl_loss": kl_loss,
         "hidden_loss": hidden_loss,
         "accuracy": accuracy,
+        "anchor_correct": anchor_correct.detach(),
+        "anchor_total": anchor_total.detach(),
+        "position_correct": position_correct.detach(),
+        "position_total": position_total.detach(),
+        "anchor_position_correct": anchor_position_correct.detach(),
+        "anchor_position_total": anchor_position_total.detach(),
     }
 
 
@@ -570,31 +689,42 @@ def evaluate(
     model.eval()
     total_loss = 0.0
     total_ce = 0.0
+    total_kl = 0.0
     total_hidden = 0.0
     total_acc = 0.0
     total_samples = 0
+    detail_accumulator = None
 
     for batch in val_loader:
         metrics = compute_loss_and_accuracy(model, embed_tokens, lm_head, batch, args, device)
         bs = batch["lengths"].shape[0]
         total_loss += metrics["loss"].item() * bs
         total_ce += metrics["ce_loss"].item() * bs
+        total_kl += metrics["kl_loss"].item() * bs
         total_hidden += metrics["hidden_loss"].item() * bs
         total_acc += metrics["accuracy"].item() * bs
         total_samples += bs
+        detail_accumulator = accumulate_detail_metrics(detail_accumulator, metrics)
 
     model.train()
     denom = max(total_samples, 1)
-    return {
+    result = {
         "val/loss": total_loss / denom,
         "val/ce_loss": total_ce / denom,
+        "val/kl_loss": total_kl / denom,
         "val/hidden_loss": total_hidden / denom,
         "val/accuracy": total_acc / denom,
     }
+    result.update(detail_metrics_to_log("val", detail_accumulator))
+    return result
 
 
 def main():
     args = parse_args()
+    if args.kl_temperature <= 0:
+        raise ValueError("--kl_temperature must be > 0.")
+    if args.action_dim <= 0:
+        raise ValueError("--action_dim must be > 0.")
     set_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if args.run_name is None:
@@ -643,6 +773,7 @@ def main():
     draft_config.num_target_layers = num_target_layers# 将目标模型的总层数也存入草稿配置，供 build_target_layer_ids 使用
     draft_config.dflash_target_layer_ids = args.target_layer_ids# 5
     draft_config.dflash_block_size = args.block_size# 7
+    draft_config.dflash_action_dim = args.action_dim# action token维度数，用于action-dimension embedding
     model = DFlashDraftModel(draft_config).to(device=device, dtype=torch.bfloat16)# 实例化草稿模型
     trainable_params = count_trainable_parameters(model)
 
@@ -769,8 +900,10 @@ def main():
             optimizer.zero_grad(set_to_none=True)
             train_loss_sum = 0.0
             train_ce_sum = 0.0
+            train_kl_sum = 0.0
             train_hidden_sum = 0.0
             train_acc_sum = 0.0
+            train_detail_accumulator = None
             train_log_steps = 0
             pbar = tqdm(train_loader, desc=f"train {epoch}/{args.num_epochs}", dynamic_ncols=True)
             for batch_idx, batch in enumerate(pbar, start=1):
@@ -779,8 +912,10 @@ def main():
 
                 train_loss_sum += metrics["loss"].item()
                 train_ce_sum += metrics["ce_loss"].item()
+                train_kl_sum += metrics["kl_loss"].item()
                 train_hidden_sum += metrics["hidden_loss"].item()
                 train_acc_sum += metrics["accuracy"].item()
+                train_detail_accumulator = accumulate_detail_metrics(train_detail_accumulator, metrics)
                 train_log_steps += 1
 
                 should_step = (
@@ -801,33 +936,33 @@ def main():
                             "global_step": global_step,
                             "train/loss": train_loss_sum / max(1, train_log_steps),
                             "train/ce_loss": train_ce_sum / max(1, train_log_steps),
+                            "train/kl_loss": train_kl_sum / max(1, train_log_steps),
                             "train/hidden_loss": train_hidden_sum / max(1, train_log_steps),
                             "train/accuracy": train_acc_sum / max(1, train_log_steps),
                             "train/lr": scheduler.get_last_lr()[0],
                         }
+                        train_payload.update(detail_metrics_to_log("train", train_detail_accumulator))
                         append_jsonl(metrics_log_path, train_payload)
                         if swanlab_run is not None:
+                            swan_payload = {k: v for k, v in train_payload.items() if k.startswith("train/")}
+                            swan_payload["train/epoch"] = epoch
                             swanlab_run = safe_swanlab_log(
                                 swanlab_run,
-                                {
-                                    "train/loss": train_payload["train/loss"],
-                                    "train/ce_loss": train_payload["train/ce_loss"],
-                                    "train/hidden_loss": train_payload["train/hidden_loss"],
-                                    "train/accuracy": train_payload["train/accuracy"],
-                                    "train/lr": train_payload["train/lr"],
-                                    "train/epoch": epoch,
-                                },
+                                swan_payload,
                                 step=global_step,
                             )
                         train_loss_sum = 0.0
                         train_ce_sum = 0.0
+                        train_kl_sum = 0.0
                         train_hidden_sum = 0.0
                         train_acc_sum = 0.0
+                        train_detail_accumulator = None
                         train_log_steps = 0
 
                 pbar.set_postfix(
                     loss=f"{metrics['loss'].item():.4f}",
                     ce=f"{metrics['ce_loss'].item():.4f}",
+                    kl=f"{metrics['kl_loss'].item():.4f}",
                     h=f"{metrics['hidden_loss'].item():.4f}",
                     acc=f"{metrics['accuracy'].item():.3f}",
                     lr=f"{scheduler.get_last_lr()[0]:.2e}",
@@ -873,6 +1008,7 @@ def main():
 
                 print(
                     f"验证 epoch={epoch} | loss={current_val_loss:.4f} ce={val_metrics['val/ce_loss']:.4f} "
+                    f"kl={val_metrics['val/kl_loss']:.4f} "
                     f"hidden={val_metrics['val/hidden_loss']:.4f} acc={current_val_acc:.3f} "
                     f"| best_loss={best_val_loss:.4f} best_acc={best_val_acc:.3f} "
                     f"patience={patience_counter}/{args.patience}"

@@ -69,6 +69,7 @@ def get_vla(cfg):
             dflash_num_draft_layers=getattr(cfg, "dflash_num_draft_layers", 1),# 草稿层数
             dflash_target_layer_ids=getattr(cfg, "dflash_target_layer_ids", None),# 目标层id
             dflash_mask_token_id=getattr(cfg, "dflash_mask_token_id", None),# 掩码tokenid
+            dflash_action_dim=getattr(cfg, "dflash_action_dim", ACTION_DIM),# action维度数
         )
         # 投机采样外层包装（先让基础模型 prefill 处理输入序列，再用草稿模型快速生成候选 token，最后用基础模型验证并接受/拒绝）
         vla = SpecVLAforActionPrediction(**spec_kwargs)

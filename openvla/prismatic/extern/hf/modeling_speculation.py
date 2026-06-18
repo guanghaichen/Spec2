@@ -554,6 +554,7 @@ class SpecVLAforActionPrediction(nn.Module):
             dflash_num_draft_layers=1,# 草稿模型层数    
             dflash_target_layer_ids=None,# 目标层id
             dflash_mask_token_id=None,# 掩码tokenid
+            dflash_action_dim=7,# action token维度数，用于DFlash action-dimension embedding
     ):
 
         super().__init__()
@@ -575,6 +576,7 @@ class SpecVLAforActionPrediction(nn.Module):
                 saved_dflash_cfg = json.load(f)
             dflash_block_size = saved_dflash_cfg.get("block_size", dflash_block_size)
             dflash_num_draft_layers = saved_dflash_cfg.get("num_draft_layers", dflash_num_draft_layers)
+            dflash_action_dim = saved_dflash_cfg.get("action_dim", dflash_action_dim)
             if dflash_target_layer_ids is None:
                 dflash_target_layer_ids = saved_dflash_cfg.get("target_layer_ids")
             if dflash_mask_token_id is None:
@@ -604,6 +606,7 @@ class SpecVLAforActionPrediction(nn.Module):
             target_config.num_target_layers = self.base_model.language_model.config.num_hidden_layers
             target_config.dflash_target_layer_ids = dflash_target_layer_ids
             target_config.dflash_block_size = dflash_block_size
+            target_config.dflash_action_dim = dflash_action_dim
             # # 实例化草稿模型
             self.ea_layer = DFlashDraftModel(target_config)
             load_model_path = os.path.join(ea_model_path, "pytorch_model.bin")
@@ -818,6 +821,12 @@ class SpecVLAforActionPrediction(nn.Module):
                 device=input_ids.device,
                 dtype=torch.long,
             ).unsqueeze(0)
+            action_position_ids = torch.arange(
+                anchor_idx,
+                anchor_idx + q_len,
+                device=input_ids.device,
+                dtype=torch.long,
+            ).unsqueeze(0)
 
             draft_hidden = self.ea_layer(
                 noise_embedding=noise_embedding,
@@ -825,6 +834,7 @@ class SpecVLAforActionPrediction(nn.Module):
                 ctx_position_ids=ctx_position_ids,
                 noise_position_ids=noise_position_ids,
                 ctx_attention_mask=None,
+                action_position_ids=action_position_ids,
             )
             draft_logits = self.base_model.language_model.lm_head(draft_hidden)
             proposed_tokens = dflash_sample(draft_logits, temperature=0.0)

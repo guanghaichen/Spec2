@@ -207,6 +207,9 @@ class DFlashDraftModel(nn.Module):
             base=getattr(config, "rope_theta", 10000),
         )
         self.block_size = getattr(config, "dflash_block_size", None)
+        self.action_dim = getattr(config, "dflash_action_dim", self.block_size)
+        if self.action_dim is None or self.action_dim <= 0:
+            raise ValueError("Missing or invalid DFlash config field `dflash_action_dim`.")
         num_target_layers = getattr(config, "num_target_layers", None)
         configured_target_layer_ids = getattr(config, "dflash_target_layer_ids", None)
         if self.block_size is None:
@@ -219,6 +222,8 @@ class DFlashDraftModel(nn.Module):
         else:
             self.target_layer_ids = configured_target_layer_ids# 按配置指定的层取索引
         self.fc = nn.Linear(len(self.target_layer_ids) * config.hidden_size, config.hidden_size, bias=False)
+        self.action_dim_embed = nn.Embedding(self.action_dim, config.hidden_size)
+        nn.init.normal_(self.action_dim_embed.weight, mean=0.0, std=0.02)
         self.hidden_norm = LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.norm = LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
@@ -229,8 +234,17 @@ class DFlashDraftModel(nn.Module):
         ctx_position_ids: torch.LongTensor,
         noise_position_ids: torch.LongTensor,
         ctx_attention_mask: torch.Tensor | None = None,
+        action_position_ids: torch.LongTensor | None = None,
     ) -> torch.Tensor:
         hidden_states = noise_embedding
+        if action_position_ids is not None:
+            if int(action_position_ids.max().item()) >= self.action_dim:
+                raise ValueError(
+                    f"action_position_ids max={int(action_position_ids.max().item())} exceeds "
+                    f"dflash_action_dim={self.action_dim}."
+                )
+            action_dim_embedding = self.action_dim_embed(action_position_ids.to(noise_embedding.device))
+            hidden_states = hidden_states + action_dim_embedding.to(dtype=hidden_states.dtype)
         # Step 1: 将上下文特征压缩到 hidden_size
         target_hidden = self.hidden_norm(self.fc(target_hidden))
         # Step 2: 计算 RoPE

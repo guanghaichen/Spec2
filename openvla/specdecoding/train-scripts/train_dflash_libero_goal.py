@@ -50,7 +50,7 @@ def parse_args():
         default="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_goal_dflash",
         help="输出目录（用于保存模型权重）",
     )
-    parser.add_argument("--batch_size", type=int, default=4, help="每张卡的 micro batch size")
+    parser.add_argument("--batch_size", type=int, default=8, help="每张卡的 micro batch size")
     parser.add_argument("--gradient_accumulation_steps", type=int, default=1, help="梯度累积步数；effective batch = batch_size * gradient_accumulation_steps")
     parser.add_argument("--num_workers", type=int, default=4, help="DataLoader worker 数")
     parser.add_argument("--num_epochs", type=int, default=200, help="最大训练 epochs")
@@ -79,7 +79,7 @@ def parse_args():
         help="hidden 蒸馏损失类型；默认 cosine，避免 raw MSE 过度约束 hidden 幅值",
     )
     parser.add_argument("--action_dim", type=int, default=7, help="OpenVLA action token 维度数，用于 action-dimension embedding")
-    parser.add_argument("--hidden_noise", type=float, default=0.03, help="训练时 context hidden 加噪标准差（0=不加，推荐 0.02）")
+    parser.add_argument("--hidden_noise", type=float, default=0.01, help="训练时 context hidden 加噪标准差（0=不加，推荐 0.02）")
     parser.add_argument("--grad_clip", type=float, default=0.5)
     parser.add_argument("--log_every_steps", type=int, default=20, help="每多少个 optimizer step 记录一次训练日志")
     parser.add_argument("--resume_from_checkpoint", type=str, default=None, help="恢复训练；可传具体 checkpoint 目录，或 latest")
@@ -90,7 +90,7 @@ def parse_args():
     parser.add_argument("--swanlab_mode", type=str, default="cloud", choices=["cloud", "local", "offline", "disabled"], help="SwanLab 模式")
     parser.add_argument("--refresh_file_cache", action="store_true", help="强制重新扫描数据目录并刷新 .ckpt 文件清单缓存")
     parser.add_argument("--val_split", type=float, default=0.1, help="验证集比例，0 表示不划分验证集")
-    parser.add_argument("--patience", type=int, default=15, help="早停耐心值（epoch 数）；验证 loss 不下降多少个 epoch 后停止")
+    parser.add_argument("--patience", type=int, default=10, help="早停耐心值（epoch 数）；验证 loss 不下降多少个 epoch 后停止")
     parser.add_argument("--eval_every", type=int, default=1, help="每隔多少个 epoch 进行一次验证")
     return parser.parse_args()
 
@@ -752,6 +752,11 @@ def main():
         raise ValueError("--kl_temperature must be > 0.")
     if args.action_dim <= 0:
         raise ValueError("--action_dim must be > 0.")
+    if args.lr > 1e-3:
+        print(
+            f"WARNING: lr={args.lr:g} is very high for DFLASH AdamW training. "
+            "This can quickly improve early metrics and then destabilize the draft model."
+        )
     set_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if args.run_name is None:

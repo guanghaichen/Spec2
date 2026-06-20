@@ -713,7 +713,10 @@ def compute_loss_and_accuracy(
     soft_loss = soft_sum / loss_denom
     hidden_loss = hidden_sum / loss_denom
     cos_loss = cos_sum / loss_denom
-    total_loss = args.hidden_w * hidden_loss + args.soft_w * soft_loss + args.cos_w * cos_loss
+    hidden_component = args.hidden_w * hidden_loss
+    soft_component = args.soft_w * soft_loss
+    cos_component = args.cos_w * cos_loss
+    total_loss = hidden_component + soft_component + cos_component
     accuracy = total_correct / metric_denom
 
     return {
@@ -721,6 +724,9 @@ def compute_loss_and_accuracy(
         "soft_loss": soft_loss,
         "hidden_loss": hidden_loss,
         "cos_loss": cos_loss,
+        "soft_component": soft_component,
+        "hidden_component": hidden_component,
+        "cos_component": cos_component,
         "accuracy": accuracy,
         "anchor_correct": anchor_correct.detach(),
         "anchor_total": anchor_total.detach(),
@@ -746,6 +752,9 @@ def evaluate(
     total_soft = 0.0
     total_hidden = 0.0
     total_cos = 0.0
+    total_soft_component = 0.0
+    total_hidden_component = 0.0
+    total_cos_component = 0.0
     total_acc = 0.0
     total_samples = 0
     detail_accumulator = None
@@ -757,6 +766,9 @@ def evaluate(
         total_soft += metrics["soft_loss"].item() * bs
         total_hidden += metrics["hidden_loss"].item() * bs
         total_cos += metrics["cos_loss"].item() * bs
+        total_soft_component += metrics["soft_component"].item() * bs
+        total_hidden_component += metrics["hidden_component"].item() * bs
+        total_cos_component += metrics["cos_component"].item() * bs
         total_acc += metrics["accuracy"].item() * bs
         total_samples += bs
         detail_accumulator = accumulate_detail_metrics(detail_accumulator, metrics)
@@ -768,6 +780,9 @@ def evaluate(
         "val/soft_loss": total_soft / denom,
         "val/hidden_loss": total_hidden / denom,
         "val/cos_loss": total_cos / denom,
+        "val/soft_component": total_soft_component / denom,
+        "val/hidden_component": total_hidden_component / denom,
+        "val/cos_component": total_cos_component / denom,
         "val/accuracy": total_acc / denom,
     }
     result.update(detail_metrics_to_log("val", detail_accumulator))
@@ -983,6 +998,9 @@ def main():
             train_soft_sum = 0.0
             train_hidden_sum = 0.0
             train_cos_sum = 0.0
+            train_soft_component_sum = 0.0
+            train_hidden_component_sum = 0.0
+            train_cos_component_sum = 0.0
             train_acc_sum = 0.0
             train_detail_accumulator = None
             train_log_steps = 0
@@ -995,6 +1013,9 @@ def main():
                 train_soft_sum += metrics["soft_loss"].item()
                 train_hidden_sum += metrics["hidden_loss"].item()
                 train_cos_sum += metrics["cos_loss"].item()
+                train_soft_component_sum += metrics["soft_component"].item()
+                train_hidden_component_sum += metrics["hidden_component"].item()
+                train_cos_component_sum += metrics["cos_component"].item()
                 train_acc_sum += metrics["accuracy"].item()
                 train_detail_accumulator = accumulate_detail_metrics(train_detail_accumulator, metrics)
                 train_log_steps += 1
@@ -1010,16 +1031,20 @@ def main():
                     global_step += 1
 
                     if global_step % args.log_every_steps == 0:
+                        denom_log_steps = max(1, train_log_steps)
                         train_payload = {
                             "event": "train_step",
                             "timestamp": datetime.now().isoformat(),
                             "epoch": epoch,
                             "global_step": global_step,
-                            "train/loss": train_loss_sum / max(1, train_log_steps),
-                            "train/soft_loss": train_soft_sum / max(1, train_log_steps),
-                            "train/hidden_loss": train_hidden_sum / max(1, train_log_steps),
-                            "train/cos_loss": train_cos_sum / max(1, train_log_steps),
-                            "train/accuracy": train_acc_sum / max(1, train_log_steps),
+                            "train/loss": train_loss_sum / denom_log_steps,
+                            "train/soft_loss": train_soft_sum / denom_log_steps,
+                            "train/hidden_loss": train_hidden_sum / denom_log_steps,
+                            "train/cos_loss": train_cos_sum / denom_log_steps,
+                            "train/soft_component": train_soft_component_sum / denom_log_steps,
+                            "train/hidden_component": train_hidden_component_sum / denom_log_steps,
+                            "train/cos_component": train_cos_component_sum / denom_log_steps,
+                            "train/accuracy": train_acc_sum / denom_log_steps,
                             "train/lr": scheduler.get_last_lr()[0],
                         }
                         train_payload.update(detail_metrics_to_log("train", train_detail_accumulator))
@@ -1032,19 +1057,35 @@ def main():
                                 swan_payload,
                                 step=global_step,
                         )
+                        print(
+                            f"train step={global_step} epoch={epoch} "
+                            f"loss={train_payload['train/loss']:.4f} "
+                            f"soft={train_payload['train/soft_loss']:.4f} "
+                            f"soft*={train_payload['train/soft_component']:.4f} "
+                            f"h={train_payload['train/hidden_loss']:.4f} "
+                            f"h*={train_payload['train/hidden_component']:.4f} "
+                            f"cos={train_payload['train/cos_loss']:.4f} "
+                            f"cos*={train_payload['train/cos_component']:.4f} "
+                            f"acc={train_payload['train/accuracy']:.3f} "
+                            f"lr={train_payload['train/lr']:.2e}",
+                            flush=True,
+                        )
                         train_loss_sum = 0.0
                         train_soft_sum = 0.0
                         train_hidden_sum = 0.0
                         train_cos_sum = 0.0
+                        train_soft_component_sum = 0.0
+                        train_hidden_component_sum = 0.0
+                        train_cos_component_sum = 0.0
                         train_acc_sum = 0.0
                         train_detail_accumulator = None
                         train_log_steps = 0
 
                 pbar.set_postfix(
-                    loss=f"{metrics['loss'].item():.4f}",
-                    soft=f"{metrics['soft_loss'].item():.4f}",
-                    h=f"{metrics['hidden_loss'].item():.4f}",
-                    cos=f"{metrics['cos_loss'].item():.4f}",
+                    s=f"{metrics['soft_loss'].item():.3f}",
+                    h=f"{metrics['hidden_loss'].item():.3f}",
+                    c=f"{metrics['cos_loss'].item():.3f}",
+                    L=f"{metrics['loss'].item():.3f}",
                     acc=f"{metrics['accuracy'].item():.3f}",
                     lr=f"{scheduler.get_last_lr()[0]:.2e}",
                     step=global_step,
@@ -1099,8 +1140,11 @@ def main():
                 print(
                     f"验证 epoch={epoch} | loss={current_val_loss:.4f} "
                     f"soft={val_metrics['val/soft_loss']:.4f} "
+                    f"soft*={val_metrics['val/soft_component']:.4f} "
                     f"hidden={val_metrics['val/hidden_loss']:.4f} "
+                    f"hidden*={val_metrics['val/hidden_component']:.4f} "
                     f"cos={val_metrics['val/cos_loss']:.4f} "
+                    f"cos*={val_metrics['val/cos_component']:.4f} "
                     f"acc={current_val_acc:.3f} "
                     f"| best_loss={best_val_loss:.4f} best_acc={best_val_acc:.3f} "
                     f"patience={patience_counter}/{args.patience}"

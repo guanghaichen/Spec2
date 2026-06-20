@@ -343,11 +343,13 @@ def save_checkpoint(
         f.write(str(save_dir))
 
 
-def save_best_checkpoint(output_dir: str, epoch: int, global_step: int, model: DFlashDraftModel) -> None:
+def save_best_checkpoint(output_dir: str, epoch: int, global_step: int, model: DFlashDraftModel, args) -> None:
     """保存当前最优权重，自动覆盖上一个最优权重。"""
     best_dir = Path(output_dir) / "best_model"
     best_dir.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(), best_dir / "pytorch_model.bin")
+    with open(best_dir / "dflash_config.json", "w") as f:
+        json.dump(build_dflash_config_dict(args), f, indent=2)
     info = {"best_epoch": epoch, "best_global_step": global_step, "timestamp": datetime.now().isoformat()}
     with open(best_dir / "best_info.json", "w", encoding="utf-8") as f:
         json.dump(info, f, indent=2, ensure_ascii=False)
@@ -1032,7 +1034,7 @@ def main():
                 is_best_acc = best_val_acc is None or current_val_acc > best_val_acc
                 if is_best_acc:
                     best_val_acc = current_val_acc
-                    save_best_checkpoint(args.output_dir, epoch, global_step, model)
+                    save_best_checkpoint(args.output_dir, epoch, global_step, model, args)
 
                 # 早停：按 loss（越低越好）
                 is_best_loss = best_val_loss is None or current_val_loss < best_val_loss

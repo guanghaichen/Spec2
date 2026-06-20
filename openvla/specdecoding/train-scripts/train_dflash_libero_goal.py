@@ -47,7 +47,7 @@ def parse_args():
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_goal_dflash",
+        default="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_goal_dflash_hidden_soft",
         help="输出目录（用于保存模型权重）",
     )
     parser.add_argument("--batch_size", type=int, default=8, help="每张卡的 micro batch size")
@@ -67,19 +67,23 @@ def parse_args():
     parser.add_argument("--num_draft_layers", type=int, default=3, help="DFlash Draft 层数（原默认 5）")
     parser.add_argument("--target_layer_ids", type=int, nargs="*", default=[1, 8, 15, 22, 29], help="捕捉的 OpenVLA 目标层；留空时按 Draft 层数均匀选取，恢复 5 层时用 [1,8,15,22,29]")
     parser.add_argument("--mask_token_id", type=int, default=None, help="加噪声的 token ID，不指定也会自适应取pad_token_id")
-    parser.add_argument("--hidden_w", type=float, default=0.03, help="hidden states 蒸馏权重")
-    parser.add_argument("--ce_w", type=float, default=1.0, help="token CE 权重")
-    parser.add_argument("--kl_w", type=float, default=0.05, help="teacher soft distribution KL 蒸馏权重")
-    parser.add_argument("--kl_temperature", type=float, default=1.0, help="KL 蒸馏温度")
+    parser.add_argument("--hidden_w", type=float, default=1.0, help="hidden states 蒸馏主损失权重")
+    parser.add_argument("--soft_w", type=float, default=0.1, help="teacher soft distribution 交叉熵蒸馏权重")
+    parser.add_argument("--soft_temperature", type=float, default=2.0, help="teacher soft distribution 蒸馏温度")
+    parser.add_argument("--cos_w", type=float, default=0.05, help="hidden cosine 辅助约束权重")
+    parser.add_argument("--slot_decay", type=float, default=0.85, help="DFLASH 块内位置衰减权重，越靠前的 draft slot 越重要")
+    parser.add_argument("--position_balance", action=argparse.BooleanOptionalAction, default=True, help="是否平衡多 anchor 中不同 action 位置的重复监督次数")
+    parser.add_argument("--kl_w", type=float, dest="soft_w", help=argparse.SUPPRESS)
+    parser.add_argument("--kl_temperature", type=float, dest="soft_temperature", help=argparse.SUPPRESS)
     parser.add_argument(
         "--hidden_loss_type",
         type=str,
-        default="cosine",
-        choices=["cosine", "norm_mse", "raw_mse"],
-        help="hidden 蒸馏损失类型；默认 cosine，避免 raw MSE 过度约束 hidden 幅值",
+        default="smooth_l1",
+        choices=["smooth_l1", "cosine", "norm_mse", "raw_mse"],
+        help="hidden 蒸馏损失类型；默认 smooth_l1，参考 SpecVLA 以 hidden 回归为主",
     )
     parser.add_argument("--action_dim", type=int, default=7, help="OpenVLA action token 维度数，用于 action-dimension embedding")
-    parser.add_argument("--hidden_noise", type=float, default=0.01, help="训练时 context hidden 加噪标准差（0=不加，推荐 0.02）")
+    parser.add_argument("--hidden_noise", type=float, default=0.03, help="训练时 context hidden 加噪标准差（0=不加，推荐 0.03）")
     parser.add_argument("--grad_clip", type=float, default=0.5)
     parser.add_argument("--log_every_steps", type=int, default=20, help="每多少个 optimizer step 记录一次训练日志")
     parser.add_argument("--resume_from_checkpoint", type=str, default=None, help="恢复训练；可传具体 checkpoint 目录，或 latest")
@@ -90,7 +94,7 @@ def parse_args():
     parser.add_argument("--swanlab_mode", type=str, default="cloud", choices=["cloud", "local", "offline", "disabled"], help="SwanLab 模式")
     parser.add_argument("--refresh_file_cache", action="store_true", help="强制重新扫描数据目录并刷新 .ckpt 文件清单缓存")
     parser.add_argument("--val_split", type=float, default=0.1, help="验证集比例，0 表示不划分验证集")
-    parser.add_argument("--patience", type=int, default=10, help="早停耐心值（epoch 数）；验证 loss 不下降多少个 epoch 后停止")
+    parser.add_argument("--patience", type=int, default=5, help="早停耐心值（epoch 数）；验证 loss 不下降多少个 epoch 后停止")
     parser.add_argument("--eval_every", type=int, default=1, help="每隔多少个 epoch 进行一次验证")
     return parser.parse_args()
 
@@ -271,10 +275,13 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "num_draft_layers": args.num_draft_layers,
         "target_layer_ids": args.target_layer_ids,
         "mask_token_id": args.mask_token_id,
+        "loss_design": "hidden_smooth_l1_main_plus_teacher_soft_ce",
         "hidden_w": args.hidden_w,
-        "ce_w": args.ce_w,
-        "kl_w": args.kl_w,
-        "kl_temperature": args.kl_temperature,
+        "soft_w": args.soft_w,
+        "soft_temperature": args.soft_temperature,
+        "cos_w": args.cos_w,
+        "slot_decay": args.slot_decay,
+        "position_balance": args.position_balance,
         "hidden_loss_type": args.hidden_loss_type,
         "action_dim": args.action_dim,
         "hidden_noise": args.hidden_noise,
@@ -549,9 +556,10 @@ def compute_loss_and_accuracy(
     lengths = batch["lengths"].to(device=device)# 目标模型生成的 序列 的长度[B, ]
 
     batch_size, seq_len, _ = target_hidden.shape
-    ce_sum = torch.zeros((), device=device, dtype=torch.float32)
-    kl_sum = torch.zeros((), device=device, dtype=torch.float32)
+    soft_sum = torch.zeros((), device=device, dtype=torch.float32)
     hidden_sum = torch.zeros((), device=device, dtype=torch.float32)
+    cos_sum = torch.zeros((), device=device, dtype=torch.float32)
+    weight_sum = torch.zeros((), device=device, dtype=torch.float32)
     total_positions = torch.zeros((), device=device, dtype=torch.float32)
     total_correct = torch.zeros((), device=device, dtype=torch.float32)
     anchor_correct = torch.zeros(seq_len, device=device, dtype=torch.float32)
@@ -636,24 +644,39 @@ def compute_loss_and_accuracy(
         valid_count = valid_mask.sum()
         if valid_count.item() == 0:
             continue
-        # token块交叉熵损失
-        ce = F.cross_entropy(
-            student_logits.reshape(-1, student_logits.shape[-1]),
-            target_tokens.reshape(-1),
-            reduction="none",
-        ).view(batch_size, -1)
-        ce_sum += (ce * valid_mask).sum()
-        # soft distribution 蒸馏：不只逼近argmax token，也让草稿学习目标模型的相对偏好。
-        if args.kl_w > 0:
+        slot_weights = args.slot_decay ** torch.arange(
+            max_block_len,
+            device=device,
+            dtype=torch.float32,
+        )
+        target_positions = anchor + torch.arange(
+            max_block_len,
+            device=device,
+            dtype=torch.float32,
+        )
+        if args.position_balance:
+            position_weights = 1.0 / (target_positions + 1.0)
+        else:
+            position_weights = torch.ones_like(target_positions)
+        loss_weight = valid_mask * slot_weights.unsqueeze(0) * position_weights.unsqueeze(0)
+        current_weight_sum = loss_weight.sum()
+        if current_weight_sum.item() == 0:
+            continue
+        weight_sum += current_weight_sum
+
+        # SpecVLA 风格的 soft distribution 交叉熵：学习 teacher 的相对偏好，而不是 hard token id。
+        if args.soft_w > 0:
             with torch.no_grad():
                 teacher_logits = lm_head(teacher_hidden.to(torch.bfloat16)).float()
-                teacher_probs = F.softmax(teacher_logits / args.kl_temperature, dim=-1)
-            student_log_probs = F.log_softmax(student_logits / args.kl_temperature, dim=-1)
-            kl = F.kl_div(student_log_probs, teacher_probs, reduction="none").sum(dim=-1)
-            kl_sum += (kl * (args.kl_temperature ** 2) * valid_mask).sum()
+                teacher_probs = F.softmax(teacher_logits / args.soft_temperature, dim=-1)
+            student_log_probs = F.log_softmax(student_logits / args.soft_temperature, dim=-1)
+            soft_ce = -(teacher_probs * student_log_probs).sum(dim=-1) * (args.soft_temperature ** 2)
+            soft_sum += (soft_ce * loss_weight).sum()
 
-        # hidden蒸馏默认用cosine，避免raw MSE强行匹配幅值；必要时可切回norm_mse/raw_mse做消融。
-        if args.hidden_loss_type == "cosine":
+        # hidden 蒸馏是主任务；默认 SmoothL1，参考 SpecVLA 的 hidden/value regression 经验。
+        if args.hidden_loss_type == "smooth_l1":
+            hidden_reg = F.smooth_l1_loss(student_hidden, teacher_hidden, reduction="none").mean(dim=-1)
+        elif args.hidden_loss_type == "cosine":
             hidden_reg = 1.0 - F.cosine_similarity(student_hidden, teacher_hidden, dim=-1)
         elif args.hidden_loss_type == "norm_mse":
             hidden_reg = F.mse_loss(
@@ -663,7 +686,9 @@ def compute_loss_and_accuracy(
             ).sum(dim=-1)
         else:
             hidden_reg = F.mse_loss(student_hidden, teacher_hidden, reduction="none").mean(dim=-1)
-        hidden_sum += (hidden_reg * valid_mask).sum()
+        hidden_sum += (hidden_reg * loss_weight).sum()
+        cos_reg = 1.0 - F.cosine_similarity(student_hidden, teacher_hidden, dim=-1)
+        cos_sum += (cos_reg * loss_weight).sum()
 
         pred_tokens = student_logits.argmax(dim=-1)# 草稿模型走贪婪解码
         correct_mask = (pred_tokens == target_tokens) & valid_mask.bool()
@@ -683,18 +708,19 @@ def compute_loss_and_accuracy(
             anchor_position_total[anchor, target_pos] += pos_count
             anchor_position_correct[anchor, target_pos] += pos_correct
 
-    denom = total_positions.clamp_min(1.0)
-    ce_loss = ce_sum / denom
-    kl_loss = kl_sum / denom
-    hidden_loss = hidden_sum / denom
-    total_loss = args.ce_w * ce_loss + args.kl_w * kl_loss + args.hidden_w * hidden_loss
-    accuracy = total_correct / denom
+    loss_denom = weight_sum.clamp_min(1.0)
+    metric_denom = total_positions.clamp_min(1.0)
+    soft_loss = soft_sum / loss_denom
+    hidden_loss = hidden_sum / loss_denom
+    cos_loss = cos_sum / loss_denom
+    total_loss = args.hidden_w * hidden_loss + args.soft_w * soft_loss + args.cos_w * cos_loss
+    accuracy = total_correct / metric_denom
 
     return {
         "loss": total_loss,
-        "ce_loss": ce_loss,
-        "kl_loss": kl_loss,
+        "soft_loss": soft_loss,
         "hidden_loss": hidden_loss,
+        "cos_loss": cos_loss,
         "accuracy": accuracy,
         "anchor_correct": anchor_correct.detach(),
         "anchor_total": anchor_total.detach(),
@@ -717,9 +743,9 @@ def evaluate(
     """在验证集上评估 Draft 模型，返回平均指标。"""
     model.eval()
     total_loss = 0.0
-    total_ce = 0.0
-    total_kl = 0.0
+    total_soft = 0.0
     total_hidden = 0.0
+    total_cos = 0.0
     total_acc = 0.0
     total_samples = 0
     detail_accumulator = None
@@ -728,9 +754,9 @@ def evaluate(
         metrics = compute_loss_and_accuracy(model, embed_tokens, lm_head, batch, args, device)
         bs = batch["lengths"].shape[0]
         total_loss += metrics["loss"].item() * bs
-        total_ce += metrics["ce_loss"].item() * bs
-        total_kl += metrics["kl_loss"].item() * bs
+        total_soft += metrics["soft_loss"].item() * bs
         total_hidden += metrics["hidden_loss"].item() * bs
+        total_cos += metrics["cos_loss"].item() * bs
         total_acc += metrics["accuracy"].item() * bs
         total_samples += bs
         detail_accumulator = accumulate_detail_metrics(detail_accumulator, metrics)
@@ -739,9 +765,9 @@ def evaluate(
     denom = max(total_samples, 1)
     result = {
         "val/loss": total_loss / denom,
-        "val/ce_loss": total_ce / denom,
-        "val/kl_loss": total_kl / denom,
+        "val/soft_loss": total_soft / denom,
         "val/hidden_loss": total_hidden / denom,
+        "val/cos_loss": total_cos / denom,
         "val/accuracy": total_acc / denom,
     }
     result.update(detail_metrics_to_log("val", detail_accumulator))
@@ -750,8 +776,13 @@ def evaluate(
 
 def main():
     args = parse_args()
-    if args.kl_temperature <= 0:
-        raise ValueError("--kl_temperature must be > 0.")
+    if args.soft_temperature <= 0:
+        raise ValueError("--soft_temperature must be > 0.")
+    if args.slot_decay <= 0 or args.slot_decay > 1:
+        raise ValueError("--slot_decay must be in (0, 1].")
+    for loss_name in ("hidden_w", "soft_w", "cos_w"):
+        if getattr(args, loss_name) < 0:
+            raise ValueError(f"--{loss_name} must be >= 0.")
     if args.action_dim <= 0:
         raise ValueError("--action_dim must be > 0.")
     if args.lr > 1e-3:
@@ -949,9 +980,9 @@ def main():
             model.train()
             optimizer.zero_grad(set_to_none=True)
             train_loss_sum = 0.0
-            train_ce_sum = 0.0
-            train_kl_sum = 0.0
+            train_soft_sum = 0.0
             train_hidden_sum = 0.0
+            train_cos_sum = 0.0
             train_acc_sum = 0.0
             train_detail_accumulator = None
             train_log_steps = 0
@@ -961,9 +992,9 @@ def main():
                 (metrics["loss"] / args.gradient_accumulation_steps).backward()
 
                 train_loss_sum += metrics["loss"].item()
-                train_ce_sum += metrics["ce_loss"].item()
-                train_kl_sum += metrics["kl_loss"].item()
+                train_soft_sum += metrics["soft_loss"].item()
                 train_hidden_sum += metrics["hidden_loss"].item()
+                train_cos_sum += metrics["cos_loss"].item()
                 train_acc_sum += metrics["accuracy"].item()
                 train_detail_accumulator = accumulate_detail_metrics(train_detail_accumulator, metrics)
                 train_log_steps += 1
@@ -985,9 +1016,9 @@ def main():
                             "epoch": epoch,
                             "global_step": global_step,
                             "train/loss": train_loss_sum / max(1, train_log_steps),
-                            "train/ce_loss": train_ce_sum / max(1, train_log_steps),
-                            "train/kl_loss": train_kl_sum / max(1, train_log_steps),
+                            "train/soft_loss": train_soft_sum / max(1, train_log_steps),
                             "train/hidden_loss": train_hidden_sum / max(1, train_log_steps),
+                            "train/cos_loss": train_cos_sum / max(1, train_log_steps),
                             "train/accuracy": train_acc_sum / max(1, train_log_steps),
                             "train/lr": scheduler.get_last_lr()[0],
                         }
@@ -1000,20 +1031,20 @@ def main():
                                 swanlab_run,
                                 swan_payload,
                                 step=global_step,
-                            )
+                        )
                         train_loss_sum = 0.0
-                        train_ce_sum = 0.0
-                        train_kl_sum = 0.0
+                        train_soft_sum = 0.0
                         train_hidden_sum = 0.0
+                        train_cos_sum = 0.0
                         train_acc_sum = 0.0
                         train_detail_accumulator = None
                         train_log_steps = 0
 
                 pbar.set_postfix(
                     loss=f"{metrics['loss'].item():.4f}",
-                    ce=f"{metrics['ce_loss'].item():.4f}",
-                    kl=f"{metrics['kl_loss'].item():.4f}",
+                    soft=f"{metrics['soft_loss'].item():.4f}",
                     h=f"{metrics['hidden_loss'].item():.4f}",
+                    cos=f"{metrics['cos_loss'].item():.4f}",
                     acc=f"{metrics['accuracy'].item():.3f}",
                     lr=f"{scheduler.get_last_lr()[0]:.2e}",
                     step=global_step,
@@ -1066,9 +1097,11 @@ def main():
                     )
 
                 print(
-                    f"验证 epoch={epoch} | loss={current_val_loss:.4f} ce={val_metrics['val/ce_loss']:.4f} "
-                    f"kl={val_metrics['val/kl_loss']:.4f} "
-                    f"hidden={val_metrics['val/hidden_loss']:.4f} acc={current_val_acc:.3f} "
+                    f"验证 epoch={epoch} | loss={current_val_loss:.4f} "
+                    f"soft={val_metrics['val/soft_loss']:.4f} "
+                    f"hidden={val_metrics['val/hidden_loss']:.4f} "
+                    f"cos={val_metrics['val/cos_loss']:.4f} "
+                    f"acc={current_val_acc:.3f} "
                     f"| best_loss={best_val_loss:.4f} best_acc={best_val_acc:.3f} "
                     f"patience={patience_counter}/{args.patience}"
                 )

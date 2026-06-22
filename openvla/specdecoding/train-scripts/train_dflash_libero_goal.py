@@ -78,6 +78,20 @@ def parse_args():
     parser.add_argument("--soft_temperature", type=float, default=2.0, help="teacher soft distribution 蒸馏温度")
     parser.add_argument("--cos_w", type=float, default=0.05, help="hidden cosine 辅助约束权重")
     parser.add_argument("--slot_decay", type=float, default=0.85, help="DFLASH 块内位置衰减权重，越靠前的 draft slot 越重要")
+    parser.add_argument("--anchor_consistency_w", type=float, default=0.0, help="跨 anchor 一致性 loss 权重；0 表示关闭")
+    parser.add_argument(
+        "--anchor_consistency_type",
+        type=str,
+        default="cosine",
+        choices=["cosine", "smooth_l1", "norm_mse"],
+        help="跨 anchor 一致性距离；默认 cosine，作为温和的结构正则",
+    )
+    parser.add_argument(
+        "--anchor_consistency_warmup_steps",
+        type=int,
+        default=0,
+        help="跨 anchor 一致性权重线性 warmup 步数；0 表示不 warmup",
+    )
     parser.add_argument("--position_balance", action=argparse.BooleanOptionalAction, default=True, help="是否平衡多 anchor 中不同 action 位置的重复监督次数")
     parser.add_argument("--kl_w", type=float, dest="soft_w", help=argparse.SUPPRESS)
     parser.add_argument("--kl_temperature", type=float, dest="soft_temperature", help=argparse.SUPPRESS)
@@ -289,6 +303,9 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "soft_w": args.soft_w,
         "soft_temperature": args.soft_temperature,
         "cos_w": args.cos_w,
+        "anchor_consistency_w": args.anchor_consistency_w,
+        "anchor_consistency_type": args.anchor_consistency_type,
+        "anchor_consistency_warmup_steps": args.anchor_consistency_warmup_steps,
         "slot_decay": args.slot_decay,
         "position_balance": args.position_balance,
         "hidden_loss_type": args.hidden_loss_type,
@@ -546,6 +563,21 @@ def detail_metrics_to_log(prefix: str, accumulator: Optional[Dict[str, torch.Ten
     return payload
 
 
+def hidden_distance(student_hidden: torch.Tensor, teacher_hidden: torch.Tensor, loss_type: str) -> torch.Tensor:
+    """返回逐样本 hidden 距离 [B]，用于主 hidden loss 之外的结构约束。"""
+    if loss_type == "cosine":
+        return 1.0 - F.cosine_similarity(student_hidden, teacher_hidden, dim=-1)
+    if loss_type == "smooth_l1":
+        return F.smooth_l1_loss(student_hidden, teacher_hidden, reduction="none").mean(dim=-1)
+    if loss_type == "norm_mse":
+        return F.mse_loss(
+            F.normalize(student_hidden, dim=-1),
+            F.normalize(teacher_hidden, dim=-1),
+            reduction="none",
+        ).sum(dim=-1)
+    raise ValueError(f"Unsupported hidden distance type: {loss_type}")
+
+
 # 损失函数与准确计算函数
 def compute_loss_and_accuracy(
     model: DFlashDraftModel,# Draft Model
@@ -554,6 +586,7 @@ def compute_loss_and_accuracy(
     batch: Dict[str, torch.Tensor],# 一个 batch 数据
     args,# 训练参数
     device: torch.device,
+    consistency_scale: float = 1.0,
 ) -> Dict[str, torch.Tensor]:
     prompt_selected = batch["prompt_selected"].to(device=device, dtype=torch.bfloat16)# 完整 prefill/prefix 上下文 [B, P, L*hidden]
     prompt_position_ids = batch["prompt_position_ids"].to(device=device)# 完整 prefill/prefix 的绝对 position [B, P]
@@ -568,6 +601,9 @@ def compute_loss_and_accuracy(
     soft_sum = torch.zeros((), device=device, dtype=torch.float32)
     hidden_sum = torch.zeros((), device=device, dtype=torch.float32)
     cos_sum = torch.zeros((), device=device, dtype=torch.float32)
+    anchor_consistency_sum = torch.zeros((), device=device, dtype=torch.float32)
+    anchor_consistency_weight_sum = torch.zeros((), device=device, dtype=torch.float32)
+    anchor_consistency_pairs = torch.zeros((), device=device, dtype=torch.float32)
     weight_sum = torch.zeros((), device=device, dtype=torch.float32)
     total_positions = torch.zeros((), device=device, dtype=torch.float32)
     total_correct = torch.zeros((), device=device, dtype=torch.float32)
@@ -577,6 +613,9 @@ def compute_loss_and_accuracy(
     position_total = torch.zeros(seq_len, device=device, dtype=torch.float32)
     anchor_position_correct = torch.zeros(seq_len, seq_len, device=device, dtype=torch.float32)
     anchor_position_total = torch.zeros(seq_len, seq_len, device=device, dtype=torch.float32)
+    causal_slot0_hidden: Dict[int, torch.Tensor] = {}
+    causal_slot0_mask: Dict[int, torch.Tensor] = {}
+    far_slot_entries = []
     # 主循环：
     # - 原始 DFLASH: context=P+A[:anchor]，block=[t_anchor, MASK...]，预测 t_{anchor+1}...
     # - SpecVLA式注入: context=P+A[:anchor+1]，block=[t_anchor, MASK...]，预测 t_{anchor+1}...
@@ -715,6 +754,23 @@ def compute_loss_and_accuracy(
         cos_reg = 1.0 - F.cosine_similarity(student_hidden, teacher_hidden, dim=-1)
         cos_sum += (cos_reg * loss_weight).sum()
 
+        if args.anchor_consistency_w > 0:
+            for local_pos in range(max_block_len):
+                target_pos = teacher_start + local_pos
+                pos_mask = valid_mask[:, local_pos].bool()
+                if local_pos == 0:
+                    causal_slot0_hidden[target_pos] = student_hidden[:, local_pos, :]
+                    causal_slot0_mask[target_pos] = pos_mask
+                else:
+                    far_slot_entries.append(
+                        (
+                            target_pos,
+                            student_hidden[:, local_pos, :],
+                            pos_mask,
+                            loss_weight[:, local_pos].detach(),
+                        )
+                    )
+
         pred_tokens = student_logits.argmax(dim=-1)# 草稿模型走贪婪解码
         correct_mask = (pred_tokens == target_tokens) & valid_mask.bool()
         total_correct += correct_mask.sum().float()
@@ -733,15 +789,43 @@ def compute_loss_and_accuracy(
             anchor_position_total[anchor, target_pos] += pos_count
             anchor_position_correct[anchor, target_pos] += pos_correct
 
+    if args.anchor_consistency_w > 0:
+        for target_pos, far_hidden, far_mask, far_weight in far_slot_entries:
+            ref_hidden = causal_slot0_hidden.get(target_pos)
+            ref_mask = causal_slot0_mask.get(target_pos)
+            if ref_hidden is None or ref_mask is None:
+                continue
+            pair_mask = far_mask & ref_mask
+            if int(pair_mask.sum().item()) == 0:
+                continue
+            pair_weight = far_weight * pair_mask.float()
+            current_weight = pair_weight.sum()
+            if current_weight.item() == 0:
+                continue
+            consistency_reg = hidden_distance(
+                far_hidden.float(),
+                ref_hidden.detach().float(),
+                args.anchor_consistency_type,
+            )
+            anchor_consistency_sum += (consistency_reg * pair_weight).sum()
+            anchor_consistency_weight_sum += current_weight
+            anchor_consistency_pairs += pair_mask.sum().float()
+
     loss_denom = weight_sum.clamp_min(1.0)
     metric_denom = total_positions.clamp_min(1.0)
+    consistency_denom = anchor_consistency_weight_sum.clamp_min(1.0)
     soft_loss = soft_sum / loss_denom
     hidden_loss = hidden_sum / loss_denom
     cos_loss = cos_sum / loss_denom
+    anchor_consistency_loss = anchor_consistency_sum / consistency_denom
     hidden_component = args.hidden_w * hidden_loss
     soft_component = args.soft_w * soft_loss
     cos_component = args.cos_w * cos_loss
-    total_loss = hidden_component + soft_component + cos_component
+    anchor_consistency_scale = torch.tensor(float(consistency_scale), device=device, dtype=torch.float32)
+    anchor_consistency_component = (
+        args.anchor_consistency_w * anchor_consistency_scale * anchor_consistency_loss
+    )
+    total_loss = hidden_component + soft_component + cos_component + anchor_consistency_component
     accuracy = total_correct / metric_denom
 
     return {
@@ -749,9 +833,13 @@ def compute_loss_and_accuracy(
         "soft_loss": soft_loss,
         "hidden_loss": hidden_loss,
         "cos_loss": cos_loss,
+        "anchor_consistency_loss": anchor_consistency_loss,
         "soft_component": soft_component,
         "hidden_component": hidden_component,
         "cos_component": cos_component,
+        "anchor_consistency_component": anchor_consistency_component,
+        "anchor_consistency_scale": anchor_consistency_scale.detach(),
+        "anchor_consistency_pairs": anchor_consistency_pairs.detach(),
         "accuracy": accuracy,
         "anchor_correct": anchor_correct.detach(),
         "anchor_total": anchor_total.detach(),
@@ -777,9 +865,13 @@ def evaluate(
     total_soft = 0.0
     total_hidden = 0.0
     total_cos = 0.0
+    total_anchor_consistency = 0.0
     total_soft_component = 0.0
     total_hidden_component = 0.0
     total_cos_component = 0.0
+    total_anchor_consistency_component = 0.0
+    total_anchor_consistency_scale = 0.0
+    total_anchor_consistency_pairs = 0.0
     total_acc = 0.0
     total_samples = 0
     detail_accumulator = None
@@ -791,9 +883,13 @@ def evaluate(
         total_soft += metrics["soft_loss"].item() * bs
         total_hidden += metrics["hidden_loss"].item() * bs
         total_cos += metrics["cos_loss"].item() * bs
+        total_anchor_consistency += metrics["anchor_consistency_loss"].item() * bs
         total_soft_component += metrics["soft_component"].item() * bs
         total_hidden_component += metrics["hidden_component"].item() * bs
         total_cos_component += metrics["cos_component"].item() * bs
+        total_anchor_consistency_component += metrics["anchor_consistency_component"].item() * bs
+        total_anchor_consistency_scale += metrics["anchor_consistency_scale"].item() * bs
+        total_anchor_consistency_pairs += metrics["anchor_consistency_pairs"].item()
         total_acc += metrics["accuracy"].item() * bs
         total_samples += bs
         detail_accumulator = accumulate_detail_metrics(detail_accumulator, metrics)
@@ -805,9 +901,13 @@ def evaluate(
         "val/soft_loss": total_soft / denom,
         "val/hidden_loss": total_hidden / denom,
         "val/cos_loss": total_cos / denom,
+        "val/anchor_consistency_loss": total_anchor_consistency / denom,
         "val/soft_component": total_soft_component / denom,
         "val/hidden_component": total_hidden_component / denom,
         "val/cos_component": total_cos_component / denom,
+        "val/anchor_consistency_component": total_anchor_consistency_component / denom,
+        "val/anchor_consistency_scale": total_anchor_consistency_scale / denom,
+        "val/anchor_consistency_pairs_per_sample": total_anchor_consistency_pairs / denom,
         "val/accuracy": total_acc / denom,
     }
     result.update(detail_metrics_to_log("val", detail_accumulator))
@@ -820,9 +920,11 @@ def main():
         raise ValueError("--soft_temperature must be > 0.")
     if args.slot_decay <= 0 or args.slot_decay > 1:
         raise ValueError("--slot_decay must be in (0, 1].")
-    for loss_name in ("hidden_w", "soft_w", "cos_w"):
+    for loss_name in ("hidden_w", "soft_w", "cos_w", "anchor_consistency_w"):
         if getattr(args, loss_name) < 0:
             raise ValueError(f"--{loss_name} must be >= 0.")
+    if args.anchor_consistency_warmup_steps < 0:
+        raise ValueError("--anchor_consistency_warmup_steps must be >= 0.")
     if args.action_dim <= 0:
         raise ValueError("--action_dim must be > 0.")
     if args.include_anchor_hidden and args.block_size < 3:
@@ -1025,24 +1127,47 @@ def main():
             train_soft_sum = 0.0
             train_hidden_sum = 0.0
             train_cos_sum = 0.0
+            train_anchor_consistency_sum = 0.0
             train_soft_component_sum = 0.0
             train_hidden_component_sum = 0.0
             train_cos_component_sum = 0.0
+            train_anchor_consistency_component_sum = 0.0
+            train_anchor_consistency_scale_sum = 0.0
+            train_anchor_consistency_pairs_sum = 0.0
             train_acc_sum = 0.0
             train_detail_accumulator = None
             train_log_steps = 0
             pbar = tqdm(train_loader, desc=f"train {epoch}/{args.num_epochs}", dynamic_ncols=True)
             for batch_idx, batch in enumerate(pbar, start=1):
-                metrics = compute_loss_and_accuracy(model, embed_tokens, lm_head, batch, args, device)
+                if args.anchor_consistency_w > 0 and args.anchor_consistency_warmup_steps > 0:
+                    consistency_scale = min(
+                        1.0,
+                        float(global_step + 1) / float(max(1, args.anchor_consistency_warmup_steps)),
+                    )
+                else:
+                    consistency_scale = 1.0
+                metrics = compute_loss_and_accuracy(
+                    model,
+                    embed_tokens,
+                    lm_head,
+                    batch,
+                    args,
+                    device,
+                    consistency_scale=consistency_scale,
+                )
                 (metrics["loss"] / args.gradient_accumulation_steps).backward()
 
                 train_loss_sum += metrics["loss"].item()
                 train_soft_sum += metrics["soft_loss"].item()
                 train_hidden_sum += metrics["hidden_loss"].item()
                 train_cos_sum += metrics["cos_loss"].item()
+                train_anchor_consistency_sum += metrics["anchor_consistency_loss"].item()
                 train_soft_component_sum += metrics["soft_component"].item()
                 train_hidden_component_sum += metrics["hidden_component"].item()
                 train_cos_component_sum += metrics["cos_component"].item()
+                train_anchor_consistency_component_sum += metrics["anchor_consistency_component"].item()
+                train_anchor_consistency_scale_sum += metrics["anchor_consistency_scale"].item()
+                train_anchor_consistency_pairs_sum += metrics["anchor_consistency_pairs"].item()
                 train_acc_sum += metrics["accuracy"].item()
                 train_detail_accumulator = accumulate_detail_metrics(train_detail_accumulator, metrics)
                 train_log_steps += 1
@@ -1068,9 +1193,13 @@ def main():
                             "train/soft_loss": train_soft_sum / denom_log_steps,
                             "train/hidden_loss": train_hidden_sum / denom_log_steps,
                             "train/cos_loss": train_cos_sum / denom_log_steps,
+                            "train/anchor_consistency_loss": train_anchor_consistency_sum / denom_log_steps,
                             "train/soft_component": train_soft_component_sum / denom_log_steps,
                             "train/hidden_component": train_hidden_component_sum / denom_log_steps,
                             "train/cos_component": train_cos_component_sum / denom_log_steps,
+                            "train/anchor_consistency_component": train_anchor_consistency_component_sum / denom_log_steps,
+                            "train/anchor_consistency_scale": train_anchor_consistency_scale_sum / denom_log_steps,
+                            "train/anchor_consistency_pairs_per_batch": train_anchor_consistency_pairs_sum / denom_log_steps,
                             "train/accuracy": train_acc_sum / denom_log_steps,
                             "train/lr": scheduler.get_last_lr()[0],
                         }
@@ -1093,6 +1222,8 @@ def main():
                             f"h*={train_payload['train/hidden_component']:.4f} "
                             f"cos={train_payload['train/cos_loss']:.4f} "
                             f"cos*={train_payload['train/cos_component']:.4f} "
+                            f"anc={train_payload['train/anchor_consistency_loss']:.4f} "
+                            f"anc*={train_payload['train/anchor_consistency_component']:.4f} "
                             f"acc={train_payload['train/accuracy']:.3f} "
                             f"lr={train_payload['train/lr']:.2e}",
                             flush=True,
@@ -1101,9 +1232,13 @@ def main():
                         train_soft_sum = 0.0
                         train_hidden_sum = 0.0
                         train_cos_sum = 0.0
+                        train_anchor_consistency_sum = 0.0
                         train_soft_component_sum = 0.0
                         train_hidden_component_sum = 0.0
                         train_cos_component_sum = 0.0
+                        train_anchor_consistency_component_sum = 0.0
+                        train_anchor_consistency_scale_sum = 0.0
+                        train_anchor_consistency_pairs_sum = 0.0
                         train_acc_sum = 0.0
                         train_detail_accumulator = None
                         train_log_steps = 0
@@ -1112,6 +1247,7 @@ def main():
                     s=f"{metrics['soft_loss'].item():.3f}",
                     h=f"{metrics['hidden_loss'].item():.3f}",
                     c=f"{metrics['cos_loss'].item():.3f}",
+                    anc=f"{metrics['anchor_consistency_loss'].item():.3f}",
                     L=f"{metrics['loss'].item():.3f}",
                     acc=f"{metrics['accuracy'].item():.3f}",
                     lr=f"{scheduler.get_last_lr()[0]:.2e}",
@@ -1172,6 +1308,8 @@ def main():
                     f"hidden*={val_metrics['val/hidden_component']:.4f} "
                     f"cos={val_metrics['val/cos_loss']:.4f} "
                     f"cos*={val_metrics['val/cos_component']:.4f} "
+                    f"anc={val_metrics['val/anchor_consistency_loss']:.4f} "
+                    f"anc*={val_metrics['val/anchor_consistency_component']:.4f} "
                     f"acc={current_val_acc:.3f} "
                     f"| best_loss={best_val_loss:.4f} best_acc={best_val_acc:.3f} "
                     f"patience={patience_counter}/{args.patience}"

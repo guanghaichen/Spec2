@@ -942,7 +942,7 @@ class SpecVLAforActionPrediction(nn.Module):
         Invariant:
         - Before draft, target has already decoded the current anchor token.
         - action_context therefore contains A0..A_anchor.
-        - Draft starts from t_{anchor+1} and predicts t_{anchor+2}...
+        - The draft block still starts from t_anchor and predicts t_{anchor+1}...
         """
         assert input_ids.shape[0] == 1, "Only support batch size 1 for now!!"
         input_ids = input_ids.clone()
@@ -958,7 +958,7 @@ class SpecVLAforActionPrediction(nn.Module):
 
         token_prefix_len = input_ids.shape[1]
         block_size = self.ea_layer.block_size
-        max_draft_tokens = max(block_size - 2, 0)
+        max_draft_tokens = max(block_size - 1, 0)
         max_length = token_prefix_len + max_new_tokens
         output_ids = torch.full(
             (1, max_length + block_size),
@@ -1017,18 +1017,13 @@ class SpecVLAforActionPrediction(nn.Module):
             )[:, :1, :]
             action_context_with_anchor = torch.cat([action_context, anchor_hidden], dim=1)
 
-            known_next_idx = anchor_idx + 1
-            known_next_token = dflash_sample(anchor_logits[:, -1:, :], temperature=0.0)
-            output_ids[:, token_prefix_len + known_next_idx : token_prefix_len + known_next_idx + 1] = (
-                known_next_token
-            )
-
-            remaining = max_new_tokens - known_next_idx - 1
+            target_next_token = dflash_sample(anchor_logits[:, -1:, :], temperature=0.0)
+            remaining = max_new_tokens - anchor_idx - 1
             q_len = min(max_draft_tokens, remaining)
             if q_len <= 0:
                 past_key_values = anchor_outputs.past_key_values
                 action_context = action_context_with_anchor
-                anchor_idx = known_next_idx
+                anchor_idx = anchor_idx + 1
                 continue
 
             block_input_ids = torch.full(
@@ -1037,7 +1032,7 @@ class SpecVLAforActionPrediction(nn.Module):
                 dtype=torch.long,
                 device=input_ids.device,
             )
-            block_input_ids[:, 0] = known_next_token.squeeze(1)
+            block_input_ids[:, 0] = anchor_input_ids.squeeze(1)
             noise_embedding = self.base_model.language_model.model.embed_tokens(block_input_ids)
 
             target_hidden = torch.cat([prompt_context, action_context_with_anchor], dim=1)
@@ -1049,14 +1044,14 @@ class SpecVLAforActionPrediction(nn.Module):
             ).unsqueeze(0)
             ctx_position_ids = torch.cat([prompt_position_ids, action_ctx_position_ids], dim=1)
             noise_position_ids = torch.arange(
-                action_base_position + known_next_idx,
-                action_base_position + known_next_idx + q_len,
+                action_base_position + anchor_idx,
+                action_base_position + anchor_idx + q_len,
                 device=input_ids.device,
                 dtype=torch.long,
             ).unsqueeze(0)
             action_position_ids = torch.arange(
-                known_next_idx,
-                known_next_idx + q_len,
+                anchor_idx,
+                anchor_idx + q_len,
                 device=input_ids.device,
                 dtype=torch.long,
             ).unsqueeze(0)
@@ -1072,19 +1067,31 @@ class SpecVLAforActionPrediction(nn.Module):
             draft_logits = self.base_model.language_model.lm_head(draft_hidden)
             proposed_tokens = dflash_sample(draft_logits, temperature=0.0)
 
-            # 用目标模型并行校验 draft 对 t_{anchor+2}... 的猜测。
-            verify_input_ids = torch.cat([block_input_ids[:, :1], proposed_tokens[:, :-1]], dim=1)
-            verify_embeds = self.base_model.language_model.model.embed_tokens(verify_input_ids)
-            verify_outputs, verify_logits, _, _ = self(
-                input_embeds=verify_embeds,
-                output_orig=True,
-                attention_mask=None,
-                past_key_values=anchor_outputs.past_key_values,
-                return_dict=True,
-                position_ids=noise_position_ids,
-                use_cache=True,
-            )
-            posterior = dflash_sample(verify_logits, temperature=0.0)
+            # slot0 的 target posterior 已经由 target decode(t_anchor) 得到；
+            # 后续 slot 用 target 并行校验 proposed t_{anchor+1}...
+            verify_outputs = None
+            if q_len > 1:
+                verify_input_ids = proposed_tokens[:, :-1]
+                verify_embeds = self.base_model.language_model.model.embed_tokens(verify_input_ids)
+                verify_position_ids = torch.arange(
+                    action_base_position + anchor_idx + 1,
+                    action_base_position + anchor_idx + q_len,
+                    device=input_ids.device,
+                    dtype=torch.long,
+                ).unsqueeze(0)
+                verify_outputs, verify_logits, _, _ = self(
+                    input_embeds=verify_embeds,
+                    output_orig=True,
+                    attention_mask=None,
+                    past_key_values=anchor_outputs.past_key_values,
+                    return_dict=True,
+                    position_ids=verify_position_ids,
+                    use_cache=True,
+                )
+                posterior_tail = dflash_sample(verify_logits, temperature=0.0)
+                posterior = torch.cat([target_next_token, posterior_tail], dim=1)
+            else:
+                posterior = target_next_token
 
             accept_mask = self._compute_dflash_accept_mask(
                 proposed_tokens, posterior, accept_threshold=accept_threshold
@@ -1102,7 +1109,7 @@ class SpecVLAforActionPrediction(nn.Module):
             accept_lengths.append(effective_accept_length)
             total_accepted += effective_accept_length
 
-            proposed_start_pos = token_prefix_len + known_next_idx + 1
+            proposed_start_pos = token_prefix_len + anchor_idx + 1
             if effective_accept_length > 0:
                 output_ids[
                     :,
@@ -1115,14 +1122,21 @@ class SpecVLAforActionPrediction(nn.Module):
                     :, effective_accept_length
                 ]
 
-            verified_append_count = effective_accept_length if all_accepted else effective_accept_length + 1
-            new_anchor_idx = known_next_idx + verified_append_count
+            new_anchor_idx = anchor_idx + (q_len if all_accepted else effective_accept_length + 1)
             new_cache_length = action_base_position + new_anchor_idx
-            past_key_values = self._crop_past_key_values(verify_outputs.past_key_values, new_cache_length)
-            verified_hidden = extract_context_feature(
-                verify_outputs.hidden_states, self.ea_layer.target_layer_ids
-            )[:, :verified_append_count, :]
-            action_context = torch.cat([action_context_with_anchor, verified_hidden], dim=1)
+            source_past_key_values = (
+                verify_outputs.past_key_values if verify_outputs is not None else anchor_outputs.past_key_values
+            )
+            past_key_values = self._crop_past_key_values(source_past_key_values, new_cache_length)
+
+            tail_hidden_count = min(effective_accept_length, max(q_len - 1, 0))
+            if verify_outputs is not None and tail_hidden_count > 0:
+                verified_hidden = extract_context_feature(
+                    verify_outputs.hidden_states, self.ea_layer.target_layer_ids
+                )[:, :tail_hidden_count, :]
+                action_context = torch.cat([action_context_with_anchor, verified_hidden], dim=1)
+            else:
+                action_context = action_context_with_anchor
             anchor_idx = new_anchor_idx
 
         per_position_stats = []

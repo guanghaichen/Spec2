@@ -579,18 +579,18 @@ def compute_loss_and_accuracy(
     anchor_position_total = torch.zeros(seq_len, seq_len, device=device, dtype=torch.float32)
     # 主循环：
     # - 原始 DFLASH: context=P+A[:anchor]，block=[t_anchor, MASK...]，预测 t_{anchor+1}...
-    # - SpecVLA式注入: context=P+A[:anchor+1]，block=[t_{anchor+1}, MASK...]，预测 t_{anchor+2}...
+    # - SpecVLA式注入: context=P+A[:anchor+1]，block=[t_anchor, MASK...]，预测 t_{anchor+1}...
     # 后者让 anchor=0 时真正注入 A0；训练/推理都由 target 先走过 anchor token。
     for anchor in range(seq_len):# anchor：一个滑动窗口的起始位置
         if args.include_anchor_hidden:
-            # 需要 A_anchor 已存在，同时还要有 H_{anchor+1} 作为 draft 的第一个监督槽位。
-            if int((lengths > anchor + 1).sum().item()) == 0:
+            # 需要 A_anchor 已存在；slot0 仍然对齐 H_anchor，经 lm_head 预测 t_{anchor+1}。
+            if int((lengths > anchor).sum().item()) == 0:
                 continue
-            max_block_len = min(args.block_size - 2, seq_len - anchor - 1)
-            known_token_index = anchor + 1
+            max_block_len = min(args.block_size - 1, seq_len - anchor)
+            known_token_index = anchor
             ctx_action_count = anchor + 1
-            teacher_start = anchor + 1
-            target_token_start = anchor + 2
+            teacher_start = anchor
+            target_token_start = anchor + 1
         else:
             if int((lengths > anchor).sum().item()) == 0:
                 continue

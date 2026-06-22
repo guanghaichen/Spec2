@@ -47,7 +47,7 @@ def parse_args():
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_goal_dflash_hidden_soft",
+        default="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_goal_dflash_specvla_anchor_hidden",
         help="输出目录（用于保存模型权重）",
     )
     parser.add_argument("--batch_size", type=int, default=8, help="每张卡的 micro batch size")
@@ -67,8 +67,14 @@ def parse_args():
     parser.add_argument("--num_draft_layers", type=int, default=3, help="DFlash Draft 层数（原默认 5）")
     parser.add_argument("--target_layer_ids", type=int, nargs="*", default=[1, 8, 15, 22, 29], help="捕捉的 OpenVLA 目标层；留空时按 Draft 层数均匀选取，恢复 5 层时用 [1,8,15,22,29]")
     parser.add_argument("--mask_token_id", type=int, default=None, help="加噪声的 token ID，不指定也会自适应取pad_token_id")
+    parser.add_argument(
+        "--include_anchor_hidden",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="SpecVLA式注入：context包含当前anchor的目标模型hidden；draft从anchor+1开始并行预测后续token",
+    )
     parser.add_argument("--hidden_w", type=float, default=1.0, help="hidden states 蒸馏主损失权重")
-    parser.add_argument("--soft_w", type=float, default=0.1, help="teacher soft distribution 交叉熵蒸馏权重")
+    parser.add_argument("--soft_w", type=float, default=0, help="teacher soft distribution 交叉熵蒸馏权重")
     parser.add_argument("--soft_temperature", type=float, default=2.0, help="teacher soft distribution 蒸馏温度")
     parser.add_argument("--cos_w", type=float, default=0.05, help="hidden cosine 辅助约束权重")
     parser.add_argument("--slot_decay", type=float, default=0.85, help="DFLASH 块内位置衰减权重，越靠前的 draft slot 越重要")
@@ -94,7 +100,7 @@ def parse_args():
     parser.add_argument("--swanlab_mode", type=str, default="cloud", choices=["cloud", "local", "offline", "disabled"], help="SwanLab 模式")
     parser.add_argument("--refresh_file_cache", action="store_true", help="强制重新扫描数据目录并刷新 .ckpt 文件清单缓存")
     parser.add_argument("--val_split", type=float, default=0.1, help="验证集比例，0 表示不划分验证集")
-    parser.add_argument("--patience", type=int, default=5, help="早停耐心值（epoch 数）；验证 loss 不下降多少个 epoch 后停止")
+    parser.add_argument("--patience", type=int, default=3, help="早停耐心值（epoch 数）；验证 loss 不下降多少个 epoch 后停止")
     parser.add_argument("--eval_every", type=int, default=1, help="每隔多少个 epoch 进行一次验证")
     return parser.parse_args()
 
@@ -275,7 +281,10 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "num_draft_layers": args.num_draft_layers,
         "target_layer_ids": args.target_layer_ids,
         "mask_token_id": args.mask_token_id,
-        "loss_design": "hidden_smooth_l1_main_plus_teacher_soft_ce",
+        "loss_design": "specvla_anchor_hidden_smooth_l1_main_plus_teacher_soft_ce"
+        if args.include_anchor_hidden
+        else "hidden_smooth_l1_main_plus_teacher_soft_ce",
+        "include_anchor_hidden": args.include_anchor_hidden,
         "hidden_w": args.hidden_w,
         "soft_w": args.soft_w,
         "soft_temperature": args.soft_temperature,
@@ -568,12 +577,28 @@ def compute_loss_and_accuracy(
     position_total = torch.zeros(seq_len, device=device, dtype=torch.float32)
     anchor_position_correct = torch.zeros(seq_len, seq_len, device=device, dtype=torch.float32)
     anchor_position_total = torch.zeros(seq_len, seq_len, device=device, dtype=torch.float32)
-    # 主循环：anchor token 作为当前已知 token，DFLASH 并行预测 anchor+1 开始的若干 token。
-    # 输出槽位 0 对齐 teacher H(token_anchor)，经 lm_head 预测 token_{anchor+1}。
+    # 主循环：
+    # - 原始 DFLASH: context=P+A[:anchor]，block=[t_anchor, MASK...]，预测 t_{anchor+1}...
+    # - SpecVLA式注入: context=P+A[:anchor+1]，block=[t_{anchor+1}, MASK...]，预测 t_{anchor+2}...
+    # 后者让 anchor=0 时真正注入 A0；训练/推理都由 target 先走过 anchor token。
     for anchor in range(seq_len):# anchor：一个滑动窗口的起始位置
-        if int((lengths > anchor).sum().item()) == 0:
-            continue
-        max_block_len = min(args.block_size - 1, seq_len - anchor)
+        if args.include_anchor_hidden:
+            # 需要 A_anchor 已存在，同时还要有 H_{anchor+1} 作为 draft 的第一个监督槽位。
+            if int((lengths > anchor + 1).sum().item()) == 0:
+                continue
+            max_block_len = min(args.block_size - 2, seq_len - anchor - 1)
+            known_token_index = anchor + 1
+            ctx_action_count = anchor + 1
+            teacher_start = anchor + 1
+            target_token_start = anchor + 2
+        else:
+            if int((lengths > anchor).sum().item()) == 0:
+                continue
+            max_block_len = min(args.block_size - 1, seq_len - anchor)
+            known_token_index = anchor
+            ctx_action_count = anchor
+            teacher_start = anchor
+            target_token_start = anchor + 1
         if max_block_len <= 0:
             continue
         # 构造输入序列
@@ -583,17 +608,17 @@ def compute_loss_and_accuracy(
             dtype=tokens.dtype,
             device=device,
         )
-        anchor_active = lengths > anchor
-        block_ids[anchor_active, 0] = tokens[anchor_active, anchor]# 给输入序列的第 0 位放已知 anchor token
+        anchor_active = lengths > teacher_start
+        block_ids[anchor_active, 0] = tokens[anchor_active, known_token_index]# 给输入序列第0位放当前已知 token
         noise_embedding = embed_tokens(block_ids)# 加噪
 
         ctx_hidden = torch.cat(
-            [prompt_selected, action_selected[:, :anchor, :]],
+            [prompt_selected, action_selected[:, :ctx_action_count, :]],
             dim=1,
-        )# [B, prefix_len+anchor, L*hidden] 上下文：完整 prefill/prefix + anchor前action hidden
-        if anchor > 0:
+        )# [B, prefix_len+ctx_action_count, L*hidden] 上下文：完整 prefill/prefix + 已注入action hidden
+        if ctx_action_count > 0:
             action_ctx_mask = (
-                torch.arange(anchor, device=device, dtype=torch.long).unsqueeze(0)
+                torch.arange(ctx_action_count, device=device, dtype=torch.long).unsqueeze(0)
                 < lengths.unsqueeze(1)
             )
             ctx_attention_mask = torch.cat([prompt_attention_mask, action_ctx_mask], dim=1)
@@ -604,21 +629,21 @@ def compute_loss_and_accuracy(
             noise = torch.randn_like(ctx_hidden) * args.hidden_noise
             ctx_hidden = torch.where(ctx_attention_mask.unsqueeze(-1), ctx_hidden + noise, ctx_hidden)
         action_base_positions = prompt_lengths
-        if anchor > 0:
+        if ctx_action_count > 0:
             action_ctx_positions = (
                 action_base_positions.unsqueeze(1)
-                + torch.arange(anchor, device=device, dtype=torch.long).unsqueeze(0)
+                + torch.arange(ctx_action_count, device=device, dtype=torch.long).unsqueeze(0)
             )
             ctx_position_ids = torch.cat([prompt_position_ids, action_ctx_positions], dim=1)
         else:
             ctx_position_ids = prompt_position_ids
         noise_position_ids = (
             action_base_positions.unsqueeze(1)
-            + anchor
+            + known_token_index
             + torch.arange(max_block_len, device=device, dtype=torch.long).unsqueeze(0)
         )
         action_position_ids = (
-            anchor + torch.arange(max_block_len, device=device, dtype=torch.long).unsqueeze(0)
+            known_token_index + torch.arange(max_block_len, device=device, dtype=torch.long).unsqueeze(0)
         ).expand(batch_size, -1)
 
         # Draft 模型推理
@@ -632,14 +657,14 @@ def compute_loss_and_accuracy(
         )
 
         student_hidden = pred_hidden[:, :max_block_len, :].float()# 草稿预测的最终层 hidden [B, block, hidden]
-        teacher_hidden = target_hidden[:, anchor : anchor + max_block_len, :].float()# H(token_anchor..)
+        teacher_hidden = target_hidden[:, teacher_start : teacher_start + max_block_len, :].float()# H(已知token..)
         # 草稿预测最终层hidden过lm头取logits
         student_logits = lm_head(student_hidden.to(torch.bfloat16)).float()
-        target_tokens = tokens[:, anchor + 1 : anchor + 1 + max_block_len]
+        target_tokens = tokens[:, target_token_start : target_token_start + max_block_len]
 
         valid_mask = (
             torch.arange(max_block_len, device=device, dtype=torch.long).unsqueeze(0)
-            < (lengths - anchor).unsqueeze(1)
+            < (lengths - teacher_start).unsqueeze(1)
         ).float()
         valid_count = valid_mask.sum()
         if valid_count.item() == 0:
@@ -649,7 +674,7 @@ def compute_loss_and_accuracy(
             device=device,
             dtype=torch.float32,
         )
-        target_positions = anchor + torch.arange(
+        target_positions = teacher_start + torch.arange(
             max_block_len,
             device=device,
             dtype=torch.float32,
@@ -697,7 +722,7 @@ def compute_loss_and_accuracy(
         anchor_total[anchor] += valid_count
         anchor_correct[anchor] += correct_mask.sum().float()
         for local_pos in range(max_block_len):
-            target_pos = anchor + local_pos
+            target_pos = teacher_start + local_pos
             pos_mask = valid_mask[:, local_pos].bool()
             pos_count = pos_mask.sum().float()
             if pos_count.item() == 0:
@@ -800,6 +825,8 @@ def main():
             raise ValueError(f"--{loss_name} must be >= 0.")
     if args.action_dim <= 0:
         raise ValueError("--action_dim must be > 0.")
+    if args.include_anchor_hidden and args.block_size < 3:
+        raise ValueError("--block_size must be >= 3 when --include_anchor_hidden is enabled.")
     if args.lr > 1e-3:
         print(
             f"WARNING: lr={args.lr:g} is very high for DFLASH AdamW training. "

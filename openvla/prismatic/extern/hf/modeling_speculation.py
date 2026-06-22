@@ -555,6 +555,7 @@ class SpecVLAforActionPrediction(nn.Module):
             dflash_target_layer_ids=None,# 目标层id
             dflash_mask_token_id=None,# 掩码tokenid
             dflash_action_dim=7,# action token维度数，用于DFlash action-dimension embedding
+            dflash_include_anchor_hidden=False,# 是否启用SpecVLA式当前anchor hidden注入
     ):
 
         super().__init__()
@@ -565,6 +566,7 @@ class SpecVLAforActionPrediction(nn.Module):
         self.base_model_name_or_path = base_model_name_or_path
         self.tokenizer = AutoTokenizer.from_pretrained(self.base_model_name_or_path, use_fast=False)
         self.draft_backend = draft_backend
+        self.dflash_include_anchor_hidden = dflash_include_anchor_hidden
         self.dflash_mask_token_id = (
             dflash_mask_token_id
             if dflash_mask_token_id is not None
@@ -577,6 +579,9 @@ class SpecVLAforActionPrediction(nn.Module):
             dflash_block_size = saved_dflash_cfg.get("block_size", dflash_block_size)
             dflash_num_draft_layers = saved_dflash_cfg.get("num_draft_layers", dflash_num_draft_layers)
             dflash_action_dim = saved_dflash_cfg.get("action_dim", dflash_action_dim)
+            self.dflash_include_anchor_hidden = saved_dflash_cfg.get(
+                "include_anchor_hidden", self.dflash_include_anchor_hidden
+            )
             if dflash_target_layer_ids is None:
                 dflash_target_layer_ids = saved_dflash_cfg.get("target_layer_ids")
             if dflash_mask_token_id is None:
@@ -739,6 +744,13 @@ class SpecVLAforActionPrediction(nn.Module):
         accept_threshold=None,
         **kwargs
     ):
+        if self.dflash_include_anchor_hidden:
+            return self._dflash_generate_with_anchor_hidden(
+                input_ids=input_ids,
+                max_new_tokens=max_new_tokens,
+                accept_threshold=accept_threshold,
+                **kwargs,
+            )
         assert input_ids.shape[0] == 1, "Only support batch size 1 for now!!"
         input_ids = input_ids.clone()
 
@@ -908,6 +920,231 @@ class SpecVLAforActionPrediction(nn.Module):
             "block_size": block_size,
             "generated_tokens": max_new_tokens,
             "num_blocks": len(accept_lengths),
+            "accept_lengths": accept_lengths,
+            "avg_accept_length": (sum(accept_lengths) / len(accept_lengths)) if accept_lengths else 0.0,
+            "accepted_tokens": total_accepted,
+            "compared_tokens": total_compared,
+            "overall_hit_rate": (total_accepted / total_compared) if total_compared > 0 else None,
+            "per_position": per_position_stats,
+        }
+        return output_ids[:, token_prefix_len:max_length]
+
+    @torch.no_grad()
+    def _dflash_generate_with_anchor_hidden(
+        self,
+        input_ids,
+        max_new_tokens,
+        accept_threshold=None,
+        **kwargs
+    ):
+        """SpecVLA-style anchor hidden injection for DFLASH.
+
+        Invariant:
+        - Before draft, target has already decoded the current anchor token.
+        - action_context therefore contains A0..A_anchor.
+        - Draft starts from t_{anchor+1} and predicts t_{anchor+2}...
+        """
+        assert input_ids.shape[0] == 1, "Only support batch size 1 for now!!"
+        input_ids = input_ids.clone()
+
+        model_inputs = self.base_model.prepare_inputs_for_generation(input_ids, **kwargs)
+        outputs, orig, _, _ = self(
+            **model_inputs,
+            return_dict=True,
+            output_attentions=False,
+            output_hidden_states=True,
+            output_orig=True,
+        )
+
+        token_prefix_len = input_ids.shape[1]
+        block_size = self.ea_layer.block_size
+        max_draft_tokens = max(block_size - 2, 0)
+        max_length = token_prefix_len + max_new_tokens
+        output_ids = torch.full(
+            (1, max_length + block_size),
+            self.dflash_mask_token_id,
+            dtype=torch.long,
+            device=input_ids.device,
+        )
+        output_ids[:, :token_prefix_len] = input_ids
+
+        first_token = dflash_sample(orig[:, -1:, :], temperature=0.0)
+        output_ids[:, token_prefix_len : token_prefix_len + 1] = first_token
+
+        past_key_values = outputs.past_key_values
+        prefill_hidden = extract_context_feature(outputs.hidden_states, self.ea_layer.target_layer_ids)
+        prompt_context = prefill_hidden
+        prompt_position_ids = torch.arange(
+            prefill_hidden.shape[1],
+            device=input_ids.device,
+            dtype=torch.long,
+        ).unsqueeze(0)
+        action_base_position = prefill_hidden.shape[1]
+        action_context = prefill_hidden[:, :0, :]
+
+        position_hits = [0 for _ in range(max_draft_tokens)]
+        position_counts = [0 for _ in range(max_draft_tokens)]
+        accept_lengths = []
+        total_accepted = 0
+        total_compared = 0
+        anchor_decode_steps = 0
+
+        anchor_idx = 0
+        while anchor_idx < max_new_tokens - 1:
+            token_anchor_pos = token_prefix_len + anchor_idx
+
+            # 先让目标模型真正看过当前 anchor token，得到 A_anchor，并顺便得到 t_{anchor+1}。
+            anchor_input_ids = output_ids[:, token_anchor_pos : token_anchor_pos + 1]
+            anchor_embeds = self.base_model.language_model.model.embed_tokens(anchor_input_ids)
+            anchor_position_ids = torch.full(
+                (1, 1),
+                action_base_position + anchor_idx,
+                device=input_ids.device,
+                dtype=torch.long,
+            )
+            anchor_outputs, anchor_logits, _, _ = self(
+                input_embeds=anchor_embeds,
+                output_orig=True,
+                attention_mask=None,
+                past_key_values=past_key_values,
+                return_dict=True,
+                position_ids=anchor_position_ids,
+                use_cache=True,
+            )
+            anchor_decode_steps += 1
+            anchor_hidden = extract_context_feature(
+                anchor_outputs.hidden_states, self.ea_layer.target_layer_ids
+            )[:, :1, :]
+            action_context_with_anchor = torch.cat([action_context, anchor_hidden], dim=1)
+
+            known_next_idx = anchor_idx + 1
+            known_next_token = dflash_sample(anchor_logits[:, -1:, :], temperature=0.0)
+            output_ids[:, token_prefix_len + known_next_idx : token_prefix_len + known_next_idx + 1] = (
+                known_next_token
+            )
+
+            remaining = max_new_tokens - known_next_idx - 1
+            q_len = min(max_draft_tokens, remaining)
+            if q_len <= 0:
+                past_key_values = anchor_outputs.past_key_values
+                action_context = action_context_with_anchor
+                anchor_idx = known_next_idx
+                continue
+
+            block_input_ids = torch.full(
+                (1, q_len),
+                self.dflash_mask_token_id,
+                dtype=torch.long,
+                device=input_ids.device,
+            )
+            block_input_ids[:, 0] = known_next_token.squeeze(1)
+            noise_embedding = self.base_model.language_model.model.embed_tokens(block_input_ids)
+
+            target_hidden = torch.cat([prompt_context, action_context_with_anchor], dim=1)
+            action_ctx_position_ids = torch.arange(
+                action_base_position,
+                action_base_position + action_context_with_anchor.shape[1],
+                device=input_ids.device,
+                dtype=torch.long,
+            ).unsqueeze(0)
+            ctx_position_ids = torch.cat([prompt_position_ids, action_ctx_position_ids], dim=1)
+            noise_position_ids = torch.arange(
+                action_base_position + known_next_idx,
+                action_base_position + known_next_idx + q_len,
+                device=input_ids.device,
+                dtype=torch.long,
+            ).unsqueeze(0)
+            action_position_ids = torch.arange(
+                known_next_idx,
+                known_next_idx + q_len,
+                device=input_ids.device,
+                dtype=torch.long,
+            ).unsqueeze(0)
+
+            draft_hidden = self.ea_layer(
+                noise_embedding=noise_embedding,
+                target_hidden=target_hidden,
+                ctx_position_ids=ctx_position_ids,
+                noise_position_ids=noise_position_ids,
+                ctx_attention_mask=None,
+                action_position_ids=action_position_ids,
+            )
+            draft_logits = self.base_model.language_model.lm_head(draft_hidden)
+            proposed_tokens = dflash_sample(draft_logits, temperature=0.0)
+
+            # 用目标模型并行校验 draft 对 t_{anchor+2}... 的猜测。
+            verify_input_ids = torch.cat([block_input_ids[:, :1], proposed_tokens[:, :-1]], dim=1)
+            verify_embeds = self.base_model.language_model.model.embed_tokens(verify_input_ids)
+            verify_outputs, verify_logits, _, _ = self(
+                input_embeds=verify_embeds,
+                output_orig=True,
+                attention_mask=None,
+                past_key_values=anchor_outputs.past_key_values,
+                return_dict=True,
+                position_ids=noise_position_ids,
+                use_cache=True,
+            )
+            posterior = dflash_sample(verify_logits, temperature=0.0)
+
+            accept_mask = self._compute_dflash_accept_mask(
+                proposed_tokens, posterior, accept_threshold=accept_threshold
+            )
+            accept_length = self._compute_dflash_accept_length(
+                proposed_tokens, posterior, accept_threshold=accept_threshold
+            )
+            effective_accept_length = min(accept_length, q_len)
+            if q_len > 0:
+                current_hits = accept_mask[0, :q_len].tolist()
+                for idx, hit in enumerate(current_hits):
+                    position_counts[idx] += 1
+                    position_hits[idx] += int(hit)
+                total_compared += q_len
+            accept_lengths.append(effective_accept_length)
+            total_accepted += effective_accept_length
+
+            proposed_start_pos = token_prefix_len + known_next_idx + 1
+            if effective_accept_length > 0:
+                output_ids[
+                    :,
+                    proposed_start_pos : proposed_start_pos + effective_accept_length,
+                ] = proposed_tokens[:, :effective_accept_length]
+
+            all_accepted = effective_accept_length == q_len
+            if not all_accepted:
+                output_ids[:, proposed_start_pos + effective_accept_length] = posterior[
+                    :, effective_accept_length
+                ]
+
+            verified_append_count = effective_accept_length if all_accepted else effective_accept_length + 1
+            new_anchor_idx = known_next_idx + verified_append_count
+            new_cache_length = action_base_position + new_anchor_idx
+            past_key_values = self._crop_past_key_values(verify_outputs.past_key_values, new_cache_length)
+            verified_hidden = extract_context_feature(
+                verify_outputs.hidden_states, self.ea_layer.target_layer_ids
+            )[:, :verified_append_count, :]
+            action_context = torch.cat([action_context_with_anchor, verified_hidden], dim=1)
+            anchor_idx = new_anchor_idx
+
+        per_position_stats = []
+        for idx, (hit_count, compare_count) in enumerate(zip(position_hits, position_counts), start=1):
+            reject_count = compare_count - hit_count
+            per_position_stats.append(
+                {
+                    "position": idx,
+                    "count": compare_count,
+                    "hit_count": hit_count,
+                    "reject_count": reject_count,
+                    "hit_rate": (hit_count / compare_count) if compare_count > 0 else None,
+                    "reject_rate": (reject_count / compare_count) if compare_count > 0 else None,
+                }
+            )
+        self.last_dflash_stats = {
+            "block_size": block_size,
+            "generated_tokens": max_new_tokens,
+            "include_anchor_hidden": True,
+            "num_blocks": len(accept_lengths),
+            "anchor_decode_steps": anchor_decode_steps,
+            "target_bootstrap_tokens": anchor_decode_steps,
             "accept_lengths": accept_lengths,
             "avg_accept_length": (sum(accept_lengths) / len(accept_lengths)) if accept_lengths else 0.0,
             "accepted_tokens": total_accepted,

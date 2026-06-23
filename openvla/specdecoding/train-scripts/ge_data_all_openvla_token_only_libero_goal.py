@@ -1,8 +1,50 @@
 """关键：调用modeling_prismatic.py的OpenVLAForActionPrediction来生成动作和hidden states"""
 import argparse
 import copy
+import os
 import sys
-sys.path.insert(0, "/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/SpecVLA-main")
+from pathlib import Path
+from typing import Optional, Union
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(REPO_ROOT))
+
+
+def resolve_default_path(env_names, candidates, fallback):
+    for env_name in env_names:
+        env_value = os.environ.get(env_name)
+        if env_value:
+            return Path(env_value)
+    for candidate in candidates:
+        candidate = Path(candidate)
+        if candidate.exists():
+            return candidate
+    return Path(fallback)
+
+
+DEFAULT_VLA_PATH = resolve_default_path(
+    ("VLA_PATH", "OPENVLA_MODEL_PATH"),
+    (
+        "/data/wulin/models/openvla-7b-finetuned-libero-goal",
+        "/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/data/models--openvla--openvla-7b-finetuned-libero-goal",
+    ),
+    "/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/data/models--openvla--openvla-7b-finetuned-libero-goal",
+)
+DEFAULT_RLDS_ROOT = resolve_default_path(
+    ("LIBERO_RLDS_ROOT", "RLDS_ROOT", "DATA_ROOT_DIR"),
+    (
+        "/data/wulin/datasets/modified_libero_rlds",
+        "/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/SpecVLA-main/dataset/modified_libero_rlds",
+    ),
+    "/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/SpecVLA-main/dataset/modified_libero_rlds",
+)
+if os.environ.get("DFLASH_DATA_OUTDIR") or os.environ.get("OUTDIR"):
+    DEFAULT_OUTDIR = Path(os.environ.get("DFLASH_DATA_OUTDIR") or os.environ["OUTDIR"])
+elif Path("/data/wulin").exists():
+    DEFAULT_OUTDIR = Path("/data/wulin/specvla-data/dflash_goal_dataset")
+else:
+    DEFAULT_OUTDIR = Path("/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset")
+
 #参数：开始/结束的数据idx，gpu-idx，用于多线程并行生成
 parser = argparse.ArgumentParser(description='sp')
 
@@ -11,10 +53,15 @@ parser.add_argument('--start', type=int, default=0)
 parser.add_argument('--end', type=int, default=100)
 parser.add_argument('--index', type=int, default=1)
 parser.add_argument('--gpu_index', type=int, nargs='+', default=[0])# 指定用哪几张 GPU（nargs='+' 表示可接收多个，如 --gpu_index 0 1）
-parser.add_argument('--outdir', type=str, default='outdir0')# 输出目录名（后面代码里硬编码成了 libero_goal_dataset，也没用上这个参数）
+parser.add_argument('--outdir', type=str, default=None)# 输出目录；默认按机器自动选择
+parser.add_argument('--vla_path', type=str, default=None)
+parser.add_argument('--data_root_dir', type=str, default=None)
+parser.add_argument('--dataset_name', type=str, default='libero_goal_no_noops')
+parser.add_argument('--shuffle_buffer_size', type=int, default=100_000)
+parser.add_argument('--image_aug', action=argparse.BooleanOptionalAction, default=True)
+args = parser.parse_args()
+
 #Config
-from pathlib import Path
-from typing import Optional, Union
 
 class GenerateConfig:
     # fmt: off
@@ -23,7 +70,7 @@ class GenerateConfig:
     # Model-specific parameters
     #################################################################################################################
     model_family: str = "openvla"                    # 模型家族，这里是 OpenVLA
-    pretrained_checkpoint: Union[str, Path] = "/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/data/models--openvla--openvla-7b-finetuned-libero-goal"     # Pretrained checkpoint path
+    pretrained_checkpoint: Union[str, Path] = str(args.vla_path or DEFAULT_VLA_PATH)     # Pretrained checkpoint path
     load_in_8bit: bool = False                       # (For OpenVLA only) Load with 8-bit quantization
     load_in_4bit: bool = False                       # (For OpenVLA only) Load with 4-bit quantization
 
@@ -55,21 +102,19 @@ gen_model_cfg=GenerateConfig()
 
 class DataGenerationConfig:
     # fmt: off
-    vla_path: str = "/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/data/models--openvla--openvla-7b-finetuned-libero-goal"                            # Path to OpenVLA model (on HuggingFace Hub)
-    shuffle_buffer_size: int = 100_000                              # Dataloader shuffle buffer size (can reduce if OOM)
-    image_aug: bool = True                                          # Whether to train with image augmentations
+    vla_path: str = str(args.vla_path or DEFAULT_VLA_PATH)                            # Path to OpenVLA model (on HuggingFace Hub)
+    shuffle_buffer_size: int = args.shuffle_buffer_size                              # Dataloader shuffle buffer size (can reduce if OOM)
+    image_aug: bool = args.image_aug                                          # Whether to train with image augmentations
     # Directory Paths
-    data_root_dir: Path = Path("/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/SpecVLA-main/dataset/modified_libero_rlds")        # RLDS 格式数据集的根目录和子集名称
-    dataset_name: str = "libero_goal_no_noops"                                # Name of fine-tuning dataset (e.g., `droid_wipe`)
+    data_root_dir: Path = Path(args.data_root_dir or DEFAULT_RLDS_ROOT)        # RLDS 格式数据集的根目录和子集名称
+    dataset_name: str = args.dataset_name                                # Name of fine-tuning dataset (e.g., `droid_wipe`)
     batch_size: int = 1                                          # 生成时一次处理一条样本（因为需要把每条样本的 hidden state 精确存下来）
 #暂时粘贴过来
-import os
-os.system("export PYTHONPATH=/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/SpecVLA-main")
-os.chdir("/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/SpecVLA-main")# 强行把 Python 路径切到 SpecVLA 项目根目录，确保后面能 import 到 openvla 等自定义包
-os.environ['RANK']='1'
-os.environ['WORLD_SIZE']='1'
-os.environ['MASTER_ADDR']='localhost'
-os.environ['MASTER_PORT']='23456'
+os.chdir(REPO_ROOT)# 切到 SpecVLA 项目根目录，确保后面能 import 到 openvla 等自定义包
+os.environ.setdefault('RANK', '1')
+os.environ.setdefault('WORLD_SIZE', '1')
+os.environ.setdefault('MASTER_ADDR', 'localhost')
+os.environ.setdefault('MASTER_PORT', '23456')
 #倒入需要的modules
 #import openvla
 from tqdm import tqdm
@@ -107,6 +152,12 @@ torch.cuda.set_device(device_id := distributed_state.local_process_index)
 torch.cuda.empty_cache()
 
 cfg=DataGenerationConfig()
+outdir = str(args.outdir or DEFAULT_OUTDIR)
+gen_model_cfg.pretrained_checkpoint = cfg.vla_path
+print(f'repo root: {REPO_ROOT}')
+print(f'vla path: {cfg.vla_path}')
+print(f'rlds root: {cfg.data_root_dir}')
+print(f'output dir: {outdir}')
 # 加载投影器和动作分词器
 processor = AutoProcessor.from_pretrained(cfg.vla_path, trust_remote_code=False)# 使用已注册的本地 PrismaticProcessor，避免联网拉 HF dynamic module
 action_tokenizer = ActionTokenizer(processor.tokenizer)
@@ -152,7 +203,6 @@ def writedata(name,data_point):
 
 #from transformers.modeling_outputs import CausalLMOutputWithPast
 gen_model_cfg.unnorm_key = gen_model_cfg.task_suite_name# 反归一化动作时用的 key，告诉模型这是 libero_goal 任务集的动作统计量（均值/方差）
-outdir = '/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset'# 写死输出目录
 total_samples = len(vla_dataset)
 sample_num = 0# 处理总数
 write_sample_num = 0# 实际写入数

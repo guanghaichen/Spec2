@@ -12,10 +12,13 @@ from typing import Any, Dict, List, Optional
 sys.path.insert(0, "/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/SpecVLA-main")
 
 import torch
+import torch.distributed as dist
 import torch.nn.functional as F
 from torch import nn
+from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import AdamW
 from torch.utils.data import DataLoader, Dataset
+from torch.utils.data.distributed import DistributedSampler
 from tqdm import tqdm
 from transformers import AutoConfig, AutoImageProcessor, AutoModelForVision2Seq, AutoProcessor
 
@@ -123,6 +126,67 @@ def set_seed(seed: int) -> None:
     random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
+
+
+def init_distributed_if_needed() -> Dict[str, Any]:
+    """启用 torchrun/DDP 时初始化分布式；普通单卡启动时保持原行为。"""
+    world_size = int(os.environ.get("WORLD_SIZE", "1"))
+    rank = int(os.environ.get("RANK", "0"))
+    local_rank = int(os.environ.get("LOCAL_RANK", "0"))
+    distributed = world_size > 1
+    if distributed:
+        if not torch.cuda.is_available():
+            raise RuntimeError("DDP training requires CUDA.")
+        torch.cuda.set_device(local_rank)
+        dist.init_process_group(backend="nccl")
+    return {
+        "distributed": distributed,
+        "world_size": world_size,
+        "rank": rank,
+        "local_rank": local_rank,
+        "is_main": rank == 0,
+    }
+
+
+def cleanup_distributed(distributed: bool) -> None:
+    if distributed and dist.is_available() and dist.is_initialized():
+        dist.destroy_process_group()
+
+
+def unwrap_model(model: nn.Module) -> nn.Module:
+    return model.module if isinstance(model, DDP) else model
+
+
+def rank0_print(is_main: bool, *args, **kwargs) -> None:
+    if is_main:
+        print(*args, **kwargs)
+
+
+def distributed_log_metrics(metrics: Dict[str, torch.Tensor], distributed: bool) -> Dict[str, torch.Tensor]:
+    """把各 rank 的日志指标聚合成全局指标；loss/acc 取均值，count 类指标取和。"""
+    if not distributed:
+        return metrics
+    sum_keys = {
+        "anchor_correct",
+        "anchor_total",
+        "position_correct",
+        "position_total",
+        "anchor_position_correct",
+        "anchor_position_total",
+        "anchor_consistency_pairs",
+    }
+    reduced: Dict[str, torch.Tensor] = {}
+    world_size = dist.get_world_size()
+    for key, value in metrics.items():
+        if not torch.is_tensor(value):
+            reduced[key] = value
+            continue
+        tensor = value.detach().float().clone()
+        dist.all_reduce(tensor, op=dist.ReduceOp.SUM)
+        if key not in sum_keys:
+            tensor /= world_size
+        reduced[key] = tensor
+    return reduced
 
 def get_dataset_file_cache_path(path: str) -> Path:
     return Path(path) / ".dflash_ckpt_index.json"
@@ -350,8 +414,9 @@ def save_checkpoint(
     save_dir = Path(output_dir) / f"epoch_{epoch:03d}_step_{global_step:06d}"
     save_dir.mkdir(parents=True, exist_ok=True)
     config_payload = build_dflash_config_dict(args)
+    raw_model = unwrap_model(model)
     # 保存模型权重
-    torch.save(model.state_dict(), save_dir / "pytorch_model.bin")
+    torch.save(raw_model.state_dict(), save_dir / "pytorch_model.bin")
     # 保存训练状态（用于恢复训练，包含早停与最优权重信息）
     torch.save(
         {
@@ -369,7 +434,7 @@ def save_checkpoint(
     # 保存超参数配置
     with open(save_dir / "dflash_config.json", "w") as f:
         json.dump(config_payload, f, indent=2)
-    torch.save(model.state_dict(), Path(output_dir) / "pytorch_model.bin")
+    torch.save(raw_model.state_dict(), Path(output_dir) / "pytorch_model.bin")
     with open(Path(output_dir) / "dflash_config.json", "w") as f:
         json.dump(config_payload, f, indent=2)
     with open(Path(output_dir) / "latest_checkpoint.txt", "w") as f:
@@ -380,7 +445,7 @@ def save_best_checkpoint(output_dir: str, epoch: int, global_step: int, model: D
     """保存当前最优权重，自动覆盖上一个最优权重。"""
     best_dir = Path(output_dir) / "best_model"
     best_dir.mkdir(parents=True, exist_ok=True)
-    torch.save(model.state_dict(), best_dir / "pytorch_model.bin")
+    torch.save(unwrap_model(model).state_dict(), best_dir / "pytorch_model.bin")
     with open(best_dir / "dflash_config.json", "w") as f:
         json.dump(build_dflash_config_dict(args), f, indent=2)
     info = {"best_epoch": epoch, "best_global_step": global_step, "timestamp": datetime.now().isoformat()}
@@ -416,7 +481,7 @@ def load_checkpoint(
     scheduler,
     device: torch.device,
 ) -> Dict[str, Any]:
-    model.load_state_dict(torch.load(checkpoint_dir / "pytorch_model.bin", map_location=device))
+    unwrap_model(model).load_state_dict(torch.load(checkpoint_dir / "pytorch_model.bin", map_location=device))
     training_state = torch.load(checkpoint_dir / "training_state.pt", map_location=device)
     optimizer.load_state_dict(training_state["optimizer"])
     scheduler.load_state_dict(training_state["scheduler"])
@@ -916,6 +981,12 @@ def evaluate(
 
 def main():
     args = parse_args()
+    ddp_info = init_distributed_if_needed()
+    distributed = ddp_info["distributed"]
+    world_size = ddp_info["world_size"]
+    rank = ddp_info["rank"]
+    local_rank = ddp_info["local_rank"]
+    is_main = ddp_info["is_main"]
     if args.soft_temperature <= 0:
         raise ValueError("--soft_temperature must be > 0.")
     if args.slot_decay <= 0 or args.slot_decay > 1:
@@ -929,17 +1000,23 @@ def main():
         raise ValueError("--action_dim must be > 0.")
     if args.include_anchor_hidden and args.block_size < 3:
         raise ValueError("--block_size must be >= 3 when --include_anchor_hidden is enabled.")
+    if distributed and args.val_split > 0:
+        raise ValueError("DDP mode currently supports pure training only. Please set --val_split 0.")
     if args.lr > 1e-3:
-        print(
+        rank0_print(
+            is_main,
             f"WARNING: lr={args.lr:g} is very high for DFLASH AdamW training. "
             "This can quickly improve early metrics and then destabilize the draft model."
         )
     set_seed(args.seed)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device(f"cuda:{local_rank}" if distributed else ("cuda" if torch.cuda.is_available() else "cpu"))
     if args.run_name is None:
         args.run_name = f"dflash-libero-goal-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 
-    os.makedirs(args.output_dir, exist_ok=True)
+    if is_main:
+        os.makedirs(args.output_dir, exist_ok=True)
+    if distributed:
+        dist.barrier()
     metrics_log_path = Path(args.output_dir) / "metrics.jsonl"
 
     # transformer库内置的模型、配置、分词器加载器
@@ -948,7 +1025,7 @@ def main():
     AutoProcessor.register(OpenVLAConfig, PrismaticProcessor)# 使用PrismaticProcessor分词器
     AutoModelForVision2Seq.register(OpenVLAConfig, OpenVLAForActionPrediction)# 使用 OpenVLAForActionPrediction 来实例化VLA模型
 
-    print("正在加载 OpenVLA ...")
+    rank0_print(is_main, "正在加载 OpenVLA ...")
     vla = AutoModelForVision2Seq.from_pretrained(
         args.vla_path,
         torch_dtype=torch.bfloat16,
@@ -985,15 +1062,23 @@ def main():
     draft_config.dflash_action_dim = args.action_dim# action token维度数，用于action-dimension embedding
     model = DFlashDraftModel(draft_config).to(device=device, dtype=torch.bfloat16)# 实例化草稿模型
     trainable_params = count_trainable_parameters(model)
+    if distributed:
+        model = DDP(model, device_ids=[local_rank], output_device=local_rank)
 
     cache_path = get_dataset_file_cache_path(args.datapath)
-    if args.refresh_file_cache:
-        print(f"正在刷新数据文件缓存: {cache_path}")
-    elif cache_path.exists():
-        print(f"正在加载数据文件缓存: {cache_path}")
-    else:
-        print(f"首次扫描数据目录并建立缓存: {args.datapath}")
-    datapath = list_files(args.datapath, refresh_cache=args.refresh_file_cache)
+    if is_main:
+        if args.refresh_file_cache:
+            print(f"正在刷新数据文件缓存: {cache_path}")
+        elif cache_path.exists():
+            print(f"正在加载数据文件缓存: {cache_path}")
+        else:
+            print(f"首次扫描数据目录并建立缓存: {args.datapath}")
+        datapath = list_files(args.datapath, refresh_cache=args.refresh_file_cache)
+    if distributed:
+        dist.barrier()
+        datapath = list_files(args.datapath, refresh_cache=False)
+    elif not is_main:
+        datapath = list_files(args.datapath, refresh_cache=args.refresh_file_cache)
     if not datapath:
         raise ValueError(f"No .ckpt files found in {args.datapath}")
     random.Random(args.seed).shuffle(datapath)
@@ -1010,10 +1095,19 @@ def main():
 
     train_dataset = OfflineDFlashDataset(train_files, expected_selected_layers=len(args.target_layer_ids))
     collator = DataCollatorForOfflineDFlash()
+    train_sampler = DistributedSampler(
+        train_dataset,
+        num_replicas=world_size,
+        rank=rank,
+        shuffle=True,
+        seed=args.seed,
+        drop_last=False,
+    ) if distributed else None
     train_loader = DataLoader(
         train_dataset,
         batch_size=args.batch_size,
-        shuffle=True,
+        shuffle=train_sampler is None,
+        sampler=train_sampler,
         num_workers=args.num_workers,
         collate_fn=collator,
         pin_memory=device.type == "cuda",
@@ -1058,8 +1152,11 @@ def main():
         best_val_loss = state.get("best_val_loss")
         best_val_acc = state.get("best_val_acc")
         patience_counter = state.get("patience_counter", 0)
-        print(f"已从 {resume_checkpoint_dir} 恢复：epoch={start_epoch} global_step={global_step} "
-              f"best_val_loss={best_val_loss} best_val_acc={best_val_acc} patience_counter={patience_counter}")
+        rank0_print(
+            is_main,
+            f"已从 {resume_checkpoint_dir} 恢复：epoch={start_epoch} global_step={global_step} "
+            f"best_val_loss={best_val_loss} best_val_acc={best_val_acc} patience_counter={patience_counter}",
+        )
 
     config_payload = build_dflash_config_dict(args)
     config_payload.update(
@@ -1070,32 +1167,40 @@ def main():
             "trainable_params_m": round(trainable_params / 1e6, 2),
             "steps_per_epoch": steps_per_epoch,
             "total_optimizer_steps": total_optimizer_steps,
+            "distributed": distributed,
+            "world_size": world_size,
+            "per_device_batch": args.batch_size,
+            "global_effective_batch": args.batch_size * args.gradient_accumulation_steps * world_size,
         }
     )
-    with open(Path(args.output_dir) / "run_config.json", "w", encoding="utf-8") as f:
-        json.dump(config_payload, f, indent=2, ensure_ascii=False)
-    append_jsonl(
-        metrics_log_path,
-        {
-            "event": "run_start",
-            "timestamp": datetime.now().isoformat(),
-            "run_name": args.run_name,
-            "train_files": len(train_files),
-            "val_files": len(val_files),
-            "trainable_params": trainable_params,
-            "steps_per_epoch": steps_per_epoch,
-            "total_optimizer_steps": total_optimizer_steps,
-        },
-    )
-    print(
-        f"训练集={len(train_files)} "
-        f"验证集={len(val_files)} "
-        f"Draft参数={trainable_params/1e6:.2f}M "
-        f"effective_batch={args.batch_size * args.gradient_accumulation_steps} "
-        f"steps_per_epoch={steps_per_epoch}"
-    )
+    if is_main:
+        with open(Path(args.output_dir) / "run_config.json", "w", encoding="utf-8") as f:
+            json.dump(config_payload, f, indent=2, ensure_ascii=False)
+        append_jsonl(
+            metrics_log_path,
+            {
+                "event": "run_start",
+                "timestamp": datetime.now().isoformat(),
+                "run_name": args.run_name,
+                "train_files": len(train_files),
+                "val_files": len(val_files),
+                "trainable_params": trainable_params,
+                "steps_per_epoch": steps_per_epoch,
+                "total_optimizer_steps": total_optimizer_steps,
+                "distributed": distributed,
+                "world_size": world_size,
+            },
+        )
+        print(
+            f"训练集={len(train_files)} "
+            f"验证集={len(val_files)} "
+            f"Draft参数={trainable_params/1e6:.2f}M "
+            f"effective_batch={args.batch_size * args.gradient_accumulation_steps * world_size} "
+            f"steps_per_epoch={steps_per_epoch} "
+            f"world_size={world_size}"
+        )
 
-    swanlab_run = init_swanlab_run(args, config_payload, args.output_dir, resume_run_id=resume_run_id)
+    swanlab_run = init_swanlab_run(args, config_payload, args.output_dir, resume_run_id=resume_run_id) if is_main else None
     if swanlab_run is not None:
         swanlab_run_id = get_swanlab_run_id(swanlab_run)
         if swanlab_run_id is not None:
@@ -1122,6 +1227,8 @@ def main():
     try:
         for epoch in range(start_epoch, args.num_epochs + 1):
             model.train()
+            if train_sampler is not None:
+                train_sampler.set_epoch(epoch)
             optimizer.zero_grad(set_to_none=True)
             train_loss_sum = 0.0
             train_soft_sum = 0.0
@@ -1137,7 +1244,7 @@ def main():
             train_acc_sum = 0.0
             train_detail_accumulator = None
             train_log_steps = 0
-            pbar = tqdm(train_loader, desc=f"train {epoch}/{args.num_epochs}", dynamic_ncols=True)
+            pbar = tqdm(train_loader, desc=f"train {epoch}/{args.num_epochs}", dynamic_ncols=True) if is_main else train_loader
             for batch_idx, batch in enumerate(pbar, start=1):
                 if args.anchor_consistency_w > 0 and args.anchor_consistency_warmup_steps > 0:
                     consistency_scale = min(
@@ -1156,20 +1263,21 @@ def main():
                     consistency_scale=consistency_scale,
                 )
                 (metrics["loss"] / args.gradient_accumulation_steps).backward()
+                log_metrics = distributed_log_metrics(metrics, distributed)
 
-                train_loss_sum += metrics["loss"].item()
-                train_soft_sum += metrics["soft_loss"].item()
-                train_hidden_sum += metrics["hidden_loss"].item()
-                train_cos_sum += metrics["cos_loss"].item()
-                train_anchor_consistency_sum += metrics["anchor_consistency_loss"].item()
-                train_soft_component_sum += metrics["soft_component"].item()
-                train_hidden_component_sum += metrics["hidden_component"].item()
-                train_cos_component_sum += metrics["cos_component"].item()
-                train_anchor_consistency_component_sum += metrics["anchor_consistency_component"].item()
-                train_anchor_consistency_scale_sum += metrics["anchor_consistency_scale"].item()
-                train_anchor_consistency_pairs_sum += metrics["anchor_consistency_pairs"].item()
-                train_acc_sum += metrics["accuracy"].item()
-                train_detail_accumulator = accumulate_detail_metrics(train_detail_accumulator, metrics)
+                train_loss_sum += log_metrics["loss"].item()
+                train_soft_sum += log_metrics["soft_loss"].item()
+                train_hidden_sum += log_metrics["hidden_loss"].item()
+                train_cos_sum += log_metrics["cos_loss"].item()
+                train_anchor_consistency_sum += log_metrics["anchor_consistency_loss"].item()
+                train_soft_component_sum += log_metrics["soft_component"].item()
+                train_hidden_component_sum += log_metrics["hidden_component"].item()
+                train_cos_component_sum += log_metrics["cos_component"].item()
+                train_anchor_consistency_component_sum += log_metrics["anchor_consistency_component"].item()
+                train_anchor_consistency_scale_sum += log_metrics["anchor_consistency_scale"].item()
+                train_anchor_consistency_pairs_sum += log_metrics["anchor_consistency_pairs"].item()
+                train_acc_sum += log_metrics["accuracy"].item()
+                train_detail_accumulator = accumulate_detail_metrics(train_detail_accumulator, log_metrics)
                 train_log_steps += 1
 
                 should_step = (
@@ -1182,7 +1290,7 @@ def main():
                     optimizer.zero_grad(set_to_none=True)
                     global_step += 1
 
-                    if global_step % args.log_every_steps == 0:
+                    if is_main and global_step % args.log_every_steps == 0:
                         denom_log_steps = max(1, train_log_steps)
                         train_payload = {
                             "event": "train_step",
@@ -1243,16 +1351,17 @@ def main():
                         train_detail_accumulator = None
                         train_log_steps = 0
 
-                pbar.set_postfix(
-                    s=f"{metrics['soft_loss'].item():.3f}",
-                    h=f"{metrics['hidden_loss'].item():.3f}",
-                    c=f"{metrics['cos_loss'].item():.3f}",
-                    anc=f"{metrics['anchor_consistency_loss'].item():.3f}",
-                    L=f"{metrics['loss'].item():.3f}",
-                    acc=f"{metrics['accuracy'].item():.3f}",
-                    lr=f"{scheduler.get_last_lr()[0]:.2e}",
-                    step=global_step,
-                )
+                if is_main:
+                    pbar.set_postfix(
+                        s=f"{log_metrics['soft_loss'].item():.3f}",
+                        h=f"{log_metrics['hidden_loss'].item():.3f}",
+                        c=f"{log_metrics['cos_loss'].item():.3f}",
+                        anc=f"{log_metrics['anchor_consistency_loss'].item():.3f}",
+                        L=f"{log_metrics['loss'].item():.3f}",
+                        acc=f"{log_metrics['accuracy'].item():.3f}",
+                        lr=f"{scheduler.get_last_lr()[0]:.2e}",
+                        step=global_step,
+                    )
 
             # ── 验证 + 早停 + 最优权重 ──
             do_eval = (
@@ -1260,6 +1369,8 @@ def main():
                 and epoch % args.eval_every == 0
             )
             if do_eval:
+                if distributed:
+                    raise RuntimeError("Validation is disabled in DDP mode; use --val_split 0.")
                 val_metrics = evaluate(model, embed_tokens, lm_head, val_loader, args, device)
 
                 current_val_loss = val_metrics["val/loss"]
@@ -1321,38 +1432,43 @@ def main():
 
             # 按 epoch 保存 checkpoint
             if epoch % args.save_every == 0:
-                save_checkpoint(
-                    args.output_dir,
-                    epoch,
-                    global_step,
-                    model,
-                    optimizer,
-                    scheduler,
-                    args,
-                    swanlab_run_id=(get_swanlab_run_id(swanlab_run) if swanlab_run is not None else resume_run_id),
-                    best_val_loss=best_val_loss,
-                    best_val_acc=best_val_acc,
-                    patience_counter=patience_counter,
-                )
+                if is_main:
+                    save_checkpoint(
+                        args.output_dir,
+                        epoch,
+                        global_step,
+                        model,
+                        optimizer,
+                        scheduler,
+                        args,
+                        swanlab_run_id=(get_swanlab_run_id(swanlab_run) if swanlab_run is not None else resume_run_id),
+                        best_val_loss=best_val_loss,
+                        best_val_acc=best_val_acc,
+                        patience_counter=patience_counter,
+                    )
+                if distributed:
+                    dist.barrier()
     except KeyboardInterrupt:
-        print("检测到手动中断，正在保存 latest checkpoint 以便续训 ...")
-        save_checkpoint(
-            args.output_dir,
-            max(start_epoch, min(args.num_epochs, epoch if 'epoch' in locals() else start_epoch)),
-            global_step,
-            model,
-            optimizer,
-            scheduler,
-            args,
-            swanlab_run_id=(get_swanlab_run_id(swanlab_run) if swanlab_run is not None else resume_run_id),
-            best_val_loss=best_val_loss if 'best_val_loss' in locals() else None,
-            best_val_acc=best_val_acc if 'best_val_acc' in locals() else None,
-            patience_counter=patience_counter if 'patience_counter' in locals() else 0,
-        )
+        rank0_print(is_main, "检测到手动中断，正在保存 latest checkpoint 以便续训 ...")
+        if is_main:
+            save_checkpoint(
+                args.output_dir,
+                max(start_epoch, min(args.num_epochs, epoch if 'epoch' in locals() else start_epoch)),
+                global_step,
+                model,
+                optimizer,
+                scheduler,
+                args,
+                swanlab_run_id=(get_swanlab_run_id(swanlab_run) if swanlab_run is not None else resume_run_id),
+                best_val_loss=best_val_loss if 'best_val_loss' in locals() else None,
+                best_val_acc=best_val_acc if 'best_val_acc' in locals() else None,
+                patience_counter=patience_counter if 'patience_counter' in locals() else 0,
+            )
         raise
     finally:
         if swanlab_run is not None:
             swanlab_run.finish()
+        cleanup_distributed(distributed)
 
 
 if __name__ == "__main__":

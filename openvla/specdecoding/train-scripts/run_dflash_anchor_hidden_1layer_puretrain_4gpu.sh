@@ -8,13 +8,13 @@ cd "${REPO_ROOT}"
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3}"
 
 if [[ -d "/data/wulin" ]]; then
-  DEFAULT_VLA_PATH="/data/wulin/models/openvla-7b-finetuned-libero-goal"
-  DEFAULT_DATAPATH="/data/wulin/specvla-data/dflash_goal_dataset"
-  DEFAULT_OUTPUT_DIR="/data/wulin/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_puretrain_4gpu"
+  DEFAULT_VLA_PATH="/data/wulin/hf_files/openvla-7b-finetuned-libero-goal"
+  DEFAULT_DATAPATH="/data/wulin/c/specvla-data/dflash_goal_dataset"
+  DEFAULT_OUTPUT_DIR="/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu"
 else
   DEFAULT_VLA_PATH="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/data/models--openvla--openvla-7b-finetuned-libero-goal"
   DEFAULT_DATAPATH="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset"
-  DEFAULT_OUTPUT_DIR="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_puretrain_4gpu"
+  DEFAULT_OUTPUT_DIR="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu"
 fi
 
 VLA_PATH="${VLA_PATH:-${DEFAULT_VLA_PATH}}"
@@ -27,12 +27,13 @@ echo "OUTPUT_DIR=${OUTPUT_DIR}"
 
 torchrun --standalone --nnodes 1 --nproc_per_node 4 \
   openvla/specdecoding/train-scripts/train_dflash_libero_goal.py \
-  --run_name dflash-anchor-hidden-1layer-puretrain-4gpu \
+  --run_name dflash-anchor-hidden-1layer-finalhidden-puretrain-4gpu \
   --vla_path "${VLA_PATH}" \
   --datapath "${DATAPATH}" \
   --output_dir "${OUTPUT_DIR}" \
   --num_draft_layers 1 \
   --target_layer_ids 1 8 15 22 29 \
+  --selected_hidden_variant replace_22_with_final \
   --include_anchor_hidden \
   --anchor_consistency_w 0 \
   --soft_w 0 \

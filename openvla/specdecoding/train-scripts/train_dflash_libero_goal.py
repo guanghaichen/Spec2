@@ -26,7 +26,13 @@ from transformers import AutoConfig, AutoImageProcessor, AutoModelForVision2Seq,
 from openvla.prismatic.extern.hf.configuration_prismatic import OpenVLAConfig# 导入VLA配置类
 from openvla.prismatic.extern.hf.modeling_prismatic import OpenVLAForActionPrediction# 导入VLA模型
 from openvla.prismatic.extern.hf.processing_prismatic import PrismaticImageProcessor, PrismaticProcessor
-from openvla.specdecoding.model.dflash import DFlashDraftModel, build_target_layer_ids# 导入DFlash Draft模型与自适应选层函数
+from openvla.specdecoding.model.dflash import (
+    SELECTED_HIDDEN_VARIANTS,
+    DFlashDraftModel,
+    apply_selected_hidden_variant,
+    build_target_layer_ids,
+    normalize_selected_hidden_variant,
+)# 导入DFlash Draft模型与自适应选层函数
 
 try:
     import swanlab
@@ -70,6 +76,13 @@ def parse_args():
     parser.add_argument("--block_size", type=int, default=7, help="块大小")
     parser.add_argument("--num_draft_layers", type=int, default=3, help="DFlash Draft 层数（原默认 5）")
     parser.add_argument("--target_layer_ids", type=int, nargs="*", default=[1, 8, 15, 22, 29], help="捕捉的 OpenVLA 目标层；留空时按 Draft 层数均匀选取，恢复 5 层时用 [1,8,15,22,29]")
+    parser.add_argument(
+        "--selected_hidden_variant",
+        type=str,
+        choices=SELECTED_HIDDEN_VARIANTS,
+        default="target_layers",
+        help="DFlash context hidden 组装方式：target_layers=使用数据中保存的目标层；replace_22_with_final=将 [1,8,15,22,29] 重组为 [1,8,15,29,final]",
+    )
     parser.add_argument("--mask_token_id", type=int, default=None, help="加噪声的 token ID，不指定也会自适应取pad_token_id")
     parser.add_argument(
         "--include_anchor_hidden",
@@ -216,9 +229,17 @@ def list_files(path: str, refresh_cache: bool = False) -> List[str]:
 
 # 数据集类
 class OfflineDFlashDataset(Dataset):
-    def __init__(self, datapath: List[str], expected_selected_layers: Optional[int] = None):
+    def __init__(
+        self,
+        datapath: List[str],
+        expected_selected_layers: Optional[int] = None,
+        target_layer_ids: Optional[List[int]] = None,
+        selected_hidden_variant: str = "target_layers",
+    ):
         self.data = datapath# 所有 .ckpt 文件的路径列表
         self.expected_selected_layers = expected_selected_layers# 期望的 selected layers 数量（用于校验数据兼容性）
+        self.target_layer_ids = target_layer_ids
+        self.selected_hidden_variant = normalize_selected_hidden_variant(selected_hidden_variant)
 
     def __len__(self) -> int:
         return len(self.data)
@@ -262,6 +283,8 @@ class OfflineDFlashDataset(Dataset):
                 "Please regenerate the offline DFlash dataset with the current exporter."
             )
         required_keys = {"prompt_selected", "prompt_position_ids", "prompt_length", "action_last", "action_selected"}
+        if self.selected_hidden_variant == "replace_22_with_final":
+            required_keys.add("prompt_last")
         if not required_keys.issubset(hidden_state):
             raise ValueError(
                 f"{self.data[index]} is missing one of {sorted(required_keys)} in hidden_state. "
@@ -272,6 +295,15 @@ class OfflineDFlashDataset(Dataset):
         action_selected_hidden = self._collapse_step_hidden(
             hidden_state["action_selected"], "action_selected", self.data[index]
         )
+        data_layer_ids = hidden_state.get("layer_ids", self.target_layer_ids)
+        if data_layer_ids is None:
+            raise ValueError(f"{self.data[index]} is missing hidden_state['layer_ids']; cannot validate selected hidden layout.")
+        data_layer_ids = [int(layer_id) for layer_id in data_layer_ids]
+        if self.target_layer_ids is not None and data_layer_ids != list(self.target_layer_ids):
+            raise ValueError(
+                f"{self.data[index]} layer_ids={data_layer_ids} != configured target_layer_ids={self.target_layer_ids}. "
+                "Please use matching --target_layer_ids or regenerate data."
+            )
         if action_last_hidden.shape[0] + 1 != tokens.shape[0] or action_selected_hidden.shape[0] + 1 != tokens.shape[0]:
             raise ValueError(
                 f"{self.data[index]} hidden/tokens length mismatch: "
@@ -301,9 +333,23 @@ class OfflineDFlashDataset(Dataset):
                 f"{self.data[index]} prompt_position_ids length={hidden_state['prompt_position_ids'].shape[0]} "
                 f"!= prompt_length={prompt_length}."
             )
+        prompt_selected = apply_selected_hidden_variant(
+            hidden_state["prompt_selected"],
+            hidden_state.get("prompt_last"),
+            data_layer_ids,
+            self.selected_hidden_variant,
+            self.data[index],
+        )
+        action_selected_hidden = apply_selected_hidden_variant(
+            action_selected_hidden,
+            action_last_hidden,
+            data_layer_ids,
+            self.selected_hidden_variant,
+            self.data[index],
+        )
         # 返回单个样本的dict
         return {
-            "prompt_selected": hidden_state["prompt_selected"],# 完整 prefill/prefix 目标层 [prefix_len, L*hidden]
+            "prompt_selected": prompt_selected,# 完整 prefill/prefix 目标层 [prefix_len, L*hidden]
             "prompt_position_ids": hidden_state["prompt_position_ids"].long(),
             "prompt_length": prompt_length,
             "action_selected": action_selected_hidden,# token0..token5 的目标层
@@ -359,6 +405,7 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "block_size": args.block_size,
         "num_draft_layers": args.num_draft_layers,
         "target_layer_ids": args.target_layer_ids,
+        "selected_hidden_variant": args.selected_hidden_variant,
         "mask_token_id": args.mask_token_id,
         "loss_design": "specvla_anchor_hidden_smooth_l1_main_plus_teacher_soft_ce"
         if args.include_anchor_hidden
@@ -1059,6 +1106,7 @@ def main():
     draft_config.num_hidden_layers = args.num_draft_layers# 覆盖 草稿模型的层数
     draft_config.num_target_layers = num_target_layers# 将目标模型的总层数也存入草稿配置，供 build_target_layer_ids 使用
     draft_config.dflash_target_layer_ids = args.target_layer_ids# 5
+    draft_config.dflash_selected_hidden_variant = args.selected_hidden_variant
     draft_config.dflash_block_size = args.block_size# 7
     draft_config.dflash_action_dim = args.action_dim# action token维度数，用于action-dimension embedding
     model = DFlashDraftModel(draft_config).to(device=device, dtype=torch.bfloat16)# 实例化草稿模型
@@ -1094,7 +1142,12 @@ def main():
         train_files = datapath
         val_files = []
 
-    train_dataset = OfflineDFlashDataset(train_files, expected_selected_layers=len(args.target_layer_ids))
+    train_dataset = OfflineDFlashDataset(
+        train_files,
+        expected_selected_layers=len(args.target_layer_ids),
+        target_layer_ids=args.target_layer_ids,
+        selected_hidden_variant=args.selected_hidden_variant,
+    )
     collator = DataCollatorForOfflineDFlash()
     train_sampler = DistributedSampler(
         train_dataset,
@@ -1116,7 +1169,12 @@ def main():
     )
 
     if val_files:
-        val_dataset = OfflineDFlashDataset(val_files, expected_selected_layers=len(args.target_layer_ids))
+        val_dataset = OfflineDFlashDataset(
+            val_files,
+            expected_selected_layers=len(args.target_layer_ids),
+            target_layer_ids=args.target_layer_ids,
+            selected_hidden_variant=args.selected_hidden_variant,
+        )
         val_loader = DataLoader(
             val_dataset,
             batch_size=args.batch_size,

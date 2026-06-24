@@ -12,7 +12,12 @@ from transformers.models.llama import LlamaForCausalLM
 from transformers.models.llama.configuration_llama import LlamaConfig
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 from openvla.specdecoding.model.cnets import MMModel,PMMModel
-from openvla.specdecoding.model.dflash import DFlashDraftModel, extract_context_feature, sample as dflash_sample# 导入dflash模型、从目标模型提取hidden的函数、从logits采样token的函数
+from openvla.specdecoding.model.dflash import (
+    DFlashDraftModel,
+    extract_context_feature,
+    normalize_selected_hidden_variant,
+    sample as dflash_sample,
+)# 导入dflash模型、从目标模型提取hidden的函数、从logits采样token的函数
 from openvla.specdecoding.model.cnets import EConfig
 from transformers import AutoTokenizer
 import os
@@ -556,6 +561,7 @@ class SpecVLAforActionPrediction(nn.Module):
             dflash_mask_token_id=None,# 掩码tokenid
             dflash_action_dim=7,# action token维度数，用于DFlash action-dimension embedding
             dflash_include_anchor_hidden=False,# 是否启用SpecVLA式当前anchor hidden注入
+            dflash_selected_hidden_variant="target_layers",# DFlash条件hidden层选择，默认保持原始target layers
     ):
 
         super().__init__()
@@ -567,6 +573,7 @@ class SpecVLAforActionPrediction(nn.Module):
         self.tokenizer = AutoTokenizer.from_pretrained(self.base_model_name_or_path, use_fast=False)
         self.draft_backend = draft_backend
         self.dflash_include_anchor_hidden = dflash_include_anchor_hidden
+        self.dflash_selected_hidden_variant = normalize_selected_hidden_variant(dflash_selected_hidden_variant)
         self.dflash_mask_token_id = (
             dflash_mask_token_id
             if dflash_mask_token_id is not None
@@ -581,6 +588,9 @@ class SpecVLAforActionPrediction(nn.Module):
             dflash_action_dim = saved_dflash_cfg.get("action_dim", dflash_action_dim)
             self.dflash_include_anchor_hidden = saved_dflash_cfg.get(
                 "include_anchor_hidden", self.dflash_include_anchor_hidden
+            )
+            self.dflash_selected_hidden_variant = normalize_selected_hidden_variant(
+                saved_dflash_cfg.get("selected_hidden_variant", self.dflash_selected_hidden_variant)
             )
             if dflash_target_layer_ids is None:
                 dflash_target_layer_ids = saved_dflash_cfg.get("target_layer_ids")
@@ -612,6 +622,7 @@ class SpecVLAforActionPrediction(nn.Module):
             target_config.dflash_target_layer_ids = dflash_target_layer_ids
             target_config.dflash_block_size = dflash_block_size
             target_config.dflash_action_dim = dflash_action_dim
+            target_config.dflash_selected_hidden_variant = self.dflash_selected_hidden_variant
             # # 实例化草稿模型
             self.ea_layer = DFlashDraftModel(target_config)
             load_model_path = os.path.join(ea_model_path, "pytorch_model.bin")
@@ -778,7 +789,11 @@ class SpecVLAforActionPrediction(nn.Module):
         output_ids[:, token_prefix_len : token_prefix_len + 1] = first_token
 
         past_key_values = outputs.past_key_values
-        prefill_hidden = extract_context_feature(outputs.hidden_states, self.ea_layer.target_layer_ids)
+        prefill_hidden = extract_context_feature(
+            outputs.hidden_states,
+            self.ea_layer.target_layer_ids,
+            self.ea_layer.selected_hidden_variant,
+        )
         prompt_context = prefill_hidden
         prompt_position_ids = torch.arange(
             prefill_hidden.shape[1],
@@ -899,7 +914,9 @@ class SpecVLAforActionPrediction(nn.Module):
             new_cache_length = action_base_position + new_anchor_idx
             past_key_values = self._crop_past_key_values(verify_outputs.past_key_values, new_cache_length)
             verified_hidden = extract_context_feature(
-                verify_outputs.hidden_states, self.ea_layer.target_layer_ids
+                verify_outputs.hidden_states,
+                self.ea_layer.target_layer_ids,
+                self.ea_layer.selected_hidden_variant,
             )[:, :append_count, :]
             action_context = torch.cat([action_context, verified_hidden], dim=1)
             anchor_idx = new_anchor_idx
@@ -972,7 +989,11 @@ class SpecVLAforActionPrediction(nn.Module):
         output_ids[:, token_prefix_len : token_prefix_len + 1] = first_token
 
         past_key_values = outputs.past_key_values
-        prefill_hidden = extract_context_feature(outputs.hidden_states, self.ea_layer.target_layer_ids)
+        prefill_hidden = extract_context_feature(
+            outputs.hidden_states,
+            self.ea_layer.target_layer_ids,
+            self.ea_layer.selected_hidden_variant,
+        )
         prompt_context = prefill_hidden
         prompt_position_ids = torch.arange(
             prefill_hidden.shape[1],
@@ -1013,7 +1034,9 @@ class SpecVLAforActionPrediction(nn.Module):
             )
             anchor_decode_steps += 1
             anchor_hidden = extract_context_feature(
-                anchor_outputs.hidden_states, self.ea_layer.target_layer_ids
+                anchor_outputs.hidden_states,
+                self.ea_layer.target_layer_ids,
+                self.ea_layer.selected_hidden_variant,
             )[:, :1, :]
             action_context_with_anchor = torch.cat([action_context, anchor_hidden], dim=1)
 
@@ -1132,7 +1155,9 @@ class SpecVLAforActionPrediction(nn.Module):
             tail_hidden_count = min(effective_accept_length, max(q_len - 1, 0))
             if verify_outputs is not None and tail_hidden_count > 0:
                 verified_hidden = extract_context_feature(
-                    verify_outputs.hidden_states, self.ea_layer.target_layer_ids
+                    verify_outputs.hidden_states,
+                    self.ea_layer.target_layer_ids,
+                    self.ea_layer.selected_hidden_variant,
                 )[:, :tail_hidden_count, :]
                 action_context = torch.cat([action_context_with_anchor, verified_hidden], dim=1)
             else:

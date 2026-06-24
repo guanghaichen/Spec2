@@ -43,17 +43,89 @@ def build_target_layer_ids(num_target_layers: int, num_draft_layers: int) -> lis
     ]
 
 
+SELECTED_HIDDEN_VARIANTS = ("target_layers", "replace_22_with_final")
+
+
+def normalize_selected_hidden_variant(variant: str | None) -> str:
+    variant = variant or "target_layers"
+    if variant not in SELECTED_HIDDEN_VARIANTS:
+        raise ValueError(
+            f"Unsupported selected hidden variant: {variant!r}. "
+            f"Expected one of {SELECTED_HIDDEN_VARIANTS}."
+        )
+    return variant
+
+
+def _drop_22_and_append_final(
+    selected_states: list[torch.Tensor],
+    layer_ids: list[int],
+    final_state: torch.Tensor,
+) -> list[torch.Tensor]:
+    if 22 not in layer_ids:
+        raise ValueError(
+            "selected_hidden_variant='replace_22_with_final' requires source layer_ids to contain layer 22. "
+            f"Got layer_ids={layer_ids}."
+        )
+    kept_states = [state for state, layer_id in zip(selected_states, layer_ids) if layer_id != 22]
+    if len(kept_states) != len(selected_states) - 1:
+        raise ValueError(f"Expected exactly one layer 22 in layer_ids={layer_ids}.")
+    kept_states.append(final_state)
+    return kept_states
+
+
+def apply_selected_hidden_variant(
+    selected_hidden: torch.Tensor,
+    final_hidden: torch.Tensor | None,
+    layer_ids: list[int],
+    variant: str | None = None,
+    file_path: str | None = None,
+) -> torch.Tensor:
+    """Optionally replace source layer 22 with final-layer hidden while preserving feature width.
+
+    The offline exporter stores selected hidden as concat([1, 8, 15, 22, 29]) and stores final
+    hidden separately as prompt_last/action_last. For replace_22_with_final we rebuild the concat
+    as concat([1, 8, 15, 29, final]) without regenerating data.
+    """
+    variant = normalize_selected_hidden_variant(variant)
+    if variant == "target_layers":
+        return selected_hidden
+    if final_hidden is None:
+        location = f" in {file_path}" if file_path else ""
+        raise ValueError(f"Missing final hidden{location} for selected_hidden_variant={variant!r}.")
+    if selected_hidden.shape[:-1] != final_hidden.shape[:-1]:
+        location = f" in {file_path}" if file_path else ""
+        raise ValueError(
+            f"selected/final hidden shape mismatch{location}: "
+            f"selected={tuple(selected_hidden.shape)}, final={tuple(final_hidden.shape)}."
+        )
+    hidden_size = final_hidden.shape[-1]
+    expected_width = len(layer_ids) * hidden_size
+    if selected_hidden.shape[-1] != expected_width:
+        location = f" in {file_path}" if file_path else ""
+        raise ValueError(
+            f"selected hidden width mismatch{location}: got {selected_hidden.shape[-1]}, "
+            f"expected len(layer_ids) * hidden={expected_width} for layer_ids={layer_ids}."
+        )
+    chunks = list(selected_hidden.split(hidden_size, dim=-1))
+    final_hidden = final_hidden.to(device=selected_hidden.device, dtype=selected_hidden.dtype)
+    return torch.cat(_drop_22_and_append_final(chunks, layer_ids, final_hidden), dim=-1)
+
+
 def extract_context_feature(
     hidden_states: list[torch.Tensor],
     layer_ids: list[int],
+    selected_hidden_variant: str | None = None,
 ) -> torch.Tensor:
     """
     这是给在线推理用的函数，用于从目标模型的 hidden states 中提取特征，作为草稿模型的条件输入
     从目标模型的 hidden states 中（包含所有层）提取特征
     按照层索引取出所需层的hidden states
     """
+    selected_hidden_variant = normalize_selected_hidden_variant(selected_hidden_variant)
     offset = 1
     selected_states = [hidden_states[layer_id + offset] for layer_id in layer_ids]
+    if selected_hidden_variant == "replace_22_with_final":
+        selected_states = _drop_22_and_append_final(selected_states, layer_ids, hidden_states[-1])
     return torch.cat(selected_states, dim=-1)# 提取指定层的输出，拼接成一个大的特征向量。这个拼接特征会作为草稿模型的"上下文"条件输入
 
 
@@ -221,6 +293,14 @@ class DFlashDraftModel(nn.Module):
             self.target_layer_ids = build_target_layer_ids(num_target_layers, config.num_hidden_layers)
         else:
             self.target_layer_ids = configured_target_layer_ids# 按配置指定的层取索引
+        self.selected_hidden_variant = normalize_selected_hidden_variant(
+            getattr(config, "dflash_selected_hidden_variant", "target_layers")
+        )
+        if self.selected_hidden_variant == "replace_22_with_final" and 22 not in self.target_layer_ids:
+            raise ValueError(
+                "DFlash replace_22_with_final requires dflash_target_layer_ids to contain layer 22. "
+                f"Got {self.target_layer_ids}."
+            )
         self.fc = nn.Linear(len(self.target_layer_ids) * config.hidden_size, config.hidden_size, bias=False)
         self.action_dim_embed = nn.Embedding(self.action_dim, config.hidden_size)
         nn.init.normal_(self.action_dim_embed.weight, mean=0.0, std=0.02)

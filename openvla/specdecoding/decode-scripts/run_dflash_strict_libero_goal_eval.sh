@@ -6,9 +6,9 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/libero_eval_common.sh"
 init_libero_goal_eval_env
 resolve_dflash_goal_checkpoint
 
-ACCEPT_THRESHOLD="${ACCEPT_THRESHOLD:-9}"
+ACCEPT_THRESHOLD="${ACCEPT_THRESHOLD:-0}"
 DFLASH_NUM_DRAFT_LAYERS="${DFLASH_NUM_DRAFT_LAYERS:-1}"
-RUN_ID_NOTE="${RUN_ID_NOTE:-dflash-relaxed-${EVAL_EPOCH}-r${ACCEPT_THRESHOLD}}"
+RUN_ID_NOTE="${RUN_ID_NOTE:-dflash-strict-${EVAL_EPOCH}-r${ACCEPT_THRESHOLD}}"
 
 print_common_eval_config
 echo "DFLASH_OUTPUT_DIR=${DFLASH_OUTPUT_DIR}"
@@ -16,7 +16,7 @@ echo "EVAL_EPOCH=${EVAL_EPOCH}"
 echo "ACCEPT_THRESHOLD=${ACCEPT_THRESHOLD}"
 echo "DFLASH_NUM_DRAFT_LAYERS=${DFLASH_NUM_DRAFT_LAYERS}"
 
-python openvla/experiments/robot/libero/run_libero_goal_Spec_Relaxed.py \
+python openvla/experiments/robot/libero/run_libero_goal_Spec.py \
   --model_family openvla \
   --pretrained_checkpoint "${VLA_PATH}" \
   --spec_checkpoint "${SPEC_CKPT}" \

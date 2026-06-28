@@ -310,19 +310,47 @@ openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_consistency.s
 
 ### 3. Evaluate in LIBERO-Goal
 
-Entry point: `openvla/experiments/robot/libero/run_libero_goal_Spec_Relaxed.py`
-
-Recommended launcher:
+All LIBERO-Goal evaluation launchers live in:
 
 ```text
-openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh
+openvla/specdecoding/decode-scripts/
 ```
 
-The launcher auto-selects the 4090 or 3090 paths, reads
-`<output>/latest_checkpoint.txt` by default, and runs relaxed DFLASH evaluation
-with `accept_threshold=9`.  On the 3090 server it also uses the local NVIDIA
-570 EGL shim under `/data/wulin/c/nvidia-egl-570.133.07` when present, because
-that server's system EGL libraries are older than its active NVIDIA driver.
+They share `libero_eval_common.sh`, which auto-selects the 4090 or 3090 paths,
+sets `PYTHONPATH`, configures LIBERO, and on 3090 uses the local NVIDIA 570 EGL
+shim under `/data/wulin/c/nvidia-egl-570.133.07` when present.  The default
+3090 paths are:
+
+```text
+OpenVLA goal model: /data/wulin/hf_files/openvla-7b-finetuned-libero-goal
+SpecVLA checkpoints: /data/wulin/c/specvla-data/specvla_checkpoint/goal
+DFLASH run dir: /data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu
+Logs: /data/wulin/c/specvla-data/eval_logs
+```
+
+The corresponding 4090 default SpecVLA goal checkpoint is:
+
+```text
+/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_libero_goal_debug_ckpt
+```
+
+Use `SPEC_CKPT=/path/to/goal_ckpt` or `SPECVLA_GOAL_CKPT=/path/to/goal_ckpt`
+when evaluating a copied or renamed SpecVLA checkpoint.
+
+Use this matrix to keep experiments separated:
+
+| Experiment | Launcher | Python entry | Draft backend | Acceptance | Log subdir |
+| --- | --- | --- | --- | --- | --- |
+| OpenVLA AR baseline | `run_openvla_ar_libero_goal_eval.sh` | `run_libero_goal_AR.py` | none | autoregressive | `openvla_ar` |
+| SpecVLA strict baseline | `run_specvla_libero_goal_eval.sh` | `run_libero_goal_Spec.py` | `eagle` | strict, `accept_threshold=0` | `specvla_strict` |
+| SpecVLA relaxed baseline | `run_specvla_relaxed_libero_goal_eval.sh` | `run_libero_goal_Spec_Relaxed.py` | `eagle` | relaxed, default `accept_threshold=9` | `specvla_relaxed` |
+| DFLASH strict ablation | `run_dflash_strict_libero_goal_eval.sh` | `run_libero_goal_Spec.py` | `dflash` | strict, `accept_threshold=0` | `dflash_strict` |
+| DFLASH relaxed current method | `run_dflash_libero_goal_eval.sh` | `run_libero_goal_Spec_Relaxed.py` | `dflash` | relaxed, default `accept_threshold=9` | `dflash_relaxed` |
+
+The DFLASH relaxed launcher reads `<DFLASH_OUTPUT_DIR>/latest_checkpoint.txt`
+by default.  `run_libero_goal_Spec_Relaxed.py` is the preferred DFLASH
+evaluation entry because it records average accepted length, total hit rate,
+and per-position hit/reject statistics.
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 \
@@ -343,10 +371,23 @@ CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=180 RUN_ID_NOTE=e200-r9 \
   bash openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh
 ```
 
-The evaluator logs task success, action-generation timing, average accepted
-length, total hit rate, and per-position hit/reject rate.  Compare each DFLASH
-checkpoint with the autoregressive reference under the same LIBERO task suite,
-trial count, seed, model checkpoint, and crop setting.
+Run the baselines under the same trial count, seed, model checkpoint, and crop
+setting:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_openvla_ar_libero_goal_eval.sh
+
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_specvla_libero_goal_eval.sh
+
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_specvla_relaxed_libero_goal_eval.sh
+```
+
+For one-off overrides, set environment variables before `bash`: `VLA_PATH`,
+`SPEC_CKPT`, `SPECVLA_GOAL_CKPT`, `DFLASH_OUTPUT_DIR`, `EVAL_EPOCH`, `LOG_DIR`,
+`NUM_TRIALS_PER_TASK`, `RUN_ID_NOTE`, `USE_WANDB`, or `SEED`.
 
 #### 3090 LIBERO EGL Troubleshooting
 

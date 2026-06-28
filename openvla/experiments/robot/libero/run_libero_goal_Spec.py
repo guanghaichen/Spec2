@@ -19,10 +19,15 @@ Usage:
 
 import os
 import sys
-sys.path.insert(0, "/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/SpecVLA-main")
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Union
+
+REPO_ROOT = Path(__file__).resolve().parents[4]
+OPENVLA_ROOT = REPO_ROOT / "openvla"
+for path in (str(OPENVLA_ROOT), str(REPO_ROOT)):
+    if path not in sys.path:
+        sys.path.insert(0, path)
 
 import draccus
 import numpy as np
@@ -33,8 +38,6 @@ import wandb
 import json
 
 # Append current directory so that interpreter can find experiments.robot
-sys.path.append("/OpenVLA/openvla")
-print(sys.path)
 from experiments.robot.libero.libero_utils import (
     get_libero_dummy_action,
     get_libero_env,
@@ -128,15 +131,16 @@ def eval_libero(cfg: GenerateConfig) -> None:
         processor = get_processor(cfg)
 
     # Initialize local logging
-    target_dir = "/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/SpecVLA-main/openvla/specdecoding/test-speed/libero_goal_spec"
-    os.makedirs(target_dir,exist_ok=True)
+    eval_family = "dflash_strict" if cfg.draft_backend == "dflash" else "specvla_strict"
+    target_dir = Path(cfg.local_log_dir) / eval_family
+    target_dir.mkdir(parents=True, exist_ok=True)
     run_id = f"EVAL-{cfg.task_suite_name}-{cfg.model_family}-{DATE_TIME}"
     if cfg.run_id_note is not None:
         run_id += f"--{cfg.run_id_note}"
     os.makedirs(cfg.local_log_dir, exist_ok=True)
-    local_log_filepath = os.path.join(target_dir, run_id + ".txt")
+    local_log_filepath = str(target_dir / f"{run_id}.txt")
     log_file = open(local_log_filepath, "w")
-    local_log_timefilepath = os.path.join(target_dir, run_id + "libero_goal_spec.json")
+    local_log_timefilepath = str(target_dir / f"{run_id}-{eval_family}_timing.json")
     print(f"Logging to local log file: {local_log_filepath}")
 
     # Initialize Weights & Biases logging as well

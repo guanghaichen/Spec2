@@ -24,7 +24,10 @@ from pathlib import Path
 from typing import Optional, Union
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-sys.path.insert(0, str(REPO_ROOT))
+OPENVLA_ROOT = REPO_ROOT / "openvla"
+for path in (str(OPENVLA_ROOT), str(REPO_ROOT)):
+    if path not in sys.path:
+        sys.path.insert(0, path)
 
 import draccus
 import numpy as np
@@ -80,7 +83,6 @@ def summarize_dflash_stats(step_stats_list):
     }
 
 # Append current directory so that interpreter can find experiments.robot
-print(sys.path)
 from experiments.robot.libero.libero_utils import (
     get_libero_dummy_action,
     get_libero_env,
@@ -174,7 +176,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
         processor = get_processor(cfg)
 
     # Initialize local logging
-    target_dir = Path(cfg.local_log_dir) / "libero_goal_dflash_relaxed"
+    eval_family = "dflash_relaxed" if cfg.draft_backend == "dflash" else "specvla_relaxed"
+    target_dir = Path(cfg.local_log_dir) / eval_family
     target_dir.mkdir(parents=True, exist_ok=True)
     run_id = f"EVAL-{cfg.task_suite_name}-{cfg.model_family}-{DATE_TIME}"
     if cfg.run_id_note is not None:
@@ -182,7 +185,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
     os.makedirs(cfg.local_log_dir, exist_ok=True)
     local_log_filepath = str(target_dir / f"{run_id}.txt")
     log_file = open(local_log_filepath, "w")
-    local_log_timefilepath = str(target_dir / f"{run_id}libero_goal_dflash_relaxed.json")
+    local_log_timefilepath = str(target_dir / f"{run_id}-{eval_family}_timing.json")
     print(f"Logging to local log file: {local_log_filepath}")
 
     # Initialize Weights & Biases logging as well

@@ -152,7 +152,13 @@ def init_distributed_if_needed() -> Dict[str, Any]:
         if not torch.cuda.is_available():
             raise RuntimeError("DDP training requires CUDA.")
         torch.cuda.set_device(local_rank)
-        dist.init_process_group(backend="nccl")
+        if not dist.is_available():
+            raise RuntimeError("DDP requested but torch.distributed is not available.")
+        if not dist.is_initialized():
+            dist.init_process_group(backend="nccl")
+        else:
+            rank = dist.get_rank()
+            world_size = dist.get_world_size()
     return {
         "distributed": distributed,
         "world_size": world_size,

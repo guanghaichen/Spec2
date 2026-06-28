@@ -39,7 +39,7 @@ torchrun --standalone --nnodes 1 --nproc_per_node 4 \
   --soft_w 0 \
   --hidden_w 1.0 \
   --cos_w 0.05 \
-  --hidden_noise 0.03 \
+  --hidden_noise 0.05 \
   --weight_decay 0.05 \
   --lr 5e-5 \
   --batch_size 8 \

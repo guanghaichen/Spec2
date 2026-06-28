@@ -146,7 +146,7 @@ Token accuracy is retained as a diagnostic metric, but hard CE is not part of
 the optimization objective.  Earlier token soft-distribution experiments showed
 early validation deterioration in this offline block setting; they are retained
 as optional code (`--soft_w`, `--soft_temperature`) rather than the current
-default.  Hidden-context noise is `0.03` in the checked-in recipe.  Per-anchor
+default.  Hidden-context noise is `0.05` in the checked-in recipe.  Per-anchor
 and per-position diagnostic metrics are logged to SwanLab and local JSONL.
 
 The intended long-run control signal for the current recipe is simulator

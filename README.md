@@ -312,25 +312,34 @@ openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_consistency.s
 
 Entry point: `openvla/experiments/robot/libero/run_libero_goal_Spec_Relaxed.py`
 
-```bash
-OUT=/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu
-SPEC_CKPT="$(cat "$OUT/latest_checkpoint.txt")"
-VLA_PATH=/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/data/models--openvla--openvla-7b-finetuned-libero-goal
+Recommended launcher:
 
-CUDA_VISIBLE_DEVICES=0 MUJOCO_GL=egl MUJOCO_EGL_DEVICE_ID=0 \
-python openvla/experiments/robot/libero/run_libero_goal_Spec_Relaxed.py \
-  --pretrained_checkpoint "$VLA_PATH" \
-  --spec_checkpoint "$SPEC_CKPT" \
-  --draft_backend dflash \
-  --use_spec True \
-  --parallel_draft False \
-  --task_suite_name libero_goal \
-  --num_trials_per_task 50 \
-  --center_crop True \
-  --accept_threshold 9 \
-  --local_log_dir /mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/eval_logs \
-  --run_id_note dflash-finalhidden-latest \
-  --use_wandb False
+```text
+openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh
+```
+
+The launcher auto-selects the 4090 or 3090 paths, reads
+`<output>/latest_checkpoint.txt` by default, and runs relaxed DFLASH evaluation
+with `accept_threshold=9`.
+
+```bash
+CUDA_VISIBLE_DEVICES=0 \
+  bash openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh
+```
+
+For a quick smoke test:
+
+```bash
+NUM_TRIALS_PER_TASK=2 RUN_ID_NOTE=dflash-e200-smoke-r9 \
+  bash openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh
+```
+
+To evaluate a specific saved checkpoint instead of `latest_checkpoint.txt`:
+
+```bash
+SPEC_CKPT=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu/epoch_180_step_160740 \
+RUN_ID_NOTE=dflash-e180-r9 \
+  bash openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh
 ```
 
 The evaluator logs task success, action-generation timing, average accepted

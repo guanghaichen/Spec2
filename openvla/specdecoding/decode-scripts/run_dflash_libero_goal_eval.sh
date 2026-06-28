@@ -27,17 +27,35 @@ LOG_DIR="${LOG_DIR:-${DEFAULT_LOG_DIR}}"
 LIBERO_PATH="${LIBERO_PATH:-${DEFAULT_LIBERO_PATH}}"
 NUM_TRIALS_PER_TASK="${NUM_TRIALS_PER_TASK:-50}"
 ACCEPT_THRESHOLD="${ACCEPT_THRESHOLD:-9}"
-RUN_ID_NOTE="${RUN_ID_NOTE:-dflash-finalhidden-latest-r${ACCEPT_THRESHOLD}}"
+EVAL_EPOCH="${EVAL_EPOCH:-latest}"
+RUN_ID_NOTE="${RUN_ID_NOTE:-dflash-finalhidden-${EVAL_EPOCH}-r${ACCEPT_THRESHOLD}}"
 USE_WANDB="${USE_WANDB:-False}"
 
 if [[ -z "${SPEC_CKPT:-}" ]]; then
-  LATEST_FILE="${OUTPUT_DIR}/latest_checkpoint.txt"
-  if [[ ! -f "${LATEST_FILE}" ]]; then
-    echo "Missing latest checkpoint file: ${LATEST_FILE}" >&2
-    echo "Set OUTPUT_DIR to a DFLASH run directory or set SPEC_CKPT directly." >&2
-    exit 1
+  if [[ "${EVAL_EPOCH}" == "latest" ]]; then
+    LATEST_FILE="${OUTPUT_DIR}/latest_checkpoint.txt"
+    if [[ ! -f "${LATEST_FILE}" ]]; then
+      echo "Missing latest checkpoint file: ${LATEST_FILE}" >&2
+      echo "Set OUTPUT_DIR to a DFLASH run directory, set EVAL_EPOCH, or set SPEC_CKPT directly." >&2
+      exit 1
+    fi
+    SPEC_CKPT="$(cat "${LATEST_FILE}")"
+  elif [[ "${EVAL_EPOCH}" == epoch_* ]]; then
+    SPEC_CKPT="${OUTPUT_DIR}/${EVAL_EPOCH}"
+  else
+    if [[ ! "${EVAL_EPOCH}" =~ ^[0-9]+$ ]]; then
+      echo "EVAL_EPOCH must be an integer epoch number, 'latest', or a checkpoint directory name like epoch_180_step_160740." >&2
+      exit 1
+    fi
+    EPOCH_TAG="$(printf "%03d" "${EVAL_EPOCH}")"
+    mapfile -t MATCHED_CKPTS < <(find "${OUTPUT_DIR}" -maxdepth 1 -type d -name "epoch_${EPOCH_TAG}_step_*" | sort -V)
+    if [[ "${#MATCHED_CKPTS[@]}" -ne 1 ]]; then
+      echo "Expected exactly one checkpoint matching ${OUTPUT_DIR}/epoch_${EPOCH_TAG}_step_*, found ${#MATCHED_CKPTS[@]}." >&2
+      printf '%s\n' "${MATCHED_CKPTS[@]}" >&2
+      exit 1
+    fi
+    SPEC_CKPT="${MATCHED_CKPTS[0]}"
   fi
-  SPEC_CKPT="$(cat "${LATEST_FILE}")"
 fi
 
 if [[ ! -d "${SPEC_CKPT}" ]]; then
@@ -63,6 +81,7 @@ echo "SPEC_CKPT=${SPEC_CKPT}"
 echo "LOG_DIR=${LOG_DIR}"
 echo "NUM_TRIALS_PER_TASK=${NUM_TRIALS_PER_TASK}"
 echo "ACCEPT_THRESHOLD=${ACCEPT_THRESHOLD}"
+echo "EVAL_EPOCH=${EVAL_EPOCH}"
 echo "RUN_ID_NOTE=${RUN_ID_NOTE}"
 
 python openvla/experiments/robot/libero/run_libero_goal_Spec_Relaxed.py \

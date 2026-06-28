@@ -337,8 +337,7 @@ NUM_TRIALS_PER_TASK=2 RUN_ID_NOTE=dflash-e200-smoke-r9 \
 To evaluate a specific saved checkpoint instead of `latest_checkpoint.txt`:
 
 ```bash
-SPEC_CKPT=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu/epoch_180_step_160740 \
-RUN_ID_NOTE=dflash-e180-r9 \
+EVAL_EPOCH=180 \
   bash openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh
 ```
 

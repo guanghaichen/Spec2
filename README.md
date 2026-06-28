@@ -347,6 +347,10 @@ Use this matrix to keep experiments separated:
 | DFLASH strict ablation | `run_dflash_strict_libero_goal_eval.sh` | `run_libero_goal_Spec.py` | `dflash` | strict, `accept_threshold=0` | `dflash_strict` |
 | DFLASH relaxed current method | `run_dflash_libero_goal_eval.sh` | `run_libero_goal_Spec_Relaxed.py` | `dflash` | relaxed, default `accept_threshold=9` | `dflash_relaxed` |
 
+The AR baseline uses the standard OpenVLA model and intentionally does not pass
+SpecVLA/DFlash-only generation arguments such as `generate_mode` or
+`return_dflash_stats`.
+
 The DFLASH relaxed launcher reads `<DFLASH_OUTPUT_DIR>/latest_checkpoint.txt`
 by default.  `run_libero_goal_Spec_Relaxed.py` is the preferred DFLASH
 evaluation entry because it records average accepted length, total hit rate,

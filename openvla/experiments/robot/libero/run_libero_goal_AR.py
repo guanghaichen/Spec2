@@ -229,7 +229,6 @@ def eval_libero(cfg: GenerateConfig) -> None:
                         task_description,
                         processor=processor,
                         return_time=True,# 返回模型推理耗时
-                        generate_mode = 'AR'# 推理模式，控制是否用草稿加速
                     )
 
                     # Normalize gripper action [0,1] -> [-1,+1] because the environment expects the latter

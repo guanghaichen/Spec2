@@ -214,14 +214,18 @@ def get_vla_action(vla, processor, base_vla_name, obs, task_label, unnorm_key, r
     # 统计推理耗时
     start_time = time.time()
     # 标准推理 推理动作
-    action = vla.predict_action(# 调用 OpenVLAForActionPrediction.predict_action()
+    predict_kwargs = dict(
         **inputs,
         unnorm_key=unnorm_key,
         return_hidden_states=return_hidden_states,
-        return_dflash_stats=return_dflash_stats,
         do_sample=False,
-        generate_mode=generate_mode,
     )
+    if generate_mode in {"speculative", "dflash"}:
+        predict_kwargs["generate_mode"] = generate_mode
+    if return_dflash_stats:
+        predict_kwargs["return_dflash_stats"] = True
+
+    action = vla.predict_action(**predict_kwargs)# 调用 OpenVLAForActionPrediction.predict_action()
     end_time = time.time()
     if return_time:
         if return_dflash_stats:

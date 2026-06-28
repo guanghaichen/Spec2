@@ -179,9 +179,23 @@ dflash_data_format           full_prefix_plus_action_hidden_v4
 - 低 hidden loss 不等于有效 speculative speedup。真正决定速度的是在线 acceptance distribution 和 target-call count。
 - Relaxed acceptance 可能保持实际动作效果，但 token 层面不等于 strict equality。必须做消融并诚实报告阈值。
 
-## 4090 复现实验命令
+## 服务器分工和训练流程
 
-主开发机器是 **4090**。进入服务器和环境：
+当前两台机器的分工如下：
+
+| 机器 | GPU 情况 | 主要用途 |
+| --- | --- | --- |
+| 4090 | 1 张 RTX 4090 | 主开发、代码调试、数据生成、小规模 sanity check。 |
+| 3090 | 8 张 RTX 3090，实验中默认只用 0-3 四张 | 完整 DFLASH 训练和 LIBERO 推理评测。 |
+
+因此，**不要在 README 中把 4090 写成四卡训练机器**。当前四卡 launcher
+`run_dflash_anchor_hidden_1layer_puretrain_4gpu.sh` 固定使用
+`torchrun --nproc_per_node 4`，实际应该在 3090 上用 `CUDA_VISIBLE_DEVICES=0,1,2,3`
+启动。4090 如果需要训练，只适合临时做单卡小规模调试，不能直接照搬四卡命令。
+
+### 1. 4090：主开发、数据生成和单卡调试
+
+4090 进入服务器和环境：
 
 ```bash
 ssh 4090
@@ -193,15 +207,13 @@ export PYTHONPATH="$PWD"
 路径可以通过 `VLA_PATH`、`LIBERO_RLDS_ROOT`、`DFLASH_DATA_OUTDIR` 覆盖；
 数据生成脚本也支持显式 `--vla_path`、`--data_root_dir`、`--outdir` 参数。这样可以避免意外触发 Hugging Face 下载。
 
-### 1. 生成 DFLASH 原始数据
-
-入口：
+生成 DFLASH 原始数据的入口：
 
 ```text
 openvla/specdecoding/train-scripts/ge_data_all_openvla_token_only_libero_goal.py
 ```
 
-命令：
+数据生成命令：
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 python openvla/specdecoding/train-scripts/ge_data_all_openvla_token_only_libero_goal.py \
@@ -220,7 +232,31 @@ find /mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_data
   -maxdepth 1 -name 'data_*.ckpt' | wc -l
 ```
 
-### 2. 训练当前 1-layer pure-training recipe
+2026-06-29 重新检查到的 4090 数据目录状态：
+
+```text
+/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset
+大小: 419G
+样本数: 28,639 个 data_*.ckpt
+```
+
+### 2. 3090：完整四卡训练
+
+3090 进入服务器和环境：
+
+```bash
+ssh 3090_wulin
+cd /data/wulin/c/SpecVLA-DFLASH
+source /data/wulin/miniconda3/etc/profile.d/conda.sh
+conda activate specvla
+```
+
+3090 当前有 8 张 RTX 3090，但默认完整训练只使用 0-3 四张卡：
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1,2,3 \
+  bash openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_puretrain_4gpu.sh
+```
 
 推荐 launcher：
 
@@ -228,14 +264,15 @@ find /mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_data
 openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_puretrain_4gpu.sh
 ```
 
-4090 上使用四张指定 GPU：
+该 launcher 会根据机器自动选择默认路径。3090 上的默认路径是：
 
-```bash
-CUDA_VISIBLE_DEVICES=0,1,2,3 \
-  bash openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_puretrain_4gpu.sh
+```text
+VLA_PATH=/data/wulin/hf_files/openvla-7b-finetuned-libero-goal
+DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset
+OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu
 ```
 
-该 launcher 使用：
+当前主训练配置：
 
 ```text
 torchrun --nproc_per_node 4
@@ -249,7 +286,23 @@ val_split = 0
 SwanLab = 使用环境默认配置
 ```
 
-重要输出：
+2026-06-29 重新检查到的 3090 数据和训练产物状态：
+
+```text
+数据目录: /data/wulin/c/specvla-data/dflash_goal_dataset
+大小: 419G
+当前样本数: 28,576 个 data_*.ckpt
+
+训练输出目录: /data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu
+已保存 checkpoint: epoch_010_step_008930 ... epoch_200_step_178600
+latest_checkpoint.txt -> epoch_200_step_178600
+run_config.json 记录: world_size=4, global_effective_batch=32, train_files=28576
+```
+
+4090 和 3090 的数据文件数目前不完全相同，因此写实验记录时必须记录本机实际
+`find ... | wc -l` 结果，不要默认两台机器的数据集完全一致。
+
+训练输出中的重要文件：
 
 ```text
 <output>/epoch_XXX_step_XXXXXX/pytorch_model.bin
@@ -263,7 +316,8 @@ SwanLab = 使用环境默认配置
 `latest_checkpoint.txt` 指向默认评测 checkpoint。若中断后继续训练，应使用同一个 `--output_dir`
 和 `--resume_from_checkpoint latest`，不要在对比实验中静默改变 world size、有效 batch 或 scheduler 设置。
 
-保留两个旧诊断 launcher，仅用于 controlled ablation，不作为默认 recipe：
+保留两个旧诊断 launcher，仅用于 controlled ablation，不作为当前默认 recipe。注意它们目前仍写死了
+4090 风格输出路径，不能直接当作 3090 主训练命令：
 
 ```text
 openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_baseline.sh

@@ -339,7 +339,7 @@ NUM_TRIALS_PER_TASK=2 RUN_ID_NOTE=dflash-e200-smoke-r9 \
 To evaluate a specific saved checkpoint instead of `latest_checkpoint.txt`:
 
 ```bash
-EVAL_EPOCH=180 \
+CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=180 RUN_ID_NOTE=e200-r9 \
   bash openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh
 ```
 

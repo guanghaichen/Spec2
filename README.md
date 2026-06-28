@@ -348,6 +348,37 @@ length, total hit rate, and per-position hit/reject rate.  Compare each DFLASH
 checkpoint with the autoregressive reference under the same LIBERO task suite,
 trial count, seed, model checkpoint, and crop setting.
 
+#### 3090 LIBERO EGL Troubleshooting
+
+The 3090 server has shown this LIBERO/robosuite failure mode:
+
+```text
+RuntimeError: The MUJOCO_EGL_DEVICE_ID environment variable must be an integer between 0 and -1
+ImportError: Cannot initialize a EGL device display
+```
+
+The root cause observed on that machine was NVIDIA driver/user-space mismatch:
+`nvidia-smi` reported driver `570.133.07`, while system EGL libraries were from
+the 535 series.  We fixed it without sudo by unpacking the matching NVIDIA
+runfile into a user-local shim directory and pointing GLVND at that shim.  The
+helper is:
+
+```bash
+bash openvla/specdecoding/decode-scripts/setup_3090_nvidia_egl_shim.sh
+```
+
+The evaluation launcher auto-detects the default shim at:
+
+```text
+/data/wulin/c/nvidia-egl-570.133.07/slim-lib
+/data/wulin/c/nvidia-egl-570.133.07/egl_vendor.d/10_nvidia_570.json
+```
+
+Do not manually set `MUJOCO_EGL_DEVICE_ID=0` on 3090 unless there is a specific
+reason; with the broken system EGL stack this was the direct trigger for the
+`0 to -1` error.  Use `CUDA_VISIBLE_DEVICES=<gpu_id>` to choose the inference
+GPU.
+
 ## Git and Server Workflow
 
 The development workflow is intentionally one-way:

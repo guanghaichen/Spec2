@@ -83,6 +83,10 @@ if [[ -n "${NVIDIA_EGL_SHIM_DIR}" && -d "${NVIDIA_EGL_SHIM_DIR}" ]]; then
 fi
 if [[ -n "${NVIDIA_EGL_VENDOR_JSON}" && -f "${NVIDIA_EGL_VENDOR_JSON}" ]]; then
   export __EGL_VENDOR_LIBRARY_FILENAMES="${NVIDIA_EGL_VENDOR_JSON}"
+elif [[ -d "/data/wulin" ]]; then
+  echo "WARNING: NVIDIA EGL shim was not found." >&2
+  echo "If LIBERO fails with an EGL device-display error, run:" >&2
+  echo "  bash openvla/specdecoding/decode-scripts/setup_3090_nvidia_egl_shim.sh" >&2
 fi
 
 echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}"

@@ -7,24 +7,29 @@ cd "${REPO_ROOT}"
 
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
 export MUJOCO_GL="${MUJOCO_GL:-egl}"
-export MUJOCO_EGL_DEVICE_ID="${MUJOCO_EGL_DEVICE_ID:-0}"
 
 if [[ -d "/data/wulin" ]]; then
   DEFAULT_VLA_PATH="/data/wulin/hf_files/openvla-7b-finetuned-libero-goal"
   DEFAULT_OUTPUT_DIR="/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu"
   DEFAULT_LOG_DIR="/data/wulin/c/specvla-data/eval_logs"
   DEFAULT_LIBERO_PATH="/data/wulin/c/LIBERO"
+  DEFAULT_NVIDIA_EGL_SHIM_DIR="/data/wulin/c/nvidia-egl-570.133.07/slim-lib"
+  DEFAULT_NVIDIA_EGL_VENDOR_JSON="/data/wulin/c/nvidia-egl-570.133.07/egl_vendor.d/10_nvidia_570.json"
 else
   DEFAULT_VLA_PATH="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/data/models--openvla--openvla-7b-finetuned-libero-goal"
   DEFAULT_OUTPUT_DIR="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu"
   DEFAULT_LOG_DIR="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/eval_logs"
   DEFAULT_LIBERO_PATH=""
+  DEFAULT_NVIDIA_EGL_SHIM_DIR=""
+  DEFAULT_NVIDIA_EGL_VENDOR_JSON=""
 fi
 
 VLA_PATH="${VLA_PATH:-${DEFAULT_VLA_PATH}}"
 OUTPUT_DIR="${OUTPUT_DIR:-${DEFAULT_OUTPUT_DIR}}"
 LOG_DIR="${LOG_DIR:-${DEFAULT_LOG_DIR}}"
 LIBERO_PATH="${LIBERO_PATH:-${DEFAULT_LIBERO_PATH}}"
+NVIDIA_EGL_SHIM_DIR="${NVIDIA_EGL_SHIM_DIR:-${DEFAULT_NVIDIA_EGL_SHIM_DIR}}"
+NVIDIA_EGL_VENDOR_JSON="${NVIDIA_EGL_VENDOR_JSON:-${DEFAULT_NVIDIA_EGL_VENDOR_JSON}}"
 NUM_TRIALS_PER_TASK="${NUM_TRIALS_PER_TASK:-50}"
 ACCEPT_THRESHOLD="${ACCEPT_THRESHOLD:-9}"
 EVAL_EPOCH="${EVAL_EPOCH:-latest}"
@@ -73,9 +78,18 @@ if [[ -n "${LIBERO_PATH}" && -d "${LIBERO_PATH}" ]]; then
   export PYTHONPATH="${LIBERO_PATH}:${PYTHONPATH}"
 fi
 
+if [[ -n "${NVIDIA_EGL_SHIM_DIR}" && -d "${NVIDIA_EGL_SHIM_DIR}" ]]; then
+  export LD_LIBRARY_PATH="${NVIDIA_EGL_SHIM_DIR}:${LD_LIBRARY_PATH:-}"
+fi
+if [[ -n "${NVIDIA_EGL_VENDOR_JSON}" && -f "${NVIDIA_EGL_VENDOR_JSON}" ]]; then
+  export __EGL_VENDOR_LIBRARY_FILENAMES="${NVIDIA_EGL_VENDOR_JSON}"
+fi
+
 echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}"
 echo "MUJOCO_GL=${MUJOCO_GL}"
-echo "MUJOCO_EGL_DEVICE_ID=${MUJOCO_EGL_DEVICE_ID}"
+echo "MUJOCO_EGL_DEVICE_ID=${MUJOCO_EGL_DEVICE_ID:-}"
+echo "NVIDIA_EGL_SHIM_DIR=${NVIDIA_EGL_SHIM_DIR}"
+echo "__EGL_VENDOR_LIBRARY_FILENAMES=${__EGL_VENDOR_LIBRARY_FILENAMES:-}"
 echo "VLA_PATH=${VLA_PATH}"
 echo "SPEC_CKPT=${SPEC_CKPT}"
 echo "LOG_DIR=${LOG_DIR}"

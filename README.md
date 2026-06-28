@@ -320,7 +320,9 @@ openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh
 
 The launcher auto-selects the 4090 or 3090 paths, reads
 `<output>/latest_checkpoint.txt` by default, and runs relaxed DFLASH evaluation
-with `accept_threshold=9`.
+with `accept_threshold=9`.  On the 3090 server it also uses the local NVIDIA
+570 EGL shim under `/data/wulin/c/nvidia-egl-570.133.07` when present, because
+that server's system EGL libraries are older than its active NVIDIA driver.
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 \

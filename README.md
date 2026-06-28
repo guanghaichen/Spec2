@@ -1,140 +1,114 @@
 # SpecVLA-DFLASH
 
-> **Repository role.** This is an experimental fork of
-> [PineTreeWss/SpecVLA](https://github.com/PineTreeWss/SpecVLA), itself built on
-> [OpenVLA](https://github.com/openvla/openvla).  It keeps the OpenVLA LIBERO
-> action interface and the Spec-VLA verification setting, while replacing the
-> autoregressive EAGLE-style draft with a DFlash-inspired, block-parallel draft
-> model.
+> **仓库定位。** 本仓库是基于
+> [PineTreeWss/SpecVLA](https://github.com/PineTreeWss/SpecVLA) 的实验性分支；
+> SpecVLA 本身构建在 [OpenVLA](https://github.com/openvla/openvla) 之上。
+> 当前代码保留 OpenVLA 的 LIBERO 动作接口和 SpecVLA 的 target-model 校验框架，
+> 但把原本 EAGLE 风格的自回归 draft 替换为受 DFlash 启发的块并行 draft。
 >
-> **Status on 2026-06-26.** This is an active research codebase, not a released
-> reproduction.  The current DFLASH design, data format, and commands below are
-> the source of truth for new experiments.  Do not report a speedup or policy
-> success improvement until it has been measured in the LIBERO simulator.
+> **状态记录。** 这是一个正在迭代中的研究代码库，还不是公开复现实验包。
+> 当前 DFLASH 设计、数据格式和 README 中的命令是新实验的主要上下文来源。
+> 在 LIBERO 仿真中实际测量之前，不要声称已经获得稳定加速或成功率提升。
 
-## Read This First: Project Map
+## 先看这里：项目地图
 
-The research question is deliberately narrow:
+当前研究问题可以概括为：
 
-> Can an OpenVLA policy on LIBERO-Goal obtain useful speculative acceptance with
-> a lightweight **non-autoregressive block draft**, conditioned on target-model
-> multi-layer hidden states, while target-model verification preserves the
-> output policy?
+> 在 LIBERO-Goal 上，OpenVLA 能否使用一个轻量的、非自回归的块并行 draft，
+> 在 target-model 多层 hidden state 条件下获得可用的 speculative acceptance，
+> 同时仍由 target model 校验来保持输出策略可靠性？
 
-The main code paths are:
+主要代码路径如下：
 
-| Role | Current file | Notes |
+| 作用 | 当前文件 | 说明 |
 | --- | --- | --- |
-| Offline data generation | `openvla/specdecoding/train-scripts/ge_data_all_openvla_token_only_libero_goal.py` | Runs OpenVLA greedily on RLDS demonstrations and saves full prefix/action hidden context. |
-| Offline DFLASH training | `openvla/specdecoding/train-scripts/train_dflash_libero_goal.py` | Dataset loading, multi-anchor supervision, losses, checkpoints, SwanLab, and DDP. |
-| DFLASH architecture | `openvla/specdecoding/model/dflash.py` | Context projection, action-dimension embeddings, non-causal block attention, RoPE. |
-| Online draft and verification | `openvla/prismatic/extern/hf/modeling_speculation.py` | Loads a DFLASH checkpoint, drafts a block, then accepts/corrects it using OpenVLA. |
-| LIBERO DFLASH evaluation | `openvla/experiments/robot/libero/run_libero_goal_Spec_Relaxed.py` | Executes rollouts and writes success/time/acceptance statistics. |
+| 离线数据生成 | `openvla/specdecoding/train-scripts/ge_data_all_openvla_token_only_libero_goal.py` | 在 RLDS demonstration 上贪心运行 OpenVLA，并保存完整 prefix/action hidden context。 |
+| 离线 DFLASH 训练 | `openvla/specdecoding/train-scripts/train_dflash_libero_goal.py` | Dataset、multi-anchor 监督、loss、checkpoint、SwanLab、DDP。 |
+| DFLASH 模型结构 | `openvla/specdecoding/model/dflash.py` | Context projection、action-dimension embedding、非因果 block attention、RoPE。 |
+| 在线 draft 和 target 校验 | `openvla/prismatic/extern/hf/modeling_speculation.py` | 加载 DFLASH checkpoint，一次 draft 一个 block，再用 OpenVLA 接受/纠正。 |
+| LIBERO DFLASH 评测 | `openvla/experiments/robot/libero/run_libero_goal_Spec_Relaxed.py` | 执行 rollout，并记录成功率、耗时、acceptance 统计。 |
 
-`openvla/specdecoding/train-scripts/train_deepspeed_libero_goal.py` and the
-original `run_libero_goal_Spec.py` remain the upstream Spec-VLA/EAGLE reference
-path.  They are useful for comparison, but are not the current DFLASH training
-entry points.
+`openvla/specdecoding/train-scripts/train_deepspeed_libero_goal.py` 和原始
+`run_libero_goal_Spec.py` 仍然是上游 SpecVLA/EAGLE 的参考路径。它们适合用来做 baseline 对比，
+但不是当前 DFLASH 训练的入口。
 
-## Literature Baselines and Motivation
+## 文献 baseline 和动机
 
-### Spec-VLA baseline
+### SpecVLA baseline
 
-[Spec-VLA: Speculative Decoding for Vision-Language-Action Models with Relaxed
-Acceptance](https://aclanthology.org/2025.emnlp-main.1367.pdf) (EMNLP 2025)
-adapts speculative decoding to OpenVLA.  Its draft generator is
-autoregressive: target-model prefill hidden states and prior action tokens are
-used to predict the next action token repeatedly.  It verifies draft tokens
-with OpenVLA and introduces relaxed acceptance based on action-token distance.
+[Spec-VLA: Speculative Decoding for Vision-Language-Action Models with Relaxed Acceptance](https://aclanthology.org/2025.emnlp-main.1367.pdf)
+发表于 EMNLP 2025。它把 speculative decoding 迁移到 OpenVLA 上：draft generator 是自回归的，
+使用 target model 的 prefill hidden state 和历史 action token 反复预测下一个 action token；
+然后用 OpenVLA 校验 draft token，并提出基于 action-token distance 的 relaxed acceptance。
 
-The following are **the paper's Table 1 numbers**, not results reproduced by
-this repository.  `Length` is the average number of tokens generated per
-forward pass and speed is relative to autoregressive OpenVLA.
+下面是 **SpecVLA 论文 Table 1 的数值**，不是本仓库复现结果。`Length` 表示每次 forward
+平均生成 token 数，speedup 是相对 OpenVLA 自回归推理的速度。
 
-| LIBERO suite | OpenVLA AR success rate | Spec-VLA success / Length / speedup | Spec-VLA relaxed success / Length / speedup |
+| LIBERO suite | OpenVLA AR 成功率 | SpecVLA 成功率 / Length / speedup | SpecVLA relaxed 成功率 / Length / speedup |
 | --- | ---: | --- | --- |
 | Goal | 78.0% | 74.2% / 2.04 / 1.09x | 74.4% / 2.94 / 1.42x |
 | Object | 89.0% | 89.0% / 1.75 / 1.15x | 85.0% / 2.38 / 1.38x |
 | Spatial | 85.0% | 83.8% / 1.59 / 1.08x | 85.8% / 2.14 / 1.28x |
 | Long | 52.0% | 50.8% / 1.67 / 1.13x | 55.0% / 2.10 / 1.22x |
 
-The paper reports a 44% acceptance-length increase and 1.42x speedup at its
-best reported setting, without a success-rate loss under that setting.  The
-relevant lesson for this fork is not that these values should be expected here;
-it is that acceptance length and simulator success must be measured together.
+论文报告的最好设置中，acceptance length 提升 44%，速度达到 1.42x，且成功率没有下降。
+对本项目最重要的启发不是“我们也应该直接得到这些数值”，而是：**acceptance length、推理耗时、
+仿真成功率必须放在一起报告**。
 
-### DFlash inspiration
+### DFlash 灵感来源
 
-[DFlash: Block Diffusion for Flash Speculative
-Decoding](https://arxiv.org/abs/2602.06036) (ICML 2026) replaces sequential
-drafting with a lightweight block-diffusion draft.  It conditions on target
-context features and predicts a whole token block in one forward pass; the
-target model still verifies the proposal.  Its authors report over 6x lossless
-LLM acceleration and up to 2.5x higher speedup than EAGLE-3 in their LLM
-experiments.  Those figures are **not** transferable claims for OpenVLA.
+[DFlash: Block Diffusion for Flash Speculative Decoding](https://arxiv.org/abs/2602.06036)
+发表于 ICML 2026。它用轻量 block-diffusion draft 替代逐 token draft，条件是 target context feature，
+一次 forward 预测整块 token，然后仍由 target model 校验 proposal。论文在 LLM 实验中报告了
+超过 6x 的 lossless acceleration，并比 EAGLE-3 最高快 2.5x。
 
-This implementation takes only the core mechanism: a small non-causal block
-draft conditioned on target hidden states.  It does not claim to reproduce the
-original DFlash training pipeline.  The closest public implementation reference
-is [SpecForge's `dflash.py`](https://github.com/sgl-project/SpecForge/blob/main/specforge/modeling/draft/dflash.py).
+这些 LLM 数值 **不能直接迁移为 OpenVLA 结论**。本仓库只迁移其核心机制：一个小型的、
+非因果 block draft，条件来自 target hidden state。本仓库不声称复现 DFlash 原论文完整训练流程。
+最近的公开代码参考是 [SpecForge 的 `dflash.py`](https://github.com/sgl-project/SpecForge/blob/main/specforge/modeling/draft/dflash.py)。
 
-## Current DFLASH Design
+## 当前 DFLASH 设计
 
-### What is generated in parallel
+### 并行生成的到底是什么
 
-OpenVLA has a 7-token action representation.  At an action anchor `a`, the
-target model has already decoded the anchor token and produced its hidden state.
-The DFLASH draft receives:
+OpenVLA 的动作由 7 个 action token 表示。给定 action anchor `a` 时，target model 已经解码出当前
+anchor token，并产生了该位置 hidden state。DFLASH draft 接收：
 
-1. the complete OpenVLA prefill/prefix multi-layer hidden sequence;
-2. multi-layer hidden states for all target-verified action tokens through the
-   current anchor, including the anchor itself; and
-3. a length-`q` input block `[token_a, MASK, ..., MASK]` with RoPE positions and
-   a learned action-dimension embedding for each action position.
+1. 完整 OpenVLA prefill/prefix 多层 hidden 序列；
+2. 从第一个 action token 到当前 anchor 为止，所有已经被 target 验证过的 action token 多层 hidden；
+3. 一个长度为 `q` 的输入块 `[token_a, MASK, ..., MASK]`，带 RoPE position 和每个 action 维度的
+   learned action-dimension embedding。
 
-In **one** DFLASH forward pass, the draft emits hidden states/logits for the
-`q <= 6` future positions `token_(a+1) ... token_(a+q)`.  Its block attention is
-non-causal (`is_causal=False`): this is parallel block drafting, not an internal
-autoregressive loop.  The target model then obtains posterior tokens for the
-proposal in parallel.  It accepts the longest valid prefix and writes its own
-posterior token at the first rejection, so partial acceptance and correction are
-implemented.
+在 **一次** DFLASH forward 中，draft 会为未来 `q <= 6` 个位置
+`token_(a+1) ... token_(a+q)` 输出 hidden/logits。它的 block attention 是非因果的
+（`is_causal=False`），所以这是块并行 draft，不是内部自回归循环。随后 target model 并行得到
+proposal 的 posterior token，接受最长合法前缀；如果遇到拒绝位置，就写入 target model 自己的
+posterior token，因此支持 partial acceptance 和 partial correction。
 
-The current evaluator uses `accept_threshold=9`, which means relaxed
-token-distance acceptance rather than strict equality.  Set it to `None` only
-when a strict-acceptance ablation is explicitly desired.  Simulator success and
-accepted-length statistics must be reported with the threshold.
+当前主评测使用 `accept_threshold=9`，也就是基于 token distance 的 relaxed acceptance，而不是严格相等。
+只有在做 strict-acceptance 消融时才把阈值设成 `0` 或显式 strict 脚本。报告实验时必须同时写清楚阈值、
+仿真成功率和 accepted length。
 
-### Context, layers, and position invariants
+### Context、层选择和 position invariant
 
-The training and inference paths must agree on all of the following:
+训练和推理必须保持下面这些不变量一致：
 
-- **Full prefix context:** do not reduce context to only the final prefill
-  hidden state.  The full prompt sequence is present in both the offline data
-  and online draft context.
-- **Anchor context:** the target model decodes each current anchor before the
-  block is drafted.  This contributes the true anchor hidden state and makes
-  the target-side action history available to later anchors.
-- **Source layers:** offline data stores selected OpenVLA layers
-  `[1, 8, 15, 22, 29]` plus the final layer separately.  The current
-  `replace_22_with_final` variant constructs `[1, 8, 15, 29, final]` at load
-  time, preserving the five-layer feature width without regenerating data.
-- **RoPE positions:** prefix positions are `0 ... prefix_len-1`; action-context
-  and block positions follow immediately after the prefix.  The same rule is
-  used offline and online.
-- **Action identity:** `action_dim_embed` identifies the seven distinct action
-  dimensions.  It is additional learned information; it does not replace or
-  modify RoPE.
+- **完整 prefix context：** 不要把 context 压缩成只有最后一个 prefill hidden。离线数据和在线推理都保留完整 prompt sequence。
+- **Anchor context：** 每次 draft block 前，target model 会先解码当前 anchor。这一步提供真实 anchor hidden，
+  也让后续 anchor 能看到 target-side action history。
+- **Source layers：** 离线数据保存 OpenVLA 选定层 `[1, 8, 15, 22, 29]`，并额外保存 final layer。
+  当前 `replace_22_with_final` 变体会在加载时构造 `[1, 8, 15, 29, final]`，
+  保持五层特征宽度，不需要重新生成数据。
+- **RoPE positions：** prefix positions 是 `0 ... prefix_len-1`；action context 和 block positions 紧接在 prefix 后面。
+  训练和推理必须使用同一规则。
+- **Action identity：** `action_dim_embed` 标识 7 个不同动作维度。这是额外学习到的信息，不替代 RoPE，也不修改 RoPE。
 
-The checkpoint's `dflash_config.json` is read at inference time and overrides
-the evaluator defaults for block size, draft depth, target layers, anchor-hidden
-mode, mask token, and selected-hidden variant.  Always point evaluation at a
-checkpoint directory that contains this file.
+推理时会读取 checkpoint 目录里的 `dflash_config.json`，并用它覆盖 evaluator 默认值，包括 block size、
+draft depth、target layers、anchor-hidden mode、mask token 和 selected-hidden variant。评测 DFLASH 时，
+必须让 `SPEC_CKPT` 指向包含 `dflash_config.json` 的 checkpoint 目录。
 
-### Current loss and training policy
+### 当前 loss 和训练策略
 
-The current pure-training recipe intentionally uses hidden-state distillation,
-not token-level CE:
+当前 pure-training recipe 使用 hidden-state distillation，而不是 token-level CE：
 
 ```text
 total = 1.0 * hidden_loss + 0.05 * cosine_hidden_loss
@@ -142,95 +116,72 @@ soft_w = 0
 anchor_consistency_w = 0
 ```
 
-Token accuracy is retained as a diagnostic metric, but hard CE is not part of
-the optimization objective.  Earlier token soft-distribution experiments showed
-early validation deterioration in this offline block setting; they are retained
-as optional code (`--soft_w`, `--soft_temperature`) rather than the current
-default.  Hidden-context noise is `0.05` in the checked-in recipe.  Per-anchor
-and per-position diagnostic metrics are logged to SwanLab and local JSONL.
+Token accuracy 只作为诊断指标保留，不进入优化目标。早期 token soft-distribution 实验在这个离线 block setting
+中出现较早的 validation deterioration，所以当前默认不启用；相关代码仍通过 `--soft_w`、`--soft_temperature`
+保留为可控消融。当前 recipe 中 hidden-context noise 是 `0.05`。Per-anchor 和 per-position 指标会记录到
+SwanLab 和本地 JSONL。
 
-The intended long-run control signal for the current recipe is simulator
-behavior, not early stopping on an offline validation split.  Accordingly the
-pure-training launcher uses `--val_split 0`, disables validation/early stopping
-by construction, and saves a checkpoint every 10 epochs.
+当前 recipe 的长期控制信号是 LIBERO simulator behavior，而不是离线 validation split 的 early stopping。
+因此 pure-training launcher 使用 `--val_split 0`，默认不做 validation/early stopping，并且每 10 个 epoch 保存一次 checkpoint。
 
-## Offline Data: Current 4090 Artifact
+## 离线数据：当前 4090 artifact
 
-The data generator uses `openvla/modified_libero_rlds` data through the
-`libero_goal_no_noops` split.  For every RLDS sample it runs greedy OpenVLA,
-then writes one `data_*.ckpt` tensor dictionary only when the returned action
-hidden-state sequence and the 7 action tokens are structurally compatible.
+数据生成脚本使用 `openvla/modified_libero_rlds` 中的 `libero_goal_no_noops` split。对每个 RLDS sample，
+脚本贪心运行 OpenVLA；只有当返回的 action hidden-state sequence 和 7 个 action token 在结构上兼容时，
+才写出一个 `data_*.ckpt` tensor dictionary。
 
-The current 4090 directory is:
+当前 4090 数据目录：
 
 ```text
 /mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset
 ```
 
-Audited on 2026-06-26: `419G`, `28,639` saved `.ckpt` samples.  The generation
-log reported `52,042` enumerated samples and `28,639` valid samples.  The large
-size is expected because each valid sample carries complete prefix hidden
-sequences and selected/final hidden states for action decoding, rather than only
-discrete action tokens.
+2026-06-26 审计结果：`419G`，`28,639` 个 `.ckpt` 样本。生成日志显示枚举样本 `52,042`，
+有效样本 `28,639`。数据较大是预期现象，因为每个有效样本保存完整 prefix hidden sequence、
+selected/final hidden states，而不只是离散 action token。
 
-The essential per-sample fields are:
+关键字段如下：
 
 ```text
-input_ids                 tokenized vision-language prompt
-pixel_values              preprocessed image tensor
-loss_mask                 prompt attention mask
-predicted_tokens          greedy OpenVLA action-token sequence (7 tokens)
-hidden_state.prompt_selected  complete prefix, concatenated selected layers
-hidden_state.prompt_last      complete prefix, final layer
-hidden_state.action_selected  action hidden states, selected layers
-hidden_state.action_last      action hidden states, final layer
-dflash_data_format        full_prefix_plus_action_hidden_v4
+input_ids                    tokenized vision-language prompt
+pixel_values                 preprocessed image tensor
+loss_mask                    prompt attention mask
+predicted_tokens             greedy OpenVLA action-token sequence，长度 7
+hidden_state.prompt_selected 完整 prefix，拼接 selected layers
+hidden_state.prompt_last     完整 prefix，final layer
+hidden_state.action_selected action hidden states，selected layers
+hidden_state.action_last     action hidden states，final layer
+dflash_data_format           full_prefix_plus_action_hidden_v4
 ```
 
-Do not mix files generated by older data formats with this directory.  The
-trainer checks expected fields/shapes, but an explicit dataset version and count
-check is still required before an experiment.
+不要把旧数据格式生成的文件混进这个目录。Trainer 会检查字段和 shape，但实验前仍应手动确认数据版本和样本数。
 
-## Experiment Record
+## 实验历程
 
-This section is intentionally concise and chronological.  It records design
-decisions, not a claim that an experimental question has been settled.
+这里记录的是设计决策，不代表实验问题已经被解决。
 
-1. **Initial migration:** a DFlash-style draft was inserted into the Spec-VLA /
-   OpenVLA speculative path.  Early drafts that used insufficient context had
-   essentially no useful acceptance.
-2. **Context correction:** the data and runtime were changed to preserve full
-   prefill hidden sequences and target-verified action history.  The current
-   `include_anchor_hidden` path decodes the anchor with the target before each
-   parallel tail proposal.
-3. **Offline supervision correction:** multi-anchor supervision, action-
-   dimension embeddings, position balancing, hidden loss, cosine loss, and
-   diagnostics were added.  The earlier hard-token-CE objective was removed
-   from the active recipe.
-4. **Soft-loss and consistency ablations:** soft token-distribution and
-   cross-anchor consistency experiments were run as diagnostics.  They are
-   available behind flags, but neither is in the current pure-training recipe.
-5. **Current experiment:** train a 1-layer draft from the full 28,639-sample
-   dataset with five context features `[1, 8, 15, 29, final]`, `soft_w=0`,
-   `anchor_consistency_w=0`, no offline validation split, then compare
-   checkpoints by LIBERO simulator success, acceptance length, hit rate, and
-   wall-clock time.
+1. **初始迁移：** 把 DFlash-style draft 插入 SpecVLA/OpenVLA speculative 路径。早期 draft context 不足，
+   acceptance 基本不可用。
+2. **Context 修正：** 数据和 runtime 改为保留完整 prefill hidden sequence 和 target-verified action history。
+   当前 `include_anchor_hidden` 路径会在每次并行 tail proposal 前，先用 target 解码 anchor。
+3. **离线监督修正：** 加入 multi-anchor supervision、action-dimension embedding、position balancing、
+   hidden loss、cosine loss 和诊断指标。早期 hard-token-CE objective 已从主 recipe 中移除。
+4. **Soft-loss 和 consistency 消融：** soft token-distribution 和 cross-anchor consistency 都跑过诊断实验；
+   相关 flag 仍保留，但都不是当前 pure-training recipe。
+5. **当前主实验：** 使用完整 28,639 样本数据集训练 1-layer draft，五层 context 特征为
+   `[1, 8, 15, 29, final]`，`soft_w=0`，`anchor_consistency_w=0`，不使用离线 validation split；
+   然后用 LIBERO simulator 比较 checkpoint 的成功率、acceptance length、hit rate 和 wall-clock time。
 
-Known limitations to keep visible:
+需要始终记住的限制：
 
-- The block draft has non-causal intra-block inputs, so future slots do not
-  receive ground-truth causal prefixes during a single draft forward.  This is
-  the central modeling risk of the parallel design, not a bug to hide with an
-  offline token metric.
-- A low hidden loss alone does not establish useful speculative speedup.  The
-  online acceptance distribution and target-call count determine speed.
-- Relaxed acceptance can preserve practical actions while diverging from strict
-  token equality.  It must be ablated and reported honestly.
+- Block draft 的 block 内输入是非因果的，未来 slot 在单次 draft forward 中不会收到 ground-truth causal prefix。
+  这是并行设计的核心建模风险，不是可以用离线 token metric 掩盖的小问题。
+- 低 hidden loss 不等于有效 speculative speedup。真正决定速度的是在线 acceptance distribution 和 target-call count。
+- Relaxed acceptance 可能保持实际动作效果，但 token 层面不等于 strict equality。必须做消融并诚实报告阈值。
 
-## 4090 Reproduction Commands
+## 4090 复现实验命令
 
-The active development machine is **4090**.  Activate its environment and work
-from the repository root:
+主开发机器是 **4090**。进入服务器和环境：
 
 ```bash
 ssh 4090
@@ -239,14 +190,18 @@ cd /mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/SpecVLA-main
 export PYTHONPATH="$PWD"
 ```
 
-Paths can be overridden through `VLA_PATH`, `LIBERO_RLDS_ROOT`, and
-`DFLASH_DATA_OUTDIR`; the generator also has explicit `--vla_path`,
-`--data_root_dir`, and `--outdir` arguments.  This avoids accidental Hugging
-Face downloads: local processor loading uses `trust_remote_code=False`.
+路径可以通过 `VLA_PATH`、`LIBERO_RLDS_ROOT`、`DFLASH_DATA_OUTDIR` 覆盖；
+数据生成脚本也支持显式 `--vla_path`、`--data_root_dir`、`--outdir` 参数。这样可以避免意外触发 Hugging Face 下载。
 
-### 1. Generate raw DFLASH data
+### 1. 生成 DFLASH 原始数据
 
-Entry point: `openvla/specdecoding/train-scripts/ge_data_all_openvla_token_only_libero_goal.py`
+入口：
+
+```text
+openvla/specdecoding/train-scripts/ge_data_all_openvla_token_only_libero_goal.py
+```
+
+命令：
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 python openvla/specdecoding/train-scripts/ge_data_all_openvla_token_only_libero_goal.py \
@@ -257,7 +212,7 @@ CUDA_VISIBLE_DEVICES=0 python openvla/specdecoding/train-scripts/ge_data_all_ope
   --outdir /mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset
 ```
 
-Before training, confirm both size and count:
+训练前确认数据大小和数量：
 
 ```bash
 du -sh /mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset
@@ -265,26 +220,36 @@ find /mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_data
   -maxdepth 1 -name 'data_*.ckpt' | wc -l
 ```
 
-### 2. Train the current 1-layer pure-training recipe
+### 2. 训练当前 1-layer pure-training recipe
 
-Recommended launcher:
+推荐 launcher：
 
 ```text
 openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_puretrain_4gpu.sh
 ```
 
-On 4090, launch it with four selected GPUs:
+4090 上使用四张指定 GPU：
 
 ```bash
 CUDA_VISIBLE_DEVICES=0,1,2,3 \
   bash openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_puretrain_4gpu.sh
 ```
 
-This launcher uses `torchrun --nproc_per_node 4`, one DFLASH layer, selected
-hidden variant `replace_22_with_final`, batch size 8 per GPU (effective batch
-32), 200 epochs, warmup 2000 optimizer steps, `save_every=10`, `val_split=0`,
-and SwanLab's normal configured mode.  The output directory is printed by the
-launcher.  Its important artifacts are:
+该 launcher 使用：
+
+```text
+torchrun --nproc_per_node 4
+num_draft_layers = 1
+selected_hidden_variant = replace_22_with_final
+batch_size = 8 per GPU，有效 batch size = 32
+epochs = 200
+warmup = 2000 optimizer steps
+save_every = 10
+val_split = 0
+SwanLab = 使用环境默认配置
+```
+
+重要输出：
 
 ```text
 <output>/epoch_XXX_step_XXXXXX/pytorch_model.bin
@@ -295,31 +260,32 @@ launcher.  Its important artifacts are:
 <output>/swanlog/
 ```
 
-`latest_checkpoint.txt` points to the checkpoint directory to use for
-evaluation.  To continue an interrupted run, invoke the Python trainer with
-`--resume_from_checkpoint latest` and the same `--output_dir`; do not silently
-change world size, effective batch, or scheduler settings when comparing runs.
+`latest_checkpoint.txt` 指向默认评测 checkpoint。若中断后继续训练，应使用同一个 `--output_dir`
+和 `--resume_from_checkpoint latest`，不要在对比实验中静默改变 world size、有效 batch 或 scheduler 设置。
 
-Two older diagnostic launchers are kept for controlled ablations, not as the
-default recipe:
+保留两个旧诊断 launcher，仅用于 controlled ablation，不作为默认 recipe：
 
 ```text
 openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_baseline.sh
 openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_consistency.sh
 ```
 
-### 3. Evaluate in LIBERO-Goal
+## LIBERO-Goal 评测命令
 
-All LIBERO-Goal evaluation launchers live in:
+所有 LIBERO-Goal 评测 launcher 都在：
 
 ```text
 openvla/specdecoding/decode-scripts/
 ```
 
-They share `libero_eval_common.sh`, which auto-selects the 4090 or 3090 paths,
-sets `PYTHONPATH`, configures LIBERO, and on 3090 uses the local NVIDIA 570 EGL
-shim under `/data/wulin/c/nvidia-egl-570.133.07` when present.  The default
-3090 paths are:
+这些脚本共享 `libero_eval_common.sh`。它会自动选择 4090 或 3090 路径，设置 `PYTHONPATH`，
+配置 LIBERO，并在 3090 上优先使用本地 NVIDIA 570 EGL shim：
+
+```text
+/data/wulin/c/nvidia-egl-570.133.07
+```
+
+3090 默认路径：
 
 ```text
 OpenVLA goal model: /data/wulin/hf_files/openvla-7b-finetuned-libero-goal
@@ -328,136 +294,198 @@ DFLASH run dir: /data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer
 Logs: /data/wulin/c/specvla-data/eval_logs
 ```
 
-The corresponding 4090 default SpecVLA goal checkpoint is:
+4090 默认 SpecVLA goal checkpoint：
 
 ```text
 /mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_libero_goal_debug_ckpt
 ```
 
-Use `SPEC_CKPT=/path/to/goal_ckpt` or `SPECVLA_GOAL_CKPT=/path/to/goal_ckpt`
-when evaluating a copied or renamed SpecVLA checkpoint.
+如果权重被复制或重命名，可以用下面任一变量覆盖：
 
-Use this matrix to keep experiments separated:
+```bash
+SPEC_CKPT=/path/to/goal_ckpt
+SPECVLA_GOAL_CKPT=/path/to/goal_ckpt
+```
 
-| Experiment | Launcher | Python entry | Draft backend | Acceptance | Log subdir |
+### 五套核心评测
+
+| 实验 | Launcher | Python 入口 | Draft backend | Acceptance | 日志子目录 |
 | --- | --- | --- | --- | --- | --- |
-| OpenVLA AR baseline | `run_openvla_ar_libero_goal_eval.sh` | `run_libero_goal_AR.py` | none | autoregressive | `openvla_ar` |
-| SpecVLA strict baseline | `run_specvla_libero_goal_eval.sh` | `run_libero_goal_Spec.py` | `eagle` | strict, `accept_threshold=0` | `specvla_strict` |
-| SpecVLA relaxed baseline | `run_specvla_relaxed_libero_goal_eval.sh` | `run_libero_goal_Spec_Relaxed.py` | `eagle` | relaxed, default `accept_threshold=9` | `specvla_relaxed` |
-| DFLASH strict ablation | `run_dflash_strict_libero_goal_eval.sh` | `run_libero_goal_Spec.py` | `dflash` | strict, `accept_threshold=0` | `dflash_strict` |
-| DFLASH relaxed current method | `run_dflash_libero_goal_eval.sh` | `run_libero_goal_Spec_Relaxed.py` | `dflash` | relaxed, default `accept_threshold=9` | `dflash_relaxed` |
+| OpenVLA AR baseline | `run_openvla_ar_libero_goal_eval.sh` | `run_libero_goal_AR.py` | 无 | 自回归 | `openvla_ar` |
+| SpecVLA strict baseline | `run_specvla_libero_goal_eval.sh` | `run_libero_goal_Spec.py` | `eagle` | strict，`accept_threshold=0` | `specvla_strict` |
+| SpecVLA relaxed baseline | `run_specvla_relaxed_libero_goal_eval.sh` | `run_libero_goal_Spec_Relaxed.py` | `eagle` | relaxed，默认 `accept_threshold=9` | `specvla_relaxed` |
+| DFLASH strict ablation | `run_dflash_strict_libero_goal_eval.sh` | `run_libero_goal_Spec.py` | `dflash` | strict，`accept_threshold=0` | `dflash_strict` |
+| DFLASH relaxed 当前方法 | `run_dflash_libero_goal_eval.sh` | `run_libero_goal_Spec_Relaxed.py` | `dflash` | relaxed，默认 `accept_threshold=9` | `dflash_relaxed` |
 
-The AR baseline uses the standard OpenVLA model and intentionally does not pass
-SpecVLA/DFlash-only generation arguments such as `generate_mode` or
-`return_dflash_stats`.
+AR baseline 使用标准 OpenVLA 模型，故意不向模型传 `generate_mode`、`return_dflash_stats`
+这类 SpecVLA/DFlash 专用 generation 参数。2026-06-28 曾因误传这些参数导致 AR 每个 episode
+一开始就异常退出，表现为“推得很快但成功率全 0”；该问题已在 `a5817d5` 修复。
 
-The DFLASH relaxed launcher reads `<DFLASH_OUTPUT_DIR>/latest_checkpoint.txt`
-by default.  `run_libero_goal_Spec_Relaxed.py` is the preferred DFLASH
-evaluation entry because it records average accepted length, total hit rate,
-and per-position hit/reject statistics.
+### 3090 上的五套一键命令
 
-```bash
-CUDA_VISIBLE_DEVICES=0 \
-  bash openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh
-```
-
-For a quick smoke test:
+先进入环境：
 
 ```bash
-NUM_TRIALS_PER_TASK=2 RUN_ID_NOTE=dflash-e200-smoke-r9 \
-  bash openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh
+cd /data/wulin/c/SpecVLA-DFLASH
+source /data/wulin/miniconda3/etc/profile.d/conda.sh
+conda activate specvla
 ```
 
-To evaluate a specific saved checkpoint instead of `latest_checkpoint.txt`:
-
-```bash
-CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=180 RUN_ID_NOTE=e200-r9 \
-  bash openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh
-```
-
-Run the baselines under the same trial count, seed, model checkpoint, and crop
-setting:
+1. 不投机的 OpenVLA AR baseline：
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
   bash openvla/specdecoding/decode-scripts/run_openvla_ar_libero_goal_eval.sh
+```
 
+2. SpecVLA 不带 relaxed：
+
+```bash
 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
   bash openvla/specdecoding/decode-scripts/run_specvla_libero_goal_eval.sh
+```
 
+3. SpecVLA 带 relaxed：
+
+```bash
 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
   bash openvla/specdecoding/decode-scripts/run_specvla_relaxed_libero_goal_eval.sh
 ```
 
-For one-off overrides, set environment variables before `bash`: `VLA_PATH`,
-`SPEC_CKPT`, `SPECVLA_GOAL_CKPT`, `DFLASH_OUTPUT_DIR`, `EVAL_EPOCH`, `LOG_DIR`,
-`NUM_TRIALS_PER_TASK`, `RUN_ID_NOTE`, `USE_WANDB`, or `SEED`.
+4. DFLASH 不带 relaxed，默认评测 `latest_checkpoint.txt`：
 
-#### 3090 LIBERO EGL Troubleshooting
+```bash
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_dflash_strict_libero_goal_eval.sh
+```
 
-The 3090 server has shown this LIBERO/robosuite failure mode:
+指定评测第 190 epoch：
+
+```bash
+CUDA_VISIBLE_DEVICES=3 NUM_TRIALS_PER_TASK=50 EVAL_EPOCH=190 \
+  bash openvla/specdecoding/decode-scripts/run_dflash_strict_libero_goal_eval.sh
+```
+
+指定评测第 200 epoch：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 EVAL_EPOCH=200 \
+  bash openvla/specdecoding/decode-scripts/run_dflash_strict_libero_goal_eval.sh
+```
+
+5. DFLASH 带 relaxed，默认评测 `latest_checkpoint.txt`：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh
+```
+
+指定评测第 200 epoch：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 EVAL_EPOCH=200 \
+  bash openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh
+```
+
+### 评测输出和覆盖变量
+
+`run_libero_goal_Spec_Relaxed.py` 是 DFLASH 推荐评测入口，因为它会记录：
+
+```text
+task success
+action-generation timing
+average accepted length
+total hit rate
+per-position hit/reject rate
+```
+
+一次性覆盖变量可以写在 `bash` 前面：
+
+```text
+VLA_PATH
+SPEC_CKPT
+SPECVLA_GOAL_CKPT
+DFLASH_OUTPUT_DIR
+EVAL_EPOCH
+LOG_DIR
+NUM_TRIALS_PER_TASK
+RUN_ID_NOTE
+USE_WANDB
+SEED
+```
+
+## 3090 LIBERO EGL 问题记录
+
+3090 曾出现过 LIBERO/robosuite EGL 相关报错：
 
 ```text
 RuntimeError: The MUJOCO_EGL_DEVICE_ID environment variable must be an integer between 0 and -1
 ImportError: Cannot initialize a EGL device display
 ```
 
-The root cause observed on that machine was NVIDIA driver/user-space mismatch:
-`nvidia-smi` reported driver `570.133.07`, while system EGL libraries were from
-the 535 series.  We fixed it without sudo by unpacking the matching NVIDIA
-runfile into a user-local shim directory and pointing GLVND at that shim.  The
-helper is:
+当时观察到的根因是 NVIDIA driver 和用户态 EGL library 不匹配：
+
+```text
+nvidia-smi: driver 570.133.07
+system EGL libraries: 535 系列
+```
+
+无 sudo 权限下的修复方式是解包匹配 driver 版本的 NVIDIA runfile 到用户目录，并让 GLVND 指向这个 shim。
+辅助脚本：
 
 ```bash
 bash openvla/specdecoding/decode-scripts/setup_3090_nvidia_egl_shim.sh
 ```
 
-The evaluation launcher auto-detects the default shim at:
+默认 shim 路径：
 
 ```text
 /data/wulin/c/nvidia-egl-570.133.07/slim-lib
 /data/wulin/c/nvidia-egl-570.133.07/egl_vendor.d/10_nvidia_570.json
 ```
 
-Do not manually set `MUJOCO_EGL_DEVICE_ID=0` on 3090 unless there is a specific
-reason; with the broken system EGL stack this was the direct trigger for the
-`0 to -1` error.  Use `CUDA_VISIBLE_DEVICES=<gpu_id>` to choose the inference
-GPU.
+不要手动设置 `MUJOCO_EGL_DEVICE_ID=0`，除非明确知道原因。之前 `0 to -1` 报错就是由破损 EGL 栈下的
+这个设置直接触发的。选择推理 GPU 用 `CUDA_VISIBLE_DEVICES=<gpu_id>`。
 
-## Git and Server Workflow
+## Git 和服务器工作流
 
-The development workflow is intentionally one-way:
+当前维护逻辑：
 
 ```text
-4090 (primary edit/test machine) -> commit -> GitHub main -> 3090 (pull/sync only when requested)
+4090 主开发/提交机器 -> GitHub main -> 3090 按需同步
 ```
 
-Therefore:
+这次 README 中文化以 3090 当前 README 为起点，因为 3090 上已经包含一条本地补充的 DFLASH strict
+评测命令。后续默认仍建议：
 
-1. Make and verify code/documentation changes on 4090.
-2. Commit only files relevant to that change and push `main` to
-   [guanghaichen/SpecVLA-DFLASH](https://github.com/guanghaichen/SpecVLA-DFLASH).
-3. Do not copy uncommitted 4090 changes to 3090.
-4. Only after GitHub contains the intended commit, synchronize 3090 when a
-   training or generation task requires it.
+1. 在 4090 上做代码或文档改动并验证。
+2. 只提交与当前改动相关的文件，推送到
+   [guanghaichen/SpecVLA-DFLASH](https://github.com/guanghaichen/SpecVLA-DFLASH)。
+3. 不把未提交的 4090 改动直接复制到 3090。
+4. GitHub 包含目标 commit 后，再按训练/生成/评测需要同步 3090。
 
-Before every experiment, record the Git commit, data directory/count, launcher,
-checkpoint path, selected-hidden variant, acceptance threshold, and evaluation
-seed.  These six lines are the minimum metadata needed to make an outcome
-comparable rather than anecdotal.
+每次实验前，至少记录下面信息：
 
-## Environment Notes
+```text
+Git commit
+数据目录和样本数
+launcher
+checkpoint path
+selected-hidden variant
+acceptance threshold
+evaluation seed
+```
 
-- Python 3.10, PyTorch 2.2.0 with CUDA 12.1, and LIBERO 0.1.0 are the original
-  tested environment notes inherited from Spec-VLA.
-- Install the repository package with `cd openvla && pip install -e .` after
-  dependency setup.
-- The model and RLDS data are intentionally local paths on 4090.  Do not allow
-  a training/data-generation run to fall back to an unintended remote download.
-- This repository may contain historical scripts and comments from Spec-VLA.
-  For DFLASH behavior, use the files in the project map above as authoritative.
+这些信息是让结果可比较而不是只停留在经验描述的最低要求。
 
-## References
+## 环境备注
+
+- 原 SpecVLA 环境备注：Python 3.10、PyTorch 2.2.0 + CUDA 12.1、LIBERO 0.1.0。
+- 依赖安装后，在仓库中执行 `cd openvla && pip install -e .`。
+- 模型和 RLDS 数据都应使用本地路径。不要让训练或数据生成意外回退到远程下载。
+- 本仓库中仍可能保留 SpecVLA 历史脚本和注释。判断 DFLASH 当前行为时，以“项目地图”列出的文件为准。
+
+## 参考文献
 
 ```bibtex
 @inproceedings{wang2025specvla,

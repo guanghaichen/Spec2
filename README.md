@@ -26,7 +26,7 @@
 | 离线 DFLASH 训练 | `openvla/specdecoding/train-scripts/train_dflash_libero_goal.py` | Dataset、multi-anchor 监督、loss、checkpoint、SwanLab、DDP。 |
 | DFLASH 模型结构 | `openvla/specdecoding/model/dflash.py` | Context projection、action-dimension embedding、非因果 block attention、RoPE。 |
 | 在线 draft 和 target 校验 | `openvla/prismatic/extern/hf/modeling_speculation.py` | 加载 DFLASH checkpoint，一次 draft 一个 block，再用 OpenVLA 接受/纠正。 |
-| LIBERO DFLASH 评测 | `openvla/experiments/robot/libero/run_libero_goal_Spec_Relaxed.py` | 执行 rollout，并记录成功率、耗时、acceptance 统计。 |
+| LIBERO 推理评测 | `openvla/experiments/robot/libero/run_libero_goal_AR.py`、`run_libero_goal_Spec.py`、`run_libero_goal_Spec_Relaxed.py` | 执行 rollout，并记录成功率、耗时、Length、acceptance 统计。 |
 
 `openvla/specdecoding/train-scripts/train_deepspeed_libero_goal.py` 和原始
 `run_libero_goal_Spec.py` 仍然是上游 SpecVLA/EAGLE 的参考路径。它们适合用来做 baseline 对比，
@@ -185,13 +185,22 @@ dflash_data_format           full_prefix_plus_action_hidden_v4
 
 | 机器 | GPU 情况 | 主要用途 |
 | --- | --- | --- |
-| 4090 | 1 张 RTX 4090 | 主开发、代码调试、数据生成、小规模 sanity check。 |
-| 3090 | 8 张 RTX 3090，实验中默认只用 0-3 四张 | 完整 DFLASH 训练和 LIBERO 推理评测。 |
+| 4090 | 1 张 RTX 4090 | 主开发、代码调试、数据生成、小规模 sanity check、最终 LIBERO 推理评测。 |
+| 3090 | 8 张 RTX 3090，实验中默认只用 0-3 四张 | 完整 DFLASH 四卡训练。 |
 
 因此，**不要在 README 中把 4090 写成四卡训练机器**。当前四卡 launcher
 `run_dflash_anchor_hidden_1layer_puretrain_4gpu.sh` 固定使用
 `torchrun --nproc_per_node 4`，实际应该在 3090 上用 `CUDA_VISIBLE_DEVICES=0,1,2,3`
 启动。4090 如果需要训练，只适合临时做单卡小规模调试，不能直接照搬四卡命令。
+
+当前固定实验流如下：
+
+```text
+4090 维护代码和数据生成 -> GitHub main 固化代码 -> 3090 四卡训练 -> 本地 scp -3 搬 checkpoint 到 4090 -> 4090 跑五套推理评测
+```
+
+3090 的 RTX 3090 对 speculative decoding 的小 kernel、校验和调度开销更敏感，速度结果容易偏低；
+因此正式比较 `SR / Length / Speedup` 时统一使用 4090。3090 只作为训练吞吐机器。
 
 ### 1. 4090：主开发、数据生成和单卡调试
 
@@ -316,6 +325,42 @@ run_config.json 记录: world_size=4, global_effective_batch=32, train_files=285
 `latest_checkpoint.txt` 指向默认评测 checkpoint。若中断后继续训练，应使用同一个 `--output_dir`
 和 `--resume_from_checkpoint latest`，不要在对比实验中静默改变 world size、有效 batch 或 scheduler 设置。
 
+### 3. 本地：把 3090 checkpoint 搬到 4090
+
+训练完成后，在 **本地终端** 执行远端到远端复制。方向必须是：
+
+```text
+3090_wulin:/data/.../checkpoint -> 4090:/mnt/.../checkpoint
+```
+
+推荐加 `-3`，让数据经由本地转发，不要求 3090 能直接连到 4090：
+
+```bash
+CKPT=epoch_190_step_169670
+
+scp -3 -r \
+  3090_wulin:/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu/${CKPT} \
+  4090:/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/${CKPT}
+```
+
+如果要复制 3090 当前 `latest_checkpoint.txt` 指向的最新 checkpoint，可以在本地终端执行：
+
+```bash
+CKPT=$(ssh 3090_wulin 'basename "$(cat /data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu/latest_checkpoint.txt)"')
+
+scp -3 -r \
+  3090_wulin:/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu/${CKPT} \
+  4090:/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/${CKPT}
+```
+
+复制后检查 4090 上的 checkpoint 是否完整：
+
+```bash
+ssh 4090 "ls -lh \
+  /mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/${CKPT}/dflash_config.json \
+  /mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/${CKPT}/pytorch_model.bin"
+```
+
 保留两个旧诊断 launcher，仅用于 controlled ablation，不作为当前默认 recipe。注意它们目前仍写死了
 4090 风格输出路径，不能直接当作 3090 主训练命令：
 
@@ -333,13 +378,14 @@ openvla/specdecoding/decode-scripts/
 ```
 
 这些脚本共享 `libero_eval_common.sh`。它会自动选择 4090 或 3090 路径，设置 `PYTHONPATH`，
-配置 LIBERO，并在 3090 上优先使用本地 NVIDIA 570 EGL shim：
+配置 LIBERO，并在 3090 上优先使用本地 NVIDIA 570 EGL shim。当前固定流程虽然不在 3090
+做正式速度评测，但保留这些路径可以方便必要时做 sanity check：
 
 ```text
 /data/wulin/c/nvidia-egl-570.133.07
 ```
 
-3090 默认路径：
+3090 训练/临时 sanity check 默认路径：
 
 ```text
 OpenVLA goal model: /data/wulin/hf_files/openvla-7b-finetuned-libero-goal
@@ -348,13 +394,17 @@ DFLASH run dir: /data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer
 Logs: /data/wulin/c/specvla-data/eval_logs
 ```
 
-4090 默认 SpecVLA goal checkpoint：
+4090 正式评测默认路径：
 
 ```text
-/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_libero_goal_debug_ckpt
+OpenVLA goal model: /mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/data/models--openvla--openvla-7b-finetuned-libero-goal
+SpecVLA checkpoint: /mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_libero_goal_debug_ckpt
+DFLASH copied checkpoint example: /mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/epoch_190_step_169670
+Logs: /mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/eval_logs
 ```
 
-如果权重被复制或重命名，可以用下面任一变量覆盖：
+如果权重被复制或重命名，可以用下面变量覆盖。DFlash 评测用 `SPEC_CKPT` 指向从 3090 搬到 4090 的
+checkpoint；SpecVLA baseline 才需要 `SPECVLA_GOAL_CKPT`：
 
 ```bash
 SPEC_CKPT=/path/to/goal_ckpt
@@ -375,71 +425,11 @@ AR baseline 使用标准 OpenVLA 模型，故意不向模型传 `generate_mode`�
 这类 SpecVLA/DFlash 专用 generation 参数。2026-06-28 曾因误传这些参数导致 AR 每个 episode
 一开始就异常退出，表现为“推得很快但成功率全 0”；该问题已在 `a5817d5` 修复。
 
-### 3090 上的五套一键命令
+### 评测机器约定
 
-先进入环境：
-
-```bash
-cd /data/wulin/c/SpecVLA-DFLASH
-source /data/wulin/miniconda3/etc/profile.d/conda.sh
-conda activate specvla
-```
-
-1. 不投机的 OpenVLA AR baseline：
-
-```bash
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
-  bash openvla/specdecoding/decode-scripts/run_openvla_ar_libero_goal_eval.sh
-```
-
-2. SpecVLA 不带 relaxed：
-
-```bash
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
-  bash openvla/specdecoding/decode-scripts/run_specvla_libero_goal_eval.sh
-```
-
-3. SpecVLA 带 relaxed：
-
-```bash
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
-  bash openvla/specdecoding/decode-scripts/run_specvla_relaxed_libero_goal_eval.sh
-```
-
-4. DFLASH 不带 relaxed，默认评测 `latest_checkpoint.txt`：
-
-```bash
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
-  bash openvla/specdecoding/decode-scripts/run_dflash_strict_libero_goal_eval.sh
-```
-
-指定评测第 190 epoch：
-
-```bash
-CUDA_VISIBLE_DEVICES=3 NUM_TRIALS_PER_TASK=50 EVAL_EPOCH=190 \
-  bash openvla/specdecoding/decode-scripts/run_dflash_strict_libero_goal_eval.sh
-```
-
-指定评测第 200 epoch：
-
-```bash
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 EVAL_EPOCH=200 \
-  bash openvla/specdecoding/decode-scripts/run_dflash_strict_libero_goal_eval.sh
-```
-
-5. DFLASH 带 relaxed，默认评测 `latest_checkpoint.txt`：
-
-```bash
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
-  bash openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh
-```
-
-指定评测第 200 epoch：
-
-```bash
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 EVAL_EPOCH=200 \
-  bash openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh
-```
+正式速度评测默认 **不在 3090 上跑**。3090 推理时 SpecVLA/DFlash 的小 kernel、校验和调度开销
+会明显吃掉投机解码收益，曾观察到 strict/relaxed speedup 都低于 4090。3090 可以临时做成功率 sanity check，
+但论文式 `SR / Length / Speedup` 统一在 4090 上记录。
 
 ### 评测输出和覆盖变量
 
@@ -490,9 +480,12 @@ USE_WANDB
 SEED
 ```
 
-### 4090 上复测整套指标
+### 4. 4090：统一推理评测
 
-4090 是单卡主开发机器，适合在更快的 RTX 4090 上复测推理速度、Length 和成功率。进入环境：
+4090 是固定推理评测机器。每次从 3090 搬来 checkpoint 后，在 4090 上跑 AR、SpecVLA strict、
+SpecVLA relaxed、DFLASH strict、DFLASH relaxed 五套实验，最终比较 `SR / Length / Speedup`。
+
+进入环境：
 
 ```bash
 ssh 4090
@@ -500,32 +493,72 @@ source /home/pc/miniconda3/bin/activate specvla
 cd /mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/SpecVLA-main
 ```
 
-如果要评测手动复制到 4090 的 DFLASH checkpoint，例如：
-
-```text
-/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/epoch_190_step_169670
-```
-
-则 DFLASH 两个命令都显式传 `SPEC_CKPT`：
+设置本次要评测的 DFLASH checkpoint。这里以从 3090 搬来的第 190 epoch 为例：
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
-  bash openvla/specdecoding/decode-scripts/run_openvla_ar_libero_goal_eval.sh
+export DFLASH_CKPT=/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/epoch_190_step_169670
+export NUM_TRIALS_PER_TASK=50
+export CUDA_VISIBLE_DEVICES=0
+```
 
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
-  bash openvla/specdecoding/decode-scripts/run_specvla_libero_goal_eval.sh
+建议每个长评测都放在 screen 里跑，例如：
 
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
-  bash openvla/specdecoding/decode-scripts/run_specvla_relaxed_libero_goal_eval.sh
+```bash
+screen -S eval_dflash_strict
+```
 
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
-  SPEC_CKPT=/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/epoch_190_step_169670 \
+五套评测命令如下。DFlash 两个命令必须显式传 `SPEC_CKPT="${DFLASH_CKPT}"`，确保评测的是刚从
+3090 复制来的权重。
+
+1. OpenVLA AR baseline：
+
+```bash
+bash openvla/specdecoding/decode-scripts/run_openvla_ar_libero_goal_eval.sh
+```
+
+2. SpecVLA strict baseline：
+
+```bash
+bash openvla/specdecoding/decode-scripts/run_specvla_libero_goal_eval.sh
+```
+
+3. SpecVLA relaxed baseline：
+
+```bash
+bash openvla/specdecoding/decode-scripts/run_specvla_relaxed_libero_goal_eval.sh
+```
+
+4. DFLASH strict：
+
+```bash
+SPEC_CKPT="${DFLASH_CKPT}" \
   bash openvla/specdecoding/decode-scripts/run_dflash_strict_libero_goal_eval.sh
+```
 
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
-  SPEC_CKPT=/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/epoch_190_step_169670 \
+5. DFLASH relaxed：
+
+```bash
+SPEC_CKPT="${DFLASH_CKPT}" \
   bash openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh
 ```
+
+评测结束后，汇总最新五个 summary：
+
+```bash
+LOG_DIR=/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/eval_logs
+
+AR=$(ls -t ${LOG_DIR}/openvla_ar/*_summary.json | head -1)
+SPEC=$(ls -t ${LOG_DIR}/specvla_strict/*_summary.json | head -1)
+SPEC_R=$(ls -t ${LOG_DIR}/specvla_relaxed/*_summary.json | head -1)
+DFLASH=$(ls -t ${LOG_DIR}/dflash_strict/*_summary.json | head -1)
+DFLASH_R=$(ls -t ${LOG_DIR}/dflash_relaxed/*_summary.json | head -1)
+
+python openvla/specdecoding/test-speed/summarize_eval_summaries.py \
+  --ar-summary "$AR" "$SPEC" "$SPEC_R" "$DFLASH" "$DFLASH_R"
+```
+
+如果不是刚跑完五套实验，不要盲目使用 `ls -t | head -1`；应手动确认每个 summary 文件的时间戳、
+`run_id`、`SPEC_CKPT` 和 `accept_threshold` 是否属于同一组对比。
 
 ## 3090 LIBERO EGL 问题记录
 
@@ -565,17 +598,18 @@ bash openvla/specdecoding/decode-scripts/setup_3090_nvidia_egl_shim.sh
 当前维护逻辑：
 
 ```text
-4090 主开发/提交机器 -> GitHub main -> 3090 按需同步
+代码: 4090 主开发/提交机器 -> GitHub main -> 3090 按需同步训练代码
+权重: 3090 四卡训练输出 -> 本地 scp -3 -> 4090 推理评测
 ```
 
-这次 README 中文化以 3090 当前 README 为起点，因为 3090 上已经包含一条本地补充的 DFLASH strict
-评测命令。后续默认仍建议：
+后续默认建议：
 
 1. 在 4090 上做代码或文档改动并验证。
 2. 只提交与当前改动相关的文件，推送到
    [guanghaichen/SpecVLA-DFLASH](https://github.com/guanghaichen/SpecVLA-DFLASH)。
 3. 不把未提交的 4090 改动直接复制到 3090。
-4. GitHub 包含目标 commit 后，再按训练/生成/评测需要同步 3090。
+4. GitHub 包含目标 commit 后，再按训练需要同步 3090。
+5. 3090 训练完只复制 checkpoint 到 4090；不要把 3090 的临时改动反向覆盖 4090 代码。
 
 每次实验前，至少记录下面信息：
 

@@ -45,6 +45,11 @@ from experiments.robot.libero.libero_utils import (
     quat2axisangle,
     save_rollout_video,
 )
+from experiments.robot.libero.eval_metrics import (
+    format_generation_summary,
+    summarize_generation_stats,
+    write_eval_summary,
+)
 from experiments.robot.openvla_utils import get_processor
 from experiments.robot.robot_utils import (
     DATE_TIME,
@@ -141,6 +146,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
     local_log_filepath = str(target_dir / f"{run_id}.txt")
     log_file = open(local_log_filepath, "w")
     local_log_timefilepath = str(target_dir / f"{run_id}-{eval_family}_timing.json")
+    local_log_summaryfilepath = str(target_dir / f"{run_id}-{eval_family}_summary.json")
     print(f"Logging to local log file: {local_log_filepath}")
 
     # Initialize Weights & Biases logging as well
@@ -163,6 +169,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
 
     # Start evaluation
     total_episodes, total_successes = 0, 0
+    total_episode_time = []
+    total_generation_step_stats = []
     for task_id in tqdm.tqdm(range(num_tasks_in_suite)):
         # Get task
         task = task_suite.get_task(task_id)
@@ -175,9 +183,10 @@ def eval_libero(cfg: GenerateConfig) -> None:
 
         # Start episodes
         task_episodes, task_successes = 0, 0
-        total_episode_time = []
+        task_generation_step_stats = []
         for episode_idx in tqdm.tqdm(range(cfg.num_trials_per_task)):
             total_time = []
+            episode_generation_stats = []
             print(f"\nTask: {task_description}")
             log_file.write(f"\nTask: {task_description}\n")
 
@@ -228,15 +237,18 @@ def eval_libero(cfg: GenerateConfig) -> None:
                     }
 
                     # Query model to get action
-                    action,time = get_action(
+                    action,time,generation_stats = get_action(
                         cfg,
                         model,
                         observation,
                         task_description,
                         processor=processor,
                         return_time=True,
+                        return_generation_stats=True,
                         generate_mode = ("dflash" if cfg.draft_backend == "dflash" else "speculative")
                     )
+                    episode_generation_stats.append(generation_stats)
+                    total_time.append(time)
                     # Normalize gripper action [0,1] -> [-1,+1] because the environment expects the latter
                     action = normalize_gripper_action(action, binarize=True)
 
@@ -252,7 +264,6 @@ def eval_libero(cfg: GenerateConfig) -> None:
                         total_successes += 1
                         break
                     t += 1
-                    total_time.append(time)
 
                 except Exception as e:
                     print(f"Caught exception: {e}")
@@ -262,6 +273,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
             task_episodes += 1
             total_episodes += 1
             total_episode_time.append(total_time)
+            task_generation_step_stats.extend(episode_generation_stats)
+            total_generation_step_stats.extend(episode_generation_stats)
 
             # Save a replay video of the episode
             # save_rollout_video(
@@ -275,6 +288,11 @@ def eval_libero(cfg: GenerateConfig) -> None:
             log_file.write(f"Success: {done}\n")
             log_file.write(f"# episodes completed so far: {total_episodes}\n")
             log_file.write(f"# successes: {total_successes} ({total_successes / total_episodes * 100:.1f}%)\n")
+            episode_generation_summary = summarize_generation_stats(episode_generation_stats)
+            if episode_generation_summary is not None:
+                episode_summary_line = format_generation_summary(episode_generation_summary)
+                print(episode_summary_line)
+                log_file.write(f"{episode_summary_line}\n")
             log_file.flush()
 
         # Log final results
@@ -282,17 +300,41 @@ def eval_libero(cfg: GenerateConfig) -> None:
         print(f"Current total success rate: {float(total_successes) / float(total_episodes)}")
         log_file.write(f"Current task success rate: {float(task_successes) / float(task_episodes)}\n")
         log_file.write(f"Current total success rate: {float(total_successes) / float(total_episodes)}\n")
+        task_generation_summary = summarize_generation_stats(task_generation_step_stats)
+        if task_generation_summary is not None:
+            task_summary_line = format_generation_summary(task_generation_summary, prefix="Current task speculative stats")
+            print(task_summary_line)
+            log_file.write(f"{task_summary_line}\n")
         log_file.flush()
         if cfg.use_wandb:
-            wandb.log(
-                {
-                    f"success_rate/{task_description}": float(task_successes) / float(task_episodes),
-                    f"num_episodes/{task_description}": task_episodes,
-                }
-            )
+            log_payload = {
+                f"success_rate/{task_description}": float(task_successes) / float(task_episodes),
+                f"num_episodes/{task_description}": task_episodes,
+            }
+            if task_generation_summary is not None:
+                log_payload[f"spec/length/{task_description}"] = task_generation_summary["length"]
+                log_payload[f"spec/avg_accept_length/{task_description}"] = task_generation_summary["avg_accept_length"]
+            wandb.log(log_payload)
         #exit()
     with open(local_log_timefilepath,mode='w') as f:
         json.dump(total_episode_time,f)
+    summary_payload = write_eval_summary(
+        local_log_summaryfilepath,
+        cfg=cfg,
+        run_id=run_id,
+        eval_family=eval_family,
+        total_episodes=total_episodes,
+        total_successes=total_successes,
+        episode_times=total_episode_time,
+        generation_stats=total_generation_step_stats,
+    )
+    print(f"Saved eval summary to: {local_log_summaryfilepath}")
+    log_file.write(f"Saved eval summary to: {local_log_summaryfilepath}\n")
+    total_generation_summary = summary_payload.get("generation")
+    if total_generation_summary is not None:
+        total_summary_line = format_generation_summary(total_generation_summary, prefix="Total speculative stats")
+        print(total_summary_line)
+        log_file.write(f"{total_summary_line}\n")
     # Save local log file
     log_file.close()
    # print('total time')
@@ -304,6 +346,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
             {
                 "success_rate/total": float(total_successes) / float(total_episodes),
                 "num_episodes/total": total_episodes,
+                "spec/length/total": total_generation_summary["length"] if total_generation_summary else None,
+                "spec/avg_accept_length/total": total_generation_summary["avg_accept_length"] if total_generation_summary else None,
             }
         )
         wandb.save(local_log_filepath)

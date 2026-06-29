@@ -807,6 +807,7 @@ class SpecVLAforActionPrediction(nn.Module):
         position_hits = [0 for _ in range(max_draft_tokens)]
         position_counts = [0 for _ in range(max_draft_tokens)]
         accept_lengths = []
+        progress_lengths = []
         total_accepted = 0
         total_compared = 0
 
@@ -910,6 +911,7 @@ class SpecVLAforActionPrediction(nn.Module):
                 ]
 
             append_count = effective_accept_length if all_accepted else effective_accept_length + 1
+            progress_lengths.append(int(append_count))
             new_anchor_idx = anchor_idx + append_count
             new_cache_length = action_base_position + new_anchor_idx
             past_key_values = self._crop_past_key_values(verify_outputs.past_key_values, new_cache_length)
@@ -933,17 +935,29 @@ class SpecVLAforActionPrediction(nn.Module):
                     "reject_rate": (reject_count / compare_count) if compare_count > 0 else None,
                 }
             )
-        self.last_dflash_stats = {
+        num_blocks = len(accept_lengths)
+        progressed_tokens = min(max_new_tokens, 1 + sum(progress_lengths))
+        generation_stats = {
+            "backend": "dflash",
             "block_size": block_size,
             "generated_tokens": max_new_tokens,
-            "num_blocks": len(accept_lengths),
-            "accept_lengths": accept_lengths,
-            "avg_accept_length": (sum(accept_lengths) / len(accept_lengths)) if accept_lengths else 0.0,
+            "num_blocks": num_blocks,
+            "bootstrapped_tokens": 1,
+            "progressed_tokens": progressed_tokens,
+            "progress_lengths": progress_lengths,
+            "length": (progressed_tokens / num_blocks) if num_blocks > 0 else 0.0,
+            "table1_length": (progressed_tokens / num_blocks) if num_blocks > 0 else 0.0,
+            "avg_progress_length": (progressed_tokens / num_blocks) if num_blocks > 0 else 0.0,
+            "avg_tail_progress_length": (sum(progress_lengths) / num_blocks) if num_blocks > 0 else 0.0,
+            "accept_lengths": [int(x) for x in accept_lengths],
+            "avg_accept_length": (sum(accept_lengths) / num_blocks) if num_blocks > 0 else 0.0,
             "accepted_tokens": total_accepted,
             "compared_tokens": total_compared,
             "overall_hit_rate": (total_accepted / total_compared) if total_compared > 0 else None,
             "per_position": per_position_stats,
         }
+        self.last_dflash_stats = generation_stats
+        self.last_generation_stats = generation_stats
         return output_ids[:, token_prefix_len:max_length]
 
     @torch.no_grad()
@@ -1006,6 +1020,7 @@ class SpecVLAforActionPrediction(nn.Module):
         position_hits = [0 for _ in range(max_draft_tokens)]
         position_counts = [0 for _ in range(max_draft_tokens)]
         accept_lengths = []
+        progress_lengths = []
         total_accepted = 0
         total_compared = 0
         anchor_decode_steps = 0
@@ -1146,6 +1161,7 @@ class SpecVLAforActionPrediction(nn.Module):
                 ]
 
             new_anchor_idx = anchor_idx + (q_len if all_accepted else effective_accept_length + 1)
+            progress_lengths.append(int(new_anchor_idx - anchor_idx))
             new_cache_length = action_base_position + new_anchor_idx
             source_past_key_values = (
                 verify_outputs.past_key_values if verify_outputs is not None else anchor_outputs.past_key_values
@@ -1177,20 +1193,32 @@ class SpecVLAforActionPrediction(nn.Module):
                     "reject_rate": (reject_count / compare_count) if compare_count > 0 else None,
                 }
             )
-        self.last_dflash_stats = {
+        num_blocks = len(accept_lengths)
+        progressed_tokens = min(max_new_tokens, 1 + sum(progress_lengths))
+        generation_stats = {
+            "backend": "dflash",
             "block_size": block_size,
             "generated_tokens": max_new_tokens,
             "include_anchor_hidden": True,
-            "num_blocks": len(accept_lengths),
+            "num_blocks": num_blocks,
+            "bootstrapped_tokens": 1,
+            "progressed_tokens": progressed_tokens,
+            "progress_lengths": progress_lengths,
+            "length": (progressed_tokens / num_blocks) if num_blocks > 0 else 0.0,
+            "table1_length": (progressed_tokens / num_blocks) if num_blocks > 0 else 0.0,
+            "avg_progress_length": (progressed_tokens / num_blocks) if num_blocks > 0 else 0.0,
+            "avg_tail_progress_length": (sum(progress_lengths) / num_blocks) if num_blocks > 0 else 0.0,
             "anchor_decode_steps": anchor_decode_steps,
             "target_bootstrap_tokens": anchor_decode_steps,
-            "accept_lengths": accept_lengths,
-            "avg_accept_length": (sum(accept_lengths) / len(accept_lengths)) if accept_lengths else 0.0,
+            "accept_lengths": [int(x) for x in accept_lengths],
+            "avg_accept_length": (sum(accept_lengths) / num_blocks) if num_blocks > 0 else 0.0,
             "accepted_tokens": total_accepted,
             "compared_tokens": total_compared,
             "overall_hit_rate": (total_accepted / total_compared) if total_compared > 0 else None,
             "per_position": per_position_stats,
         }
+        self.last_dflash_stats = generation_stats
+        self.last_generation_stats = generation_stats
         return output_ids[:, token_prefix_len:max_length]
     def forward(
         self,
@@ -1248,6 +1276,7 @@ class SpecVLAforActionPrediction(nn.Module):
         return_hidden_states: bool = False,
         legacy_output_hidden: Optional[bool] = None,
         return_dflash_stats: bool = False,
+        return_generation_stats: bool = False,
         generate_mode = 'Speculative',
         #accept_threshold=None,
         **kwargs: str
@@ -1271,6 +1300,7 @@ class SpecVLAforActionPrediction(nn.Module):
         if legacy_output_hidden is not None:
             return_hidden_states = legacy_output_hidden
         self.last_dflash_stats = None
+        self.last_generation_stats = None
 
         # 设置generate方法的参数
         if return_hidden_states:
@@ -1375,6 +1405,8 @@ class SpecVLAforActionPrediction(nn.Module):
             # 返回二元组: (动作, 隐藏状态)
             #print(last_layer_hidden[0].shape)
             return actions, predicted_action_token_ids,(first_layer_hidden,last_layer_hidden)
+        if return_generation_stats:
+            return actions, self.last_generation_stats
         if return_dflash_stats:
             return actions, self.last_dflash_stats
 
@@ -1663,6 +1695,10 @@ class SpecVLAforActionPrediction(nn.Module):
         input_len = input_ids.shape[1]-1
         max_length = max_length - self.ea_layer.total_tokens - 10
         new_token = 0
+        accept_lengths = []
+        raw_accept_lengths = []
+        progress_lengths = []
+        idx = -1
         for idx in range(max_length):
             # with Timer("all"):
             cycle_begin_time = time.time()
@@ -1684,6 +1720,11 @@ class SpecVLAforActionPrediction(nn.Module):
             best_candidate, accept_length, sample_p = evaluate_posterior(
                 logits, candidates, logits_processor,accept_threshold=accept_threshold
             )
+            if torch.is_tensor(accept_length):
+                raw_accept_length = int(accept_length.item())
+            else:
+                raw_accept_length = int(accept_length)
+            previous_new_token = new_token
             input_ids, draft_tokens, retrieve_indices, tree_mask, tree_position_ids, new_token,prompt_embeds,past_key_value_data,attention_mask = update_inference_inputs(
                 prompt_embeds,
                 #prompt_hidden_states,
@@ -1703,6 +1744,11 @@ class SpecVLAforActionPrediction(nn.Module):
                 sample_p,
                 attention_mask
             )
+            block_progress = int(new_token - previous_new_token)
+            if block_progress > 0:
+                progress_lengths.append(block_progress)
+                accept_lengths.append(max(block_progress - 1, 0))
+                raw_accept_lengths.append(raw_accept_length)
             if self.tokenizer.eos_token_id in input_ids[0, input_len:].tolist():
                 break
             if new_token > max_new_tokens:
@@ -1719,6 +1765,24 @@ class SpecVLAforActionPrediction(nn.Module):
         if len(stop_token_ids_index) > 0:
                     input_ids = input_ids[:,:stop_token_ids_index[0]]
 
+        num_blocks = len(progress_lengths)
+        progressed_tokens = min(max_new_tokens, sum(progress_lengths))
+        self.last_generation_stats = {
+            "backend": "eagle",
+            "generated_tokens": max_new_tokens,
+            "num_blocks": num_blocks,
+            "progressed_tokens": progressed_tokens,
+            "progress_lengths": progress_lengths,
+            "length": (progressed_tokens / num_blocks) if num_blocks > 0 else 0.0,
+            "table1_length": (progressed_tokens / num_blocks) if num_blocks > 0 else 0.0,
+            "avg_progress_length": (progressed_tokens / num_blocks) if num_blocks > 0 else 0.0,
+            "accept_lengths": accept_lengths,
+            "raw_accept_lengths": raw_accept_lengths,
+            "avg_accept_length": (sum(accept_lengths) / num_blocks) if num_blocks > 0 else 0.0,
+            "accepted_tokens": sum(accept_lengths),
+            "compared_tokens": 0,
+            "overall_hit_rate": None,
+        }
         if not log:
             return input_ids[:,input_len+1:]
         else:

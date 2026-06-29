@@ -443,14 +443,36 @@ CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 EVAL_EPOCH=200 \
 
 ### 评测输出和覆盖变量
 
-`run_libero_goal_Spec_Relaxed.py` 是 DFLASH 推荐评测入口，因为它会记录：
+`run_libero_goal_Spec.py` 和 `run_libero_goal_Spec_Relaxed.py` 现在都会为 SpecVLA/EAGLE 与
+DFLASH 记录论文 Table 1 风格的 `Length`。评测结束后，每个 run 会写三类文件：
 
 ```text
-task success
-action-generation timing
-average accepted length
-total hit rate
-per-position hit/reject rate
+*.txt             人类可读日志：成功率、Length、accept length、hit rate
+*_timing.json    每个环境 step 的 action-generation 耗时
+*_summary.json   汇总指标：success_rate、timing.mean、generation.length
+```
+
+`generation.length` / `generation.table1_length` 的口径是：
+
+```text
+Length = 该 run 生成的 action token 总数 / speculative block 数
+```
+
+对 OpenVLA action 来说，每个 policy step 目标是 7 个 action token。DFLASH 会先由 target
+prefill 得到第一个 action token，再用 block draft 推进后续 token；summary 中的 `Length`
+仍把这个首 token 放进总生成 token 数里，以便接近 SpecVLA 论文 Table 1 的
+“每次 forward 平均生成 token 数”口径。`avg_accept_length` 则保留更底层的含义：
+平均每个 block 真正接受了多少 draft token，不等同于 Table 1 的 `Length`。
+
+可用下面的脚本把 AR 和若干 speculative summary 汇总成论文式表格：
+
+```bash
+python openvla/specdecoding/test-speed/summarize_eval_summaries.py \
+  --ar-summary /path/to/openvla_ar_summary.json \
+  /path/to/specvla_strict_summary.json \
+  /path/to/specvla_relaxed_summary.json \
+  /path/to/dflash_strict_summary.json \
+  /path/to/dflash_relaxed_summary.json
 ```
 
 一次性覆盖变量可以写在 `bash` 前面：
@@ -466,6 +488,43 @@ NUM_TRIALS_PER_TASK
 RUN_ID_NOTE
 USE_WANDB
 SEED
+```
+
+### 4090 上复测整套指标
+
+4090 是单卡主开发机器，适合在更快的 RTX 4090 上复测推理速度、Length 和成功率。进入环境：
+
+```bash
+ssh 4090
+source /home/pc/miniconda3/bin/activate specvla
+cd /mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/SpecVLA-main
+```
+
+如果要评测手动复制到 4090 的 DFLASH checkpoint，例如：
+
+```text
+/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/epoch_190_step_169670
+```
+
+则 DFLASH 两个命令都显式传 `SPEC_CKPT`：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_openvla_ar_libero_goal_eval.sh
+
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_specvla_libero_goal_eval.sh
+
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_specvla_relaxed_libero_goal_eval.sh
+
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  SPEC_CKPT=/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/epoch_190_step_169670 \
+  bash openvla/specdecoding/decode-scripts/run_dflash_strict_libero_goal_eval.sh
+
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  SPEC_CKPT=/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/epoch_190_step_169670 \
+  bash openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh
 ```
 
 ## 3090 LIBERO EGL 问题记录

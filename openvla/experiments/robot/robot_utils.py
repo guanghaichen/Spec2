@@ -60,7 +60,7 @@ def get_image_resize_size(cfg):
     return resize_size
 
 
-def get_action(cfg, model, obs, task_label, return_time = False,return_hidden_states=False,processor=None,generate_mode=None,return_topk_index=None,token=None,return_dflash_stats=False):
+def get_action(cfg, model, obs, task_label, return_time = False,return_hidden_states=False,processor=None,generate_mode=None,return_topk_index=None,token=None,return_dflash_stats=False,return_generation_stats=False):
     """Queries the model to get an action."""
     if cfg.model_family == "openvla":
         if return_hidden_states:
@@ -69,18 +69,18 @@ def get_action(cfg, model, obs, task_label, return_time = False,return_hidden_st
             )
             return action,tokens,hidden
         if return_time:
-            if return_dflash_stats:
-                action,time,dflash_stats = get_vla_action(
-                model, processor, cfg.pretrained_checkpoint, obs, task_label, cfg.unnorm_key, return_hidden_states=return_hidden_states, center_crop=cfg.center_crop,return_time=True,generate_mode=generate_mode,return_dflash_stats=True
+            if return_dflash_stats or return_generation_stats:
+                action,time,generation_stats = get_vla_action(
+                model, processor, cfg.pretrained_checkpoint, obs, task_label, cfg.unnorm_key, return_hidden_states=return_hidden_states, center_crop=cfg.center_crop,return_time=True,generate_mode=generate_mode,return_dflash_stats=return_dflash_stats,return_generation_stats=return_generation_stats
                 )
-                return action,time,dflash_stats
+                return action,time,generation_stats
             action,time = get_vla_action(
             model, processor, cfg.pretrained_checkpoint, obs, task_label, cfg.unnorm_key, return_hidden_states=return_hidden_states, center_crop=cfg.center_crop,return_time=True,generate_mode=generate_mode
             )
             return action,time
         else:
             action = get_vla_action(
-                model, processor, cfg.pretrained_checkpoint, obs, task_label, cfg.unnorm_key, return_hidden_states=return_hidden_states, center_crop=cfg.center_crop,generate_mode=generate_mode,return_topk_index=return_topk_index,return_dflash_stats=return_dflash_stats
+                model, processor, cfg.pretrained_checkpoint, obs, task_label, cfg.unnorm_key, return_hidden_states=return_hidden_states, center_crop=cfg.center_crop,generate_mode=generate_mode,return_topk_index=return_topk_index,return_dflash_stats=return_dflash_stats,return_generation_stats=return_generation_stats
             )
             assert action.shape == (ACTION_DIM,)
     else:

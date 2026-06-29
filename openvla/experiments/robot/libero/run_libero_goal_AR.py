@@ -46,6 +46,7 @@ from experiments.robot.libero.libero_utils import (
     quat2axisangle,
     save_rollout_video,
 )
+from experiments.robot.libero.eval_metrics import write_eval_summary
 from experiments.robot.openvla_utils import get_processor
 from experiments.robot.robot_utils import (
     DATE_TIME,
@@ -135,6 +136,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
     local_log_filepath = str(target_dir / f"{run_id}.txt")
     log_file = open(local_log_filepath, "w")
     local_log_timefilepath = str(target_dir / f"{run_id}-openvla_ar_timing.json")
+    local_log_summaryfilepath = str(target_dir / f"{run_id}-openvla_ar_summary.json")
     print(f"Logging to local log file: {local_log_filepath}")
 
     # Initialize Weights & Biases logging as well
@@ -157,6 +159,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
 
     # Start evaluation
     total_episodes, total_successes = 0, 0
+    total_episode_time = []
     for task_id in tqdm.tqdm(range(num_tasks_in_suite)):
         # Get task
         task = task_suite.get_task(task_id)
@@ -169,7 +172,6 @@ def eval_libero(cfg: GenerateConfig) -> None:
 
         # Start episodes
         task_episodes, task_successes = 0, 0
-        total_episode_time = []
         for episode_idx in tqdm.tqdm(range(cfg.num_trials_per_task)):
             total_time = []
             print(f"\nTask: {task_description}")
@@ -230,6 +232,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
                         processor=processor,
                         return_time=True,# 返回模型推理耗时
                     )
+                    total_time.append(time)# 一个 episode 中所有 policy call 的推理耗时
 
                     # Normalize gripper action [0,1] -> [-1,+1] because the environment expects the latter
                     action = normalize_gripper_action(action, binarize=True)
@@ -246,7 +249,6 @@ def eval_libero(cfg: GenerateConfig) -> None:
                         total_successes += 1
                         break
                     t += 1
-                    total_time.append(time)# 一个 episode 中所有推理步的耗时
 
                 except Exception as e:
                     print(f"Caught exception: {e}")
@@ -286,6 +288,18 @@ def eval_libero(cfg: GenerateConfig) -> None:
             )
     with open(local_log_timefilepath,mode='w') as f:
         json.dump(total_episode_time,f)
+    write_eval_summary(
+        local_log_summaryfilepath,
+        cfg=cfg,
+        run_id=run_id,
+        eval_family="openvla_ar",
+        total_episodes=total_episodes,
+        total_successes=total_successes,
+        episode_times=total_episode_time,
+        generation_stats=None,
+    )
+    print(f"Saved eval summary to: {local_log_summaryfilepath}")
+    log_file.write(f"Saved eval summary to: {local_log_summaryfilepath}\n")
     # Save local log file
     log_file.close()
 

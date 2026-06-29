@@ -157,7 +157,7 @@ def crop_and_resize(image, crop_scale, batch_size):
     return image
 
 
-def get_vla_action(vla, processor, base_vla_name, obs, task_label, unnorm_key, return_hidden_states=False,return_time=False,center_crop=False,generate_mode=None,accept_threshold=None,return_topk_index=False,token=None,return_dflash_stats=False):
+def get_vla_action(vla, processor, base_vla_name, obs, task_label, unnorm_key, return_hidden_states=False,return_time=False,center_crop=False,generate_mode=None,accept_threshold=None,return_topk_index=False,token=None,return_dflash_stats=False,return_generation_stats=False):
     """Generates an action with the VLA policy.
     generate_mode控制是否用草稿
     """
@@ -211,7 +211,9 @@ def get_vla_action(vla, processor, base_vla_name, obs, task_label, unnorm_key, r
     if return_topk_index:
         action,token,hidden = vla.eval_topk(**inputs, unnorm_key=unnorm_key, return_hidden_states=return_hidden_states,do_sample=False)
         return action
-    # 统计推理耗时
+    # 统计推理耗时。显式同步能让不同 speculative 路径的 GPU 异步开销可比。
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
     start_time = time.time()
     # 标准推理 推理动作
     predict_kwargs = dict(
@@ -224,11 +226,15 @@ def get_vla_action(vla, processor, base_vla_name, obs, task_label, unnorm_key, r
         predict_kwargs["generate_mode"] = generate_mode
     if return_dflash_stats:
         predict_kwargs["return_dflash_stats"] = True
+    if return_generation_stats:
+        predict_kwargs["return_generation_stats"] = True
 
     action = vla.predict_action(**predict_kwargs)# 调用 OpenVLAForActionPrediction.predict_action()
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
     end_time = time.time()
     if return_time:
-        if return_dflash_stats:
+        if return_dflash_stats or return_generation_stats:
             return action[0], (end_time, start_time), action[1]
         return action,(end_time,start_time)
     return action

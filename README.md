@@ -124,6 +124,49 @@ SwanLab 和本地 JSONL。
 当前 recipe 的长期控制信号是 LIBERO simulator behavior，而不是离线 validation split 的 early stopping。
 因此 pure-training launcher 使用 `--val_split 0`，默认不做 validation/early stopping，并且每 10 个 epoch 保存一次 checkpoint。
 
+### 当前新分支：跨 Anchor 因果蒸馏 + 前序 Token 残差修正
+
+2026-06-30 新增的主攻分支针对一个非常明确的现象：`anchor_a_to_position_(a+1)` 通常很高，
+但 `anchor_a_to_position_(a+2..)` 明显下降。这说明 draft 擅长一步预测，却不擅长在
+`[t_anchor, MASK, MASK, ...]` 的薄前缀条件下预测远 slot。
+
+新分支做两件事：
+
+1. **跨 Anchor 因果蒸馏。** 对同一个目标 token，用一步强路径当老师。例如预测 `t5` 时，
+   `anchor=4 -> t5` 是强路径；`anchor=0/1/2/3 -> t5` 都是弱路径。训练时让弱路径靠近强路径。
+2. **前序 Token 残差修正。** 弱路径不是直接硬追老师，而是先用一个共享小残差头读取“前一个 token”，
+   给远 slot hidden 补一小段因果残差。slot0 默认不修正，因为一步预测本来已经很强；
+   从 slot1 开始修正，默认只重点覆盖 p2-p5。
+
+训练时残差头看到的前序 token 来自 target model 真实轨迹；推理时没有真实未来 token，
+所以用刚生成的 draft token 作为下一 slot 的前序条件。DFlash transformer 主干仍然只跑一次，
+后面只是轻量 residual head + frozen `lm_head` 的逐 slot 修正。
+
+相关开关：
+
+```text
+--causal_residual_type hidden
+--causal_residual_rank 256
+--causal_residual_start_index 1
+--causal_residual_cad_w 0.05
+--causal_residual_cad_warmup_steps 2000
+--causal_residual_min_position 2
+--causal_residual_max_position 5
+```
+
+SwanLab/JSONL 会额外记录：
+
+```text
+causal_residual_cad_loss
+causal_residual_cad_component
+causal_residual_cad_pairs
+base_accuracy
+accuracy
+```
+
+其中 `base_accuracy` 是残差修正前的 token 命中率，`accuracy` 是残差修正后的命中率。这个差值用于判断
+残差修正是否真的救到了 p2-p5。
+
 ## 离线数据：当前 4090 artifact
 
 数据生成脚本使用 `openvla/modified_libero_rlds` 中的 `libero_goal_no_noops` split。对每个 RLDS sample，
@@ -171,6 +214,9 @@ dflash_data_format           full_prefix_plus_action_hidden_v4
 5. **当前主实验：** 使用完整 28,639 样本数据集训练 1-layer draft，五层 context 特征为
    `[1, 8, 15, 29, final]`，`soft_w=0`，`anchor_consistency_w=0`，不使用离线 validation split；
    然后用 LIBERO simulator 比较 checkpoint 的成功率、acceptance length、hit rate 和 wall-clock time。
+6. **Residual-CAD 新分支：** 观察到所有 anchor 的一步预测都明显强于远 slot 后，新增
+   “跨 Anchor 因果蒸馏 + 前序 Token 残差修正”。它不是直接把 DSpark 的 logits Markov head 搬过来，
+   而是让远 slot 的 hidden 经前序 token 残差修正后追同一目标位置的一步强路径。
 
 需要始终记住的限制：
 
@@ -188,8 +234,7 @@ dflash_data_format           full_prefix_plus_action_hidden_v4
 | 4090 | 1 张 RTX 4090 | 主开发、代码调试、数据生成、小规模 sanity check、最终 LIBERO 推理评测。 |
 | 3090 | 8 张 RTX 3090，实验中默认只用 0-3 四张 | 完整 DFLASH 四卡训练。 |
 
-因此，**不要在 README 中把 4090 写成四卡训练机器**。当前四卡 launcher
-`run_dflash_anchor_hidden_1layer_puretrain_4gpu.sh` 固定使用
+因此，**不要在 README 中把 4090 写成四卡训练机器**。当前四卡 launcher 固定使用
 `torchrun --nproc_per_node 4`，实际应该在 3090 上用 `CUDA_VISIBLE_DEVICES=0,1,2,3`
 启动。4090 如果需要训练，只适合临时做单卡小规模调试，不能直接照搬四卡命令。
 
@@ -260,14 +305,21 @@ source /data/wulin/miniconda3/etc/profile.d/conda.sh
 conda activate specvla
 ```
 
-3090 当前有 8 张 RTX 3090，但默认完整训练只使用 0-3 四张卡：
+3090 当前有 8 张 RTX 3090，但默认完整训练只使用 0-3 四张卡。当前优先跑
+Residual-CAD 新分支：
 
 ```bash
 CUDA_VISIBLE_DEVICES=0,1,2,3 \
-  bash openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_puretrain_4gpu.sh
+  bash openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_residual_cad_4gpu.sh
 ```
 
-推荐 launcher：
+当前推荐 launcher：
+
+```text
+openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_residual_cad_4gpu.sh
+```
+
+上一版 pure-training baseline launcher 仍保留，做消融时使用：
 
 ```text
 openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_puretrain_4gpu.sh
@@ -278,15 +330,19 @@ openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_puretrain_4gp
 ```text
 VLA_PATH=/data/wulin/hf_files/openvla-7b-finetuned-libero-goal
 DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset
-OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu
+OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_4gpu
 ```
 
-当前主训练配置：
+Residual-CAD 主训练配置：
 
 ```text
 torchrun --nproc_per_node 4
 num_draft_layers = 1
 selected_hidden_variant = replace_22_with_final
+causal_residual_type = hidden
+causal_residual_cad_w = 0.05
+causal_residual_cad_warmup_steps = 2000
+causal_residual_min/max_position = 2/5
 batch_size = 8 per GPU，有效 batch size = 32
 epochs = 200
 warmup = 2000 optimizer steps
@@ -295,7 +351,7 @@ val_split = 0
 SwanLab = 使用环境默认配置
 ```
 
-2026-06-29 重新检查到的 3090 数据和训练产物状态：
+2026-06-29 重新检查到的 3090 数据和上一版 puretrain 训练产物状态：
 
 ```text
 数据目录: /data/wulin/c/specvla-data/dflash_goal_dataset
@@ -336,20 +392,22 @@ run_config.json 记录: world_size=4, global_effective_batch=32, train_files=285
 推荐加 `-3`，让数据经由本地转发，不要求 3090 能直接连到 4090：
 
 ```bash
+TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_4gpu
 CKPT=epoch_190_step_169670
 
 scp -3 -r \
-  3090_wulin:/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu/${CKPT} \
+  3090_wulin:${TRAIN_DIR}/${CKPT} \
   4090:/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/${CKPT}
 ```
 
 如果要复制 3090 当前 `latest_checkpoint.txt` 指向的最新 checkpoint，可以在本地终端执行：
 
 ```bash
-CKPT=$(ssh 3090_wulin 'basename "$(cat /data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu/latest_checkpoint.txt)"')
+TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_4gpu
+CKPT=$(ssh 3090_wulin "basename \"\$(cat ${TRAIN_DIR}/latest_checkpoint.txt)\"")
 
 scp -3 -r \
-  3090_wulin:/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu/${CKPT} \
+  3090_wulin:${TRAIN_DIR}/${CKPT} \
   4090:/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/${CKPT}
 ```
 
@@ -390,7 +448,7 @@ openvla/specdecoding/decode-scripts/
 ```text
 OpenVLA goal model: /data/wulin/hf_files/openvla-7b-finetuned-libero-goal
 SpecVLA checkpoints: /data/wulin/c/specvla-data/specvla_checkpoint/goal
-DFLASH run dir: /data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu
+DFLASH run dir: /data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_4gpu
 Logs: /data/wulin/c/specvla-data/eval_logs
 ```
 
@@ -513,32 +571,37 @@ screen -S eval_dflash_strict
 1. OpenVLA AR baseline：
 
 ```bash
-bash openvla/specdecoding/decode-scripts/run_openvla_ar_libero_goal_eval.sh
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_openvla_ar_libero_goal_eval.sh
 ```
 
 2. SpecVLA strict baseline：
 
 ```bash
-bash openvla/specdecoding/decode-scripts/run_specvla_libero_goal_eval.sh
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_specvla_libero_goal_eval.sh
 ```
 
 3. SpecVLA relaxed baseline：
 
 ```bash
-bash openvla/specdecoding/decode-scripts/run_specvla_relaxed_libero_goal_eval.sh
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_specvla_relaxed_libero_goal_eval.sh
 ```
 
 4. DFLASH strict：
 
 ```bash
-SPEC_CKPT="${DFLASH_CKPT}" \
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  SPEC_CKPT=/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/epoch_190_step_169670 \
   bash openvla/specdecoding/decode-scripts/run_dflash_strict_libero_goal_eval.sh
 ```
 
 5. DFLASH relaxed：
 
 ```bash
-SPEC_CKPT="${DFLASH_CKPT}" \
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  SPEC_CKPT=/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/epoch_190_step_169670 \
   bash openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh
 ```
 

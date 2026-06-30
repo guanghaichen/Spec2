@@ -306,6 +306,111 @@ class DFlashDraftModel(nn.Module):
         nn.init.normal_(self.action_dim_embed.weight, mean=0.0, std=0.02)
         self.hidden_norm = LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.norm = LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        self.causal_residual_type = getattr(config, "dflash_causal_residual_type", "none")
+        self.causal_residual_rank = int(getattr(config, "dflash_causal_residual_rank", 256))
+        self.causal_residual_scale = float(getattr(config, "dflash_causal_residual_scale", 1.0))
+        if self.causal_residual_type not in ("none", "hidden"):
+            raise ValueError(
+                f"Unsupported dflash_causal_residual_type={self.causal_residual_type!r}; "
+                "expected 'none' or 'hidden'."
+            )
+        if self.causal_residual_type == "hidden":
+            vocab_size = getattr(config, "vocab_size", None)
+            if vocab_size is None or vocab_size <= 0:
+                raise ValueError("DFlash causal residual head requires config.vocab_size > 0.")
+            if self.causal_residual_rank <= 0:
+                raise ValueError("dflash_causal_residual_rank must be > 0.")
+            self.causal_residual_norm = LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+            self.causal_residual_token = nn.Embedding(vocab_size, self.causal_residual_rank)
+            self.causal_residual_hidden = nn.Linear(config.hidden_size, self.causal_residual_rank, bias=False)
+            self.causal_residual_out = nn.Linear(self.causal_residual_rank, config.hidden_size, bias=False)
+            nn.init.normal_(self.causal_residual_token.weight, mean=0.0, std=0.02)
+            nn.init.normal_(self.causal_residual_hidden.weight, mean=0.0, std=0.02)
+            # Near-zero rather than exact zero keeps DDP gradient hooks active from step 1.
+            nn.init.normal_(self.causal_residual_out.weight, mean=0.0, std=1e-4)
+        else:
+            self.causal_residual_norm = None
+            self.causal_residual_token = None
+            self.causal_residual_hidden = None
+            self.causal_residual_out = None
+
+    @property
+    def causal_residual_enabled(self) -> bool:
+        return self.causal_residual_type == "hidden"
+
+    def apply_causal_residual(
+        self,
+        hidden_states: torch.Tensor,
+        prev_token_ids: torch.LongTensor,
+        start_index: int = 1,
+    ) -> torch.Tensor:
+        """Refine hidden states using the previous token available for each slot.
+
+        start_index=1 leaves slot0 unchanged. Slot0 is already the reliable one-step prediction,
+        while later slots are exactly where block-parallel DFlash lacks short causal context.
+        """
+        if not self.causal_residual_enabled:
+            return hidden_states
+        if hidden_states.ndim != 3:
+            raise ValueError(f"hidden_states must be [B, T, H], got {tuple(hidden_states.shape)}.")
+        if prev_token_ids.shape != hidden_states.shape[:2]:
+            raise ValueError(
+                f"prev_token_ids shape {tuple(prev_token_ids.shape)} must match hidden prefix "
+                f"{tuple(hidden_states.shape[:2])}."
+            )
+        seq_len = hidden_states.shape[1]
+        if start_index >= seq_len:
+            return hidden_states
+        if start_index < 0:
+            raise ValueError("start_index must be >= 0.")
+
+        tail_hidden = hidden_states[:, start_index:, :]
+        tail_prev_tokens = prev_token_ids[:, start_index:]
+        residual_input = self.causal_residual_norm(tail_hidden)
+        hidden_feat = self.causal_residual_hidden(residual_input)
+        token_feat = self.causal_residual_token(tail_prev_tokens).to(dtype=hidden_feat.dtype)
+        residual = self.causal_residual_out(F.silu(hidden_feat + token_feat))
+        refined_tail = tail_hidden + residual.to(dtype=tail_hidden.dtype) * self.causal_residual_scale
+        if start_index == 0:
+            return refined_tail
+        return torch.cat([hidden_states[:, :start_index, :], refined_tail], dim=1)
+
+    def sample_with_causal_residual(
+        self,
+        hidden_states: torch.Tensor,
+        first_prev_token_ids: torch.LongTensor,
+        lm_head: nn.Module,
+        temperature: float = 0.0,
+        start_index: int = 1,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Sequentially sample a block after optional residual refinement.
+
+        The expensive DFlash transformer has already produced all hidden states in parallel.
+        This loop is only the light residual head + frozen lm_head, using each just-sampled
+        draft token as the next slot's previous-token condition.
+        """
+        if first_prev_token_ids.ndim == 2:
+            first_prev_token_ids = first_prev_token_ids[:, 0]
+        if first_prev_token_ids.ndim != 1:
+            raise ValueError("first_prev_token_ids must be [B] or [B, 1].")
+
+        sampled_tokens = []
+        refined_logits = []
+        prev_token = first_prev_token_ids
+        for slot_idx in range(hidden_states.shape[1]):
+            step_hidden = hidden_states[:, slot_idx : slot_idx + 1, :]
+            if self.causal_residual_enabled and slot_idx >= start_index:
+                step_hidden = self.apply_causal_residual(
+                    step_hidden,
+                    prev_token.view(-1, 1),
+                    start_index=0,
+                )
+            step_logits = lm_head(step_hidden)
+            step_token = sample(step_logits, temperature=temperature)
+            refined_logits.append(step_logits)
+            sampled_tokens.append(step_token)
+            prev_token = step_token[:, 0]
+        return torch.cat(sampled_tokens, dim=1), torch.cat(refined_logits, dim=1)
 
     def forward(
         self,
@@ -315,7 +420,10 @@ class DFlashDraftModel(nn.Module):
         noise_position_ids: torch.LongTensor,
         ctx_attention_mask: torch.Tensor | None = None,
         action_position_ids: torch.LongTensor | None = None,
-    ) -> torch.Tensor:
+        prev_token_ids: torch.LongTensor | None = None,
+        causal_residual_start_index: int = 1,
+        return_base_hidden: bool = False,
+    ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         hidden_states = noise_embedding
         if action_position_ids is not None:
             if int(action_position_ids.max().item()) >= self.action_dim:
@@ -350,4 +458,14 @@ class DFlashDraftModel(nn.Module):
                 ctx_attention_mask=ctx_attention_mask,
             )
         hidden_states = self.norm(hidden_states)
-        return hidden_states
+        if prev_token_ids is not None and self.causal_residual_enabled:
+            refined_hidden_states = self.apply_causal_residual(
+                hidden_states,
+                prev_token_ids=prev_token_ids,
+                start_index=causal_residual_start_index,
+            )
+        else:
+            refined_hidden_states = hidden_states
+        if return_base_hidden:
+            return hidden_states, refined_hidden_states
+        return refined_hidden_states

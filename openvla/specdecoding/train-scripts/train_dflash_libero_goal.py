@@ -110,6 +110,47 @@ def parse_args():
         help="跨 anchor 一致性权重线性 warmup 步数；0 表示不 warmup",
     )
     parser.add_argument("--position_balance", action=argparse.BooleanOptionalAction, default=True, help="是否平衡多 anchor 中不同 action 位置的重复监督次数")
+    parser.add_argument(
+        "--causal_residual_type",
+        type=str,
+        default="none",
+        choices=["none", "hidden"],
+        help="前序 token 残差修正头；hidden=用前一个 token 给远 slot hidden 补因果残差",
+    )
+    parser.add_argument("--causal_residual_rank", type=int, default=256, help="前序 token 残差头中间维度")
+    parser.add_argument("--causal_residual_scale", type=float, default=1.0, help="前序 token 残差幅度系数")
+    parser.add_argument("--causal_residual_start_index", type=int, default=1, help="从第几个 draft slot 开始启用残差；默认跳过高准确率 slot0")
+    parser.add_argument(
+        "--causal_residual_cad_w",
+        type=float,
+        default=0.0,
+        help="残差版跨 anchor 因果蒸馏权重；弱路径经残差修正后追同一目标位置的一步强路径",
+    )
+    parser.add_argument(
+        "--causal_residual_cad_type",
+        type=str,
+        default="smooth_l1",
+        choices=["cosine", "smooth_l1", "norm_mse"],
+        help="残差 CAD hidden 距离类型",
+    )
+    parser.add_argument(
+        "--causal_residual_cad_warmup_steps",
+        type=int,
+        default=0,
+        help="残差 CAD 权重线性 warmup 步数；0 表示不 warmup",
+    )
+    parser.add_argument(
+        "--causal_residual_min_position",
+        type=int,
+        default=2,
+        help="残差 CAD 作用的最小目标 token 位置（1-based，默认 p2）",
+    )
+    parser.add_argument(
+        "--causal_residual_max_position",
+        type=int,
+        default=5,
+        help="残差 CAD 作用的最大目标 token 位置（1-based，默认 p5）",
+    )
     parser.add_argument("--kl_w", type=float, dest="soft_w", help=argparse.SUPPRESS)
     parser.add_argument("--kl_temperature", type=float, dest="soft_temperature", help=argparse.SUPPRESS)
     parser.add_argument(
@@ -194,6 +235,7 @@ def distributed_log_metrics(metrics: Dict[str, torch.Tensor], distributed: bool)
         "anchor_position_correct",
         "anchor_position_total",
         "anchor_consistency_pairs",
+        "causal_residual_cad_pairs",
     }
     reduced: Dict[str, torch.Tensor] = {}
     world_size = dist.get_world_size()
@@ -413,7 +455,13 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "target_layer_ids": args.target_layer_ids,
         "selected_hidden_variant": args.selected_hidden_variant,
         "mask_token_id": args.mask_token_id,
-        "loss_design": "specvla_anchor_hidden_smooth_l1_main_plus_teacher_soft_ce"
+        "loss_design": (
+            "specvla_anchor_hidden_main"
+            "+teacher_soft_ce"
+            "+causal_residual_cad"
+            if args.causal_residual_cad_w > 0
+            else "specvla_anchor_hidden_smooth_l1_main_plus_teacher_soft_ce"
+        )
         if args.include_anchor_hidden
         else "hidden_smooth_l1_main_plus_teacher_soft_ce",
         "include_anchor_hidden": args.include_anchor_hidden,
@@ -424,6 +472,15 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "anchor_consistency_w": args.anchor_consistency_w,
         "anchor_consistency_type": args.anchor_consistency_type,
         "anchor_consistency_warmup_steps": args.anchor_consistency_warmup_steps,
+        "causal_residual_type": args.causal_residual_type,
+        "causal_residual_rank": args.causal_residual_rank,
+        "causal_residual_scale": args.causal_residual_scale,
+        "causal_residual_start_index": args.causal_residual_start_index,
+        "causal_residual_cad_w": args.causal_residual_cad_w,
+        "causal_residual_cad_type": args.causal_residual_cad_type,
+        "causal_residual_cad_warmup_steps": args.causal_residual_cad_warmup_steps,
+        "causal_residual_min_position": args.causal_residual_min_position,
+        "causal_residual_max_position": args.causal_residual_max_position,
         "slot_decay": args.slot_decay,
         "position_balance": args.position_balance,
         "hidden_loss_type": args.hidden_loss_type,
@@ -706,6 +763,7 @@ def compute_loss_and_accuracy(
     args,# 训练参数
     device: torch.device,
     consistency_scale: float = 1.0,
+    causal_residual_scale: float = 1.0,
 ) -> Dict[str, torch.Tensor]:
     prompt_selected = batch["prompt_selected"].to(device=device, dtype=torch.bfloat16)# 完整 prefill/prefix 上下文 [B, P, L*hidden]
     prompt_position_ids = batch["prompt_position_ids"].to(device=device)# 完整 prefill/prefix 的绝对 position [B, P]
@@ -723,9 +781,13 @@ def compute_loss_and_accuracy(
     anchor_consistency_sum = torch.zeros((), device=device, dtype=torch.float32)
     anchor_consistency_weight_sum = torch.zeros((), device=device, dtype=torch.float32)
     anchor_consistency_pairs = torch.zeros((), device=device, dtype=torch.float32)
+    causal_residual_cad_sum = torch.zeros((), device=device, dtype=torch.float32)
+    causal_residual_cad_weight_sum = torch.zeros((), device=device, dtype=torch.float32)
+    causal_residual_cad_pairs = torch.zeros((), device=device, dtype=torch.float32)
     weight_sum = torch.zeros((), device=device, dtype=torch.float32)
     total_positions = torch.zeros((), device=device, dtype=torch.float32)
     total_correct = torch.zeros((), device=device, dtype=torch.float32)
+    base_total_correct = torch.zeros((), device=device, dtype=torch.float32)
     anchor_correct = torch.zeros(seq_len, device=device, dtype=torch.float32)
     anchor_total = torch.zeros(seq_len, device=device, dtype=torch.float32)
     position_correct = torch.zeros(seq_len, device=device, dtype=torch.float32)
@@ -735,6 +797,9 @@ def compute_loss_and_accuracy(
     causal_slot0_hidden: Dict[int, torch.Tensor] = {}
     causal_slot0_mask: Dict[int, torch.Tensor] = {}
     far_slot_entries = []
+    causal_residual_teacher_hidden: Dict[int, torch.Tensor] = {}
+    causal_residual_teacher_mask: Dict[int, torch.Tensor] = {}
+    causal_residual_student_entries = []
     # 主循环：
     # - 原始 DFLASH: context=P+A[:anchor]，block=[t_anchor, MASK...]，预测 t_{anchor+1}...
     # - SpecVLA式注入: context=P+A[:anchor+1]，block=[t_anchor, MASK...]，预测 t_{anchor+1}...
@@ -803,21 +868,32 @@ def compute_loss_and_accuracy(
         action_position_ids = (
             known_token_index + torch.arange(max_block_len, device=device, dtype=torch.long).unsqueeze(0)
         ).expand(batch_size, -1)
+        prev_token_ids = tokens[:, known_token_index : known_token_index + max_block_len].contiguous()
 
         # Draft 模型推理
-        pred_hidden = model(# 输出去噪序列[B, block_size, hidden]
+        pred_hidden_output = model(# 输出去噪序列[B, block_size, hidden]
             noise_embedding=noise_embedding, # [B, max_block_len, hidden]
             target_hidden=ctx_hidden,# [B, prefix_len+anchor, L*hidden]
             ctx_position_ids=ctx_position_ids,# [B, prefix_len+anchor]
             noise_position_ids=noise_position_ids,# [B, max_block_len]
             ctx_attention_mask=ctx_attention_mask,# [B, prefix_len+anchor]
             action_position_ids=action_position_ids,# [B, max_block_len] action维度/槽位位置
+            prev_token_ids=prev_token_ids if args.causal_residual_type != "none" else None,
+            causal_residual_start_index=args.causal_residual_start_index,
+            return_base_hidden=args.causal_residual_type != "none",
         )
+        if args.causal_residual_type != "none":
+            pred_hidden, refined_pred_hidden = pred_hidden_output
+        else:
+            pred_hidden = pred_hidden_output
+            refined_pred_hidden = pred_hidden
 
         student_hidden = pred_hidden[:, :max_block_len, :].float()# 草稿预测的最终层 hidden [B, block, hidden]
+        refined_student_hidden = refined_pred_hidden[:, :max_block_len, :].float()
         teacher_hidden = target_hidden[:, teacher_start : teacher_start + max_block_len, :].float()# H(已知token..)
         # 草稿预测最终层hidden过lm头取logits
-        student_logits = lm_head(student_hidden.to(torch.bfloat16)).float()
+        base_student_logits = lm_head(student_hidden.to(torch.bfloat16)).float()
+        student_logits = lm_head(refined_student_hidden.to(torch.bfloat16)).float()
         target_tokens = tokens[:, target_token_start : target_token_start + max_block_len]
 
         valid_mask = (
@@ -890,6 +966,30 @@ def compute_loss_and_accuracy(
                         )
                     )
 
+        if args.causal_residual_cad_w > 0:
+            for local_pos in range(max_block_len):
+                target_pos = teacher_start + local_pos
+                target_token_position = target_pos + 1
+                pos_mask = valid_mask[:, local_pos].bool()
+                if local_pos == 0:
+                    causal_residual_teacher_hidden[target_pos] = student_hidden[:, local_pos, :]
+                    causal_residual_teacher_mask[target_pos] = pos_mask
+                elif (
+                    local_pos >= args.causal_residual_start_index
+                    and args.causal_residual_min_position <= target_token_position <= args.causal_residual_max_position
+                ):
+                    causal_residual_student_entries.append(
+                        (
+                            target_pos,
+                            refined_student_hidden[:, local_pos, :],
+                            pos_mask,
+                            loss_weight[:, local_pos].detach(),
+                        )
+                    )
+
+        base_pred_tokens = base_student_logits.argmax(dim=-1)
+        base_correct_mask = (base_pred_tokens == target_tokens) & valid_mask.bool()
+        base_total_correct += base_correct_mask.sum().float()
         pred_tokens = student_logits.argmax(dim=-1)# 草稿模型走贪婪解码
         correct_mask = (pred_tokens == target_tokens) & valid_mask.bool()
         total_correct += correct_mask.sum().float()
@@ -930,13 +1030,37 @@ def compute_loss_and_accuracy(
             anchor_consistency_weight_sum += current_weight
             anchor_consistency_pairs += pair_mask.sum().float()
 
+    if args.causal_residual_cad_w > 0:
+        for target_pos, weak_refined_hidden, weak_mask, weak_weight in causal_residual_student_entries:
+            strong_hidden = causal_residual_teacher_hidden.get(target_pos)
+            strong_mask = causal_residual_teacher_mask.get(target_pos)
+            if strong_hidden is None or strong_mask is None:
+                continue
+            pair_mask = weak_mask & strong_mask
+            if int(pair_mask.sum().item()) == 0:
+                continue
+            pair_weight = weak_weight * pair_mask.float()
+            current_weight = pair_weight.sum()
+            if current_weight.item() == 0:
+                continue
+            residual_cad_reg = hidden_distance(
+                weak_refined_hidden.float(),
+                strong_hidden.detach().float(),
+                args.causal_residual_cad_type,
+            )
+            causal_residual_cad_sum += (residual_cad_reg * pair_weight).sum()
+            causal_residual_cad_weight_sum += current_weight
+            causal_residual_cad_pairs += pair_mask.sum().float()
+
     loss_denom = weight_sum.clamp_min(1.0)
     metric_denom = total_positions.clamp_min(1.0)
     consistency_denom = anchor_consistency_weight_sum.clamp_min(1.0)
+    residual_cad_denom = causal_residual_cad_weight_sum.clamp_min(1.0)
     soft_loss = soft_sum / loss_denom
     hidden_loss = hidden_sum / loss_denom
     cos_loss = cos_sum / loss_denom
     anchor_consistency_loss = anchor_consistency_sum / consistency_denom
+    causal_residual_cad_loss = causal_residual_cad_sum / residual_cad_denom
     hidden_component = args.hidden_w * hidden_loss
     soft_component = args.soft_w * soft_loss
     cos_component = args.cos_w * cos_loss
@@ -944,8 +1068,23 @@ def compute_loss_and_accuracy(
     anchor_consistency_component = (
         args.anchor_consistency_w * anchor_consistency_scale * anchor_consistency_loss
     )
-    total_loss = hidden_component + soft_component + cos_component + anchor_consistency_component
+    causal_residual_cad_scale = torch.tensor(
+        float(causal_residual_scale),
+        device=device,
+        dtype=torch.float32,
+    )
+    causal_residual_cad_component = (
+        args.causal_residual_cad_w * causal_residual_cad_scale * causal_residual_cad_loss
+    )
+    total_loss = (
+        hidden_component
+        + soft_component
+        + cos_component
+        + anchor_consistency_component
+        + causal_residual_cad_component
+    )
     accuracy = total_correct / metric_denom
+    base_accuracy = base_total_correct / metric_denom
 
     return {
         "loss": total_loss,
@@ -953,13 +1092,18 @@ def compute_loss_and_accuracy(
         "hidden_loss": hidden_loss,
         "cos_loss": cos_loss,
         "anchor_consistency_loss": anchor_consistency_loss,
+        "causal_residual_cad_loss": causal_residual_cad_loss,
         "soft_component": soft_component,
         "hidden_component": hidden_component,
         "cos_component": cos_component,
         "anchor_consistency_component": anchor_consistency_component,
+        "causal_residual_cad_component": causal_residual_cad_component,
         "anchor_consistency_scale": anchor_consistency_scale.detach(),
+        "causal_residual_cad_scale": causal_residual_cad_scale.detach(),
         "anchor_consistency_pairs": anchor_consistency_pairs.detach(),
+        "causal_residual_cad_pairs": causal_residual_cad_pairs.detach(),
         "accuracy": accuracy,
+        "base_accuracy": base_accuracy,
         "anchor_correct": anchor_correct.detach(),
         "anchor_total": anchor_total.detach(),
         "position_correct": position_correct.detach(),
@@ -985,13 +1129,18 @@ def evaluate(
     total_hidden = 0.0
     total_cos = 0.0
     total_anchor_consistency = 0.0
+    total_causal_residual_cad = 0.0
     total_soft_component = 0.0
     total_hidden_component = 0.0
     total_cos_component = 0.0
     total_anchor_consistency_component = 0.0
+    total_causal_residual_cad_component = 0.0
     total_anchor_consistency_scale = 0.0
+    total_causal_residual_cad_scale = 0.0
     total_anchor_consistency_pairs = 0.0
+    total_causal_residual_cad_pairs = 0.0
     total_acc = 0.0
+    total_base_acc = 0.0
     total_samples = 0
     detail_accumulator = None
 
@@ -1003,13 +1152,18 @@ def evaluate(
         total_hidden += metrics["hidden_loss"].item() * bs
         total_cos += metrics["cos_loss"].item() * bs
         total_anchor_consistency += metrics["anchor_consistency_loss"].item() * bs
+        total_causal_residual_cad += metrics["causal_residual_cad_loss"].item() * bs
         total_soft_component += metrics["soft_component"].item() * bs
         total_hidden_component += metrics["hidden_component"].item() * bs
         total_cos_component += metrics["cos_component"].item() * bs
         total_anchor_consistency_component += metrics["anchor_consistency_component"].item() * bs
+        total_causal_residual_cad_component += metrics["causal_residual_cad_component"].item() * bs
         total_anchor_consistency_scale += metrics["anchor_consistency_scale"].item() * bs
+        total_causal_residual_cad_scale += metrics["causal_residual_cad_scale"].item() * bs
         total_anchor_consistency_pairs += metrics["anchor_consistency_pairs"].item()
+        total_causal_residual_cad_pairs += metrics["causal_residual_cad_pairs"].item()
         total_acc += metrics["accuracy"].item() * bs
+        total_base_acc += metrics["base_accuracy"].item() * bs
         total_samples += bs
         detail_accumulator = accumulate_detail_metrics(detail_accumulator, metrics)
 
@@ -1021,13 +1175,18 @@ def evaluate(
         "val/hidden_loss": total_hidden / denom,
         "val/cos_loss": total_cos / denom,
         "val/anchor_consistency_loss": total_anchor_consistency / denom,
+        "val/causal_residual_cad_loss": total_causal_residual_cad / denom,
         "val/soft_component": total_soft_component / denom,
         "val/hidden_component": total_hidden_component / denom,
         "val/cos_component": total_cos_component / denom,
         "val/anchor_consistency_component": total_anchor_consistency_component / denom,
+        "val/causal_residual_cad_component": total_causal_residual_cad_component / denom,
         "val/anchor_consistency_scale": total_anchor_consistency_scale / denom,
+        "val/causal_residual_cad_scale": total_causal_residual_cad_scale / denom,
         "val/anchor_consistency_pairs_per_sample": total_anchor_consistency_pairs / denom,
+        "val/causal_residual_cad_pairs_per_sample": total_causal_residual_cad_pairs / denom,
         "val/accuracy": total_acc / denom,
+        "val/base_accuracy": total_base_acc / denom,
     }
     result.update(detail_metrics_to_log("val", detail_accumulator))
     return result
@@ -1045,11 +1204,25 @@ def main():
         raise ValueError("--soft_temperature must be > 0.")
     if args.slot_decay <= 0 or args.slot_decay > 1:
         raise ValueError("--slot_decay must be in (0, 1].")
-    for loss_name in ("hidden_w", "soft_w", "cos_w", "anchor_consistency_w"):
+    for loss_name in ("hidden_w", "soft_w", "cos_w", "anchor_consistency_w", "causal_residual_cad_w"):
         if getattr(args, loss_name) < 0:
             raise ValueError(f"--{loss_name} must be >= 0.")
     if args.anchor_consistency_warmup_steps < 0:
         raise ValueError("--anchor_consistency_warmup_steps must be >= 0.")
+    if args.causal_residual_cad_warmup_steps < 0:
+        raise ValueError("--causal_residual_cad_warmup_steps must be >= 0.")
+    if args.causal_residual_rank <= 0:
+        raise ValueError("--causal_residual_rank must be > 0.")
+    if args.causal_residual_scale < 0:
+        raise ValueError("--causal_residual_scale must be >= 0.")
+    if args.causal_residual_start_index < 0:
+        raise ValueError("--causal_residual_start_index must be >= 0.")
+    if args.causal_residual_min_position < 1:
+        raise ValueError("--causal_residual_min_position must be >= 1.")
+    if args.causal_residual_max_position < args.causal_residual_min_position:
+        raise ValueError("--causal_residual_max_position must be >= --causal_residual_min_position.")
+    if args.causal_residual_cad_w > 0 and args.causal_residual_type == "none":
+        raise ValueError("--causal_residual_cad_w > 0 requires --causal_residual_type hidden.")
     if args.action_dim <= 0:
         raise ValueError("--action_dim must be > 0.")
     if args.include_anchor_hidden and args.block_size < 3:
@@ -1115,6 +1288,9 @@ def main():
     draft_config.dflash_selected_hidden_variant = args.selected_hidden_variant
     draft_config.dflash_block_size = args.block_size# 7
     draft_config.dflash_action_dim = args.action_dim# action token维度数，用于action-dimension embedding
+    draft_config.dflash_causal_residual_type = args.causal_residual_type
+    draft_config.dflash_causal_residual_rank = args.causal_residual_rank
+    draft_config.dflash_causal_residual_scale = args.causal_residual_scale
     model = DFlashDraftModel(draft_config).to(device=device, dtype=torch.bfloat16)# 实例化草稿模型
     trainable_params = count_trainable_parameters(model)
     if distributed:
@@ -1300,13 +1476,18 @@ def main():
             train_hidden_sum = 0.0
             train_cos_sum = 0.0
             train_anchor_consistency_sum = 0.0
+            train_causal_residual_cad_sum = 0.0
             train_soft_component_sum = 0.0
             train_hidden_component_sum = 0.0
             train_cos_component_sum = 0.0
             train_anchor_consistency_component_sum = 0.0
+            train_causal_residual_cad_component_sum = 0.0
             train_anchor_consistency_scale_sum = 0.0
+            train_causal_residual_cad_scale_sum = 0.0
             train_anchor_consistency_pairs_sum = 0.0
+            train_causal_residual_cad_pairs_sum = 0.0
             train_acc_sum = 0.0
+            train_base_acc_sum = 0.0
             train_detail_accumulator = None
             train_log_steps = 0
             pbar = tqdm(train_loader, desc=f"train {epoch}/{args.num_epochs}", dynamic_ncols=True) if is_main else train_loader
@@ -1318,6 +1499,13 @@ def main():
                     )
                 else:
                     consistency_scale = 1.0
+                if args.causal_residual_cad_w > 0 and args.causal_residual_cad_warmup_steps > 0:
+                    causal_residual_scale = min(
+                        1.0,
+                        float(global_step + 1) / float(max(1, args.causal_residual_cad_warmup_steps)),
+                    )
+                else:
+                    causal_residual_scale = 1.0
                 metrics = compute_loss_and_accuracy(
                     model,
                     embed_tokens,
@@ -1326,6 +1514,7 @@ def main():
                     args,
                     device,
                     consistency_scale=consistency_scale,
+                    causal_residual_scale=causal_residual_scale,
                 )
                 (metrics["loss"] / args.gradient_accumulation_steps).backward()
                 log_metrics = distributed_log_metrics(metrics, distributed)
@@ -1335,13 +1524,18 @@ def main():
                 train_hidden_sum += log_metrics["hidden_loss"].item()
                 train_cos_sum += log_metrics["cos_loss"].item()
                 train_anchor_consistency_sum += log_metrics["anchor_consistency_loss"].item()
+                train_causal_residual_cad_sum += log_metrics["causal_residual_cad_loss"].item()
                 train_soft_component_sum += log_metrics["soft_component"].item()
                 train_hidden_component_sum += log_metrics["hidden_component"].item()
                 train_cos_component_sum += log_metrics["cos_component"].item()
                 train_anchor_consistency_component_sum += log_metrics["anchor_consistency_component"].item()
+                train_causal_residual_cad_component_sum += log_metrics["causal_residual_cad_component"].item()
                 train_anchor_consistency_scale_sum += log_metrics["anchor_consistency_scale"].item()
+                train_causal_residual_cad_scale_sum += log_metrics["causal_residual_cad_scale"].item()
                 train_anchor_consistency_pairs_sum += log_metrics["anchor_consistency_pairs"].item()
+                train_causal_residual_cad_pairs_sum += log_metrics["causal_residual_cad_pairs"].item()
                 train_acc_sum += log_metrics["accuracy"].item()
+                train_base_acc_sum += log_metrics["base_accuracy"].item()
                 train_detail_accumulator = accumulate_detail_metrics(train_detail_accumulator, log_metrics)
                 train_log_steps += 1
 
@@ -1367,13 +1561,18 @@ def main():
                             "train/hidden_loss": train_hidden_sum / denom_log_steps,
                             "train/cos_loss": train_cos_sum / denom_log_steps,
                             "train/anchor_consistency_loss": train_anchor_consistency_sum / denom_log_steps,
+                            "train/causal_residual_cad_loss": train_causal_residual_cad_sum / denom_log_steps,
                             "train/soft_component": train_soft_component_sum / denom_log_steps,
                             "train/hidden_component": train_hidden_component_sum / denom_log_steps,
                             "train/cos_component": train_cos_component_sum / denom_log_steps,
                             "train/anchor_consistency_component": train_anchor_consistency_component_sum / denom_log_steps,
+                            "train/causal_residual_cad_component": train_causal_residual_cad_component_sum / denom_log_steps,
                             "train/anchor_consistency_scale": train_anchor_consistency_scale_sum / denom_log_steps,
+                            "train/causal_residual_cad_scale": train_causal_residual_cad_scale_sum / denom_log_steps,
                             "train/anchor_consistency_pairs_per_batch": train_anchor_consistency_pairs_sum / denom_log_steps,
+                            "train/causal_residual_cad_pairs_per_batch": train_causal_residual_cad_pairs_sum / denom_log_steps,
                             "train/accuracy": train_acc_sum / denom_log_steps,
+                            "train/base_accuracy": train_base_acc_sum / denom_log_steps,
                             "train/lr": scheduler.get_last_lr()[0],
                         }
                         train_payload.update(detail_metrics_to_log("train", train_detail_accumulator))
@@ -1397,7 +1596,10 @@ def main():
                             f"cos*={train_payload['train/cos_component']:.4f} "
                             f"anc={train_payload['train/anchor_consistency_loss']:.4f} "
                             f"anc*={train_payload['train/anchor_consistency_component']:.4f} "
+                            f"rescad={train_payload['train/causal_residual_cad_loss']:.4f} "
+                            f"rescad*={train_payload['train/causal_residual_cad_component']:.4f} "
                             f"acc={train_payload['train/accuracy']:.3f} "
+                            f"base_acc={train_payload['train/base_accuracy']:.3f} "
                             f"lr={train_payload['train/lr']:.2e}",
                             flush=True,
                         )
@@ -1406,13 +1608,18 @@ def main():
                         train_hidden_sum = 0.0
                         train_cos_sum = 0.0
                         train_anchor_consistency_sum = 0.0
+                        train_causal_residual_cad_sum = 0.0
                         train_soft_component_sum = 0.0
                         train_hidden_component_sum = 0.0
                         train_cos_component_sum = 0.0
                         train_anchor_consistency_component_sum = 0.0
+                        train_causal_residual_cad_component_sum = 0.0
                         train_anchor_consistency_scale_sum = 0.0
+                        train_causal_residual_cad_scale_sum = 0.0
                         train_anchor_consistency_pairs_sum = 0.0
+                        train_causal_residual_cad_pairs_sum = 0.0
                         train_acc_sum = 0.0
+                        train_base_acc_sum = 0.0
                         train_detail_accumulator = None
                         train_log_steps = 0
 
@@ -1422,8 +1629,10 @@ def main():
                         h=f"{log_metrics['hidden_loss'].item():.3f}",
                         c=f"{log_metrics['cos_loss'].item():.3f}",
                         anc=f"{log_metrics['anchor_consistency_loss'].item():.3f}",
+                        rescad=f"{log_metrics['causal_residual_cad_loss'].item():.3f}",
                         L=f"{log_metrics['loss'].item():.3f}",
                         acc=f"{log_metrics['accuracy'].item():.3f}",
+                        bacc=f"{log_metrics['base_accuracy'].item():.3f}",
                         lr=f"{scheduler.get_last_lr()[0]:.2e}",
                         step=global_step,
                     )
@@ -1486,7 +1695,10 @@ def main():
                     f"cos*={val_metrics['val/cos_component']:.4f} "
                     f"anc={val_metrics['val/anchor_consistency_loss']:.4f} "
                     f"anc*={val_metrics['val/anchor_consistency_component']:.4f} "
+                    f"rescad={val_metrics['val/causal_residual_cad_loss']:.4f} "
+                    f"rescad*={val_metrics['val/causal_residual_cad_component']:.4f} "
                     f"acc={current_val_acc:.3f} "
+                    f"base_acc={val_metrics['val/base_accuracy']:.3f} "
                     f"| best_loss={best_val_loss:.4f} best_acc={best_val_acc:.3f} "
                     f"patience={patience_counter}/{args.patience}"
                 )

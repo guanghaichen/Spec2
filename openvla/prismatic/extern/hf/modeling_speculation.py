@@ -574,6 +574,10 @@ class SpecVLAforActionPrediction(nn.Module):
         self.draft_backend = draft_backend
         self.dflash_include_anchor_hidden = dflash_include_anchor_hidden
         self.dflash_selected_hidden_variant = normalize_selected_hidden_variant(dflash_selected_hidden_variant)
+        self.dflash_causal_residual_type = "none"
+        self.dflash_causal_residual_rank = 256
+        self.dflash_causal_residual_scale = 1.0
+        self.dflash_causal_residual_start_index = 1
         self.dflash_mask_token_id = (
             dflash_mask_token_id
             if dflash_mask_token_id is not None
@@ -591,6 +595,18 @@ class SpecVLAforActionPrediction(nn.Module):
             )
             self.dflash_selected_hidden_variant = normalize_selected_hidden_variant(
                 saved_dflash_cfg.get("selected_hidden_variant", self.dflash_selected_hidden_variant)
+            )
+            self.dflash_causal_residual_type = saved_dflash_cfg.get(
+                "causal_residual_type", self.dflash_causal_residual_type
+            )
+            self.dflash_causal_residual_rank = saved_dflash_cfg.get(
+                "causal_residual_rank", self.dflash_causal_residual_rank
+            )
+            self.dflash_causal_residual_scale = saved_dflash_cfg.get(
+                "causal_residual_scale", self.dflash_causal_residual_scale
+            )
+            self.dflash_causal_residual_start_index = saved_dflash_cfg.get(
+                "causal_residual_start_index", self.dflash_causal_residual_start_index
             )
             if dflash_target_layer_ids is None:
                 dflash_target_layer_ids = saved_dflash_cfg.get("target_layer_ids")
@@ -623,6 +639,9 @@ class SpecVLAforActionPrediction(nn.Module):
             target_config.dflash_block_size = dflash_block_size
             target_config.dflash_action_dim = dflash_action_dim
             target_config.dflash_selected_hidden_variant = self.dflash_selected_hidden_variant
+            target_config.dflash_causal_residual_type = self.dflash_causal_residual_type
+            target_config.dflash_causal_residual_rank = self.dflash_causal_residual_rank
+            target_config.dflash_causal_residual_scale = self.dflash_causal_residual_scale
             # # 实例化草稿模型
             self.ea_layer = DFlashDraftModel(target_config)
             load_model_path = os.path.join(ea_model_path, "pytorch_model.bin")
@@ -865,7 +884,16 @@ class SpecVLAforActionPrediction(nn.Module):
                 action_position_ids=action_position_ids,
             )
             draft_logits = self.base_model.language_model.lm_head(draft_hidden)
-            proposed_tokens = dflash_sample(draft_logits, temperature=0.0)
+            if getattr(self.ea_layer, "causal_residual_enabled", False):
+                proposed_tokens, draft_logits = self.ea_layer.sample_with_causal_residual(
+                    hidden_states=draft_hidden,
+                    first_prev_token_ids=anchor_input_ids,
+                    lm_head=self.base_model.language_model.lm_head,
+                    temperature=0.0,
+                    start_index=self.dflash_causal_residual_start_index,
+                )
+            else:
+                proposed_tokens = dflash_sample(draft_logits, temperature=0.0)
             
             # 目标模型验证
             verify_input_ids = torch.cat([block_input_ids[:, :1], proposed_tokens[:, :-1]], dim=1)
@@ -1200,6 +1228,8 @@ class SpecVLAforActionPrediction(nn.Module):
             "block_size": block_size,
             "generated_tokens": max_new_tokens,
             "include_anchor_hidden": True,
+            "causal_residual_type": getattr(self.ea_layer, "causal_residual_type", "none"),
+            "causal_residual_start_index": self.dflash_causal_residual_start_index,
             "num_blocks": num_blocks,
             "bootstrapped_tokens": 1,
             "progressed_tokens": progressed_tokens,

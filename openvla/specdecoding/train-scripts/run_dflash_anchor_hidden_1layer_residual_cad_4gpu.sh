@@ -10,11 +10,11 @@ export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3}"
 if [[ -d "/data/wulin" ]]; then
   DEFAULT_VLA_PATH="/data/wulin/hf_files/openvla-7b-finetuned-libero-goal"
   DEFAULT_DATAPATH="/data/wulin/c/specvla-data/dflash_goal_dataset"
-  DEFAULT_OUTPUT_DIR="/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_b16_4gpu"
+  DEFAULT_OUTPUT_DIR="/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu"
 else
   DEFAULT_VLA_PATH="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/data/models--openvla--openvla-7b-finetuned-libero-goal"
   DEFAULT_DATAPATH="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset"
-  DEFAULT_OUTPUT_DIR="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_b16_4gpu"
+  DEFAULT_OUTPUT_DIR="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu"
 fi
 
 VLA_PATH="${VLA_PATH:-${DEFAULT_VLA_PATH}}"
@@ -25,8 +25,14 @@ LR="${LR:-5e-5}"
 WARMUP_STEPS="${WARMUP_STEPS:-1000}"
 NUM_EPOCHS="${NUM_EPOCHS:-200}"
 SAVE_EVERY="${SAVE_EVERY:-10}"
-RESIDUAL_CAD_W="${RESIDUAL_CAD_W:-0.05}"
-RESIDUAL_CAD_WARMUP_STEPS="${RESIDUAL_CAD_WARMUP_STEPS:-${WARMUP_STEPS}}"
+RESIDUAL_CAD_W="${RESIDUAL_CAD_W:-0.10}"
+RESIDUAL_CAD_TYPE="${RESIDUAL_CAD_TYPE:-cosine}"
+RESIDUAL_CAD_WARMUP_STEPS="${RESIDUAL_CAD_WARMUP_STEPS:-4000}"
+REFINED_HIDDEN_W="${REFINED_HIDDEN_W:-0.30}"
+REFINED_HIDDEN_TYPE="${REFINED_HIDDEN_TYPE:-smooth_l1}"
+WEAK_FAR_SLOT_BOOST="${WEAK_FAR_SLOT_BOOST:-2.0}"
+ANCHOR0_P2_BOOST="${ANCHOR0_P2_BOOST:-4.0}"
+HIDDEN_NOISE="${HIDDEN_NOISE:-0.03}"
 
 echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}"
 echo "VLA_PATH=${VLA_PATH}"
@@ -35,11 +41,16 @@ echo "OUTPUT_DIR=${OUTPUT_DIR}"
 echo "BATCH_SIZE=${BATCH_SIZE}"
 echo "LR=${LR}"
 echo "WARMUP_STEPS=${WARMUP_STEPS}"
+echo "RESIDUAL_CAD_W=${RESIDUAL_CAD_W}"
+echo "RESIDUAL_CAD_TYPE=${RESIDUAL_CAD_TYPE}"
 echo "RESIDUAL_CAD_WARMUP_STEPS=${RESIDUAL_CAD_WARMUP_STEPS}"
+echo "REFINED_HIDDEN_W=${REFINED_HIDDEN_W}"
+echo "WEAK_FAR_SLOT_BOOST=${WEAK_FAR_SLOT_BOOST}"
+echo "ANCHOR0_P2_BOOST=${ANCHOR0_P2_BOOST}"
 
 torchrun --standalone --nnodes 1 --nproc_per_node 4 \
   openvla/specdecoding/train-scripts/train_dflash_libero_goal.py \
-  --run_name dflash-anchor-hidden-1layer-finalhidden-residual-cad-b16-4gpu \
+  --run_name dflash-anchor-hidden-1layer-finalhidden-residual-cad-weakpath-b16-4gpu \
   --vla_path "${VLA_PATH}" \
   --datapath "${DATAPATH}" \
   --output_dir "${OUTPUT_DIR}" \
@@ -53,14 +64,22 @@ torchrun --standalone --nnodes 1 --nproc_per_node 4 \
   --causal_residual_scale 1.0 \
   --causal_residual_start_index 1 \
   --causal_residual_cad_w "${RESIDUAL_CAD_W}" \
-  --causal_residual_cad_type smooth_l1 \
+  --causal_residual_cad_type "${RESIDUAL_CAD_TYPE}" \
   --causal_residual_cad_warmup_steps "${RESIDUAL_CAD_WARMUP_STEPS}" \
+  --causal_residual_cad_correct_teacher_only \
   --causal_residual_min_position 2 \
   --causal_residual_max_position 5 \
+  --refined_hidden_w "${REFINED_HIDDEN_W}" \
+  --refined_hidden_loss_type "${REFINED_HIDDEN_TYPE}" \
+  --refined_hidden_min_position 2 \
+  --refined_hidden_max_position 5 \
+  --weak_far_slot_boost "${WEAK_FAR_SLOT_BOOST}" \
+  --anchor0_p2_boost "${ANCHOR0_P2_BOOST}" \
   --soft_w 0 \
   --hidden_w 1.0 \
   --cos_w 0.05 \
-  --hidden_noise 0.05 \
+  --slot_decay 1.0 \
+  --hidden_noise "${HIDDEN_NOISE}" \
   --weight_decay 0.05 \
   --lr "${LR}" \
   --batch_size "${BATCH_SIZE}" \

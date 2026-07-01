@@ -130,7 +130,7 @@ SwanLab 和本地 JSONL。
 但 `anchor_a_to_position_(a+2..)` 明显下降。这说明 draft 擅长一步预测，却不擅长在
 `[t_anchor, MASK, MASK, ...]` 的薄前缀条件下预测远 slot。
 
-新分支做两件事：
+这个分支最初只做两件事：
 
 1. **跨 Anchor 因果蒸馏。** 对同一个目标 token，用一步强路径当老师。例如预测 `t5` 时，
    `anchor=4 -> t5` 是强路径；`anchor=0/1/2/3 -> t5` 都是弱路径。训练时让弱路径靠近强路径。
@@ -142,16 +142,34 @@ SwanLab 和本地 JSONL。
 所以用刚生成的 draft token 作为下一 slot 的前序条件。DFlash transformer 主干仍然只跑一次，
 后面只是轻量 residual head + frozen `lm_head` 的逐 slot 修正。
 
+2026-07-01 的 b16 训练观察到：`anchor_0_to_position_1_acc` 和 `anchor_1_to_position_2_acc`
+可以较快升到 0.8 左右，但 `anchor_0_to_position_2_acc` 仍明显滞后，且 `accuracy - base_accuracy`
+接近 0。这说明旧 Residual-CAD 只让弱路径追“强路径的影子”还不够，需要让弱路径更直接地追
+target hidden，并给瓶颈位置更高权重。当前 launcher 已切到 weak-path recipe：
+
+1. **弱路径 refined hidden 直追 target hidden。** 对 p2-p5 的远 slot，额外监督 residual head 输出后的
+   `refined_hidden -> target_hidden`。
+2. **弱路径加权。** `slot_decay=1.0`，不再衰减远 slot；p2-p5 弱路径默认 2x，
+   `anchor0->p2` 默认 4x。
+3. **更干净的 CAD teacher。** 只有一步强路径预测 token 正确时，才把该强路径 hidden 作为 CAD teacher。
+4. **CAD 距离改为 cosine。** CAD 更关注方向/语义结构，而不是强行复刻 raw hidden 数值尺度。
+
 相关开关：
 
 ```text
 --causal_residual_type hidden
 --causal_residual_rank 256
 --causal_residual_start_index 1
---causal_residual_cad_w 0.05
---causal_residual_cad_warmup_steps 2000
+--causal_residual_cad_w 0.10
+--causal_residual_cad_type cosine
+--causal_residual_cad_warmup_steps 4000
+--causal_residual_cad_correct_teacher_only
 --causal_residual_min_position 2
 --causal_residual_max_position 5
+--refined_hidden_w 0.30
+--weak_far_slot_boost 2.0
+--anchor0_p2_boost 4.0
+--slot_decay 1.0
 ```
 
 SwanLab/JSONL 会额外记录：
@@ -160,12 +178,15 @@ SwanLab/JSONL 会额外记录：
 causal_residual_cad_loss
 causal_residual_cad_component
 causal_residual_cad_pairs
+refined_hidden_loss
+refined_hidden_component
 base_accuracy
 accuracy
 ```
 
 其中 `base_accuracy` 是残差修正前的 token 命中率，`accuracy` 是残差修正后的命中率。这个差值用于判断
-残差修正是否真的救到了 p2-p5。
+残差修正是否真的救到了 p2-p5。新版训练尤其要看：
+`anchor_0_to_position_2_acc` 是否比旧版更快上升，以及 `accuracy - base_accuracy` 是否转正。
 
 ## 离线数据：当前 4090 artifact
 
@@ -306,7 +327,7 @@ conda activate specvla
 ```
 
 3090 当前有 8 张 RTX 3090，但默认完整训练只使用 0-3 四张卡。当前优先跑
-Residual-CAD 新分支：
+Residual-CAD weak-path 新分支：
 
 ```bash
 CUDA_VISIBLE_DEVICES=0,1,2,3 \
@@ -330,19 +351,27 @@ openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_puretrain_4gp
 ```text
 VLA_PATH=/data/wulin/hf_files/openvla-7b-finetuned-libero-goal
 DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset
-OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_b16_4gpu
+OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu
 ```
 
-Residual-CAD 主训练配置：
+Residual-CAD weak-path 主训练配置：
 
 ```text
 torchrun --nproc_per_node 4
 num_draft_layers = 1
 selected_hidden_variant = replace_22_with_final
 causal_residual_type = hidden
-causal_residual_cad_w = 0.05
-causal_residual_cad_warmup_steps = 1000
+causal_residual_cad_w = 0.10
+causal_residual_cad_type = cosine
+causal_residual_cad_warmup_steps = 4000
+causal_residual_cad_correct_teacher_only = true
 causal_residual_min/max_position = 2/5
+refined_hidden_w = 0.30
+refined_hidden_loss_type = smooth_l1
+weak_far_slot_boost = 2.0
+anchor0_p2_boost = 4.0
+slot_decay = 1.0
+hidden_noise = 0.03
 batch_size = 16 per GPU，有效 batch size = 64
 epochs = 200
 warmup = 1000 optimizer steps
@@ -354,12 +383,13 @@ SwanLab = 使用环境默认配置
 `run_dflash_anchor_hidden_1layer_residual_cad_4gpu.sh` 支持环境变量覆盖常用超参数，例如：
 
 ```bash
-BATCH_SIZE=16 WARMUP_STEPS=1000 LR=5e-5 \
+BATCH_SIZE=16 WARMUP_STEPS=1000 LR=5e-5 RESIDUAL_CAD_W=0.10 REFINED_HIDDEN_W=0.30 \
   CUDA_VISIBLE_DEVICES=0,1,2,3 \
   bash openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_residual_cad_4gpu.sh
 ```
 
-如果要复现实验，请优先使用新的 `*_b16_4gpu` 输出目录；不要和旧的 b8 半程目录混写。
+如果要复现实验，请优先使用新的 `*_weakpath_b16_4gpu` 输出目录；不要和旧的 b8、旧 Residual-CAD
+目录混写。
 
 2026-06-29 重新检查到的 3090 数据和上一版 puretrain 训练产物状态：
 
@@ -402,7 +432,7 @@ run_config.json 记录: world_size=4, global_effective_batch=32, train_files=285
 推荐加 `-3`，让数据经由本地转发，不要求 3090 能直接连到 4090：
 
 ```bash
-TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_b16_4gpu
+TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu
 CKPT=epoch_190_step_169670
 
 scp -3 -r \
@@ -413,7 +443,7 @@ scp -3 -r \
 如果要复制 3090 当前 `latest_checkpoint.txt` 指向的最新 checkpoint，可以在本地终端执行：
 
 ```bash
-TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_b16_4gpu
+TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu
 CKPT=$(ssh 3090_wulin "basename \"\$(cat ${TRAIN_DIR}/latest_checkpoint.txt)\"")
 
 scp -3 -r \
@@ -458,7 +488,7 @@ openvla/specdecoding/decode-scripts/
 ```text
 OpenVLA goal model: /data/wulin/hf_files/openvla-7b-finetuned-libero-goal
 SpecVLA checkpoints: /data/wulin/c/specvla-data/specvla_checkpoint/goal
-DFLASH run dir: /data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_b16_4gpu
+DFLASH run dir: /data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu
 Logs: /data/wulin/c/specvla-data/eval_logs
 ```
 

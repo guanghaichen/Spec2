@@ -3,24 +3,42 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
-init_libero_goal_eval_env() {
+libero_suite_slug() {
+  case "$1" in
+    libero_goal) echo "goal" ;;
+    libero_object) echo "object" ;;
+    libero_spatial) echo "spatial" ;;
+    libero_10) echo "10" ;;
+    libero_90) echo "90" ;;
+    *)
+      echo "Unsupported LIBERO task suite: $1" >&2
+      echo "Expected one of: libero_goal, libero_object, libero_spatial, libero_10, libero_90." >&2
+      return 1
+      ;;
+  esac
+}
+
+init_libero_eval_env() {
+  TASK_SUITE_NAME="${1:-${TASK_SUITE_NAME:-libero_goal}}"
+  TASK_SUITE_SLUG="$(libero_suite_slug "${TASK_SUITE_NAME}")"
+
   cd "${REPO_ROOT}"
 
   export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
   export MUJOCO_GL="${MUJOCO_GL:-egl}"
 
   if [[ -d "/data/wulin" ]]; then
-    DEFAULT_VLA_PATH="/data/wulin/hf_files/openvla-7b-finetuned-libero-goal"
+    DEFAULT_VLA_PATH="/data/wulin/hf_files/openvla-7b-finetuned-libero-${TASK_SUITE_SLUG}"
     DEFAULT_DFLASH_OUTPUT_DIR="/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu"
-    DEFAULT_SPECVLA_GOAL_CKPT="/data/wulin/c/specvla-data/specvla_checkpoint/goal"
+    DEFAULT_SPECVLA_CKPT="/data/wulin/c/specvla-data/specvla_checkpoint/${TASK_SUITE_SLUG}"
     DEFAULT_LOG_DIR="/data/wulin/c/specvla-data/eval_logs"
     DEFAULT_LIBERO_PATH="/data/wulin/c/LIBERO"
     DEFAULT_NVIDIA_EGL_SHIM_DIR="/data/wulin/c/nvidia-egl-570.133.07/slim-lib"
     DEFAULT_NVIDIA_EGL_VENDOR_JSON="/data/wulin/c/nvidia-egl-570.133.07/egl_vendor.d/10_nvidia_570.json"
   else
-    DEFAULT_VLA_PATH="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/data/models--openvla--openvla-7b-finetuned-libero-goal"
+    DEFAULT_VLA_PATH="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/data/models--openvla--openvla-7b-finetuned-libero-${TASK_SUITE_SLUG}"
     DEFAULT_DFLASH_OUTPUT_DIR="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu"
-    DEFAULT_SPECVLA_GOAL_CKPT="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_libero_goal_debug_ckpt"
+    DEFAULT_SPECVLA_CKPT="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_libero_${TASK_SUITE_SLUG}_debug_ckpt"
     DEFAULT_LOG_DIR="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/eval_logs"
     DEFAULT_LIBERO_PATH=""
     DEFAULT_NVIDIA_EGL_SHIM_DIR=""
@@ -29,6 +47,7 @@ init_libero_goal_eval_env() {
 
   VLA_PATH="${VLA_PATH:-${DEFAULT_VLA_PATH}}"
   DFLASH_OUTPUT_DIR="${DFLASH_OUTPUT_DIR:-${DEFAULT_DFLASH_OUTPUT_DIR}}"
+  SPECVLA_CKPT="${SPECVLA_CKPT:-}"
   SPECVLA_GOAL_CKPT="${SPECVLA_GOAL_CKPT:-}"
   SPECVLA_CKPT_ROOT="${SPECVLA_CKPT_ROOT:-}"
   LOG_DIR="${LOG_DIR:-${DEFAULT_LOG_DIR}}"
@@ -41,6 +60,7 @@ init_libero_goal_eval_env() {
 
   if [[ ! -d "${VLA_PATH}" ]]; then
     echo "VLA_PATH does not exist or is not a directory: ${VLA_PATH}" >&2
+    echo "Set VLA_PATH=/path/to/openvla-7b-finetuned-${TASK_SUITE_NAME}." >&2
     exit 1
   fi
 
@@ -63,6 +83,31 @@ init_libero_goal_eval_env() {
   fi
 }
 
+init_libero_goal_eval_env() {
+  init_libero_eval_env libero_goal
+  DEFAULT_SPECVLA_GOAL_CKPT="${DEFAULT_SPECVLA_CKPT}"
+}
+
+resolve_specvla_checkpoint() {
+  if [[ -z "${SPEC_CKPT:-}" ]]; then
+    if [[ -n "${SPECVLA_CKPT}" ]]; then
+      SPEC_CKPT="${SPECVLA_CKPT}"
+    elif [[ -n "${SPECVLA_GOAL_CKPT}" && "${TASK_SUITE_NAME:-libero_goal}" == "libero_goal" ]]; then
+      SPEC_CKPT="${SPECVLA_GOAL_CKPT}"
+    elif [[ -n "${SPECVLA_CKPT_ROOT}" ]]; then
+      SPEC_CKPT="${SPECVLA_CKPT_ROOT}/${TASK_SUITE_SLUG}"
+    else
+      SPEC_CKPT="${DEFAULT_SPECVLA_CKPT}"
+    fi
+  fi
+
+  if [[ ! -d "${SPEC_CKPT}" ]]; then
+    echo "SpecVLA SPEC_CKPT does not exist or is not a directory: ${SPEC_CKPT}" >&2
+    echo "Set SPEC_CKPT=/path/to/${TASK_SUITE_SLUG}_ckpt or SPECVLA_CKPT_ROOT=/path/to/specvla_checkpoint_root." >&2
+    exit 1
+  fi
+}
+
 resolve_specvla_goal_checkpoint() {
   if [[ -z "${SPEC_CKPT:-}" ]]; then
     if [[ -n "${SPECVLA_GOAL_CKPT}" ]]; then
@@ -70,7 +115,7 @@ resolve_specvla_goal_checkpoint() {
     elif [[ -n "${SPECVLA_CKPT_ROOT}" ]]; then
       SPEC_CKPT="${SPECVLA_CKPT_ROOT}/goal"
     else
-      SPEC_CKPT="${DEFAULT_SPECVLA_GOAL_CKPT}"
+      SPEC_CKPT="${DEFAULT_SPECVLA_GOAL_CKPT:-${DEFAULT_SPECVLA_CKPT}}"
     fi
   fi
 
@@ -109,6 +154,8 @@ resolve_dflash_goal_checkpoint() {
       fi
       SPEC_CKPT="${MATCHED_CKPTS[0]}"
     fi
+  else
+    :
   fi
 
   if [[ ! -d "${SPEC_CKPT}" ]]; then
@@ -123,6 +170,7 @@ print_common_eval_config() {
   echo "MUJOCO_EGL_DEVICE_ID=${MUJOCO_EGL_DEVICE_ID:-}"
   echo "NVIDIA_EGL_SHIM_DIR=${NVIDIA_EGL_SHIM_DIR}"
   echo "__EGL_VENDOR_LIBRARY_FILENAMES=${__EGL_VENDOR_LIBRARY_FILENAMES:-}"
+  echo "TASK_SUITE_NAME=${TASK_SUITE_NAME:-}"
   echo "VLA_PATH=${VLA_PATH}"
   echo "SPEC_CKPT=${SPEC_CKPT:-}"
   echo "LOG_DIR=${LOG_DIR}"

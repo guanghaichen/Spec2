@@ -479,7 +479,7 @@ SPEC_CKPT=/path/to/goal_ckpt
 SPECVLA_GOAL_CKPT=/path/to/goal_ckpt
 ```
 
-### 五套核心评测
+### Goal 五套核心评测
 
 | 实验 | Launcher | Python 入口 | Draft backend | Acceptance | 日志子目录 |
 | --- | --- | --- | --- | --- | --- |
@@ -488,6 +488,32 @@ SPECVLA_GOAL_CKPT=/path/to/goal_ckpt
 | SpecVLA relaxed baseline | `run_specvla_relaxed_libero_goal_eval.sh` | `run_libero_goal_Spec_Relaxed.py` | `eagle` | relaxed，默认 `accept_threshold=9` | `specvla_relaxed` |
 | DFLASH strict ablation | `run_dflash_strict_libero_goal_eval.sh` | `run_libero_goal_Spec.py` | `dflash` | strict，`accept_threshold=0` | `dflash_strict` |
 | DFLASH relaxed 当前方法 | `run_dflash_libero_goal_eval.sh` | `run_libero_goal_Spec_Relaxed.py` | `dflash` | relaxed，默认 `accept_threshold=9` | `dflash_relaxed` |
+
+### 非 Goal suite 的 AR / SpecVLA baseline
+
+当前已补齐 Object、Spatial、Long 三个 suite 的 baseline launcher。这里的 Long 对应代码里的
+`libero_10`。这些脚本只覆盖 AR、SpecVLA strict、SpecVLA relaxed；DFLASH 暂时只保留 Goal
+脚本，等新 draft 方案稳定后再扩展。
+
+| LIBERO suite | AR | SpecVLA strict | SpecVLA relaxed |
+| --- | --- | --- | --- |
+| Object | `run_openvla_ar_libero_object_eval.sh` | `run_specvla_libero_object_eval.sh` | `run_specvla_relaxed_libero_object_eval.sh` |
+| Spatial | `run_openvla_ar_libero_spatial_eval.sh` | `run_specvla_libero_spatial_eval.sh` | `run_specvla_relaxed_libero_spatial_eval.sh` |
+| Long (`libero_10`) | `run_openvla_ar_libero_10_eval.sh` | `run_specvla_libero_10_eval.sh` | `run_specvla_relaxed_libero_10_eval.sh` |
+
+这些 launcher 会自动选择 4090 上的 suite-specific OpenVLA 权重和 SpecVLA checkpoint，例如：
+
+```text
+OpenVLA Object  : /mnt/.../data/models--openvla--openvla-7b-finetuned-libero-object
+SpecVLA Object  : /mnt/.../specvla-data/ckpt_libero_object_debug_ckpt
+OpenVLA Spatial : /mnt/.../data/models--openvla--openvla-7b-finetuned-libero-spatial
+SpecVLA Spatial : /mnt/.../specvla-data/ckpt_libero_spatial_debug_ckpt
+OpenVLA Long    : /mnt/.../data/models--openvla--openvla-7b-finetuned-libero-10
+SpecVLA Long    : /mnt/.../specvla-data/ckpt_libero_10_debug_ckpt
+```
+
+`libero_90` 暂未写一键脚本，因为当前 4090 没有看到对应的 OpenVLA fine-tuned model 和 SpecVLA
+checkpoint。若后续补齐权重，可用 `init_libero_eval_env libero_90` 按同一模板扩展。
 
 AR baseline 使用标准 OpenVLA 模型，故意不向模型传 `generate_mode`、`return_dflash_stats`
 这类 SpecVLA/DFlash 专用 generation 参数。2026-06-28 曾因误传这些参数导致 AR 每个 episode
@@ -538,7 +564,9 @@ python openvla/specdecoding/test-speed/summarize_eval_summaries.py \
 ```text
 VLA_PATH
 SPEC_CKPT
+SPECVLA_CKPT
 SPECVLA_GOAL_CKPT
+SPECVLA_CKPT_ROOT
 DFLASH_OUTPUT_DIR
 EVAL_EPOCH
 LOG_DIR
@@ -550,8 +578,9 @@ SEED
 
 ### 4. 4090：统一推理评测
 
-4090 是固定推理评测机器。每次从 3090 搬来 checkpoint 后，在 4090 上跑 AR、SpecVLA strict、
+4090 是固定推理评测机器。每次从 3090 搬来 checkpoint 后，在 4090 上跑 Goal 的 AR、SpecVLA strict、
 SpecVLA relaxed、DFLASH strict、DFLASH relaxed 五套实验，最终比较 `SR / Length / Speedup`。
+其它 suite 先跑 AR / SpecVLA baseline，作为后续扩展 DFLASH 的公平对照。
 
 进入环境：
 
@@ -613,6 +642,34 @@ CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
   SPEC_CKPT=/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/epoch_190_step_169670 \
   bash openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh
+```
+
+其它 suite baseline 可以照下面跑。每条命令都会自动使用对应 suite 的 OpenVLA 和 SpecVLA checkpoint：
+
+```bash
+# Object
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_openvla_ar_libero_object_eval.sh
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_specvla_libero_object_eval.sh
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_specvla_relaxed_libero_object_eval.sh
+
+# Spatial
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_openvla_ar_libero_spatial_eval.sh
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_specvla_libero_spatial_eval.sh
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_specvla_relaxed_libero_spatial_eval.sh
+
+# Long / libero_10
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_openvla_ar_libero_10_eval.sh
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_specvla_libero_10_eval.sh
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_specvla_relaxed_libero_10_eval.sh
 ```
 
 评测结束后，汇总最新五个 summary：

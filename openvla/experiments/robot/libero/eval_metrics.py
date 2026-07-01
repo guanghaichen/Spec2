@@ -93,9 +93,14 @@ def summarize_generation_stats(step_stats_list):
             }
         )
 
-    length = (total_generated / total_blocks) if total_blocks > 0 else None
     avg_progress_length = (total_progressed / total_blocks) if total_blocks > 0 else None
+    avg_generated_length = (total_generated / total_blocks) if total_blocks > 0 else None
     avg_accept_length = (total_accept_length / total_blocks) if total_blocks > 0 else None
+    # Paper-style speculative "Length" is the number of tokens actually
+    # advanced by each verification block.  Some backends still keep
+    # generated_tokens as the full draft/action width, so using it here would
+    # incorrectly report a fixed action length such as 7 for SpecVLA.
+    length = avg_progress_length if avg_progress_length is not None else avg_generated_length
 
     return {
         "backend": valid_stats[0].get("backend"),
@@ -103,6 +108,7 @@ def summarize_generation_stats(step_stats_list):
         "num_blocks": total_blocks,
         "generated_tokens": total_generated,
         "progressed_tokens": total_progressed,
+        "avg_generated_length": avg_generated_length,
         "length": length,
         "table1_length": length,
         "avg_progress_length": avg_progress_length,

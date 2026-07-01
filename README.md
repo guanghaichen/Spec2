@@ -539,14 +539,17 @@ DFLASH 记录论文 Table 1 风格的 `Length`。评测结束后，每个 run �
 `generation.length` / `generation.table1_length` 的口径是：
 
 ```text
-Length = 该 run 生成的 action token 总数 / speculative block 数
+Length = 该 run 实际推进的 action token 总数 / speculative block 数
 ```
 
 对 OpenVLA action 来说，每个 policy step 目标是 7 个 action token。DFLASH 会先由 target
 prefill 得到第一个 action token，再用 block draft 推进后续 token；summary 中的 `Length`
-仍把这个首 token 放进总生成 token 数里，以便接近 SpecVLA 论文 Table 1 的
-“每次 forward 平均生成 token 数”口径。`avg_accept_length` 则保留更底层的含义：
-平均每个 block 真正接受了多少 draft token，不等同于 Table 1 的 `Length`。
+仍把这个首 token 放进总推进 token 数里，以便接近 SpecVLA 论文 Table 1 的
+“每次 forward 平均预测/推进 token 数”口径。`generated_tokens` / `avg_generated_length`
+只是调试字段：部分 backend 会把它记成固定 action 宽度 7，不能拿来当论文式 Length。
+`avg_accept_length` 则保留更底层的含义：平均每个 block 真正接受了多少 draft token，
+不等同于 Table 1 的 `Length`。DFLASH 还会额外记录 `avg_tail_progress_length`，
+用于观察去掉 bootstrap 首 token 后的 tail-block 推进长度。
 
 可用下面的脚本把 AR 和若干 speculative summary 汇总成论文式表格：
 

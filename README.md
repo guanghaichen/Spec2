@@ -330,7 +330,7 @@ openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_puretrain_4gp
 ```text
 VLA_PATH=/data/wulin/hf_files/openvla-7b-finetuned-libero-goal
 DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset
-OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_4gpu
+OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_b16_4gpu
 ```
 
 Residual-CAD 主训练配置：
@@ -341,15 +341,25 @@ num_draft_layers = 1
 selected_hidden_variant = replace_22_with_final
 causal_residual_type = hidden
 causal_residual_cad_w = 0.05
-causal_residual_cad_warmup_steps = 2000
+causal_residual_cad_warmup_steps = 1000
 causal_residual_min/max_position = 2/5
-batch_size = 8 per GPU，有效 batch size = 32
+batch_size = 16 per GPU，有效 batch size = 64
 epochs = 200
-warmup = 2000 optimizer steps
+warmup = 1000 optimizer steps
 save_every = 10
 val_split = 0
 SwanLab = 使用环境默认配置
 ```
+
+`run_dflash_anchor_hidden_1layer_residual_cad_4gpu.sh` 支持环境变量覆盖常用超参数，例如：
+
+```bash
+BATCH_SIZE=16 WARMUP_STEPS=1000 LR=5e-5 \
+  CUDA_VISIBLE_DEVICES=0,1,2,3 \
+  bash openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_residual_cad_4gpu.sh
+```
+
+如果要复现实验，请优先使用新的 `*_b16_4gpu` 输出目录；不要和旧的 b8 半程目录混写。
 
 2026-06-29 重新检查到的 3090 数据和上一版 puretrain 训练产物状态：
 
@@ -392,7 +402,7 @@ run_config.json 记录: world_size=4, global_effective_batch=32, train_files=285
 推荐加 `-3`，让数据经由本地转发，不要求 3090 能直接连到 4090：
 
 ```bash
-TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_4gpu
+TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_b16_4gpu
 CKPT=epoch_190_step_169670
 
 scp -3 -r \
@@ -403,7 +413,7 @@ scp -3 -r \
 如果要复制 3090 当前 `latest_checkpoint.txt` 指向的最新 checkpoint，可以在本地终端执行：
 
 ```bash
-TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_4gpu
+TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_b16_4gpu
 CKPT=$(ssh 3090_wulin "basename \"\$(cat ${TRAIN_DIR}/latest_checkpoint.txt)\"")
 
 scp -3 -r \
@@ -448,7 +458,7 @@ openvla/specdecoding/decode-scripts/
 ```text
 OpenVLA goal model: /data/wulin/hf_files/openvla-7b-finetuned-libero-goal
 SpecVLA checkpoints: /data/wulin/c/specvla-data/specvla_checkpoint/goal
-DFLASH run dir: /data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_4gpu
+DFLASH run dir: /data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_b16_4gpu
 Logs: /data/wulin/c/specvla-data/eval_logs
 ```
 

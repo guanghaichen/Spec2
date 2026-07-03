@@ -35,6 +35,14 @@ init_libero_eval_env() {
     DEFAULT_LIBERO_PATH="/data/wulin/c/LIBERO"
     DEFAULT_NVIDIA_EGL_SHIM_DIR="/data/wulin/c/nvidia-egl-570.133.07/slim-lib"
     DEFAULT_NVIDIA_EGL_VENDOR_JSON="/data/wulin/c/nvidia-egl-570.133.07/egl_vendor.d/10_nvidia_570.json"
+  elif [[ -d "/mnt/storage/cgh" ]]; then
+    DEFAULT_VLA_PATH="/mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-${TASK_SUITE_SLUG}"
+    DEFAULT_DFLASH_OUTPUT_DIR="/mnt/storage/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu"
+    DEFAULT_SPECVLA_CKPT="/mnt/storage/cgh/specvla-data/specvla_checkpoint/${TASK_SUITE_SLUG}"
+    DEFAULT_LOG_DIR="/mnt/storage/cgh/specvla-data/eval_logs"
+    DEFAULT_LIBERO_PATH="/mnt/storage/cgh/LIBERO"
+    DEFAULT_NVIDIA_EGL_SHIM_DIR=""
+    DEFAULT_NVIDIA_EGL_VENDOR_JSON=""
   else
     DEFAULT_VLA_PATH="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/data/models--openvla--openvla-7b-finetuned-libero-${TASK_SUITE_SLUG}"
     DEFAULT_DFLASH_OUTPUT_DIR="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu"

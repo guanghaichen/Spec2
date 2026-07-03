@@ -26,6 +26,8 @@ DEFAULT_VLA_PATH = resolve_default_path(
     ("VLA_PATH", "OPENVLA_MODEL_PATH"),
     (
         "/data/wulin/models/openvla-7b-finetuned-libero-goal",
+        "/data/wulin/hf_files/openvla-7b-finetuned-libero-goal",
+        "/mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-goal",
         "/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/data/models--openvla--openvla-7b-finetuned-libero-goal",
     ),
     "/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/data/models--openvla--openvla-7b-finetuned-libero-goal",
@@ -34,6 +36,7 @@ DEFAULT_RLDS_ROOT = resolve_default_path(
     ("LIBERO_RLDS_ROOT", "RLDS_ROOT", "DATA_ROOT_DIR"),
     (
         "/data/wulin/datasets/modified_libero_rlds",
+        "/mnt/storage/cgh/dataset/modified_libero_rlds",
         "/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/SpecVLA-main/dataset/modified_libero_rlds",
     ),
     "/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/SpecVLA-main/dataset/modified_libero_rlds",
@@ -42,6 +45,8 @@ if os.environ.get("DFLASH_DATA_OUTDIR") or os.environ.get("OUTDIR"):
     DEFAULT_OUTDIR = Path(os.environ.get("DFLASH_DATA_OUTDIR") or os.environ["OUTDIR"])
 elif Path("/data/wulin").exists():
     DEFAULT_OUTDIR = Path("/data/wulin/specvla-data/dflash_goal_dataset")
+elif Path("/mnt/storage/cgh").exists():
+    DEFAULT_OUTDIR = Path("/mnt/storage/cgh/specvla-data/dflash_goal_dataset")
 else:
     DEFAULT_OUTDIR = Path("/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset")
 

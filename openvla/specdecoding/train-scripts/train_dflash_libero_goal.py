@@ -45,19 +45,34 @@ def parse_args():
     parser.add_argument(
         "--vla_path",
         type=str,
-        default="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/data/models--openvla--openvla-7b-finetuned-libero-goal",
+        default=os.environ.get(
+            "VLA_PATH",
+            "/mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-goal"
+            if Path("/mnt/storage/cgh").exists()
+            else "/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/data/models--openvla--openvla-7b-finetuned-libero-goal",
+        ),
         help="OpenVLA 目标模型权重路径（用于加载 embedding 和 lm_head 权重）",
     )
     parser.add_argument(
         "--datapath",
         type=str,
-        default="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset",
+        default=os.environ.get(
+            "DATAPATH",
+            "/mnt/storage/cgh/specvla-data/dflash_goal_dataset"
+            if Path("/mnt/storage/cgh").exists()
+            else "/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset",
+        ),
         help="离线数据路径（预计算的 .ckpt 文件）",
     )
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_goal_dflash_specvla_anchor_hidden",
+        default=os.environ.get(
+            "OUTPUT_DIR",
+            "/mnt/storage/cgh/specvla-data/ckpt_goal_dflash_specvla_anchor_hidden"
+            if Path("/mnt/storage/cgh").exists()
+            else "/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_goal_dflash_specvla_anchor_hidden",
+        ),
         help="输出目录（用于保存模型权重）",
     )
     parser.add_argument("--batch_size", type=int, default=8, help="每张卡的 micro batch size")

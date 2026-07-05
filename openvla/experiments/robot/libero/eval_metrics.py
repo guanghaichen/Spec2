@@ -149,6 +149,8 @@ def write_eval_summary(
         "spec_checkpoint": str(getattr(cfg, "spec_checkpoint", "")),
         "num_trials_per_task": cfg.num_trials_per_task,
         "seed": cfg.seed,
+        "timing_scope": getattr(cfg, "timing_scope", None),
+        "sync_cuda_timing": getattr(cfg, "sync_cuda_timing", None),
         "total_episodes": total_episodes,
         "total_successes": total_successes,
         "success_rate": (float(total_successes) / float(total_episodes)) if total_episodes else None,

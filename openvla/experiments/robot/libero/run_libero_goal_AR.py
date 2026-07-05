@@ -87,6 +87,8 @@ class GenerateConfig:
     #################################################################################################################
     run_id_note: Optional[str] = None                # Extra note to add in run ID for logging
     local_log_dir: str = "./experiments/logs"        # Local directory for eval logs
+    sync_cuda_timing: bool = False                   # False matches upstream SpecVLA paper-style timing.
+    timing_scope: str = "last_task"                  # last_task matches upstream timing JSON; full_suite is less noisy.
 
     use_wandb: bool = False                          # Whether to also log results in Weights & Biases
     wandb_project: str = "YOUR_WANDB_PROJECT"        # Name of W&B project to log to (use default!)
@@ -103,6 +105,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
     if "image_aug" in cfg.pretrained_checkpoint:
         assert cfg.center_crop, "Expecting `center_crop==True` because model was trained with image augmentations!"
     assert not (cfg.load_in_8bit and cfg.load_in_4bit), "Cannot use both 8-bit and 4-bit quantization!"
+    if cfg.timing_scope not in {"last_task", "full_suite"}:
+        raise ValueError("cfg.timing_scope must be one of: last_task, full_suite")
 
     # Set random seed
     set_seed_everywhere(cfg.seed)
@@ -160,6 +164,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
     # Start evaluation
     total_episodes, total_successes = 0, 0
     total_episode_time = []
+    last_task_episode_time = []
     for task_id in tqdm.tqdm(range(num_tasks_in_suite)):
         # Get task
         task = task_suite.get_task(task_id)
@@ -172,6 +177,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
 
         # Start episodes
         task_episodes, task_successes = 0, 0
+        task_episode_time = []
         for episode_idx in tqdm.tqdm(range(cfg.num_trials_per_task)):
             total_time = []
             print(f"\nTask: {task_description}")
@@ -258,6 +264,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
             task_episodes += 1
             total_episodes += 1
             total_episode_time.append(total_time)# episode级别,保存每个 episode 中所有推理步的耗时
+            task_episode_time.append(total_time)
 
             # Save a replay video of the episode
             # save_rollout_video(
@@ -286,8 +293,10 @@ def eval_libero(cfg: GenerateConfig) -> None:
                     f"num_episodes/{task_description}": task_episodes,
                 }
             )
+        last_task_episode_time = task_episode_time
+    timing_episode_time = last_task_episode_time if cfg.timing_scope == "last_task" else total_episode_time
     with open(local_log_timefilepath,mode='w') as f:
-        json.dump(total_episode_time,f)
+        json.dump(timing_episode_time,f)
     write_eval_summary(
         local_log_summaryfilepath,
         cfg=cfg,
@@ -295,7 +304,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
         eval_family="openvla_ar",
         total_episodes=total_episodes,
         total_successes=total_successes,
-        episode_times=total_episode_time,
+        episode_times=timing_episode_time,
         generation_stats=None,
     )
     print(f"Saved eval summary to: {local_log_summaryfilepath}")

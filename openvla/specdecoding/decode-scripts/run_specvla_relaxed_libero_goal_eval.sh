@@ -8,9 +8,13 @@ resolve_specvla_goal_checkpoint
 
 ACCEPT_THRESHOLD="${ACCEPT_THRESHOLD:-9}"
 RUN_ID_NOTE="${RUN_ID_NOTE:-specvla-relaxed-r${ACCEPT_THRESHOLD}}"
+SYNC_CUDA_TIMING="${SYNC_CUDA_TIMING:-False}"
+TIMING_SCOPE="${TIMING_SCOPE:-last_task}"
 
 print_common_eval_config
 echo "ACCEPT_THRESHOLD=${ACCEPT_THRESHOLD}"
+echo "SYNC_CUDA_TIMING=${SYNC_CUDA_TIMING}"
+echo "TIMING_SCOPE=${TIMING_SCOPE}"
 
 python openvla/experiments/robot/libero/run_libero_goal_Spec_Relaxed.py \
   --model_family openvla \
@@ -25,5 +29,7 @@ python openvla/experiments/robot/libero/run_libero_goal_Spec_Relaxed.py \
   --accept_threshold "${ACCEPT_THRESHOLD}" \
   --local_log_dir "${LOG_DIR}" \
   --run_id_note "${RUN_ID_NOTE}" \
+  --sync_cuda_timing "${SYNC_CUDA_TIMING}" \
+  --timing_scope "${TIMING_SCOPE}" \
   --use_wandb "${USE_WANDB}" \
   --seed "${SEED}"

@@ -69,13 +69,14 @@ def get_action(cfg, model, obs, task_label, return_time = False,return_hidden_st
             )
             return action,tokens,hidden
         if return_time:
+            sync_cuda_timing = getattr(cfg, "sync_cuda_timing", False)
             if return_dflash_stats or return_generation_stats:
                 action,time,generation_stats = get_vla_action(
-                model, processor, cfg.pretrained_checkpoint, obs, task_label, cfg.unnorm_key, return_hidden_states=return_hidden_states, center_crop=cfg.center_crop,return_time=True,generate_mode=generate_mode,return_dflash_stats=return_dflash_stats,return_generation_stats=return_generation_stats
+                model, processor, cfg.pretrained_checkpoint, obs, task_label, cfg.unnorm_key, return_hidden_states=return_hidden_states, center_crop=cfg.center_crop,return_time=True,generate_mode=generate_mode,return_dflash_stats=return_dflash_stats,return_generation_stats=return_generation_stats,sync_cuda_timing=sync_cuda_timing
                 )
                 return action,time,generation_stats
             action,time = get_vla_action(
-            model, processor, cfg.pretrained_checkpoint, obs, task_label, cfg.unnorm_key, return_hidden_states=return_hidden_states, center_crop=cfg.center_crop,return_time=True,generate_mode=generate_mode
+            model, processor, cfg.pretrained_checkpoint, obs, task_label, cfg.unnorm_key, return_hidden_states=return_hidden_states, center_crop=cfg.center_crop,return_time=True,generate_mode=generate_mode,sync_cuda_timing=sync_cuda_timing
             )
             return action,time
         else:

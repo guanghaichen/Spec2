@@ -157,7 +157,7 @@ def crop_and_resize(image, crop_scale, batch_size):
     return image
 
 
-def get_vla_action(vla, processor, base_vla_name, obs, task_label, unnorm_key, return_hidden_states=False,return_time=False,center_crop=False,generate_mode=None,accept_threshold=None,return_topk_index=False,token=None,return_dflash_stats=False,return_generation_stats=False):
+def get_vla_action(vla, processor, base_vla_name, obs, task_label, unnorm_key, return_hidden_states=False,return_time=False,center_crop=False,generate_mode=None,accept_threshold=None,return_topk_index=False,token=None,return_dflash_stats=False,return_generation_stats=False,sync_cuda_timing=False):
     """Generates an action with the VLA policy.
     generate_mode控制是否用草稿
     """
@@ -211,8 +211,8 @@ def get_vla_action(vla, processor, base_vla_name, obs, task_label, unnorm_key, r
     if return_topk_index:
         action,token,hidden = vla.eval_topk(**inputs, unnorm_key=unnorm_key, return_hidden_states=return_hidden_states,do_sample=False)
         return action
-    # 统计推理耗时。显式同步能让不同 speculative 路径的 GPU 异步开销可比。
-    if torch.cuda.is_available():
+    # SpecVLA 上游使用无同步的 paper-style 计时；需要真实 GPU 完成时间时再显式打开。
+    if sync_cuda_timing and torch.cuda.is_available():
         torch.cuda.synchronize()
     start_time = time.time()
     # 标准推理 推理动作
@@ -230,7 +230,7 @@ def get_vla_action(vla, processor, base_vla_name, obs, task_label, unnorm_key, r
         predict_kwargs["return_generation_stats"] = True
 
     action = vla.predict_action(**predict_kwargs)# 调用 OpenVLAForActionPrediction.predict_action()
-    if torch.cuda.is_available():
+    if sync_cuda_timing and torch.cuda.is_available():
         torch.cuda.synchronize()
     end_time = time.time()
     if return_time:

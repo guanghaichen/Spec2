@@ -805,6 +805,31 @@ SPECVLA_GOAL_CKPT=/path/to/goal_ckpt
 | DFLASH strict ablation | `run_dflash_strict_libero_goal_eval.sh` | `run_libero_goal_Spec.py` | `dflash` | strict，`accept_threshold=0` | `dflash_strict` |
 | DFLASH relaxed 当前方法 | `run_dflash_libero_goal_eval.sh` | `run_libero_goal_Spec_Relaxed.py` | `dflash` | relaxed，默认 `accept_threshold=9` | `dflash_relaxed` |
 
+### 速度计时口径
+
+为了复现 SpecVLA 上游代码和论文表格的速度口径，当前 Goal 评测 launcher 默认使用：
+
+```text
+SYNC_CUDA_TIMING=False
+TIMING_SCOPE=last_task
+```
+
+`SYNC_CUDA_TIMING=False` 表示计时前后不额外调用 `torch.cuda.synchronize()`，与
+`PineTreeWss/SpecVLA` 的 `openvla_utils.py` 保持一致。严格同步会把 GPU kernel 的真实完成时间计入
+每一步，对 speculative decoding 里 draft、verify、tree/cache 等多个小 forward 更不友好，容易放大
+不同显卡之间的调度差异；因此论文复现默认不用它。
+
+`TIMING_SCOPE=last_task` 是为了对齐上游 SpecVLA 的 timing JSON 行为：其
+`total_episode_time` 在 task 循环内重新初始化，最后写出的 timing 文件只对应最后一个 task。
+本仓库仍然会统计完整 suite 的成功率；`*_timing.json` 和 `*_summary.json` 中的 `timing` /
+`generation.length` 默认按最后一个 task 计算，以便和上游 speed 脚本更接近。若要做更稳定的工程统计，
+可以显式改成：
+
+```bash
+TIMING_SCOPE=full_suite SYNC_CUDA_TIMING=True \
+  bash openvla/specdecoding/decode-scripts/run_specvla_relaxed_libero_goal_eval.sh
+```
+
 ### 非 Goal suite 的 AR / SpecVLA baseline
 
 当前已补齐 Object、Spatial、Long 三个 suite 的 baseline launcher。这里的 Long 对应代码里的

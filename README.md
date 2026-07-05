@@ -1086,6 +1086,106 @@ bash openvla/specdecoding/decode-scripts/setup_3090_nvidia_egl_shim.sh
 4. GitHub 包含目标 commit 后，再按训练需要同步 3090。
 5. 3090 训练完只复制 checkpoint 到 4090d；不要把 3090 的临时改动反向覆盖 4090d 代码。
 
+### 服务器 deploy key 和 GitHub 同步
+
+私有仓库推荐每台服务器使用单独的 GitHub deploy key。私钥只放在服务器用户的 `~/.ssh` 下，
+README 只记录配置方法，不记录私钥内容。
+
+以 3090 为例，本地已经有项目专用 deploy key：
+
+```text
+/Users/chenguanghai/.ssh/id_specvla_dflash_ro
+/Users/chenguanghai/.ssh/id_specvla_dflash_ro.pub
+```
+
+把 key 放到服务器并设置权限：
+
+```bash
+scp ~/.ssh/id_specvla_dflash_ro ~/.ssh/id_specvla_dflash_ro.pub 3090_wulin:~/.ssh/
+ssh 3090_wulin
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/id_specvla_dflash_ro
+chmod 644 ~/.ssh/id_specvla_dflash_ro.pub
+```
+
+如果服务器上的仓库 remote 还是 HTTPS，会在非交互环境里报：
+
+```text
+fatal: could not read Username for 'https://github.com': No such device or address
+```
+
+改成 SSH remote，并只给当前仓库绑定这把 key：
+
+```bash
+cd /data/wulin/c/SpecVLA-DFLASH
+git remote set-url origin git@github.com:guanghaichen/SpecVLA-DFLASH.git
+git config core.sshCommand \
+  "ssh -i ~/.ssh/id_specvla_dflash_ro -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+git ls-remote origin HEAD
+```
+
+`git ls-remote origin HEAD` 能返回 commit hash，就说明 deploy key 至少有读权限。如果要从服务器推送，
+需要在 GitHub 仓库的 deploy key 设置里勾选 write access。推送前先确认远端没有新提交：
+
+```bash
+git fetch origin
+git status --short --branch
+git log --oneline --decorate --graph --max-count=12 --all
+```
+
+如果显示 `ahead` 且没有 `behind`，可以直接：
+
+```bash
+git push origin main
+```
+
+如果同时显示 `ahead` 和 `behind`，先 rebase 到最新远端：
+
+```bash
+git rebase origin/main
+```
+
+出现冲突时按下面顺序处理：
+
+```bash
+grep -RIn "<<<<<<<\|=======\|>>>>>>>" README.md openvla || true
+git diff --check
+# 手动保留两边真正需要的内容，尤其不要把 4090d 路径回退成旧 4090 路径
+git add <resolved-files>
+GIT_EDITOR=true git rebase --continue
+```
+
+完成后必须做最小检查：
+
+```bash
+git diff --check
+bash -n openvla/specdecoding/decode-scripts/*.sh
+python -m py_compile \
+  openvla/experiments/robot/openvla_utils.py \
+  openvla/experiments/robot/robot_utils.py \
+  openvla/experiments/robot/libero/eval_metrics.py
+git push origin main
+```
+
+2026-07-05 的一次实际经验：3090 原本 `origin` 是 HTTPS，且没有 GitHub 凭据，导致无法推送；
+配置 deploy key 后成功把 `main` 推到 GitHub。之后 3090 可以直接读写私有仓库，但原则上仍然只在需要同步
+训练脚本或紧急修复时从 3090 推送；常规开发优先放在 4090d。
+
+### 新服务器迁移检查表
+
+迁移到一台新机器时，按这个顺序检查，不要只复制代码就直接跑实验：
+
+1. GitHub 权限：配置 deploy key，确认 `git ls-remote origin HEAD` 能读私有仓库。
+2. 目录约定：建立 `SpecVLA-DFLASH`、`specvla-data`、`hf_files`、`hf-cache`、`LIBERO` 等固定目录。
+3. `.bashrc`：写入 `HF_ENDPOINT=https://hf-mirror.com`、HF cache、本地模型路径、`PYTHONPATH`。
+4. Conda 环境：确认 `python`、`torch`、`transformers`、`flash_attn`、`robosuite`、`mujoco`、`swanlab`。
+5. 模型权重：优先从 `hf-mirror.com` 或已有服务器复制到本地路径，避免脚本隐式访问 Hugging Face 官方站。
+6. 数据和 checkpoint：训练机需要 RLDS 与 DFLASH 离线数据；纯评测机器只需要 OpenVLA、SpecVLA/DFlash checkpoint 和 LIBERO。
+7. MuJoCo/EGL：先用小规模 LIBERO episode sanity check，发现 EGL 报错再处理 driver/library 匹配问题。
+8. 代码同步：先 `git fetch`、`git status --short --branch`，确认没有未提交改动或远端分叉。
+9. 最小验证：跑 `bash -n`、`python -m py_compile`，再用 `NUM_TRIALS_PER_TASK=1` 做评测 smoke test。
+10. 实验记录：保存 commit、launcher、数据目录、checkpoint、评测 seed、timing 口径。
+
 每次实验前，至少记录下面信息：
 
 ```text

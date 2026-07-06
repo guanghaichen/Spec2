@@ -108,23 +108,35 @@ draft depth、target layers、anchor-hidden mode、mask token 和 selected-hidde
 
 ### 当前 loss 和训练策略
 
-当前 pure-training recipe 使用 hidden-state distillation，而不是 token-level CE：
+当前推荐训练入口是：
 
 ```text
-total = 1.0 * hidden_loss + 0.05 * cosine_hidden_loss
-soft_w = 0
-anchor_consistency_w = 0
+openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_residual_cad_4gpu.sh
 ```
 
-Token accuracy 只作为诊断指标保留，不进入优化目标。早期 token soft-distribution 实验在这个离线 block setting
-中出现较早的 validation deterioration，所以当前默认不启用；相关代码仍通过 `--soft_w`、`--soft_temperature`
-保留为可控消融。当前 recipe 中 hidden-context noise 是 `0.05`。Per-anchor 和 per-position 指标会记录到
-SwanLab 和本地 JSONL。
+虽然文件名还保留 `residual_cad`，但默认 recipe 已经切到 **Markov-ACD**：
 
-当前 recipe 的长期控制信号是 LIBERO simulator behavior，而不是离线 validation split 的 early stopping。
-因此 pure-training launcher 使用 `--val_split 0`，默认不做 validation/early stopping，并且每 10 个 epoch 保存一次 checkpoint。
+```text
+total = hidden_loss
+      + 0.05 * cosine_hidden_loss
+      + 0.10 * teacher_soft_distribution_loss
+      + 0.10 * residual_token_ce_loss
+      + 0.10 * causal_residual_cad_loss
+      + 0.30 * refined_hidden_loss
+      + 0.10 * anchor_logit_distill_loss
+```
 
-### 当前新分支：跨 Anchor 因果蒸馏 + 前序 Token 残差修正
+这里的 `logit_markov_type=bias` 是一个很轻的 logits 级前序 token 修正头：训练时用 target 真实轨迹中的
+前一个 token，推理时用刚采样出来的 draft token。它不是本文想单独宣称的创新点；真正需要证明价值的是
+**Anchor-Contrastive Distillation / Anchor-Logit Distillation**：让短前缀弱路径的 logits 决策边界追同一目标位置的
+长前缀一步强路径。这样跨 anchor 设计不只是“另一个 loss”，而是在训练阶段把 VLA action-token 序列里天然存在的
+多 anchor 因果视角用起来，专门攻 p2-p5 弱路径。
+
+Per-anchor、per-position、`base_accuracy`、残差后 `accuracy`、`anchor_logit_distill_loss/component/pairs`
+都会记录到 SwanLab 和本地 `metrics.jsonl`。当前 recipe 的长期控制信号仍是 LIBERO simulator behavior，
+不是离线 validation split 的 early stopping；四卡训练默认 `--val_split 0`，每 10 个 epoch 保存一次 checkpoint。
+
+### 当前新分支：Markov-ACD（跨 Anchor Logits 蒸馏 + 前序 Token Logits 修正）
 
 2026-06-30 新增的主攻分支针对一个非常明确的现象：`anchor_a_to_position_(a+1)` 通常很高，
 但 `anchor_a_to_position_(a+2..)` 明显下降。这说明 draft 擅长一步预测，却不擅长在
@@ -246,6 +258,21 @@ overall_hit_rate = 0.342
    online-aligned 监督、加入轻量 token/hidden rerank 头，或重新设计让训练目标更贴近在线 self-generated
    prefix 的机制。
 
+2026-07-06/07 当前准备跑的新版本是 **Markov-ACD**：在原 residual hidden 修正之外，新增一个
+logits-level Markov bias head，并用 `anchor_logit_distill_loss` 做跨 anchor 强弱路径蒸馏。与 DSpark-style
+直接依赖前序 token 的区别在于：前序 token 修正只是工程执行头，训练核心是“短 anchor 弱路径追长 anchor 强路径”的
+VLA 多 anchor 监督。下一轮实验要重点看两组指标：
+
+```text
+train/anchor_logit_distill_loss
+train/anchor_logit_distill_component
+train/anchor_logit_distill_pairs_per_batch
+anchor_0_to_position_2_acc ... anchor_0_to_position_5_acc
+```
+
+如果新版本的 p2-p5 训练准确率提升能转化为在线 `Length` 和 relaxed hit rate 提升，才说明跨 anchor 设计是真的有用，
+不是滥竽充数的辅助 loss。
+
 2026-07-06 已补上 `include_anchor_hidden=True` 推理分支里的 residual sampling 接线。默认旧 DFlash
 launcher 仍关闭该功能；专用 residual launcher 会显式开启：
 
@@ -286,6 +313,16 @@ EVAL_EPOCH=200 DFLASH_USE_CAUSAL_RESIDUAL_SAMPLING=True \
 --causal_residual_min_position 2
 --causal_residual_max_position 5
 --refined_hidden_w 0.30
+--residual_token_ce_w 0.10
+--logit_markov_type bias
+--logit_markov_rank 256
+--logit_markov_scale 1.0
+--anchor_logit_distill_w 0.10
+--anchor_logit_distill_temperature 2.0
+--anchor_logit_distill_min_position 2
+--anchor_logit_distill_max_position 5
+--anchor_logit_distill_correct_teacher_only
+--soft_w 0.10
 --weak_far_slot_boost 2.0
 --anchor0_p2_boost 4.0
 --slot_decay 1.0
@@ -297,6 +334,9 @@ SwanLab/JSONL 会额外记录：
 causal_residual_cad_loss
 causal_residual_cad_component
 causal_residual_cad_pairs
+anchor_logit_distill_loss
+anchor_logit_distill_component
+anchor_logit_distill_pairs
 refined_hidden_loss
 refined_hidden_component
 base_accuracy
@@ -355,8 +395,10 @@ dflash_data_format           full_prefix_plus_action_hidden_v4
    `[1, 8, 15, 29, final]`，`soft_w=0`，`anchor_consistency_w=0`，不使用离线 validation split；
    然后用 LIBERO simulator 比较 checkpoint 的成功率、acceptance length、hit rate 和 wall-clock time。
 6. **Residual-CAD 新分支：** 观察到所有 anchor 的一步预测都明显强于远 slot 后，新增
-   “跨 Anchor 因果蒸馏 + 前序 Token 残差修正”。它不是直接把 DSpark 的 logits Markov head 搬过来，
-   而是让远 slot 的 hidden 经前序 token 残差修正后追同一目标位置的一步强路径。
+   “跨 Anchor 因果蒸馏 + 前序 Token 残差修正”。它先验证“弱路径需要因果补偿”这一判断。
+7. **Markov-ACD 新分支：** 在 residual hidden 修正基础上加入 logits-level Markov bias head，
+   并让短前缀弱路径 logits 追同一目标位置的长前缀一步强路径 logits。它的论文叙事重点是跨 anchor
+   强弱路径蒸馏，而不是单纯复制 DSpark 的前序 token 修正。
 
 需要始终记住的限制：
 
@@ -425,7 +467,7 @@ export VLA_PATH=${SPECVLA_ROOT}/hf_files/openvla-7b-finetuned-libero-goal
 export OPENVLA_MODEL_PATH=${VLA_PATH}
 export LIBERO_RLDS_ROOT=${SPECVLA_ROOT}/dataset/modified_libero_rlds
 export DFLASH_DATA_OUTDIR=${SPECVLA_DATA}/dflash_goal_dataset
-export DFLASH_OUTPUT_DIR=${SPECVLA_DATA}/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu
+export DFLASH_OUTPUT_DIR=${SPECVLA_DATA}/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu
 export SPECVLA_CKPT_ROOT=${SPECVLA_DATA}/specvla_checkpoint
 export SPECVLA_GOAL_CKPT=${SPECVLA_CKPT_ROOT}/goal
 export LOG_DIR=${SPECVLA_DATA}/eval_logs
@@ -636,7 +678,7 @@ find /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_go
 3090 继续负责四卡训练。训练完成后，在本地终端用 `scp -3` 从 3090 搬到 4090：
 
 ```bash
-TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu
+TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu
 CKPT=epoch_190_step_169670
 
 scp -3 -r \
@@ -734,7 +776,7 @@ conda activate specvla
 ```
 
 3090 当前有 8 张 RTX 3090，但默认完整训练只使用 0-3 四张卡。当前优先跑
-Residual-CAD weak-path 新分支：
+Markov-ACD 新分支：
 
 ```bash
 CUDA_VISIBLE_DEVICES=0,1,2,3 \
@@ -758,10 +800,10 @@ openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_puretrain_4gp
 ```text
 VLA_PATH=/data/wulin/hf_files/openvla-7b-finetuned-libero-goal
 DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset
-OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu
+OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu
 ```
 
-Residual-CAD weak-path 主训练配置：
+Markov-ACD 主训练配置：
 
 ```text
 torchrun --nproc_per_node 4
@@ -774,6 +816,12 @@ causal_residual_cad_warmup_steps = 4000
 causal_residual_cad_correct_teacher_only = true
 causal_residual_min/max_position = 2/5
 refined_hidden_w = 0.30
+residual_token_ce_w = 0.10
+logit_markov_type = bias
+logit_markov_rank = 256
+anchor_logit_distill_w = 0.10
+anchor_logit_distill_temperature = 2.0
+soft_w = 0.10
 refined_hidden_loss_type = smooth_l1
 weak_far_slot_boost = 2.0
 anchor0_p2_boost = 4.0
@@ -791,11 +839,12 @@ SwanLab = 使用环境默认配置
 
 ```bash
 BATCH_SIZE=16 WARMUP_STEPS=1000 LR=5e-5 RESIDUAL_CAD_W=0.10 REFINED_HIDDEN_W=0.30 \
+ANCHOR_LOGIT_DISTILL_W=0.10 RESIDUAL_TOKEN_CE_W=0.10 SOFT_W=0.10 \
   CUDA_VISIBLE_DEVICES=0,1,2,3 \
   bash openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_residual_cad_4gpu.sh
 ```
 
-如果要复现实验，请优先使用新的 `*_weakpath_b16_4gpu` 输出目录；不要和旧的 b8、旧 Residual-CAD
+如果要复现实验，请优先使用新的 `*_markov_acd_tokence_soft01_b16_4gpu` 输出目录；不要和旧的 puretrain、weak-path、Residual-CAD
 目录混写。
 
 2026-06-29 重新检查到的 3090 数据和上一版 puretrain 训练产物状态：
@@ -839,7 +888,7 @@ run_config.json 记录: world_size=4, global_effective_batch=32, train_files=285
 推荐加 `-3`，让数据经由本地转发，不要求 3090 能直接连到 4090：
 
 ```bash
-TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu
+TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu
 CKPT=epoch_190_step_169670
 
 scp -3 -r \
@@ -850,7 +899,7 @@ scp -3 -r \
 如果要复制 3090 当前 `latest_checkpoint.txt` 指向的最新 checkpoint，可以在本地终端执行：
 
 ```bash
-TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu
+TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu
 CKPT=$(ssh 3090_wulin "basename \"\$(cat ${TRAIN_DIR}/latest_checkpoint.txt)\"")
 
 scp -3 -r \
@@ -895,7 +944,7 @@ openvla/specdecoding/decode-scripts/
 ```text
 OpenVLA goal model: /data/wulin/hf_files/openvla-7b-finetuned-libero-goal
 SpecVLA checkpoints: /data/wulin/c/specvla-data/specvla_checkpoint/goal
-DFLASH run dir: /data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu
+DFLASH run dir: /data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu
 Logs: /data/wulin/c/specvla-data/eval_logs
 ```
 
@@ -1059,10 +1108,10 @@ conda activate specvla
 cd /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH
 ```
 
-设置本次要评测的 DFLASH checkpoint。这里以当前 weak-path b16 的第 200 epoch 为例：
+设置本次要评测的 DFLASH checkpoint。这里以当前 Markov-ACD 第 200 epoch 为例：
 
 ```bash
-export DFLASH_CKPT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu/epoch_200_step_089400
+export DFLASH_CKPT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu/epoch_200_step_089400
 export NUM_TRIALS_PER_TASK=50
 export CUDA_VISIBLE_DEVICES=0
 ```

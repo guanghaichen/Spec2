@@ -10,15 +10,19 @@ export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3}"
 if [[ -d "/data/wulin" ]]; then
   DEFAULT_VLA_PATH="/data/wulin/hf_files/openvla-7b-finetuned-libero-goal"
   DEFAULT_DATAPATH="/data/wulin/c/specvla-data/dflash_goal_dataset"
-  DEFAULT_OUTPUT_DIR="/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_tokence_soft01_b16_4gpu"
+  DEFAULT_OUTPUT_DIR="/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu"
+elif [[ -d "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh" ]]; then
+  DEFAULT_VLA_PATH="/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-goal"
+  DEFAULT_DATAPATH="/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset"
+  DEFAULT_OUTPUT_DIR="/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu"
 elif [[ -d "/mnt/storage/cgh" ]]; then
   DEFAULT_VLA_PATH="/mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-goal"
   DEFAULT_DATAPATH="/mnt/storage/cgh/specvla-data/dflash_goal_dataset"
-  DEFAULT_OUTPUT_DIR="/mnt/storage/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_tokence_soft01_b16_4gpu"
+  DEFAULT_OUTPUT_DIR="/mnt/storage/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu"
 else
   DEFAULT_VLA_PATH="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/data/models--openvla--openvla-7b-finetuned-libero-goal"
   DEFAULT_DATAPATH="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset"
-  DEFAULT_OUTPUT_DIR="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_tokence_soft01_b16_4gpu"
+  DEFAULT_OUTPUT_DIR="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu"
 fi
 
 VLA_PATH="${VLA_PATH:-${DEFAULT_VLA_PATH}}"
@@ -33,6 +37,11 @@ RESIDUAL_CAD_W="${RESIDUAL_CAD_W:-0.10}"
 RESIDUAL_CAD_TYPE="${RESIDUAL_CAD_TYPE:-cosine}"
 RESIDUAL_CAD_WARMUP_STEPS="${RESIDUAL_CAD_WARMUP_STEPS:-4000}"
 RESIDUAL_TOKEN_CE_W="${RESIDUAL_TOKEN_CE_W:-0.10}"
+LOGIT_MARKOV_TYPE="${LOGIT_MARKOV_TYPE:-bias}"
+LOGIT_MARKOV_RANK="${LOGIT_MARKOV_RANK:-256}"
+LOGIT_MARKOV_SCALE="${LOGIT_MARKOV_SCALE:-1.0}"
+ANCHOR_LOGIT_DISTILL_W="${ANCHOR_LOGIT_DISTILL_W:-0.10}"
+ANCHOR_LOGIT_DISTILL_TEMPERATURE="${ANCHOR_LOGIT_DISTILL_TEMPERATURE:-2.0}"
 SOFT_W="${SOFT_W:-0.10}"
 REFINED_HIDDEN_W="${REFINED_HIDDEN_W:-0.30}"
 REFINED_HIDDEN_TYPE="${REFINED_HIDDEN_TYPE:-smooth_l1}"
@@ -53,12 +62,17 @@ echo "RESIDUAL_CAD_WARMUP_STEPS=${RESIDUAL_CAD_WARMUP_STEPS}"
 echo "REFINED_HIDDEN_W=${REFINED_HIDDEN_W}"
 echo "RESIDUAL_TOKEN_CE_W=${RESIDUAL_TOKEN_CE_W}"
 echo "SOFT_W=${SOFT_W}"
+echo "LOGIT_MARKOV_TYPE=${LOGIT_MARKOV_TYPE}"
+echo "LOGIT_MARKOV_RANK=${LOGIT_MARKOV_RANK}"
+echo "LOGIT_MARKOV_SCALE=${LOGIT_MARKOV_SCALE}"
+echo "ANCHOR_LOGIT_DISTILL_W=${ANCHOR_LOGIT_DISTILL_W}"
+echo "ANCHOR_LOGIT_DISTILL_TEMPERATURE=${ANCHOR_LOGIT_DISTILL_TEMPERATURE}"
 echo "WEAK_FAR_SLOT_BOOST=${WEAK_FAR_SLOT_BOOST}"
 echo "ANCHOR0_P2_BOOST=${ANCHOR0_P2_BOOST}"
 
 torchrun --standalone --nnodes 1 --nproc_per_node 4 \
   openvla/specdecoding/train-scripts/train_dflash_libero_goal.py \
-  --run_name dflash-anchor-hidden-1layer-finalhidden-residual-cad-tokence-soft01-b16-4gpu \
+  --run_name dflash-anchor-hidden-1layer-finalhidden-markov-acd-tokence-soft01-b16-4gpu \
   --vla_path "${VLA_PATH}" \
   --datapath "${DATAPATH}" \
   --output_dir "${OUTPUT_DIR}" \
@@ -85,6 +99,14 @@ torchrun --standalone --nnodes 1 --nproc_per_node 4 \
   --residual_token_ce_min_position 2 \
   --residual_token_ce_max_position 5 \
   --residual_token_ce_label_smoothing 0 \
+  --logit_markov_type "${LOGIT_MARKOV_TYPE}" \
+  --logit_markov_rank "${LOGIT_MARKOV_RANK}" \
+  --logit_markov_scale "${LOGIT_MARKOV_SCALE}" \
+  --anchor_logit_distill_w "${ANCHOR_LOGIT_DISTILL_W}" \
+  --anchor_logit_distill_temperature "${ANCHOR_LOGIT_DISTILL_TEMPERATURE}" \
+  --anchor_logit_distill_min_position 2 \
+  --anchor_logit_distill_max_position 5 \
+  --anchor_logit_distill_correct_teacher_only \
   --weak_far_slot_boost "${WEAK_FAR_SLOT_BOOST}" \
   --anchor0_p2_boost "${ANCHOR0_P2_BOOST}" \
   --soft_w "${SOFT_W}" \

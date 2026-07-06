@@ -334,9 +334,40 @@ class DFlashDraftModel(nn.Module):
             self.causal_residual_hidden = None
             self.causal_residual_out = None
 
+        self.logit_markov_type = getattr(config, "dflash_logit_markov_type", "none")
+        self.logit_markov_rank = int(getattr(config, "dflash_logit_markov_rank", 256))
+        self.logit_markov_scale = float(getattr(config, "dflash_logit_markov_scale", 1.0))
+        if self.logit_markov_type not in ("none", "bias"):
+            raise ValueError(
+                f"Unsupported dflash_logit_markov_type={self.logit_markov_type!r}; "
+                "expected 'none' or 'bias'."
+            )
+        if self.logit_markov_type == "bias":
+            vocab_size = getattr(config, "vocab_size", None)
+            if vocab_size is None or vocab_size <= 0:
+                raise ValueError("DFlash logit Markov head requires config.vocab_size > 0.")
+            if self.logit_markov_rank <= 0:
+                raise ValueError("dflash_logit_markov_rank must be > 0.")
+            self.logit_markov_norm = LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+            self.logit_markov_token = nn.Embedding(vocab_size, self.logit_markov_rank)
+            self.logit_markov_hidden = nn.Linear(config.hidden_size, self.logit_markov_rank, bias=False)
+            self.logit_markov_out = nn.Linear(self.logit_markov_rank, vocab_size, bias=False)
+            nn.init.normal_(self.logit_markov_token.weight, mean=0.0, std=0.02)
+            nn.init.normal_(self.logit_markov_hidden.weight, mean=0.0, std=0.02)
+            nn.init.normal_(self.logit_markov_out.weight, mean=0.0, std=1e-4)
+        else:
+            self.logit_markov_norm = None
+            self.logit_markov_token = None
+            self.logit_markov_hidden = None
+            self.logit_markov_out = None
+
     @property
     def causal_residual_enabled(self) -> bool:
         return self.causal_residual_type == "hidden"
+
+    @property
+    def logit_markov_enabled(self) -> bool:
+        return self.logit_markov_type == "bias"
 
     def apply_causal_residual(
         self,
@@ -375,6 +406,51 @@ class DFlashDraftModel(nn.Module):
             return refined_tail
         return torch.cat([hidden_states[:, :start_index, :], refined_tail], dim=1)
 
+    def apply_logit_markov_bias(
+        self,
+        logits: torch.Tensor,
+        hidden_states: torch.Tensor,
+        prev_token_ids: torch.LongTensor,
+        start_index: int = 1,
+    ) -> torch.Tensor:
+        """Add a lightweight previous-token-conditioned bias on logits.
+
+        The hidden block is still produced in one DFlash forward. This head only corrects
+        the decision boundary of later slots with the previous token that is available in
+        training, or the just-sampled draft token during inference.
+        """
+        if not self.logit_markov_enabled:
+            return logits
+        if logits.ndim != 3:
+            raise ValueError(f"logits must be [B, T, V], got {tuple(logits.shape)}.")
+        if hidden_states.ndim != 3:
+            raise ValueError(f"hidden_states must be [B, T, H], got {tuple(hidden_states.shape)}.")
+        if logits.shape[:2] != hidden_states.shape[:2]:
+            raise ValueError(
+                f"logits prefix shape {tuple(logits.shape[:2])} must match hidden prefix "
+                f"{tuple(hidden_states.shape[:2])}."
+            )
+        if prev_token_ids.shape != hidden_states.shape[:2]:
+            raise ValueError(
+                f"prev_token_ids shape {tuple(prev_token_ids.shape)} must match hidden prefix "
+                f"{tuple(hidden_states.shape[:2])}."
+            )
+        seq_len = hidden_states.shape[1]
+        if start_index >= seq_len:
+            return logits
+        if start_index < 0:
+            raise ValueError("start_index must be >= 0.")
+
+        tail_hidden = hidden_states[:, start_index:, :]
+        tail_prev_tokens = prev_token_ids[:, start_index:]
+        hidden_feat = self.logit_markov_hidden(self.logit_markov_norm(tail_hidden))
+        token_feat = self.logit_markov_token(tail_prev_tokens).to(dtype=hidden_feat.dtype)
+        bias = self.logit_markov_out(F.silu(hidden_feat + token_feat))
+        bias = bias.to(dtype=logits.dtype) * self.logit_markov_scale
+        if start_index == 0:
+            return logits + bias
+        return torch.cat([logits[:, :start_index, :], logits[:, start_index:, :] + bias], dim=1)
+
     def sample_with_causal_residual(
         self,
         hidden_states: torch.Tensor,
@@ -406,6 +482,13 @@ class DFlashDraftModel(nn.Module):
                     start_index=0,
                 )
             step_logits = lm_head(step_hidden)
+            if self.logit_markov_enabled and slot_idx >= start_index:
+                step_logits = self.apply_logit_markov_bias(
+                    step_logits,
+                    step_hidden,
+                    prev_token.view(-1, 1),
+                    start_index=0,
+                )
             step_token = sample(step_logits, temperature=temperature)
             refined_logits.append(step_logits)
             sampled_tokens.append(step_token)

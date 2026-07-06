@@ -580,6 +580,9 @@ class SpecVLAforActionPrediction(nn.Module):
         self.dflash_causal_residual_rank = 256
         self.dflash_causal_residual_scale = 1.0
         self.dflash_causal_residual_start_index = 1
+        self.dflash_logit_markov_type = "none"
+        self.dflash_logit_markov_rank = 256
+        self.dflash_logit_markov_scale = 1.0
         self.dflash_mask_token_id = (
             dflash_mask_token_id
             if dflash_mask_token_id is not None
@@ -609,6 +612,15 @@ class SpecVLAforActionPrediction(nn.Module):
             )
             self.dflash_causal_residual_start_index = saved_dflash_cfg.get(
                 "causal_residual_start_index", self.dflash_causal_residual_start_index
+            )
+            self.dflash_logit_markov_type = saved_dflash_cfg.get(
+                "logit_markov_type", self.dflash_logit_markov_type
+            )
+            self.dflash_logit_markov_rank = saved_dflash_cfg.get(
+                "logit_markov_rank", self.dflash_logit_markov_rank
+            )
+            self.dflash_logit_markov_scale = saved_dflash_cfg.get(
+                "logit_markov_scale", self.dflash_logit_markov_scale
             )
             if dflash_target_layer_ids is None:
                 dflash_target_layer_ids = saved_dflash_cfg.get("target_layer_ids")
@@ -644,6 +656,9 @@ class SpecVLAforActionPrediction(nn.Module):
             target_config.dflash_causal_residual_type = self.dflash_causal_residual_type
             target_config.dflash_causal_residual_rank = self.dflash_causal_residual_rank
             target_config.dflash_causal_residual_scale = self.dflash_causal_residual_scale
+            target_config.dflash_logit_markov_type = self.dflash_logit_markov_type
+            target_config.dflash_logit_markov_rank = self.dflash_logit_markov_rank
+            target_config.dflash_logit_markov_scale = self.dflash_logit_markov_scale
             # # 实例化草稿模型
             self.ea_layer = DFlashDraftModel(target_config)
             load_model_path = os.path.join(ea_model_path, "pytorch_model.bin")
@@ -887,7 +902,10 @@ class SpecVLAforActionPrediction(nn.Module):
             )
             if (
                 self.dflash_use_causal_residual_sampling
-                and getattr(self.ea_layer, "causal_residual_enabled", False)
+                and (
+                    getattr(self.ea_layer, "causal_residual_enabled", False)
+                    or getattr(self.ea_layer, "logit_markov_enabled", False)
+                )
             ):
                 proposed_tokens, draft_logits = self.ea_layer.sample_with_causal_residual(
                     hidden_states=draft_hidden,
@@ -1138,7 +1156,10 @@ class SpecVLAforActionPrediction(nn.Module):
             )
             if (
                 self.dflash_use_causal_residual_sampling
-                and getattr(self.ea_layer, "causal_residual_enabled", False)
+                and (
+                    getattr(self.ea_layer, "causal_residual_enabled", False)
+                    or getattr(self.ea_layer, "logit_markov_enabled", False)
+                )
             ):
                 proposed_tokens, draft_logits = self.ea_layer.sample_with_causal_residual(
                     hidden_states=draft_hidden,

@@ -142,12 +142,12 @@ SwanLab 和本地 JSONL。
 所以用刚生成的 draft token 作为下一 slot 的前序条件。DFlash transformer 主干仍然只跑一次，
 后面只是轻量 residual head + frozen `lm_head` 的逐 slot 修正。
 
-但 2026-07-06 复盘发现：当前主 runtime 走的是 `include_anchor_hidden=True` 的
-`_dflash_generate_with_anchor_hidden` 分支，该分支还没有真正接入 `sample_with_causal_residual`，
-而是直接对 `draft_hidden` 做 `lm_head` 后采样。也就是说，当前训练确实训练了 residual/CAD 相关头，
-但在线推理评测主要反映的是“被 weak-path/CAD 损失正则过的 base draft”，不能证明 residual head
-在线修正机制本身已经生效。下一轮第一优先级应是把 residual sampling 接进 anchor-hidden 分支，
-并做 residual on/off 消融。
+2026-07-06 复盘发现：早先的主 runtime 走的是 `include_anchor_hidden=True` 的
+`_dflash_generate_with_anchor_hidden` 分支，当时该分支还没有真正接入 `sample_with_causal_residual`，
+而是直接对 `draft_hidden` 做 `lm_head` 后采样。也就是说，旧 DFLASH 评测虽然使用了训练过的
+residual/CAD checkpoint，但并没有在线启用 residual head。现在已经补上显式开关
+`dflash_use_causal_residual_sampling`，旧 launcher 默认关闭以保留可复现性，`CADhead` launcher
+默认开启以做对照。
 
 2026-07-01 的 b16 训练观察到：`anchor_0_to_position_1_acc` 和 `anchor_1_to_position_2_acc`
 可以较快升到 0.8 左右，但 `anchor_0_to_position_2_acc` 仍明显滞后，且 `accuracy - base_accuracy`
@@ -229,22 +229,49 @@ overall_hit_rate = 0.342
 2. DFLASH 的 Length 已经略高于 SpecVLA relaxed，但速度收益只有 `1.05x`，说明 3090 上 draft/verify
    小 forward、Python 调度和并行评测共享资源的开销很容易吃掉投机收益。
 3. 这五个 eval 在 3090 上几乎同时启动，分别占用 GPU 0-4；它们适合作 sanity check，不应作为论文最终速度。
-   正式 `SR / Length / Speedup` 仍应在 4090d 上单实验串行跑。
+   正式 `SR / Length / Speedup` 仍应在 4090 上单实验串行跑。
 4. 由于 residual head 没有接入 anchor-hidden 推理分支，本次结果不能判定 residual-CAD 机制失败。
    更准确地说，它暴露的是“只靠训练时 CAD/weak-path 正则，不在推理时使用 residual 修正”不足以明显反超。
 
 下一步行动建议：
 
-1. **先修推理接线，不急着重训。** 把 `sample_with_causal_residual` 接入
-   `_dflash_generate_with_anchor_hidden`，让 slot1 之后用已生成的 draft token 做轻量 residual 修正。
-   需要加开关，至少能做 `residual_sampling=off/on` 消融。
+1. **先跑 CADhead 推理消融，不急着重训。** 当前已经把 `sample_with_causal_residual` 接入
+   `_dflash_generate_with_anchor_hidden`，专用 residual launcher 会让 slot1 之后用已生成的 draft token
+   做轻量 residual 修正。
 2. **复用已有 checkpoint 做消融。** 当前训练最好 `train/loss` 和 `train/accuracy` 在 epoch 178 左右；
    `anchor0 -> p2` 最好在 epoch 118 左右。优先评测 epoch 120、180、190、200，而不是立刻新训。
-3. **正式速度只在 4090d 串行跑。** 3090 并行评测只能用来确认成功率和大致趋势。最终报告必须记录
+3. **正式速度只在 4090 串行跑。** 3090 并行评测只能用来确认成功率和大致趋势。最终报告必须记录
    `timing_scope`、`sync_cuda_timing`、GPU 型号、是否并行跑其它 eval。
 4. **如果 residual sampling 接入后 Length/Speedup 仍不动，再考虑训练侧变化。** 例如提高 p2-p5 的
    online-aligned 监督、加入轻量 token/hidden rerank 头，或重新设计让训练目标更贴近在线 self-generated
    prefix 的机制。
+
+2026-07-06 已补上 `include_anchor_hidden=True` 推理分支里的 residual sampling 接线。默认旧 DFlash
+launcher 仍关闭该功能；专用 residual launcher 会显式开启：
+
+```bash
+# relaxed，默认 EVAL_EPOCH=200，ACCEPT_THRESHOLD=9
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_dflash_residual_libero_goal_eval.sh
+
+# strict，默认 EVAL_EPOCH=200，ACCEPT_THRESHOLD=0
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_dflash_residual_strict_libero_goal_eval.sh
+```
+
+summary JSON 会记录：
+
+```text
+dflash_use_causal_residual_sampling = true
+generation.use_causal_residual_sampling = true
+```
+
+如果要在旧 launcher 上临时打开，也可以：
+
+```bash
+EVAL_EPOCH=200 DFLASH_USE_CAUSAL_RESIDUAL_SAMPLING=True \
+  bash openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh
+```
 
 相关开关：
 
@@ -280,16 +307,16 @@ accuracy
 残差修正是否真的救到了 p2-p5。新版训练尤其要看：
 `anchor_0_to_position_2_acc` 是否比旧版更快上升，以及 `accuracy - base_accuracy` 是否转正。
 
-## 离线数据：历史 artifact 和 4090d 目标目录
+## 离线数据：历史 artifact 和 4090 目标目录
 
 数据生成脚本使用 `openvla/modified_libero_rlds` 中的 `libero_goal_no_noops` split。对每个 RLDS sample，
 脚本贪心运行 OpenVLA；只有当返回的 action hidden-state sequence 和 7 个 action token 在结构上兼容时，
 才写出一个 `data_*.ckpt` tensor dictionary。
 
-4090d 上建议使用的数据目录：
+4090 上建议使用的数据目录：
 
 ```text
-/mnt/storage/cgh/specvla-data/dflash_goal_dataset
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset
 ```
 
 2026-06-26 审计结果：`419G`，`28,639` 个 `.ckpt` 样本。生成日志显示枚举样本 `52,042`，
@@ -339,59 +366,59 @@ dflash_data_format           full_prefix_plus_action_hidden_v4
 - Relaxed acceptance 可能保持实际动作效果，但 token 层面不等于 strict equality。必须做消融并诚实报告阈值。
 
 
-## 新服务器 4090d 从零迁移步骤
+## 新服务器 4090 从零迁移步骤
 
-旧 `ssh 4090` 机器已经退役。之后默认把 `ssh 4090d` 作为新的主开发、数据生成和单卡推理评测机器；
-3090 仍作为四卡训练机器。4090d 的固定工作根目录约定为：
+旧 4090d 机器不再作为默认推理机。之后默认把新的 `ssh 4090` 作为主开发、数据生成和单卡推理评测机器；
+3090 仍作为四卡训练机器。新 4090 的固定工作根目录约定为：
 
 ```text
-/mnt/storage/cgh
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh
 ```
 
 建议目录布局：
 
 ```text
-/mnt/storage/cgh/SpecVLA-DFLASH                            代码仓库
-/mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-goal OpenVLA Goal 权重
-/mnt/storage/cgh/dataset/modified_libero_rlds              OpenVLA 修改版 LIBERO RLDS 数据
-/mnt/storage/cgh/specvla-data/dflash_goal_dataset          DFLASH 离线训练数据
-/mnt/storage/cgh/specvla-data/eval_logs                    LIBERO 评测日志
-/mnt/storage/cgh/specvla-data/specvla_checkpoint/goal      SpecVLA Goal baseline draft 权重
-/mnt/storage/cgh/LIBERO                                    LIBERO 仿真环境源码
-/mnt/storage/cgh/hf-cache                                  Hugging Face 缓存
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH                            代码仓库
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-goal OpenVLA Goal 权重
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/dataset/modified_libero_rlds              OpenVLA 修改版 LIBERO RLDS 数据
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset          DFLASH 离线训练数据
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs                    LIBERO 评测日志
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/specvla_checkpoint/goal      SpecVLA Goal baseline draft 权重
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/LIBERO                                    LIBERO 仿真环境源码
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf-cache                                  Hugging Face 缓存
 ```
 
 ### 1. Git 和基础目录
 
-4090d 已配置 deploy key，可以直接拉取私有仓库：
+4090 应配置 deploy key，以便直接拉取和更新私有仓库：
 
 ```bash
-ssh 4090d
-mkdir -p /mnt/storage/cgh
-cd /mnt/storage/cgh
+ssh 4090
+mkdir -p /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh
+cd /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh
 
 git clone git@github.com:guanghaichen/SpecVLA-DFLASH.git
-cd /mnt/storage/cgh/SpecVLA-DFLASH
+cd /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH
 git pull --ff-only origin main
 ```
 
 如果仓库已经存在，只需要：
 
 ```bash
-ssh 4090d
-cd /mnt/storage/cgh/SpecVLA-DFLASH
+ssh 4090
+cd /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH
 git status
 git pull --ff-only origin main
 ```
 
 ### 2. `.bashrc` 中固定镜像源和本地路径
 
-4090d 后续尽量不要让脚本自动访问官方 Hugging Face。把下面内容追加到 `~/.bashrc` 后重新登录，
+4090 后续尽量不要让脚本自动访问官方 Hugging Face。把下面内容追加到 `~/.bashrc` 后重新登录，
 或执行 `source ~/.bashrc`：
 
 ```bash
-# SpecVLA-DFLASH paths on 4090d
-export SPECVLA_ROOT=/mnt/storage/cgh
+# SpecVLA-DFLASH paths on 4090
+export SPECVLA_ROOT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh
 export SPECVLA_REPO=${SPECVLA_ROOT}/SpecVLA-DFLASH
 export SPECVLA_DATA=${SPECVLA_ROOT}/specvla-data
 export VLA_PATH=${SPECVLA_ROOT}/hf_files/openvla-7b-finetuned-libero-goal
@@ -422,10 +449,10 @@ export PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
 
 ### 3. 创建 conda 环境
 
-如果 4090d 还没有 Miniconda，可以用清华镜像安装：
+如果 4090 还没有 Miniconda，可以用清华镜像安装：
 
 ```bash
-cd /mnt/storage/cgh
+cd /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh
 wget -O Miniconda3-latest-Linux-x86_64.sh \
   https://mirrors.tuna.tsinghua.edu.cn/anaconda/miniconda/Miniconda3-latest-Linux-x86_64.sh
 bash Miniconda3-latest-Linux-x86_64.sh -b -p ${HOME}/miniconda3
@@ -443,7 +470,7 @@ python -m pip install -U pip setuptools wheel packaging ninja
 ```
 
 PyTorch 版本沿用旧环境经验：Python 3.10、PyTorch 2.2.0、CUDA 12.1。优先使用官方 CUDA wheel；
-如果服务器不能直连，可先在能联网的机器下载 wheel 后传到 4090d：
+如果服务器不能直连，可先在能联网的机器下载 wheel 后传到 4090：
 
 ```bash
 pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 \
@@ -453,21 +480,23 @@ pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 \
 安装项目依赖：
 
 ```bash
-cd /mnt/storage/cgh/SpecVLA-DFLASH/openvla
+cd /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH/openvla
 pip install -e .
 ```
 
 注意：`openvla/pyproject.toml` 里包含 `dlimp @ git+https://github.com/moojink/dlimp_openvla`。
-如果 4090d 不能访问 GitHub，这一步会卡住。解决方式是先在可联网机器把 `dlimp_openvla`
-源码或 wheel 下载好，再传到 4090d 本地安装；或者临时配置能访问 GitHub 的代理后再执行 `pip install -e .`。
+如果 4090 不能访问 GitHub，这一步会卡住。解决方式是先在可联网机器把 `dlimp_openvla`
+源码或 wheel 下载好，再传到 4090 本地安装；或者临时配置能访问 GitHub 的代理后再执行 `pip install -e .`。
 
-安装 flash-attn 时必须匹配 Python、PyTorch 和 CUDA。优先去
+`flash-attn` 不是当前 DFLASH 推理评测的硬依赖。DFlash draft 自己使用 PyTorch
+`scaled_dot_product_attention`；OpenVLA target 在当前加载路径里也没有强制
+`attn_implementation="flash_attention_2"`。因此如果 4090 上安装 flash-attn 卡住，可以先不装，
+直接跑 AR / SpecVLA / DFlash 评测。代价只是可能比 flash-attn 路径慢一些或显存更高。
+
+只有在后续明确要复现上游 flash-attn 配置、或某个模型配置强制要求 flash-attn 时，再安装它。
+安装时必须匹配 Python、PyTorch 和 CUDA，优先去
 [Dao-AILab/flash-attention releases](https://github.com/Dao-AILab/flash-attention/releases)
-下载对应 wheel；如果没有完全匹配的 wheel，再源码编译：
-
-```bash
-MAX_JOBS=8 pip install flash-attn==2.5.8 --no-build-isolation
-```
+下载对应 wheel；没有完全匹配的 wheel 时再源码编译。
 
 ### 4. 下载 OpenVLA Goal 权重
 
@@ -477,10 +506,10 @@ OpenVLA Goal 目标模型来自 Hugging Face 仓库 `openvla/openvla-7b-finetune
 ```bash
 source ~/.bashrc
 conda activate specvla
-mkdir -p /mnt/storage/cgh/hf_files
+mkdir -p /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files
 
 huggingface-cli download openvla/openvla-7b-finetuned-libero-goal \
-  --local-dir /mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-goal \
+  --local-dir /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-goal \
   --local-dir-use-symlinks False \
   --resume-download
 ```
@@ -488,15 +517,15 @@ huggingface-cli download openvla/openvla-7b-finetuned-libero-goal \
 检查关键文件：
 
 ```bash
-ls -lh /mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-goal
+ls -lh /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-goal
 ```
 
 后续 Object、Spatial、Long baseline 也按同一规则下载到：
 
 ```text
-/mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-object
-/mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-spatial
-/mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-10
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-object
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-spatial
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-10
 ```
 
 对应 Hugging Face repo 名通常是：
@@ -514,11 +543,11 @@ DFLASH 数据生成脚本读取 OpenVLA 修改版 RLDS 数据。镜像下载命�
 ```bash
 source ~/.bashrc
 conda activate specvla
-mkdir -p /mnt/storage/cgh/dataset
+mkdir -p /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/dataset
 
 huggingface-cli download openvla/modified_libero_rlds \
   --repo-type dataset \
-  --local-dir /mnt/storage/cgh/dataset/modified_libero_rlds \
+  --local-dir /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/dataset/modified_libero_rlds \
   --local-dir-use-symlinks False \
   --resume-download
 ```
@@ -526,7 +555,7 @@ huggingface-cli download openvla/modified_libero_rlds \
 下载后应能看到 `libero_goal_no_noops` 等 split。检查：
 
 ```bash
-find /mnt/storage/cgh/dataset/modified_libero_rlds -maxdepth 2 -type d | sort | head -30
+find /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/dataset/modified_libero_rlds -maxdepth 2 -type d | sort | head -30
 ```
 
 ### 6. 准备 SpecVLA baseline draft 权重
@@ -536,33 +565,33 @@ SpecVLA/EAGLE baseline 的 draft 权重由原始
 Goal 权重放到：
 
 ```text
-/mnt/storage/cgh/specvla-data/specvla_checkpoint/goal
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/specvla_checkpoint/goal
 ```
 
 Object、Spatial、Long 后续如果要复现四个 suite 的 baseline，建议放到：
 
 ```text
-/mnt/storage/cgh/specvla-data/specvla_checkpoint/object
-/mnt/storage/cgh/specvla-data/specvla_checkpoint/spatial
-/mnt/storage/cgh/specvla-data/specvla_checkpoint/10
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/specvla_checkpoint/object
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/specvla_checkpoint/spatial
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/specvla_checkpoint/10
 ```
 
-评测脚本会通过 `SPECVLA_CKPT_ROOT=/mnt/storage/cgh/specvla-data/specvla_checkpoint`
+评测脚本会通过 `SPECVLA_CKPT_ROOT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/specvla_checkpoint`
 自动拼出 suite-specific checkpoint 路径。
 
 ### 7. 安装 LIBERO 仿真环境
 
-LIBERO 推荐作为源码目录放在 `/mnt/storage/cgh/LIBERO`：
+LIBERO 推荐作为源码目录放在 `/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/LIBERO`：
 
 ```bash
-cd /mnt/storage/cgh
+cd /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh
 git clone https://github.com/Lifelong-Robot-Learning/LIBERO.git
-cd /mnt/storage/cgh/LIBERO
+cd /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/LIBERO
 pip install -e .
 ```
 
-如果 4090d 无法访问 GitHub，先在其它机器下载 LIBERO 源码压缩包，再传到 `/mnt/storage/cgh/LIBERO`。
-4090d 上没有 3090 那套 NVIDIA EGL shim 记录；如果后续评测遇到 EGL/MuJoCo 报错，先检查：
+如果 4090 无法访问 GitHub，先在其它机器下载 LIBERO 源码压缩包，再传到 `/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/LIBERO`。
+4090 上没有 3090 那套 NVIDIA EGL shim 记录；如果后续评测遇到 EGL/MuJoCo 报错，先检查：
 
 ```bash
 python - <<'PY2'
@@ -576,35 +605,35 @@ PY2
 
 ### 8. 数据生成 sanity check
 
-确认模型和 RLDS 都准备好后，在 4090d 上先小规模跑通数据生成：
+确认模型和 RLDS 都准备好后，在 4090 上先小规模跑通数据生成：
 
 ```bash
-ssh 4090d
+ssh 4090
 source ~/.bashrc
 conda activate specvla
-cd /mnt/storage/cgh/SpecVLA-DFLASH
+cd /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH
 
 CUDA_VISIBLE_DEVICES=0 python openvla/specdecoding/train-scripts/ge_data_all_openvla_token_only_libero_goal.py \
   --gpu_index 0 \
-  --vla_path /mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-goal \
-  --data_root_dir /mnt/storage/cgh/dataset/modified_libero_rlds \
+  --vla_path /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-goal \
+  --data_root_dir /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/dataset/modified_libero_rlds \
   --dataset_name libero_goal_no_noops \
-  --outdir /mnt/storage/cgh/specvla-data/dflash_goal_dataset
+  --outdir /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset
 ```
 
 正式生成结束后检查：
 
 ```bash
-du -sh /mnt/storage/cgh/specvla-data/dflash_goal_dataset
-find /mnt/storage/cgh/specvla-data/dflash_goal_dataset -maxdepth 1 -name 'data_*.ckpt' | wc -l
+du -sh /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset
+find /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset -maxdepth 1 -name 'data_*.ckpt' | wc -l
 ```
 
-历史 4090/3090 的有效样本规模约为 `28.5k`，大小约 `419G`。新 4090d 重新生成后，
+历史 4090/3090 的有效样本规模约为 `28.5k`，大小约 `419G`。新 4090 重新生成后，
 应在实验记录中写清楚实际样本数；不要默认和旧机器完全一致。
 
-### 9. 从 3090 搬训练好的 checkpoint 到 4090d
+### 9. 从 3090 搬训练好的 checkpoint 到 4090
 
-3090 继续负责四卡训练。训练完成后，在本地终端用 `scp -3` 从 3090 搬到 4090d：
+3090 继续负责四卡训练。训练完成后，在本地终端用 `scp -3` 从 3090 搬到 4090：
 
 ```bash
 TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu
@@ -612,15 +641,15 @@ CKPT=epoch_190_step_169670
 
 scp -3 -r \
   3090_wulin:${TRAIN_DIR}/${CKPT} \
-  4090d:/mnt/storage/cgh/specvla-data/${CKPT}
+  4090:/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/${CKPT}
 ```
 
 复制后检查：
 
 ```bash
-ssh 4090d "ls -lh \
-  /mnt/storage/cgh/specvla-data/${CKPT}/dflash_config.json \
-  /mnt/storage/cgh/specvla-data/${CKPT}/pytorch_model.bin"
+ssh 4090 "ls -lh \
+  /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/${CKPT}/dflash_config.json \
+  /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/${CKPT}/pytorch_model.bin"
 ```
 
 ## 服务器分工和训练流程
@@ -629,31 +658,31 @@ ssh 4090d "ls -lh \
 
 | 机器 | GPU 情况 | 主要用途 |
 | --- | --- | --- |
-| 4090d | 新 RTX 4090 服务器 | 主开发、代码调试、数据生成、小规模 sanity check、最终 LIBERO 推理评测。 |
+| 4090 | 新 RTX 4090 服务器 | 主开发、代码调试、数据生成、小规模 sanity check、最终 LIBERO 推理评测。 |
 | 3090 | 8 张 RTX 3090，实验中默认只用 0-3 四张 | 完整 DFLASH 四卡训练。 |
 
-因此，**不要在 README 中把 4090d 写成四卡训练机器**。当前四卡 launcher 固定使用
+因此，**不要在 README 中把 4090 写成四卡训练机器**。当前四卡 launcher 固定使用
 `torchrun --nproc_per_node 4`，实际应该在 3090 上用 `CUDA_VISIBLE_DEVICES=0,1,2,3`
-启动。4090d 如果需要训练，只适合临时做单卡小规模调试，不能直接照搬四卡命令。
+启动。4090 如果需要训练，只适合临时做单卡小规模调试，不能直接照搬四卡命令。
 
 当前固定实验流如下：
 
 ```text
-4090d 维护代码和数据生成 -> GitHub main 固化代码 -> 3090 四卡训练 -> 本地 scp -3 搬 checkpoint 到 4090d -> 4090d 跑五套推理评测
+4090 维护代码和数据生成 -> GitHub main 固化代码 -> 3090 四卡训练 -> 本地 scp -3 搬 checkpoint 到 4090 -> 4090 跑五套推理评测
 ```
 
 3090 的 RTX 3090 对 speculative decoding 的小 kernel、校验和调度开销更敏感，速度结果容易偏低；
-因此正式比较 `SR / Length / Speedup` 时统一使用 4090d。3090 只作为训练吞吐机器。
+因此正式比较 `SR / Length / Speedup` 时统一使用 4090。3090 只作为训练吞吐机器。
 
-### 1. 4090d：主开发、数据生成和单卡调试
+### 1. 4090：主开发、数据生成和单卡调试
 
-4090d 进入服务器和环境：
+4090 进入服务器和环境：
 
 ```bash
-ssh 4090d
+ssh 4090
 source ~/.bashrc
 conda activate specvla
-cd /mnt/storage/cgh/SpecVLA-DFLASH
+cd /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH
 export PYTHONPATH="$PWD"
 ```
 
@@ -671,24 +700,24 @@ openvla/specdecoding/train-scripts/ge_data_all_openvla_token_only_libero_goal.py
 ```bash
 CUDA_VISIBLE_DEVICES=0 python openvla/specdecoding/train-scripts/ge_data_all_openvla_token_only_libero_goal.py \
   --gpu_index 0 \
-  --vla_path /mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-goal \
-  --data_root_dir /mnt/storage/cgh/dataset/modified_libero_rlds \
+  --vla_path /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-goal \
+  --data_root_dir /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/dataset/modified_libero_rlds \
   --dataset_name libero_goal_no_noops \
-  --outdir /mnt/storage/cgh/specvla-data/dflash_goal_dataset
+  --outdir /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset
 ```
 
 训练前确认数据大小和数量：
 
 ```bash
-du -sh /mnt/storage/cgh/specvla-data/dflash_goal_dataset
-find /mnt/storage/cgh/specvla-data/dflash_goal_dataset \
+du -sh /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset
+find /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset \
   -maxdepth 1 -name 'data_*.ckpt' | wc -l
 ```
 
-旧 4090 历史数据目录状态如下；4090d 重新生成或迁移后必须重新记录实际数值：
+旧 4090 历史数据目录状态如下；新 4090 重新生成或迁移后必须重新记录实际数值：
 
 ```text
-/mnt/storage/cgh/specvla-data/dflash_goal_dataset
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset
 大小: 419G
 样本数: 28,639 个 data_*.ckpt
 ```
@@ -782,7 +811,7 @@ latest_checkpoint.txt -> epoch_200_step_178600
 run_config.json 记录: world_size=4, global_effective_batch=32, train_files=28576
 ```
 
-4090d 和 3090 的数据文件数可能不完全相同，因此写实验记录时必须记录本机实际
+4090 和 3090 的数据文件数可能不完全相同，因此写实验记录时必须记录本机实际
 `find ... | wc -l` 结果，不要默认两台机器的数据集完全一致。
 
 训练输出中的重要文件：
@@ -799,15 +828,15 @@ run_config.json 记录: world_size=4, global_effective_batch=32, train_files=285
 `latest_checkpoint.txt` 指向默认评测 checkpoint。若中断后继续训练，应使用同一个 `--output_dir`
 和 `--resume_from_checkpoint latest`，不要在对比实验中静默改变 world size、有效 batch 或 scheduler 设置。
 
-### 3. 本地：把 3090 checkpoint 搬到 4090d
+### 3. 本地：把 3090 checkpoint 搬到 4090
 
 训练完成后，在 **本地终端** 执行远端到远端复制。方向必须是：
 
 ```text
-3090_wulin:/data/.../checkpoint -> 4090d:/mnt/storage/cgh/specvla-data/checkpoint
+3090_wulin:/data/.../checkpoint -> 4090:/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/checkpoint
 ```
 
-推荐加 `-3`，让数据经由本地转发，不要求 3090 能直接连到 4090d：
+推荐加 `-3`，让数据经由本地转发，不要求 3090 能直接连到 4090：
 
 ```bash
 TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu
@@ -815,7 +844,7 @@ CKPT=epoch_190_step_169670
 
 scp -3 -r \
   3090_wulin:${TRAIN_DIR}/${CKPT} \
-  4090d:/mnt/storage/cgh/specvla-data/${CKPT}
+  4090:/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/${CKPT}
 ```
 
 如果要复制 3090 当前 `latest_checkpoint.txt` 指向的最新 checkpoint，可以在本地终端执行：
@@ -826,15 +855,15 @@ CKPT=$(ssh 3090_wulin "basename \"\$(cat ${TRAIN_DIR}/latest_checkpoint.txt)\"")
 
 scp -3 -r \
   3090_wulin:${TRAIN_DIR}/${CKPT} \
-  4090d:/mnt/storage/cgh/specvla-data/${CKPT}
+  4090:/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/${CKPT}
 ```
 
-复制后检查 4090d 上的 checkpoint 是否完整：
+复制后检查 4090 上的 checkpoint 是否完整：
 
 ```bash
-ssh 4090d "ls -lh \
-  /mnt/storage/cgh/specvla-data/${CKPT}/dflash_config.json \
-  /mnt/storage/cgh/specvla-data/${CKPT}/pytorch_model.bin"
+ssh 4090 "ls -lh \
+  /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/${CKPT}/dflash_config.json \
+  /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/${CKPT}/pytorch_model.bin"
 ```
 
 保留两个旧诊断 launcher，仅用于 controlled ablation，不作为当前默认 recipe。注意它们目前仍写死了
@@ -853,7 +882,7 @@ openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_consistency.s
 openvla/specdecoding/decode-scripts/
 ```
 
-这些脚本共享 `libero_eval_common.sh`。它会自动选择 4090d、3090 或旧 4090 路径，设置 `PYTHONPATH`，
+这些脚本共享 `libero_eval_common.sh`。它会自动选择新 4090、3090 或历史旧 4090 路径，设置 `PYTHONPATH`，
 配置 LIBERO，并在 3090 上优先使用本地 NVIDIA 570 EGL shim。当前固定流程虽然不在 3090
 做正式速度评测，但保留这些路径可以方便必要时做 sanity check：
 
@@ -870,16 +899,16 @@ DFLASH run dir: /data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer
 Logs: /data/wulin/c/specvla-data/eval_logs
 ```
 
-4090d 正式评测默认路径：
+4090 正式评测默认路径：
 
 ```text
-OpenVLA goal model: /mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-goal
-SpecVLA checkpoint: /mnt/storage/cgh/specvla-data/ckpt_libero_goal_debug_ckpt
-DFLASH copied checkpoint example: /mnt/storage/cgh/specvla-data/epoch_190_step_169670
-Logs: /mnt/storage/cgh/specvla-data/eval_logs
+OpenVLA goal model: /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-goal
+SpecVLA checkpoint: /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_libero_goal_debug_ckpt
+DFLASH copied checkpoint example: /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/epoch_190_step_169670
+Logs: /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs
 ```
 
-如果权重被复制或重命名，可以用下面变量覆盖。DFlash 评测用 `SPEC_CKPT` 指向从 3090 搬到 4090d 的
+如果权重被复制或重命名，可以用下面变量覆盖。DFlash 评测用 `SPEC_CKPT` 指向从 3090 搬到 4090 的
 checkpoint；SpecVLA baseline 才需要 `SPECVLA_GOAL_CKPT`：
 
 ```bash
@@ -887,7 +916,7 @@ SPEC_CKPT=/path/to/goal_ckpt
 SPECVLA_GOAL_CKPT=/path/to/goal_ckpt
 ```
 
-### Goal 五套核心评测
+### Goal 七套核心评测
 
 | 实验 | Launcher | Python 入口 | Draft backend | Acceptance | 日志子目录 |
 | --- | --- | --- | --- | --- | --- |
@@ -896,6 +925,8 @@ SPECVLA_GOAL_CKPT=/path/to/goal_ckpt
 | SpecVLA relaxed baseline | `run_specvla_relaxed_libero_goal_eval.sh` | `run_libero_goal_Spec_Relaxed.py` | `eagle` | relaxed，默认 `accept_threshold=9` | `specvla_relaxed` |
 | DFLASH strict ablation | `run_dflash_strict_libero_goal_eval.sh` | `run_libero_goal_Spec.py` | `dflash` | strict，`accept_threshold=0` | `dflash_strict` |
 | DFLASH relaxed 当前方法 | `run_dflash_libero_goal_eval.sh` | `run_libero_goal_Spec_Relaxed.py` | `dflash` | relaxed，默认 `accept_threshold=9` | `dflash_relaxed` |
+| DFLASH CADhead strict | `run_dflash_residual_strict_libero_goal_eval.sh` | `run_libero_goal_Spec.py` | `dflash` | strict，开启 residual sampling | `dflash_strict` |
+| DFLASH CADhead relaxed | `run_dflash_residual_libero_goal_eval.sh` | `run_libero_goal_Spec_Relaxed.py` | `dflash` | relaxed，开启 residual sampling | `dflash_relaxed` |
 
 ### 速度计时口径
 
@@ -934,18 +965,18 @@ TIMING_SCOPE=full_suite SYNC_CUDA_TIMING=True \
 | Spatial | `run_openvla_ar_libero_spatial_eval.sh` | `run_specvla_libero_spatial_eval.sh` | `run_specvla_relaxed_libero_spatial_eval.sh` |
 | Long (`libero_10`) | `run_openvla_ar_libero_10_eval.sh` | `run_specvla_libero_10_eval.sh` | `run_specvla_relaxed_libero_10_eval.sh` |
 
-这些 launcher 会自动选择 4090d 上的 suite-specific OpenVLA 权重和 SpecVLA checkpoint，例如：
+这些 launcher 会自动选择 4090 上的 suite-specific OpenVLA 权重和 SpecVLA checkpoint，例如：
 
 ```text
-OpenVLA Object  : /mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-object
-SpecVLA Object  : /mnt/storage/cgh/specvla-data/specvla_checkpoint/object
-OpenVLA Spatial : /mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-spatial
-SpecVLA Spatial : /mnt/storage/cgh/specvla-data/specvla_checkpoint/spatial
-OpenVLA Long    : /mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-10
-SpecVLA Long    : /mnt/storage/cgh/specvla-data/specvla_checkpoint/10
+OpenVLA Object  : /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-object
+SpecVLA Object  : /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/specvla_checkpoint/object
+OpenVLA Spatial : /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-spatial
+SpecVLA Spatial : /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/specvla_checkpoint/spatial
+OpenVLA Long    : /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-10
+SpecVLA Long    : /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/specvla_checkpoint/10
 ```
 
-`libero_90` 暂未写一键脚本，因为当前 4090d 没有准备对应的 OpenVLA fine-tuned model 和 SpecVLA
+`libero_90` 暂未写一键脚本，因为当前 4090 没有准备对应的 OpenVLA fine-tuned model 和 SpecVLA
 checkpoint。若后续补齐权重，可用 `init_libero_eval_env libero_90` 按同一模板扩展。
 
 AR baseline 使用标准 OpenVLA 模型，故意不向模型传 `generate_mode`、`return_dflash_stats`
@@ -955,8 +986,8 @@ AR baseline 使用标准 OpenVLA 模型，故意不向模型传 `generate_mode`�
 ### 评测机器约定
 
 正式速度评测默认 **不在 3090 上跑**。3090 推理时 SpecVLA/DFlash 的小 kernel、校验和调度开销
-会明显吃掉投机解码收益，曾观察到 strict/relaxed speedup 都低于 4090/4090d。3090 可以临时做成功率 sanity check，
-但论文式 `SR / Length / Speedup` 统一在 4090d 上记录。
+会明显吃掉投机解码收益，曾观察到 strict/relaxed speedup 明显偏低。3090 可以临时做成功率 sanity check，
+但论文式 `SR / Length / Speedup` 统一在 4090 上记录。
 
 ### 评测输出和覆盖变量
 
@@ -1012,25 +1043,26 @@ USE_WANDB
 SEED
 ```
 
-### 4. 4090d：统一推理评测
+### 4. 4090：统一推理评测
 
-4090d 是固定推理评测机器。每次从 3090 搬来 checkpoint 后，在 4090d 上跑 Goal 的 AR、SpecVLA strict、
-SpecVLA relaxed、DFLASH strict、DFLASH relaxed 五套实验，最终比较 `SR / Length / Speedup`。
+4090 是固定推理评测机器。每次从 3090 搬来 checkpoint 后，在 4090 上跑 Goal 的 AR、SpecVLA strict、
+SpecVLA relaxed、DFLASH strict、DFLASH relaxed、DFLASH CADhead strict、DFLASH CADhead relaxed
+七套实验，最终比较 `SR / Length / Speedup`。
 其它 suite 先跑 AR / SpecVLA baseline，作为后续扩展 DFLASH 的公平对照。
 
 进入环境：
 
 ```bash
-ssh 4090d
+ssh 4090
 source ~/.bashrc
 conda activate specvla
-cd /mnt/storage/cgh/SpecVLA-DFLASH
+cd /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH
 ```
 
-设置本次要评测的 DFLASH checkpoint。这里以从 3090 搬来的第 190 epoch 为例：
+设置本次要评测的 DFLASH checkpoint。这里以当前 weak-path b16 的第 200 epoch 为例：
 
 ```bash
-export DFLASH_CKPT=/mnt/storage/cgh/specvla-data/epoch_190_step_169670
+export DFLASH_CKPT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/epoch_200_step_089400
 export NUM_TRIALS_PER_TASK=50
 export CUDA_VISIBLE_DEVICES=0
 ```
@@ -1041,8 +1073,9 @@ export CUDA_VISIBLE_DEVICES=0
 screen -S eval_dflash_strict
 ```
 
-五套评测命令如下。DFlash 两个命令必须显式传 `SPEC_CKPT="${DFLASH_CKPT}"`，确保评测的是刚从
-3090 复制来的权重。
+七套评测命令如下。DFlash 四个命令必须显式传 `SPEC_CKPT="${DFLASH_CKPT}"`，确保评测的是刚从
+3090 复制来的权重。建议串行跑，不要同时启动多个评测，否则速度数字会被 CPU、MuJoCo、图像预处理和
+Python 调度共享开销污染。
 
 1. OpenVLA AR baseline：
 
@@ -1081,6 +1114,22 @@ CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
   bash openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh
 ```
 
+6. DFLASH CADhead strict：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  SPEC_CKPT="${DFLASH_CKPT}" \
+  bash openvla/specdecoding/decode-scripts/run_dflash_residual_strict_libero_goal_eval.sh
+```
+
+7. DFLASH CADhead relaxed：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  SPEC_CKPT="${DFLASH_CKPT}" \
+  bash openvla/specdecoding/decode-scripts/run_dflash_residual_libero_goal_eval.sh
+```
+
 如果只是想在 3090 上快速 sanity check，可以把五套评测分别绑到不同 GPU 并行跑；但这会共享 CPU、
 MuJoCo、图像预处理、磁盘和 Python 调度资源，速度数值只作工程参考。2026-07-05 的 3090 临时并行评测
 就是这种口径，不应直接写成论文速度。
@@ -1113,10 +1162,13 @@ CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
   bash openvla/specdecoding/decode-scripts/run_specvla_relaxed_libero_10_eval.sh
 ```
 
-评测结束后，汇总最新五个 summary：
+评测结束后，汇总 summary。由于普通 DFLASH 和 CADhead 都写入 `dflash_strict` / `dflash_relaxed`
+目录，不能只靠 `ls -t | head -1` 自动判断是哪一组；刚跑完一整套时可以先这样取最新文件，
+正式记录时必须手动核对 `run_id`、`dflash_use_causal_residual_sampling`、`SPEC_CKPT` 和
+`accept_threshold`：
 
 ```bash
-LOG_DIR=/mnt/storage/cgh/specvla-data/eval_logs
+LOG_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs
 
 AR=$(ls -t ${LOG_DIR}/openvla_ar/*_summary.json | head -1)
 SPEC=$(ls -t ${LOG_DIR}/specvla_strict/*_summary.json | head -1)
@@ -1128,8 +1180,12 @@ python openvla/specdecoding/test-speed/summarize_eval_summaries.py \
   --ar-summary "$AR" "$SPEC" "$SPEC_R" "$DFLASH" "$DFLASH_R"
 ```
 
-如果不是刚跑完五套实验，不要盲目使用 `ls -t | head -1`；应手动确认每个 summary 文件的时间戳、
-`run_id`、`SPEC_CKPT` 和 `accept_threshold` 是否属于同一组对比。
+CADhead 的两个 summary 也在 `dflash_strict` / `dflash_relaxed` 目录里，识别依据是 summary JSON 中：
+
+```text
+dflash_use_causal_residual_sampling = true
+generation.use_causal_residual_sampling = true
+```
 
 ## 3090 LIBERO EGL 问题记录
 
@@ -1169,18 +1225,18 @@ bash openvla/specdecoding/decode-scripts/setup_3090_nvidia_egl_shim.sh
 当前维护逻辑：
 
 ```text
-代码: 4090d 主开发/提交机器 -> GitHub main -> 3090 按需同步训练代码
-权重: 3090 四卡训练输出 -> 本地 scp -3 -> 4090d 推理评测
+代码: 4090 主开发/提交机器 -> GitHub main -> 3090 按需同步训练代码
+权重: 3090 四卡训练输出 -> 本地 scp -3 -> 4090 推理评测
 ```
 
 后续默认建议：
 
-1. 在 4090d 上做代码或文档改动并验证。
+1. 在 4090 上做代码或文档改动并验证。
 2. 只提交与当前改动相关的文件，推送到
    [guanghaichen/SpecVLA-DFLASH](https://github.com/guanghaichen/SpecVLA-DFLASH)。
-3. 不把未提交的 4090d 改动直接复制到 3090。
+3. 不把未提交的 4090 改动直接复制到 3090。
 4. GitHub 包含目标 commit 后，再按训练需要同步 3090。
-5. 3090 训练完只复制 checkpoint 到 4090d；不要把 3090 的临时改动反向覆盖 4090d 代码。
+5. 3090 训练完只复制 checkpoint 到 4090；不要把 3090 的临时改动反向覆盖 4090 代码。
 
 ### 服务器 deploy key 和 GitHub 同步
 
@@ -1246,7 +1302,7 @@ git rebase origin/main
 ```bash
 grep -RIn "<<<<<<<\|=======\|>>>>>>>" README.md openvla || true
 git diff --check
-# 手动保留两边真正需要的内容，尤其不要把 4090d 路径回退成旧 4090 路径
+# 手动保留两边真正需要的内容，尤其不要把 4090 路径回退成旧 4090 路径
 git add <resolved-files>
 GIT_EDITOR=true git rebase --continue
 ```
@@ -1265,7 +1321,7 @@ git push origin main
 
 2026-07-05 的一次实际经验：3090 原本 `origin` 是 HTTPS，且没有 GitHub 凭据，导致无法推送；
 配置 deploy key 后成功把 `main` 推到 GitHub。之后 3090 可以直接读写私有仓库，但原则上仍然只在需要同步
-训练脚本或紧急修复时从 3090 推送；常规开发优先放在 4090d。
+训练脚本或紧急修复时从 3090 推送；常规开发优先放在 4090。
 
 ### 新服务器迁移检查表
 

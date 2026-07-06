@@ -29,12 +29,21 @@ init_libero_eval_env() {
 
   if [[ -d "/data/wulin" ]]; then
     DEFAULT_VLA_PATH="/data/wulin/hf_files/openvla-7b-finetuned-libero-${TASK_SUITE_SLUG}"
-    DEFAULT_DFLASH_OUTPUT_DIR="/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu"
+    DEFAULT_DFLASH_OUTPUT_DIR="/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu"
     DEFAULT_SPECVLA_CKPT="/data/wulin/c/specvla-data/specvla_checkpoint/${TASK_SUITE_SLUG}"
     DEFAULT_LOG_DIR="/data/wulin/c/specvla-data/eval_logs"
     DEFAULT_LIBERO_PATH="/data/wulin/c/LIBERO"
     DEFAULT_NVIDIA_EGL_SHIM_DIR="/data/wulin/c/nvidia-egl-570.133.07/slim-lib"
     DEFAULT_NVIDIA_EGL_VENDOR_JSON="/data/wulin/c/nvidia-egl-570.133.07/egl_vendor.d/10_nvidia_570.json"
+  elif [[ -d "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh" ]]; then
+    DEFAULT_ROOT="/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh"
+    DEFAULT_VLA_PATH="${DEFAULT_ROOT}/hf_files/openvla-7b-finetuned-libero-${TASK_SUITE_SLUG}"
+    DEFAULT_DFLASH_OUTPUT_DIR="${DEFAULT_ROOT}/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu"
+    DEFAULT_SPECVLA_CKPT="${DEFAULT_ROOT}/specvla-data/specvla_checkpoint/${TASK_SUITE_SLUG}"
+    DEFAULT_LOG_DIR="${DEFAULT_ROOT}/specvla-data/eval_logs"
+    DEFAULT_LIBERO_PATH="${DEFAULT_ROOT}/LIBERO"
+    DEFAULT_NVIDIA_EGL_SHIM_DIR=""
+    DEFAULT_NVIDIA_EGL_VENDOR_JSON=""
   elif [[ -d "/mnt/storage/cgh" ]]; then
     DEFAULT_VLA_PATH="/mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-${TASK_SUITE_SLUG}"
     DEFAULT_DFLASH_OUTPUT_DIR="/mnt/storage/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu"

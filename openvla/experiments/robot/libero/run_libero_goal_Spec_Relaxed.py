@@ -128,6 +128,7 @@ class GenerateConfig:
     dflash_num_draft_layers: int = 5
     dflash_target_layer_ids: Optional[list[int]] = None
     dflash_mask_token_id: Optional[int] = None
+    dflash_use_causal_residual_sampling: bool = False
     #################################################################################################################
     # LIBERO environment-specific parameters
     #################################################################################################################

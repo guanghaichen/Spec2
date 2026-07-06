@@ -104,6 +104,7 @@ def summarize_generation_stats(step_stats_list):
 
     return {
         "backend": valid_stats[0].get("backend"),
+        "use_causal_residual_sampling": valid_stats[0].get("use_causal_residual_sampling"),
         "num_steps": len(valid_stats),
         "num_blocks": total_blocks,
         "generated_tokens": total_generated,
@@ -145,6 +146,9 @@ def write_eval_summary(
         "accept_threshold": getattr(cfg, "accept_threshold", None),
         "dflash_block_size": getattr(cfg, "dflash_block_size", None),
         "dflash_num_draft_layers": getattr(cfg, "dflash_num_draft_layers", None),
+        "dflash_use_causal_residual_sampling": getattr(
+            cfg, "dflash_use_causal_residual_sampling", None
+        ),
         "pretrained_checkpoint": str(cfg.pretrained_checkpoint),
         "spec_checkpoint": str(getattr(cfg, "spec_checkpoint", "")),
         "num_trials_per_task": cfg.num_trials_per_task,

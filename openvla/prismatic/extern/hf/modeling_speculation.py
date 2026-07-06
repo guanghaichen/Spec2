@@ -562,6 +562,7 @@ class SpecVLAforActionPrediction(nn.Module):
             dflash_action_dim=7,# action token维度数，用于DFlash action-dimension embedding
             dflash_include_anchor_hidden=False,# 是否启用SpecVLA式当前anchor hidden注入
             dflash_selected_hidden_variant="target_layers",# DFlash条件hidden层选择，默认保持原始target layers
+            dflash_use_causal_residual_sampling=False,# 是否在推理采样时启用前序token残差修正
     ):
 
         super().__init__()
@@ -574,6 +575,7 @@ class SpecVLAforActionPrediction(nn.Module):
         self.draft_backend = draft_backend
         self.dflash_include_anchor_hidden = dflash_include_anchor_hidden
         self.dflash_selected_hidden_variant = normalize_selected_hidden_variant(dflash_selected_hidden_variant)
+        self.dflash_use_causal_residual_sampling = dflash_use_causal_residual_sampling
         self.dflash_causal_residual_type = "none"
         self.dflash_causal_residual_rank = 256
         self.dflash_causal_residual_scale = 1.0
@@ -969,6 +971,7 @@ class SpecVLAforActionPrediction(nn.Module):
             "backend": "dflash",
             "block_size": block_size,
             "generated_tokens": max_new_tokens,
+            "use_causal_residual_sampling": bool(self.dflash_use_causal_residual_sampling),
             "num_blocks": num_blocks,
             "bootstrapped_tokens": 1,
             "progressed_tokens": progressed_tokens,
@@ -1130,8 +1133,20 @@ class SpecVLAforActionPrediction(nn.Module):
                 ctx_attention_mask=None,
                 action_position_ids=action_position_ids,
             )
-            draft_logits = self.base_model.language_model.lm_head(draft_hidden)
-            proposed_tokens = dflash_sample(draft_logits, temperature=0.0)
+            if (
+                self.dflash_use_causal_residual_sampling
+                and getattr(self.ea_layer, "causal_residual_enabled", False)
+            ):
+                proposed_tokens, draft_logits = self.ea_layer.sample_with_causal_residual(
+                    hidden_states=draft_hidden,
+                    first_prev_token_ids=anchor_input_ids,
+                    lm_head=self.base_model.language_model.lm_head,
+                    temperature=0.0,
+                    start_index=self.dflash_causal_residual_start_index,
+                )
+            else:
+                draft_logits = self.base_model.language_model.lm_head(draft_hidden)
+                proposed_tokens = dflash_sample(draft_logits, temperature=0.0)
 
             # slot0 的 target posterior 已经由 target decode(t_anchor) 得到；
             # 后续 slot 用 target 并行校验 proposed t_{anchor+1}...
@@ -1230,6 +1245,7 @@ class SpecVLAforActionPrediction(nn.Module):
             "include_anchor_hidden": True,
             "causal_residual_type": getattr(self.ea_layer, "causal_residual_type", "none"),
             "causal_residual_start_index": self.dflash_causal_residual_start_index,
+            "use_causal_residual_sampling": bool(self.dflash_use_causal_residual_sampling),
             "num_blocks": num_blocks,
             "bootstrapped_tokens": 1,
             "progressed_tokens": progressed_tokens,

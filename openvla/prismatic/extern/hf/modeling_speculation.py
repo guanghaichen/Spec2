@@ -885,16 +885,19 @@ class SpecVLAforActionPrediction(nn.Module):
                 ctx_attention_mask=None,
                 action_position_ids=action_position_ids,
             )
-            draft_logits = self.base_model.language_model.lm_head(draft_hidden)
-            if getattr(self.ea_layer, "causal_residual_enabled", False):
+            if (
+                self.dflash_use_causal_residual_sampling
+                and getattr(self.ea_layer, "causal_residual_enabled", False)
+            ):
                 proposed_tokens, draft_logits = self.ea_layer.sample_with_causal_residual(
                     hidden_states=draft_hidden,
-                    first_prev_token_ids=anchor_input_ids,
+                    first_prev_token_ids=block_input_ids[:, :1],
                     lm_head=self.base_model.language_model.lm_head,
                     temperature=0.0,
                     start_index=self.dflash_causal_residual_start_index,
                 )
             else:
+                draft_logits = self.base_model.language_model.lm_head(draft_hidden)
                 proposed_tokens = dflash_sample(draft_logits, temperature=0.0)
             
             # 目标模型验证

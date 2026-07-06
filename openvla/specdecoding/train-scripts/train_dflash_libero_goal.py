@@ -197,6 +197,10 @@ def parse_args():
         default=5,
         help="refined hidden 直接监督的最大目标 token 位置（1-based）",
     )
+    parser.add_argument("--residual_token_ce_w", type=float, default=0.0, help="残差修正后 logits 的 hard token CE 权重")
+    parser.add_argument("--residual_token_ce_min_position", type=int, default=2)
+    parser.add_argument("--residual_token_ce_max_position", type=int, default=5)
+    parser.add_argument("--residual_token_ce_label_smoothing", type=float, default=0.0)
     parser.add_argument(
         "--weak_far_slot_boost",
         type=float,
@@ -517,6 +521,7 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
             "specvla_anchor_hidden_main+teacher_soft_ce"
             + ("+causal_residual_cad" if args.causal_residual_cad_w > 0 else "")
             + ("+weak_path_refined_hidden" if args.refined_hidden_w > 0 else "")
+            + ("+residual_token_ce" if args.residual_token_ce_w > 0 else "")
             + (
                 "+weak_path_loss_boost"
                 if args.weak_far_slot_boost != 1.0 or args.anchor0_p2_boost != 1.0
@@ -547,6 +552,10 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "refined_hidden_loss_type": args.refined_hidden_loss_type,
         "refined_hidden_min_position": args.refined_hidden_min_position,
         "refined_hidden_max_position": args.refined_hidden_max_position,
+        "residual_token_ce_w": args.residual_token_ce_w,
+        "residual_token_ce_min_position": args.residual_token_ce_min_position,
+        "residual_token_ce_max_position": args.residual_token_ce_max_position,
+        "residual_token_ce_label_smoothing": args.residual_token_ce_label_smoothing,
         "weak_far_slot_boost": args.weak_far_slot_boost,
         "anchor0_p2_boost": args.anchor0_p2_boost,
         "slot_decay": args.slot_decay,
@@ -856,6 +865,10 @@ def compute_loss_and_accuracy(
     causal_residual_cad_pairs = torch.zeros((), device=device, dtype=torch.float32)
     refined_hidden_sum = torch.zeros((), device=device, dtype=torch.float32)
     refined_hidden_weight_sum = torch.zeros((), device=device, dtype=torch.float32)
+    residual_token_ce_sum = torch.zeros((), device=device, dtype=torch.float32)
+    residual_token_ce_weight_sum = torch.zeros((), device=device, dtype=torch.float32)
+    residual_token_ce_correct = torch.zeros((), device=device, dtype=torch.float32)
+    residual_token_ce_total = torch.zeros((), device=device, dtype=torch.float32)
     weight_sum = torch.zeros((), device=device, dtype=torch.float32)
     total_positions = torch.zeros((), device=device, dtype=torch.float32)
     total_correct = torch.zeros((), device=device, dtype=torch.float32)
@@ -1072,6 +1085,27 @@ def compute_loss_and_accuracy(
                 refined_hidden_sum += (refined_hidden_reg * refined_weight).sum()
                 refined_hidden_weight_sum += current_refined_weight
 
+        if args.residual_token_ce_w > 0 and args.causal_residual_type != "none":
+            residual_ce_pos_mask = (
+                (local_indices >= args.causal_residual_start_index)
+                & (target_token_positions >= args.residual_token_ce_min_position)
+                & (target_token_positions <= args.residual_token_ce_max_position)
+            )
+            residual_ce_weight = loss_weight * residual_ce_pos_mask.unsqueeze(0).float()
+            current_residual_ce_weight = residual_ce_weight.sum()
+            if current_residual_ce_weight.item() > 0:
+                residual_ce = F.cross_entropy(
+                    student_logits.reshape(-1, student_logits.shape[-1]),
+                    target_tokens.reshape(-1),
+                    reduction="none",
+                    label_smoothing=args.residual_token_ce_label_smoothing,
+                ).view_as(target_tokens)
+                residual_token_ce_sum += (residual_ce * residual_ce_weight).sum()
+                residual_token_ce_weight_sum += current_residual_ce_weight
+                residual_ce_valid_mask = valid_mask.bool() & residual_ce_pos_mask.unsqueeze(0)
+                residual_token_ce_correct += (correct_mask & residual_ce_valid_mask).sum().float()
+                residual_token_ce_total += residual_ce_valid_mask.sum().float()
+
         if args.anchor_consistency_w > 0:
             for local_pos in range(max_block_len):
                 target_pos = teacher_start + local_pos
@@ -1179,12 +1213,14 @@ def compute_loss_and_accuracy(
     consistency_denom = anchor_consistency_weight_sum.clamp_min(1.0)
     residual_cad_denom = causal_residual_cad_weight_sum.clamp_min(1.0)
     refined_hidden_denom = refined_hidden_weight_sum.clamp_min(1.0)
+    residual_token_ce_denom = residual_token_ce_weight_sum.clamp_min(1.0)
     soft_loss = soft_sum / loss_denom
     hidden_loss = hidden_sum / loss_denom
     cos_loss = cos_sum / loss_denom
     anchor_consistency_loss = anchor_consistency_sum / consistency_denom
     causal_residual_cad_loss = causal_residual_cad_sum / residual_cad_denom
     refined_hidden_loss = refined_hidden_sum / refined_hidden_denom
+    residual_token_ce_loss = residual_token_ce_sum / residual_token_ce_denom
     hidden_component = args.hidden_w * hidden_loss
     soft_component = args.soft_w * soft_loss
     cos_component = args.cos_w * cos_loss
@@ -1201,6 +1237,7 @@ def compute_loss_and_accuracy(
         args.causal_residual_cad_w * causal_residual_cad_scale * causal_residual_cad_loss
     )
     refined_hidden_component = args.refined_hidden_w * refined_hidden_loss
+    residual_token_ce_component = args.residual_token_ce_w * residual_token_ce_loss
     total_loss = (
         hidden_component
         + soft_component
@@ -1208,9 +1245,11 @@ def compute_loss_and_accuracy(
         + anchor_consistency_component
         + causal_residual_cad_component
         + refined_hidden_component
+        + residual_token_ce_component
     )
     accuracy = total_correct / metric_denom
     base_accuracy = base_total_correct / metric_denom
+    residual_token_ce_accuracy = residual_token_ce_correct / residual_token_ce_total.clamp_min(1.0)
 
     return {
         "loss": total_loss,
@@ -1220,12 +1259,14 @@ def compute_loss_and_accuracy(
         "anchor_consistency_loss": anchor_consistency_loss,
         "causal_residual_cad_loss": causal_residual_cad_loss,
         "refined_hidden_loss": refined_hidden_loss,
+        "residual_token_ce_loss": residual_token_ce_loss,
         "soft_component": soft_component,
         "hidden_component": hidden_component,
         "cos_component": cos_component,
         "anchor_consistency_component": anchor_consistency_component,
         "causal_residual_cad_component": causal_residual_cad_component,
         "refined_hidden_component": refined_hidden_component,
+        "residual_token_ce_component": residual_token_ce_component,
         "anchor_consistency_scale": anchor_consistency_scale.detach(),
         "causal_residual_cad_scale": causal_residual_cad_scale.detach(),
         "anchor_consistency_pairs": anchor_consistency_pairs.detach(),
@@ -1233,6 +1274,7 @@ def compute_loss_and_accuracy(
         "refined_hidden_weight_sum": refined_hidden_weight_sum.detach(),
         "accuracy": accuracy,
         "base_accuracy": base_accuracy,
+        "residual_token_ce_accuracy": residual_token_ce_accuracy,
         "anchor_correct": anchor_correct.detach(),
         "anchor_total": anchor_total.detach(),
         "position_correct": position_correct.detach(),
@@ -1626,18 +1668,21 @@ def main():
             train_anchor_consistency_sum = 0.0
             train_causal_residual_cad_sum = 0.0
             train_refined_hidden_sum = 0.0
+            train_residual_token_ce_sum = 0.0
             train_soft_component_sum = 0.0
             train_hidden_component_sum = 0.0
             train_cos_component_sum = 0.0
             train_anchor_consistency_component_sum = 0.0
             train_causal_residual_cad_component_sum = 0.0
             train_refined_hidden_component_sum = 0.0
+            train_residual_token_ce_component_sum = 0.0
             train_anchor_consistency_scale_sum = 0.0
             train_causal_residual_cad_scale_sum = 0.0
             train_anchor_consistency_pairs_sum = 0.0
             train_causal_residual_cad_pairs_sum = 0.0
             train_acc_sum = 0.0
             train_base_acc_sum = 0.0
+            train_residual_token_ce_acc_sum = 0.0
             train_detail_accumulator = None
             train_log_steps = 0
             pbar = tqdm(train_loader, desc=f"train {epoch}/{args.num_epochs}", dynamic_ncols=True) if is_main else train_loader
@@ -1676,18 +1721,21 @@ def main():
                 train_anchor_consistency_sum += log_metrics["anchor_consistency_loss"].item()
                 train_causal_residual_cad_sum += log_metrics["causal_residual_cad_loss"].item()
                 train_refined_hidden_sum += log_metrics["refined_hidden_loss"].item()
+                train_residual_token_ce_sum += log_metrics["residual_token_ce_loss"].item()
                 train_soft_component_sum += log_metrics["soft_component"].item()
                 train_hidden_component_sum += log_metrics["hidden_component"].item()
                 train_cos_component_sum += log_metrics["cos_component"].item()
                 train_anchor_consistency_component_sum += log_metrics["anchor_consistency_component"].item()
                 train_causal_residual_cad_component_sum += log_metrics["causal_residual_cad_component"].item()
                 train_refined_hidden_component_sum += log_metrics["refined_hidden_component"].item()
+                train_residual_token_ce_component_sum += log_metrics["residual_token_ce_component"].item()
                 train_anchor_consistency_scale_sum += log_metrics["anchor_consistency_scale"].item()
                 train_causal_residual_cad_scale_sum += log_metrics["causal_residual_cad_scale"].item()
                 train_anchor_consistency_pairs_sum += log_metrics["anchor_consistency_pairs"].item()
                 train_causal_residual_cad_pairs_sum += log_metrics["causal_residual_cad_pairs"].item()
                 train_acc_sum += log_metrics["accuracy"].item()
                 train_base_acc_sum += log_metrics["base_accuracy"].item()
+                train_residual_token_ce_acc_sum += log_metrics["residual_token_ce_accuracy"].item()
                 train_detail_accumulator = accumulate_detail_metrics(train_detail_accumulator, log_metrics)
                 train_log_steps += 1
 
@@ -1715,18 +1763,21 @@ def main():
                             "train/anchor_consistency_loss": train_anchor_consistency_sum / denom_log_steps,
                             "train/causal_residual_cad_loss": train_causal_residual_cad_sum / denom_log_steps,
                             "train/refined_hidden_loss": train_refined_hidden_sum / denom_log_steps,
+                            "train/residual_token_ce_loss": train_residual_token_ce_sum / denom_log_steps,
                             "train/soft_component": train_soft_component_sum / denom_log_steps,
                             "train/hidden_component": train_hidden_component_sum / denom_log_steps,
                             "train/cos_component": train_cos_component_sum / denom_log_steps,
                             "train/anchor_consistency_component": train_anchor_consistency_component_sum / denom_log_steps,
                             "train/causal_residual_cad_component": train_causal_residual_cad_component_sum / denom_log_steps,
                             "train/refined_hidden_component": train_refined_hidden_component_sum / denom_log_steps,
+                            "train/residual_token_ce_component": train_residual_token_ce_component_sum / denom_log_steps,
                             "train/anchor_consistency_scale": train_anchor_consistency_scale_sum / denom_log_steps,
                             "train/causal_residual_cad_scale": train_causal_residual_cad_scale_sum / denom_log_steps,
                             "train/anchor_consistency_pairs_per_batch": train_anchor_consistency_pairs_sum / denom_log_steps,
                             "train/causal_residual_cad_pairs_per_batch": train_causal_residual_cad_pairs_sum / denom_log_steps,
                             "train/accuracy": train_acc_sum / denom_log_steps,
                             "train/base_accuracy": train_base_acc_sum / denom_log_steps,
+                            "train/residual_token_ce_accuracy": train_residual_token_ce_acc_sum / denom_log_steps,
                             "train/lr": scheduler.get_last_lr()[0],
                         }
                         train_payload.update(detail_metrics_to_log("train", train_detail_accumulator))
@@ -1766,18 +1817,21 @@ def main():
                         train_anchor_consistency_sum = 0.0
                         train_causal_residual_cad_sum = 0.0
                         train_refined_hidden_sum = 0.0
+                        train_residual_token_ce_sum = 0.0
                         train_soft_component_sum = 0.0
                         train_hidden_component_sum = 0.0
                         train_cos_component_sum = 0.0
                         train_anchor_consistency_component_sum = 0.0
                         train_causal_residual_cad_component_sum = 0.0
                         train_refined_hidden_component_sum = 0.0
+                        train_residual_token_ce_component_sum = 0.0
                         train_anchor_consistency_scale_sum = 0.0
                         train_causal_residual_cad_scale_sum = 0.0
                         train_anchor_consistency_pairs_sum = 0.0
                         train_causal_residual_cad_pairs_sum = 0.0
                         train_acc_sum = 0.0
                         train_base_acc_sum = 0.0
+                        train_residual_token_ce_acc_sum = 0.0
                         train_detail_accumulator = None
                         train_log_steps = 0
 

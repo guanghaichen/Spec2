@@ -1062,7 +1062,7 @@ cd /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH
 设置本次要评测的 DFLASH checkpoint。这里以当前 weak-path b16 的第 200 epoch 为例：
 
 ```bash
-export DFLASH_CKPT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/epoch_200_step_089400
+export DFLASH_CKPT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu/epoch_200_step_089400
 export NUM_TRIALS_PER_TASK=50
 export CUDA_VISIBLE_DEVICES=0
 ```

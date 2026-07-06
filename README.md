@@ -138,9 +138,16 @@ SwanLab 和本地 JSONL。
    给远 slot hidden 补一小段因果残差。slot0 默认不修正，因为一步预测本来已经很强；
    从 slot1 开始修正，默认只重点覆盖 p2-p5。
 
-训练时残差头看到的前序 token 来自 target model 真实轨迹；推理时没有真实未来 token，
+设计目标是：训练时残差头看到的前序 token 来自 target model 真实轨迹；推理时没有真实未来 token，
 所以用刚生成的 draft token 作为下一 slot 的前序条件。DFlash transformer 主干仍然只跑一次，
 后面只是轻量 residual head + frozen `lm_head` 的逐 slot 修正。
+
+但 2026-07-06 复盘发现：当前主 runtime 走的是 `include_anchor_hidden=True` 的
+`_dflash_generate_with_anchor_hidden` 分支，该分支还没有真正接入 `sample_with_causal_residual`，
+而是直接对 `draft_hidden` 做 `lm_head` 后采样。也就是说，当前训练确实训练了 residual/CAD 相关头，
+但在线推理评测主要反映的是“被 weak-path/CAD 损失正则过的 base draft”，不能证明 residual head
+在线修正机制本身已经生效。下一轮第一优先级应是把 residual sampling 接进 anchor-hidden 分支，
+并做 residual on/off 消融。
 
 2026-07-01 的 b16 训练观察到：`anchor_0_to_position_1_acc` 和 `anchor_1_to_position_2_acc`
 可以较快升到 0.8 左右，但 `anchor_0_to_position_2_acc` 仍明显滞后，且 `accuracy - base_accuracy`
@@ -153,6 +160,91 @@ target hidden，并给瓶颈位置更高权重。当前 launcher 已切到 weak-
    `anchor0->p2` 默认 4x。
 3. **更干净的 CAD teacher。** 只有一步强路径预测 token 正确时，才把该强路径 hidden 作为 CAD teacher。
 4. **CAD 距离改为 cosine。** CAD 更关注方向/语义结构，而不是强行复刻 raw hidden 数值尺度。
+
+2026-07-05/06，3090 上跑完 weak-path b16 训练和 Goal suite 临时并行评测，结论如下：
+
+```text
+训练输出目录:
+/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu
+
+latest_checkpoint:
+epoch_200_step_089400
+
+训练规模:
+train_files = 28,576
+world_size = 4
+per_device_batch = 16
+global_effective_batch = 64
+epochs = 200
+total_optimizer_steps = 89,400
+trainable_params = 296.62M
+```
+
+训练端最后一步诊断：
+
+| 指标 | 最后值 | 训练中最好值 |
+| --- | ---: | ---: |
+| `train/loss` | 0.753 | 0.748 |
+| `train/hidden_loss` | 0.559 | 0.556 |
+| `train/refined_hidden_loss` | 0.543 | 0.539 |
+| `train/cos_loss` | 0.221 | 0.218 |
+| `train/accuracy` | 0.799 | 0.830 |
+| `anchor0 -> p1 acc` | 0.846 | 0.906 |
+| `anchor0 -> p2 acc` | 0.671 | 0.766 |
+| `anchor0 -> p3 acc` | 0.717 | 0.758 |
+| `anchor0 -> p4 acc` | 0.647 | 0.766 |
+| `anchor0 -> p5 acc` | 0.718 | 0.781 |
+| `anchor0 -> p6 acc` | 0.936 | 0.984 |
+
+相比上一版 puretrain，`anchor0 -> p2 acc` 从最后约 `0.503` 提升到约 `0.671`，
+说明 weak-path 加权和 CAD 训练信号确实改变了离线训练行为；但这并没有充分转化为在线
+speculative acceptance。
+
+同一批 3090 临时并行评测结果：
+
+| 方法 | SR | mean step time | Speedup vs AR | Length | avg accept | 备注 |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| OpenVLA AR | 0.768 | 0.2826s | 1.00x | - | - | baseline |
+| SpecVLA strict | 0.762 | 0.3211s | 0.88x | 1.396 | 0.396 | 3090 上负加速 |
+| SpecVLA relaxed | 0.736 | 0.2709s | 1.04x | 2.372 | 1.372 | relaxed 后才略快 |
+| DFLASH strict | 0.760 | 0.2905s | 0.97x | 2.113 | 1.043 | Length 高于 Spec strict 但速度仍不够 |
+| DFLASH relaxed | 0.768 | 0.2691s | 1.05x | 2.416 | 1.339 | SR 与 AR 持平，速度略高于 Spec relaxed |
+
+DFLASH relaxed 的在线 per-position hit rate：
+
+```text
+p1 = 0.919
+p2 = 0.369
+p3 = 0.416
+p4 = 0.428
+p5 = 0.387
+p6 = 0.626
+overall_hit_rate = 0.342
+```
+
+核心诊断：
+
+1. 训练端 anchor0 的 p2-p5 已到 `0.65-0.72`，但在线 relaxed hit rate 只有 `0.37-0.43`。
+   这是明显的 offline/online gap。
+2. DFLASH 的 Length 已经略高于 SpecVLA relaxed，但速度收益只有 `1.05x`，说明 3090 上 draft/verify
+   小 forward、Python 调度和并行评测共享资源的开销很容易吃掉投机收益。
+3. 这五个 eval 在 3090 上几乎同时启动，分别占用 GPU 0-4；它们适合作 sanity check，不应作为论文最终速度。
+   正式 `SR / Length / Speedup` 仍应在 4090d 上单实验串行跑。
+4. 由于 residual head 没有接入 anchor-hidden 推理分支，本次结果不能判定 residual-CAD 机制失败。
+   更准确地说，它暴露的是“只靠训练时 CAD/weak-path 正则，不在推理时使用 residual 修正”不足以明显反超。
+
+下一步行动建议：
+
+1. **先修推理接线，不急着重训。** 把 `sample_with_causal_residual` 接入
+   `_dflash_generate_with_anchor_hidden`，让 slot1 之后用已生成的 draft token 做轻量 residual 修正。
+   需要加开关，至少能做 `residual_sampling=off/on` 消融。
+2. **复用已有 checkpoint 做消融。** 当前训练最好 `train/loss` 和 `train/accuracy` 在 epoch 178 左右；
+   `anchor0 -> p2` 最好在 epoch 118 左右。优先评测 epoch 120、180、190、200，而不是立刻新训。
+3. **正式速度只在 4090d 串行跑。** 3090 并行评测只能用来确认成功率和大致趋势。最终报告必须记录
+   `timing_scope`、`sync_cuda_timing`、GPU 型号、是否并行跑其它 eval。
+4. **如果 residual sampling 接入后 Length/Speedup 仍不动，再考虑训练侧变化。** 例如提高 p2-p5 的
+   online-aligned 监督、加入轻量 token/hidden rerank 头，或重新设计让训练目标更贴近在线 self-generated
+   prefix 的机制。
 
 相关开关：
 
@@ -977,7 +1069,7 @@ CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
-  SPEC_CKPT=/mnt/storage/cgh/specvla-data/epoch_190_step_169670 \
+  SPEC_CKPT="${DFLASH_CKPT}" \
   bash openvla/specdecoding/decode-scripts/run_dflash_strict_libero_goal_eval.sh
 ```
 
@@ -985,9 +1077,13 @@ CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
-  SPEC_CKPT=/mnt/storage/cgh/specvla-data/epoch_190_step_169670 \
+  SPEC_CKPT="${DFLASH_CKPT}" \
   bash openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh
 ```
+
+如果只是想在 3090 上快速 sanity check，可以把五套评测分别绑到不同 GPU 并行跑；但这会共享 CPU、
+MuJoCo、图像预处理、磁盘和 Python 调度资源，速度数值只作工程参考。2026-07-05 的 3090 临时并行评测
+就是这种口径，不应直接写成论文速度。
 
 其它 suite baseline 可以照下面跑。每条命令都会自动使用对应 suite 的 OpenVLA 和 SpecVLA checkpoint：
 

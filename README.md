@@ -190,113 +190,105 @@ Per-anchor、per-position、`base_accuracy`、残差后 `accuracy`、`causal_res
 的长期控制信号仍是 LIBERO simulator behavior，不是离线 validation split 的 early stopping；四卡训练默认
 `--val_split 0`，每 10 个 epoch 保存一次 checkpoint。
 
-2026-07-06 复盘发现：早先的主 runtime 走的是 `include_anchor_hidden=True` 的
-`_dflash_generate_with_anchor_hidden` 分支，当时该分支还没有真正接入 `sample_with_causal_residual`，
-而是直接对 `draft_hidden` 做 `lm_head` 后采样。也就是说，旧 DFLASH 评测虽然使用了训练过的
-residual/CAD checkpoint，但并没有在线启用 residual head。现在已经补上显式开关
-`dflash_use_causal_residual_sampling`，旧 launcher 默认关闭以保留可复现性，`CADhead` launcher
-默认开启以做对照。
+## 实验演进与诊断记录
 
-2026-07-05/06，3090 上跑完上一版 weak-path b16 训练和 Goal suite 临时并行评测，结论如下：
+这一节是给后续自己和 AI 快速接上下文用的研究日志。指标来自 3090 上各训练目录的
+`metrics.jsonl/run_config.json/latest_checkpoint.txt`，读取时间为 2026-07-07。这里的离线 token accuracy
+只说明 draft 在 teacher-forced 训练视角下是否学到模式，最终仍要用 4090 串行 LIBERO rollout 的
+`SR / Length / Speedup` 判断。
 
-```text
-训练输出目录:
-/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu
+### 训练阶段总览
 
-latest_checkpoint:
-epoch_200_step_089400
+| 阶段 | 训练目录 | 主要改动 | 训练状态 | `train/accuracy` 末值 / 最好值 | 关键诊断 |
+| --- | --- | --- | --- | ---: | --- |
+| Pure hidden baseline | `ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu` | 完整 prefix/action hidden、1-layer draft、`[1,8,15,29,final]`、hidden+cos，`soft_w=0` | 200 epoch 完整训练 | 0.807 / 0.830 | p1/p6 很强，但 anchor0 的 p2-p5 明显弱，说明块并行远 slot 缺因果信息。 |
+| Residual-CAD weak-path | `ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu` | 增加 hidden residual head、Hidden-level CAD、refined hidden supervision，b16 四卡 | 200 epoch 完整训练 | 0.799 / 0.830 | anchor0->p2 从 0.503 抬到 0.671，但 residual 后 `accuracy` 没超过 `base_accuracy`，说明残差头训练信号还不够强。 |
+| Markov-ACD 诊断短跑 | `ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu` | 增加 logits-level Markov bias、Logit-level CAD、residual token CE、`soft_w=0.10` | 跑到 epoch 18 手动/中途停止 | 0.897 / 0.905 | p2-p5 离线准确率明显跃升，证明“跨 anchor 蒸馏 + token/logit 信号”方向有效；但该目录仍是旧短跑诊断版，run_config 里有旧 `weak_path_loss_boost` 且 `start_index=1`。 |
+| Clean Markov-ACD 下一版 | `ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu` | 删除所有手工位置加权；`causal_residual_start_index=0`；`slot_decay=0.90`；保留 Markov-aware refinement + Hidden/Logit CAD | **待跑** | - | 目标是在不靠点名位置加权的情况下，保留 Markov-ACD 对 p2-p5 的提升，同时把第一跳也纳入 residual/logit 修正。 |
 
-训练规模:
-train_files = 28,576
-world_size = 4
-per_device_batch = 16
-global_effective_batch = 64
-epochs = 200
-total_optimizer_steps = 89,400
-trainable_params = 296.62M
-```
+### 位置准确率演进
 
-训练端最后一步诊断：
+`position_i_acc` 是所有 anchor 路径上预测绝对 action 位置 `pi` 的平均准确率。它能看整体训练是否健康，
+但不完全等价于真实推理里从 anchor0 开始的一次块预测。
 
-| 指标 | 最后值 | 训练中最好值 |
-| --- | ---: | ---: |
-| `train/loss` | 0.753 | 0.748 |
-| `train/hidden_loss` | 0.559 | 0.556 |
-| `train/refined_hidden_loss` | 0.543 | 0.539 |
-| `train/cos_loss` | 0.221 | 0.218 |
-| `train/accuracy` | 0.799 | 0.830 |
-| `anchor0 -> p1 acc` | 0.846 | 0.906 |
-| `anchor0 -> p2 acc` | 0.671 | 0.766 |
-| `anchor0 -> p3 acc` | 0.717 | 0.758 |
-| `anchor0 -> p4 acc` | 0.647 | 0.766 |
-| `anchor0 -> p5 acc` | 0.718 | 0.781 |
-| `anchor0 -> p6 acc` | 0.936 | 0.984 |
+| 阶段 | p1 | p2 | p3 | p4 | p5 | p6 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Pure hidden baseline 末值 | 0.886 | 0.690 | 0.780 | 0.704 | 0.750 | 0.962 |
+| Pure hidden baseline 最好值 | 0.969 | 0.781 | 0.854 | 0.789 | 0.831 | 1.000 |
+| Residual-CAD weak-path 末值 | 0.846 | 0.728 | 0.764 | 0.691 | 0.751 | 0.942 |
+| Residual-CAD weak-path 最好值 | 0.906 | 0.828 | 0.802 | 0.773 | 0.806 | 0.987 |
+| Markov-ACD 诊断短跑末值 | 0.820 | 0.819 | 0.899 | 0.868 | 0.877 | 0.972 |
+| Markov-ACD 诊断短跑最好值 | 0.885 | 0.844 | 0.903 | 0.892 | 0.925 | 0.990 |
 
-相比上一版 puretrain，`anchor0 -> p2 acc` 从最后约 `0.503` 提升到约 `0.671`，
-说明 CAD/refined hidden 训练信号确实改变了离线训练行为；但这并没有充分转化为在线
-speculative acceptance。
+### Anchor0 弱路径演进
 
-同一批 3090 临时并行评测结果：
+`anchor0 -> p1..p6` 最接近 DFLASH 在线第一块 proposal 的压力测试：输入只有
+`[prompt hidden, t0, MASK, MASK, ...]`，后续 slot 很难直接看到真实因果前缀。这个表最能解释为什么要做
+Markov-ACD。
+
+| 阶段 | p1 | p2 | p3 | p4 | p5 | p6 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Pure hidden baseline 末值 | 0.886 | 0.503 | 0.716 | 0.620 | 0.692 | 0.953 |
+| Pure hidden baseline 最好值 | 0.969 | 0.656 | 0.844 | 0.781 | 0.813 | 1.000 |
+| Residual-CAD weak-path 末值 | 0.846 | 0.671 | 0.717 | 0.647 | 0.718 | 0.936 |
+| Residual-CAD weak-path 最好值 | 0.906 | 0.766 | 0.758 | 0.766 | 0.781 | 0.984 |
+| Markov-ACD 诊断短跑末值 | 0.820 | 0.860 | 0.913 | 0.881 | 0.880 | 0.963 |
+| Markov-ACD 诊断短跑最好值 | 0.885 | 0.917 | 0.925 | 0.901 | 0.938 | 0.973 |
+
+最重要的变化是 anchor0 弱路径：p2 从 `0.503 -> 0.671 -> 0.860`，p3 从
+`0.716 -> 0.717 -> 0.913`，p4 从 `0.620 -> 0.647 -> 0.881`，p5 从
+`0.692 -> 0.718 -> 0.880`。这说明单纯 hidden 拟合不足以解决远 slot；加入 token/logit 级 Markov 信号和
+跨 anchor 蒸馏后，弱路径确实更快追上强路径。下一版要验证的是：去掉手工位置加权、加入 start0 和
+`slot_decay=0.90` 后，这个提升是否还能稳定保留并转化为在线 acceptance length。
+
+### 3090 在线 sanity check
+
+2026-07-05 这组 Goal 评测是在 3090 上多实验并行跑的，适合判断成功率和大致趋势，但不适合作论文最终速度。
+正式速度统一在 4090 单实验串行跑，并保持 `SYNC_CUDA_TIMING=False`、`TIMING_SCOPE=last_task`。
 
 | 方法 | SR | mean step time | Speedup vs AR | Length | avg accept | 备注 |
 | --- | ---: | ---: | ---: | ---: | ---: | --- |
 | OpenVLA AR | 0.768 | 0.2826s | 1.00x | - | - | baseline |
 | SpecVLA strict | 0.762 | 0.3211s | 0.88x | 1.396 | 0.396 | 3090 上负加速 |
 | SpecVLA relaxed | 0.736 | 0.2709s | 1.04x | 2.372 | 1.372 | relaxed 后才略快 |
-| DFLASH strict | 0.760 | 0.2905s | 0.97x | 2.113 | 1.043 | Length 高于 Spec strict 但速度仍不够 |
-| DFLASH relaxed | 0.768 | 0.2691s | 1.05x | 2.416 | 1.339 | SR 与 AR 持平，速度略高于 Spec relaxed |
+| DFLASH strict | 0.760 | 0.2905s | 0.97x | 2.113 | 1.043 | Length 高于 Spec strict，但速度仍不够 |
+| DFLASH relaxed | 0.768 | 0.2691s | 1.05x | 2.416 | 1.339 | SR 与 AR 持平，Length 略高于 SpecVLA relaxed |
 
-DFLASH relaxed 的在线 per-position hit rate：
+该 DFLASH relaxed 的在线 per-position hit rate 是：
 
-```text
-p1 = 0.919
-p2 = 0.369
-p3 = 0.416
-p4 = 0.428
-p5 = 0.387
-p6 = 0.626
-overall_hit_rate = 0.342
-```
+| p1 | p2 | p3 | p4 | p5 | p6 | overall |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 0.919 | 0.369 | 0.416 | 0.428 | 0.387 | 0.626 | 0.342 |
 
-核心诊断：
+这组在线结果暴露了当时的 offline/online gap：训练里 anchor0 p2-p5 已经到 `0.65-0.72`，但在线 relaxed
+hit rate 仍只有 `0.37-0.43`。后来检查发现当时主 runtime 的 `include_anchor_hidden=True` 分支没有真正启用
+`sample_with_causal_residual`，只是直接对 `draft_hidden` 做 `lm_head` 后采样。因此该评测不能判定
+residual/CAD 机制失败，只能说明“不在推理时使用 residual 修正，仅靠训练正则”不足以明显反超。
 
-1. 训练端 anchor0 的 p2-p5 已到 `0.65-0.72`，但在线 relaxed hit rate 只有 `0.37-0.43`。
-   这是明显的 offline/online gap。
-2. DFLASH 的 Length 已经略高于 SpecVLA relaxed，但速度收益只有 `1.05x`，说明 3090 上 draft/verify
-   小 forward、Python 调度和并行评测共享资源的开销很容易吃掉投机收益。
-3. 这五个 eval 在 3090 上几乎同时启动，分别占用 GPU 0-4；它们适合作 sanity check，不应作为论文最终速度。
-   正式 `SR / Length / Speedup` 仍应在 4090 上单实验串行跑。
-4. 由于 residual head 没有接入 anchor-hidden 推理分支，本次结果不能判定 residual-CAD 机制失败。
-   更准确地说，它暴露的是“只靠训练时 CAD/weak-path 正则，不在推理时使用 residual 修正”不足以明显反超。
+### 当前待跑版本的观察重点
 
-下一步行动建议：
-
-1. **先跑 CADhead 推理消融，不急着重训。** 当前已经把 `sample_with_causal_residual` 接入
-   `_dflash_generate_with_anchor_hidden`，专用 residual launcher 会让 slot1 之后用已生成的 draft token
-   做轻量 residual 修正。
-2. **复用已有 checkpoint 做消融。** 当前训练最好 `train/loss` 和 `train/accuracy` 在 epoch 178 左右；
-   `anchor0 -> p2` 最好在 epoch 118 左右。优先评测 epoch 120、180、190、200，而不是立刻新训。
-3. **正式速度只在 4090 串行跑。** 3090 并行评测只能用来确认成功率和大致趋势。最终报告必须记录
-   `timing_scope`、`sync_cuda_timing`、GPU 型号、是否并行跑其它 eval。
-4. **如果 residual sampling 接入后 Length/Speedup 仍不动，再考虑训练侧变化。** 例如提高 p2-p5 的
-   online-aligned 监督、加入轻量 token/hidden rerank 头，或重新设计让训练目标更贴近在线 self-generated
-   prefix 的机制。
-
-2026-07-06/07 当前准备跑的新版本是 **Markov-ACD**：在 residual hidden 修正之外，新增一个
-logits-level Markov bias head，并用 `anchor_logit_distill_loss` 做跨 anchor 强弱路径蒸馏。与 DSpark-style
-直接依赖前序 token 的区别在于：前序 token 修正只是执行头，训练核心是“短 anchor 弱路径追长 anchor 强路径”的
-VLA 多 anchor 监督。下一轮实验要重点看两组指标：
+当前 commit 的下一版是 Clean Markov-ACD：删掉所有手工位置加权，使用
+`causal_residual_start_index=0` 和 `slot_decay=0.90`。开训后优先看这些指标：
 
 ```text
+train/accuracy
+train/base_accuracy
+train/residual_token_ce_accuracy
+train/anchor_0_to_position_1_acc ... train/anchor_0_to_position_6_acc
+train/causal_residual_cad_loss
 train/anchor_logit_distill_loss
-train/anchor_logit_distill_component
-train/anchor_logit_distill_pairs_per_batch
-anchor_0_to_position_2_acc ... anchor_0_to_position_5_acc
+train/refined_hidden_loss
+train/residual_token_ce_loss
 ```
 
-如果新版本的 p2-p5 训练准确率提升能转化为在线 `Length` 和 relaxed hit rate 提升，才说明跨 anchor 设计是真的有用，
-不是滥竽充数的辅助 loss。为避免审稿时被认为是手工调位置，本轮已经移除所有手工位置加权参数；
-如果性能提升，应主要归因于 Markov-aware refinement 和跨 anchor 蒸馏，而不是针对 p2/p5 的螺丝钉加权。
+判断标准：
+
+1. `anchor0 -> p2-p5` 应尽量复现 Markov-ACD 短跑里的快速上升趋势。
+2. `anchor0 -> p1` 不能因为照顾 p2-p5 而长期掉下去；`start_index=0` 和 `slot_decay=0.90`
+   就是为了把第一跳重新纳入训练重点。
+3. `accuracy - base_accuracy` 如果长期为正，说明 residual/logit 修正头在线启用后有希望产生真实收益；
+   如果长期为负，要重新检查残差头是否在破坏 base draft。
+4. 离线准确率不是最终结论；训练后仍必须搬 checkpoint 到 4090，跑 strict/relaxed、CADhead on/off 的 LIBERO rollout。
 
 2026-07-06 已补上 `include_anchor_hidden=True` 推理分支里的 residual sampling 接线。默认旧 DFlash
 launcher 仍关闭该功能；专用 residual launcher 会显式开启：
@@ -402,27 +394,23 @@ dflash_data_format           full_prefix_plus_action_hidden_v4
 
 不要把旧数据格式生成的文件混进这个目录。Trainer 会检查字段和 shape，但实验前仍应手动确认数据版本和样本数。
 
-## 实验历程
+## 方法演进摘要
 
-这里记录的是设计决策，不代表实验问题已经被解决。
+更详细的数值见上面的“实验演进与诊断记录”。这里只保留设计决策主线：
 
-1. **初始迁移：** 把 DFlash-style draft 插入 SpecVLA/OpenVLA speculative 路径。早期 draft context 不足，
+1. **初始迁移。** 把 DFlash-style draft 插入 SpecVLA/OpenVLA speculative 路径。早期 draft context 不足，
    acceptance 基本不可用。
-2. **Context 修正：** 数据和 runtime 改为保留完整 prefill hidden sequence 和 target-verified action history。
-   当前 `include_anchor_hidden` 路径会在每次并行 tail proposal 前，先用 target 解码 anchor。
-3. **离线监督修正：** 加入 multi-anchor supervision、action-dimension embedding、position balancing、
-   hidden loss、cosine loss 和诊断指标。早期 hard-token-CE objective 已从主 recipe 中移除。
-4. **Soft-loss 和 consistency 消融：** soft token-distribution 和 cross-anchor consistency 都跑过诊断实验；
-   相关 flag 仍保留，但都不是当前 pure-training recipe。
-5. **当前主实验：** 使用完整 28,639 样本数据集训练 1-layer draft，五层 context 特征为
-   `[1, 8, 15, 29, final]`，不使用离线 validation split；然后用 LIBERO simulator 比较 checkpoint
-   的成功率、acceptance length、hit rate 和 wall-clock time。
-6. **Residual-CAD 新分支：** 观察到所有 anchor 的一步预测都明显强于远 slot 后，新增
-   “跨 Anchor 因果蒸馏 + 前序 Token 残差修正”。它先验证“弱路径需要因果补偿”这一判断。
-7. **Markov-ACD 当前分支：** 在 residual hidden 修正基础上加入 logits-level Markov bias head，
-   并让短前缀弱路径 logits 追同一目标位置的长前缀一步强路径 logits。它的论文叙事重点是跨 anchor
-   强弱路径蒸馏，而不是单纯复制 DSpark 的前序 token 修正。本轮已移除手工位置加权，只保留结构性
-   Markov-aware refinement 和 CAD 蒸馏。
+2. **Context 对齐 SpecVLA。** 数据和 runtime 改为保留完整 prefill hidden sequence 和 target-verified
+   action history。当前 `include_anchor_hidden` 路径会在每次并行 tail proposal 前，先用 target 解码 anchor。
+3. **Multi-anchor 训练。** 加入 multi-anchor supervision、action-dimension embedding、position balancing、
+   hidden loss、cosine loss 和 per-anchor/per-position 诊断指标。
+4. **Pure hidden baseline。** 证明 p1/p6 容易学，p2-p5 弱，尤其 `anchor0 -> p2` 是瓶颈。
+5. **Residual-CAD weak-path。** 加入前序 token hidden 残差、Hidden-level CAD、refined hidden supervision。
+   这一步把 anchor0->p2 从约 0.50 拉到约 0.67，但 residual 后 accuracy 没稳定超过 base accuracy。
+6. **Markov-ACD。** 进一步加入 logits-level Markov bias、Logit-level CAD、residual token CE 和低权重 soft
+   distribution。短跑诊断显示 anchor0 的 p2-p5 离线准确率大幅提升。
+7. **Clean Markov-ACD 当前待跑版。** 删除所有手工位置加权，保留结构性 Markov-aware refinement 和 CAD；
+   `causal_residual_start_index=0` 覆盖第一跳，`slot_decay=0.90` 轻度偏向更影响 acceptance length 的前几个 slot。
 
 需要始终记住的限制：
 

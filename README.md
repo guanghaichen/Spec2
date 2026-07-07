@@ -847,6 +847,7 @@ SwanLab = 使用环境默认配置
 ```
 
 `run_dflash_anchor_hidden_1layer_residual_cad_4gpu.sh` 支持环境变量覆盖常用超参数，例如：
+脚本内部已经按“路径、训练规模、损失权重、Markov/弱路径增强”分区写了中文注释，启动时也会打印完整配置，训练前优先检查这份打印。
 
 ```bash
 BATCH_SIZE=16 WARMUP_STEPS=1000 LR=5e-5 RESIDUAL_CAD_W=0.10 REFINED_HIDDEN_W=0.30 \

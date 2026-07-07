@@ -75,28 +75,31 @@ def parse_args():
         ),
         help="输出目录（用于保存模型权重）",
     )
-    parser.add_argument("--batch_size", type=int, default=8, help="每张卡的 micro batch size")
-    parser.add_argument("--gradient_accumulation_steps", type=int, default=1, help="梯度累积步数；effective batch = batch_size * gradient_accumulation_steps")
+    # ---- 训练规模与优化器 ----
+    parser.add_argument("--batch_size", type=int, default=8, help="每张卡的 micro batch size；DDP 下全局 batch = batch_size * 卡数 * gradient_accumulation_steps")
+    parser.add_argument("--gradient_accumulation_steps", type=int, default=1, help="梯度累积步数；显存不够时可增大它来保持全局 batch")
     parser.add_argument("--num_workers", type=int, default=4, help="DataLoader worker 数")
     parser.add_argument("--num_epochs", type=int, default=200, help="最大训练 epochs")
-    parser.add_argument("--lr", type=float, default=5e-5, help="AdamW 学习率")
-    parser.add_argument("--weight_decay", type=float, default=5e-2)
-    parser.add_argument("--adam_beta1", type=float, default=0.9, help="Adam beta1")
-    parser.add_argument("--adam_beta2", type=float, default=0.98, help="Adam beta2")
-    parser.add_argument("--adam_eps", type=float, default=1e-8, help="Adam epsilon")
+    parser.add_argument("--lr", type=float, default=5e-5, help="AdamW 学习率；当前 4 卡 batch=64 时推荐 5e-5 起步")
+    parser.add_argument("--weight_decay", type=float, default=5e-2, help="AdamW weight decay；用于抑制 draft 过度记忆训练集")
+    parser.add_argument("--adam_beta1", type=float, default=0.9, help="AdamW beta1")
+    parser.add_argument("--adam_beta2", type=float, default=0.98, help="AdamW beta2")
+    parser.add_argument("--adam_eps", type=float, default=1e-8, help="AdamW epsilon")
     parser.add_argument("--warmup_steps", type=int, default=2000, help="学习率 warmup 步数；<=0 时退回 warmup_ratio")
     parser.add_argument("--warmup_ratio", type=float, default=0.03, help="当 warmup_steps<=0 时使用")
-    parser.add_argument("--save_every", type=int, default=5, help="保存间隔epochs")
+    parser.add_argument("--save_every", type=int, default=5, help="按 epoch 保存 checkpoint 的间隔；例如 10 表示每 10 个 epoch 保存一次")
     parser.add_argument("--seed", type=int, default=7, help="随机种子")
-    parser.add_argument("--block_size", type=int, default=7, help="块大小")
-    parser.add_argument("--num_draft_layers", type=int, default=3, help="DFlash Draft 层数（原默认 5）")
-    parser.add_argument("--target_layer_ids", type=int, nargs="*", default=[1, 8, 15, 22, 29], help="捕捉的 OpenVLA 目标层；留空时按 Draft 层数均匀选取，恢复 5 层时用 [1,8,15,22,29]")
+
+    # ---- Draft 结构与输入 hidden 组织方式 ----
+    parser.add_argument("--block_size", type=int, default=7, help="一次投机生成的 action token 块大小；OpenVLA action 默认 7 维")
+    parser.add_argument("--num_draft_layers", type=int, default=3, help="DFlash Draft Transformer 层数；当前轻量实验通常设为 1")
+    parser.add_argument("--target_layer_ids", type=int, nargs="*", default=[1, 8, 15, 22, 29], help="离线数据保存的 OpenVLA 多层 hidden；当前数据为 [1,8,15,22,29]")
     parser.add_argument(
         "--selected_hidden_variant",
         type=str,
         choices=SELECTED_HIDDEN_VARIANTS,
         default="target_layers",
-        help="DFlash context hidden 组装方式：target_layers=使用数据中保存的目标层；replace_22_with_final=将 [1,8,15,22,29] 重组为 [1,8,15,29,final]",
+        help="DFlash context hidden 组装方式：target_layers=直接用保存的目标层；replace_22_with_final=把 [1,8,15,22,29] 替换为 [1,8,15,29,final]",
     )
     parser.add_argument("--mask_token_id", type=int, default=None, help="加噪声的 token ID，不指定也会自适应取pad_token_id")
     parser.add_argument(
@@ -105,12 +108,15 @@ def parse_args():
         default=True,
         help="SpecVLA式注入：context包含当前anchor的目标模型hidden；draft从anchor+1开始并行预测后续token",
     )
-    parser.add_argument("--hidden_w", type=float, default=1.0, help="hidden states 蒸馏主损失权重")
-    parser.add_argument("--soft_w", type=float, default=0, help="teacher soft distribution 交叉熵蒸馏权重")
-    parser.add_argument("--soft_temperature", type=float, default=2.0, help="teacher soft distribution 蒸馏温度")
-    parser.add_argument("--cos_w", type=float, default=0.05, help="hidden cosine 辅助约束权重")
-    parser.add_argument("--slot_decay", type=float, default=0.85, help="DFLASH 块内位置衰减权重，越靠前的 draft slot 越重要")
-    parser.add_argument("--anchor_consistency_w", type=float, default=0.0, help="跨 anchor 一致性 loss 权重；0 表示关闭")
+    # ---- 基础蒸馏损失 ----
+    parser.add_argument("--hidden_w", type=float, default=1.0, help="基础 hidden 蒸馏权重；让 draft hidden 追目标模型最后层 hidden，是当前最核心的监督")
+    parser.add_argument("--soft_w", type=float, default=0, help="teacher soft distribution 蒸馏权重；用目标模型 logits 的软分布辅助 token 层对齐")
+    parser.add_argument("--soft_temperature", type=float, default=2.0, help="soft distribution 蒸馏温度；越大分布越平滑")
+    parser.add_argument("--cos_w", type=float, default=0.05, help="hidden cosine 辅助约束权重；强调方向一致性，通常小权重即可")
+    parser.add_argument("--slot_decay", type=float, default=0.85, help="块内位置衰减权重；1.0 表示 p1-p6 不衰减，<1 时更重视靠前 slot")
+
+    # ---- 旧版跨 anchor hidden 一致性，当前主实验关闭 ----
+    parser.add_argument("--anchor_consistency_w", type=float, default=0.0, help="旧版跨 anchor 一致性 loss 权重；0 表示关闭，主实验改用 Markov-ACD")
     parser.add_argument(
         "--anchor_consistency_type",
         type=str,
@@ -124,17 +130,19 @@ def parse_args():
         default=0,
         help="跨 anchor 一致性权重线性 warmup 步数；0 表示不 warmup",
     )
-    parser.add_argument("--position_balance", action=argparse.BooleanOptionalAction, default=True, help="是否平衡多 anchor 中不同 action 位置的重复监督次数")
+    parser.add_argument("--position_balance", action=argparse.BooleanOptionalAction, default=True, help="是否平衡多 anchor 中不同 action 位置的重复监督次数，避免靠后位置因出现次数更多而主导训练")
+
+    # ---- Markov-ACD hidden 残差头 ----
     parser.add_argument(
         "--causal_residual_type",
         type=str,
         default="none",
         choices=["none", "hidden"],
-        help="前序 token 残差修正头；hidden=用前一个 token 给远 slot hidden 补因果残差",
+        help="前序 token hidden 残差头；hidden=根据前序 token 信息给 p2-p5 等远 slot 补一段因果残差",
     )
-    parser.add_argument("--causal_residual_rank", type=int, default=256, help="前序 token 残差头中间维度")
-    parser.add_argument("--causal_residual_scale", type=float, default=1.0, help="前序 token 残差幅度系数")
-    parser.add_argument("--causal_residual_start_index", type=int, default=1, help="从第几个 draft slot 开始启用残差；默认跳过高准确率 slot0")
+    parser.add_argument("--causal_residual_rank", type=int, default=256, help="hidden 残差头中间维度；越大表达力越强但参数和过拟合风险也更高")
+    parser.add_argument("--causal_residual_scale", type=float, default=1.0, help="hidden 残差幅度系数；0 等价于禁用残差效果")
+    parser.add_argument("--causal_residual_start_index", type=int, default=1, help="从第几个 draft slot 开始启用残差；默认跳过准确率很高的 slot0/p1")
     parser.add_argument(
         "--causal_residual_cad_w",
         type=float,
@@ -146,13 +154,13 @@ def parse_args():
         type=str,
         default="smooth_l1",
         choices=["cosine", "smooth_l1", "norm_mse"],
-        help="残差 CAD hidden 距离类型",
+        help="残差 CAD hidden 距离类型；cosine 更关注方向，smooth_l1 更关注数值接近",
     )
     parser.add_argument(
         "--causal_residual_cad_warmup_steps",
         type=int,
         default=0,
-        help="残差 CAD 权重线性 warmup 步数；0 表示不 warmup",
+        help="残差 CAD 权重线性 warmup 步数；用于避免训练早期 strong path 尚不稳定时过早约束 weak path",
     )
     parser.add_argument(
         "--causal_residual_min_position",
@@ -170,20 +178,22 @@ def parse_args():
         "--causal_residual_cad_correct_teacher_only",
         action=argparse.BooleanOptionalAction,
         default=False,
-        help="只在一步强路径预测正确时使用该 hidden 作为残差 CAD teacher",
+        help="只在一步强路径预测正确时使用该 hidden 作为残差 CAD teacher，减少错误 teacher 传播",
     )
+
+    # ---- 残差修正后的 weak-path 直接监督 ----
     parser.add_argument(
         "--refined_hidden_w",
         type=float,
         default=0.0,
-        help="弱路径 refined hidden 直接追 target hidden 的损失权重；0 表示关闭",
+        help="refined weak hidden 直接追目标 hidden 的损失权重；配合 CAD，让残差头不仅靠相对蒸馏，也看到真实目标 hidden",
     )
     parser.add_argument(
         "--refined_hidden_loss_type",
         type=str,
         default="smooth_l1",
         choices=["cosine", "smooth_l1", "norm_mse", "raw_mse"],
-        help="refined hidden 直接监督的距离类型",
+        help="refined hidden 直接监督的距离类型；smooth_l1 稳定，cosine 更偏方向约束",
     )
     parser.add_argument(
         "--refined_hidden_min_position",
@@ -197,34 +207,37 @@ def parse_args():
         default=5,
         help="refined hidden 直接监督的最大目标 token 位置（1-based）",
     )
-    parser.add_argument("--residual_token_ce_w", type=float, default=0.0, help="残差修正后 logits 的 hard token CE 权重")
-    parser.add_argument("--residual_token_ce_min_position", type=int, default=2)
-    parser.add_argument("--residual_token_ce_max_position", type=int, default=5)
-    parser.add_argument("--residual_token_ce_label_smoothing", type=float, default=0.0)
+    # ---- 残差修正后的 token 层监督 ----
+    parser.add_argument("--residual_token_ce_w", type=float, default=0.0, help="残差修正后 logits 的 hard token CE 权重；只作用于 weak slot，用于直接提高 p2-p5 命中率")
+    parser.add_argument("--residual_token_ce_min_position", type=int, default=2, help="residual token CE 作用的最小目标 token 位置；默认 p2")
+    parser.add_argument("--residual_token_ce_max_position", type=int, default=5, help="residual token CE 作用的最大目标 token 位置；默认 p5")
+    parser.add_argument("--residual_token_ce_label_smoothing", type=float, default=0.0, help="residual token CE 的 label smoothing；0 表示使用硬标签")
+
+    # ---- logits 级 Markov bias 与跨 anchor logits 蒸馏 ----
     parser.add_argument(
         "--logit_markov_type",
         type=str,
         default="none",
         choices=["none", "bias"],
-        help="logits级前序token修正头；bias=在lm_head后给远slot logits加轻量Markov偏置",
+        help="logits 级前序 token 修正头；bias=在 lm_head 后给远 slot logits 加轻量 Markov 偏置",
     )
-    parser.add_argument("--logit_markov_rank", type=int, default=256, help="logits Markov bias头中间维度")
-    parser.add_argument("--logit_markov_scale", type=float, default=1.0, help="logits Markov bias幅度系数")
-    parser.add_argument("--anchor_logit_distill_w", type=float, default=0.0, help="跨anchor强弱路径logits蒸馏权重")
-    parser.add_argument("--anchor_logit_distill_temperature", type=float, default=2.0, help="跨anchor logits KL温度")
-    parser.add_argument("--anchor_logit_distill_min_position", type=int, default=2)
-    parser.add_argument("--anchor_logit_distill_max_position", type=int, default=5)
+    parser.add_argument("--logit_markov_rank", type=int, default=256, help="logits Markov bias 头中间维度；只影响 bias 头表达力")
+    parser.add_argument("--logit_markov_scale", type=float, default=1.0, help="logits Markov bias 幅度系数；调小可减弱 token 层修正")
+    parser.add_argument("--anchor_logit_distill_w", type=float, default=0.0, help="跨 anchor 强弱路径 logits 蒸馏权重；让弱前缀预测追更强前缀预测")
+    parser.add_argument("--anchor_logit_distill_temperature", type=float, default=2.0, help="跨 anchor logits KL 温度；越大越强调暗知识而非单个 hard token")
+    parser.add_argument("--anchor_logit_distill_min_position", type=int, default=2, help="anchor logits 蒸馏作用的最小目标 token 位置；默认 p2")
+    parser.add_argument("--anchor_logit_distill_max_position", type=int, default=5, help="anchor logits 蒸馏作用的最大目标 token 位置；默认 p5")
     parser.add_argument(
         "--anchor_logit_distill_correct_teacher_only",
         action=argparse.BooleanOptionalAction,
         default=True,
-        help="只用一步强路径预测正确的样本作为跨anchor logits teacher",
+        help="只用一步强路径预测正确的样本作为跨 anchor logits teacher，减少错误分布蒸馏",
     )
     parser.add_argument(
         "--weak_far_slot_boost",
         type=float,
         default=1.0,
-        help="弱路径远 slot 的主损失权重倍率；用于加速 anchor0/1 的 p2-p5 学习",
+        help="弱路径远 slot 的主损失权重倍率；用于加速 anchor0/1 等弱前缀下 p2-p5 的学习",
     )
     parser.add_argument(
         "--anchor0_p2_boost",

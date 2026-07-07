@@ -979,7 +979,7 @@ SPECVLA_GOAL_CKPT=/path/to/goal_ckpt
 
 ### 速度计时口径
 
-为了复现 SpecVLA 上游代码和论文表格的速度口径，当前 Goal 评测 launcher 默认使用：
+为了复现 SpecVLA 上游代码和论文表格的速度口径，当前所有 LIBERO 评测 launcher 默认使用并显式传入：
 
 ```text
 SYNC_CUDA_TIMING=False

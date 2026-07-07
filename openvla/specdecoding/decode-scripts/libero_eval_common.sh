@@ -29,7 +29,7 @@ init_libero_eval_env() {
 
   if [[ -d "/data/wulin" ]]; then
     DEFAULT_VLA_PATH="/data/wulin/hf_files/openvla-7b-finetuned-libero-${TASK_SUITE_SLUG}"
-    DEFAULT_DFLASH_OUTPUT_DIR="/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu"
+    DEFAULT_DFLASH_OUTPUT_DIR="/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu"
     DEFAULT_SPECVLA_CKPT="/data/wulin/c/specvla-data/specvla_checkpoint/${TASK_SUITE_SLUG}"
     DEFAULT_LOG_DIR="/data/wulin/c/specvla-data/eval_logs"
     DEFAULT_LIBERO_PATH="/data/wulin/c/LIBERO"
@@ -38,7 +38,7 @@ init_libero_eval_env() {
   elif [[ -d "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh" ]]; then
     DEFAULT_ROOT="/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh"
     DEFAULT_VLA_PATH="${DEFAULT_ROOT}/hf_files/openvla-7b-finetuned-libero-${TASK_SUITE_SLUG}"
-    DEFAULT_DFLASH_OUTPUT_DIR="${DEFAULT_ROOT}/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu"
+    DEFAULT_DFLASH_OUTPUT_DIR="${DEFAULT_ROOT}/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu"
     DEFAULT_SPECVLA_CKPT="${DEFAULT_ROOT}/specvla-data/specvla_checkpoint/${TASK_SUITE_SLUG}"
     DEFAULT_LOG_DIR="${DEFAULT_ROOT}/specvla-data/eval_logs"
     DEFAULT_LIBERO_PATH="${DEFAULT_ROOT}/LIBERO"
@@ -46,7 +46,7 @@ init_libero_eval_env() {
     DEFAULT_NVIDIA_EGL_VENDOR_JSON=""
   elif [[ -d "/mnt/storage/cgh" ]]; then
     DEFAULT_VLA_PATH="/mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-${TASK_SUITE_SLUG}"
-    DEFAULT_DFLASH_OUTPUT_DIR="/mnt/storage/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu"
+    DEFAULT_DFLASH_OUTPUT_DIR="/mnt/storage/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu"
     DEFAULT_SPECVLA_CKPT="/mnt/storage/cgh/specvla-data/specvla_checkpoint/${TASK_SUITE_SLUG}"
     DEFAULT_LOG_DIR="/mnt/storage/cgh/specvla-data/eval_logs"
     DEFAULT_LIBERO_PATH="/mnt/storage/cgh/LIBERO"
@@ -74,6 +74,8 @@ init_libero_eval_env() {
   NUM_TRIALS_PER_TASK="${NUM_TRIALS_PER_TASK:-50}"
   USE_WANDB="${USE_WANDB:-False}"
   SEED="${SEED:-7}"
+  SYNC_CUDA_TIMING="${SYNC_CUDA_TIMING:-False}"
+  TIMING_SCOPE="${TIMING_SCOPE:-last_task}"
 
   if [[ ! -d "${VLA_PATH}" ]]; then
     echo "VLA_PATH does not exist or is not a directory: ${VLA_PATH}" >&2
@@ -195,4 +197,6 @@ print_common_eval_config() {
   echo "RUN_ID_NOTE=${RUN_ID_NOTE:-}"
   echo "USE_WANDB=${USE_WANDB}"
   echo "SEED=${SEED}"
+  echo "SYNC_CUDA_TIMING=${SYNC_CUDA_TIMING}"
+  echo "TIMING_SCOPE=${TIMING_SCOPE}"
 }

@@ -5,6 +5,8 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/libero_eval_common.sh"
 
 init_libero_eval_env libero_spatial
 RUN_ID_NOTE="${RUN_ID_NOTE:-openvla-ar-spatial}"
+SYNC_CUDA_TIMING="${SYNC_CUDA_TIMING:-False}"
+TIMING_SCOPE="${TIMING_SCOPE:-last_task}"
 
 print_common_eval_config
 
@@ -18,5 +20,7 @@ python openvla/experiments/robot/libero/run_libero_goal_AR.py \
   --center_crop True \
   --local_log_dir "${LOG_DIR}" \
   --run_id_note "${RUN_ID_NOTE}" \
+  --sync_cuda_timing "${SYNC_CUDA_TIMING}" \
+  --timing_scope "${TIMING_SCOPE}" \
   --use_wandb "${USE_WANDB}" \
   --seed "${SEED}"

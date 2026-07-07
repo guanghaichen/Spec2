@@ -240,6 +240,24 @@ def parse_args():
         help="弱路径远 slot 的主损失权重倍率；用于加速 anchor0/1 等弱前缀下 p2-p5 的学习",
     )
     parser.add_argument(
+        "--first_step_boost",
+        type=float,
+        default=1.0,
+        help="每个 anchor 的第一跳/local slot0 主损失权重倍率；用于补强 t1 以及各 anchor 的一步预测能力",
+    )
+    parser.add_argument(
+        "--first_step_boost_min_position",
+        type=int,
+        default=1,
+        help="first_step_boost 作用的最小目标 token 位置；默认 p1",
+    )
+    parser.add_argument(
+        "--first_step_boost_max_position",
+        type=int,
+        default=5,
+        help="first_step_boost 作用的最大目标 token 位置；默认 p5，避免额外放大已经很高的 p6",
+    )
+    parser.add_argument(
         "--anchor0_p2_boost",
         type=float,
         default=1.0,
@@ -558,7 +576,11 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
             + ("+residual_token_ce" if args.residual_token_ce_w > 0 else "")
             + (
                 "+weak_path_loss_boost"
-                if args.weak_far_slot_boost != 1.0 or args.anchor0_p2_boost != 1.0
+                if (
+                    args.weak_far_slot_boost != 1.0
+                    or args.first_step_boost != 1.0
+                    or args.anchor0_p2_boost != 1.0
+                )
                 else ""
             )
         )
@@ -599,6 +621,9 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "anchor_logit_distill_max_position": args.anchor_logit_distill_max_position,
         "anchor_logit_distill_correct_teacher_only": args.anchor_logit_distill_correct_teacher_only,
         "weak_far_slot_boost": args.weak_far_slot_boost,
+        "first_step_boost": args.first_step_boost,
+        "first_step_boost_min_position": args.first_step_boost_min_position,
+        "first_step_boost_max_position": args.first_step_boost_max_position,
         "anchor0_p2_boost": args.anchor0_p2_boost,
         "slot_decay": args.slot_decay,
         "position_balance": args.position_balance,
@@ -1061,7 +1086,8 @@ def compute_loss_and_accuracy(
         local_indices = torch.arange(max_block_len, device=device, dtype=torch.long)
         target_token_positions = teacher_start + local_indices + 1
         weak_far_mask = (
-            (local_indices >= args.causal_residual_start_index)
+            (local_indices > 0)
+            & (local_indices >= args.causal_residual_start_index)
             & (target_token_positions >= args.refined_hidden_min_position)
             & (target_token_positions <= args.refined_hidden_max_position)
         )
@@ -1070,6 +1096,20 @@ def compute_loss_and_accuracy(
             weak_path_multiplier = torch.where(
                 weak_far_mask,
                 torch.full_like(weak_path_multiplier, args.weak_far_slot_boost),
+                weak_path_multiplier,
+            )
+        if args.first_step_boost != 1.0:
+            first_step_mask = (
+                (local_indices == 0)
+                & (target_token_positions >= args.first_step_boost_min_position)
+                & (target_token_positions <= args.first_step_boost_max_position)
+            )
+            weak_path_multiplier = torch.where(
+                first_step_mask,
+                torch.maximum(
+                    weak_path_multiplier,
+                    torch.full_like(weak_path_multiplier, args.first_step_boost),
+                ),
                 weak_path_multiplier,
             )
         if anchor == 0 and args.anchor0_p2_boost != 1.0:
@@ -1550,6 +1590,12 @@ def main():
         )
     if args.weak_far_slot_boost <= 0:
         raise ValueError("--weak_far_slot_boost must be > 0.")
+    if args.first_step_boost <= 0:
+        raise ValueError("--first_step_boost must be > 0.")
+    if args.first_step_boost_min_position < 1:
+        raise ValueError("--first_step_boost_min_position must be >= 1.")
+    if args.first_step_boost_max_position < args.first_step_boost_min_position:
+        raise ValueError("--first_step_boost_max_position must be >= --first_step_boost_min_position.")
     if args.anchor0_p2_boost <= 0:
         raise ValueError("--anchor0_p2_boost must be > 0.")
     if args.action_dim <= 0:

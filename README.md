@@ -305,7 +305,7 @@ EVAL_EPOCH=200 DFLASH_USE_CAUSAL_RESIDUAL_SAMPLING=True \
 ```text
 --causal_residual_type hidden
 --causal_residual_rank 256
---causal_residual_start_index 1
+--causal_residual_start_index 0   # first-step 分支；旧版 Markov-ACD 是 1
 --causal_residual_cad_w 0.10
 --causal_residual_cad_type cosine
 --causal_residual_cad_warmup_steps 4000
@@ -478,7 +478,7 @@ unset VLA_PATH
 unset OPENVLA_MODEL_PATH
 export LIBERO_RLDS_ROOT=${SPECVLA_ROOT}/dataset/modified_libero_rlds
 export DFLASH_DATA_OUTDIR=${SPECVLA_DATA}/dflash_goal_dataset
-export DFLASH_OUTPUT_DIR=${SPECVLA_DATA}/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu
+export DFLASH_OUTPUT_DIR=${SPECVLA_DATA}/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_firststep_tokence_soft01_b16_4gpu
 export SPECVLA_CKPT_ROOT=${SPECVLA_DATA}/specvla_checkpoint
 export SPECVLA_GOAL_CKPT=${SPECVLA_CKPT_ROOT}/goal
 export LOG_DIR=${SPECVLA_DATA}/eval_logs
@@ -689,7 +689,7 @@ find /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_go
 3090 继续负责四卡训练。训练完成后，在本地终端用 `scp -3` 从 3090 搬到 4090：
 
 ```bash
-TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu
+TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_firststep_tokence_soft01_b16_4gpu
 CKPT=epoch_190_step_169670
 
 scp -3 -r \
@@ -811,7 +811,7 @@ openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_puretrain_4gp
 ```text
 OPENVLA_GOAL_PATH=/data/wulin/hf_files/openvla-7b-finetuned-libero-goal
 DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset
-OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu
+OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_firststep_tokence_soft01_b16_4gpu
 ```
 
 Markov-ACD 主训练配置：
@@ -821,13 +821,16 @@ torchrun --nproc_per_node 4
 num_draft_layers = 1
 selected_hidden_variant = replace_22_with_final
 causal_residual_type = hidden
+causal_residual_start_index = 0
 causal_residual_cad_w = 0.10
 causal_residual_cad_type = cosine
 causal_residual_cad_warmup_steps = 4000
 causal_residual_cad_correct_teacher_only = true
 causal_residual_min/max_position = 2/5
 refined_hidden_w = 0.30
+refined_hidden_min/max_position = 1/5
 residual_token_ce_w = 0.10
+residual_token_ce_min/max_position = 1/5
 logit_markov_type = bias
 logit_markov_rank = 256
 anchor_logit_distill_w = 0.10
@@ -835,6 +838,8 @@ anchor_logit_distill_temperature = 2.0
 soft_w = 0.10
 refined_hidden_loss_type = smooth_l1
 weak_far_slot_boost = 2.0
+first_step_boost = 2.0
+first_step_boost_min/max_position = 1/5
 anchor0_p2_boost = 4.0
 slot_decay = 1.0
 hidden_noise = 0.03
@@ -849,14 +854,20 @@ SwanLab = 使用环境默认配置
 `run_dflash_anchor_hidden_1layer_residual_cad_4gpu.sh` 支持环境变量覆盖常用超参数，例如：
 脚本内部已经按“路径、训练规模、损失权重、Markov/弱路径增强”分区写了中文注释，启动时也会打印完整配置，训练前优先检查这份打印。
 
+2026-07-07 中途检查 Markov-ACD 训练时发现：p2-p6 提升非常明显，但每个 anchor 的第一跳/local slot0
+没有吃到 Markov/Residual/token-CE 增强，导致 t1 以及各 anchor 的一步预测仍接近旧版。下一版因此改为
+`causal_residual_start_index=0`，并加入 `first_step_boost`，单独补强 local slot0；跨-anchor CAD 本身仍保持
+p2-p5，因为 p1 没有更强前缀 teacher。
+
 ```bash
 BATCH_SIZE=16 WARMUP_STEPS=1000 LR=5e-5 RESIDUAL_CAD_W=0.10 REFINED_HIDDEN_W=0.30 \
 ANCHOR_LOGIT_DISTILL_W=0.10 RESIDUAL_TOKEN_CE_W=0.10 SOFT_W=0.10 \
+FIRST_STEP_BOOST=2.0 CAUSAL_RESIDUAL_START_INDEX=0 \
   CUDA_VISIBLE_DEVICES=0,1,2,3 \
   bash openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_residual_cad_4gpu.sh
 ```
 
-如果要复现实验，请优先使用新的 `*_markov_acd_tokence_soft01_b16_4gpu` 输出目录；不要和旧的 puretrain、weak-path、Residual-CAD
+如果要复现实验，请优先使用新的 `*_markov_acd_firststep_tokence_soft01_b16_4gpu` 输出目录；不要和旧的 puretrain、weak-path、Residual-CAD
 目录混写。
 
 2026-06-29 重新检查到的 3090 数据和上一版 puretrain 训练产物状态：
@@ -900,7 +911,7 @@ run_config.json 记录: world_size=4, global_effective_batch=32, train_files=285
 推荐加 `-3`，让数据经由本地转发，不要求 3090 能直接连到 4090：
 
 ```bash
-TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu
+TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_firststep_tokence_soft01_b16_4gpu
 CKPT=epoch_190_step_169670
 
 scp -3 -r \
@@ -911,7 +922,7 @@ scp -3 -r \
 如果要复制 3090 当前 `latest_checkpoint.txt` 指向的最新 checkpoint，可以在本地终端执行：
 
 ```bash
-TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu
+TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_firststep_tokence_soft01_b16_4gpu
 CKPT=$(ssh 3090_wulin "basename \"\$(cat ${TRAIN_DIR}/latest_checkpoint.txt)\"")
 
 scp -3 -r \
@@ -956,7 +967,7 @@ openvla/specdecoding/decode-scripts/
 ```text
 OpenVLA goal model: /data/wulin/hf_files/openvla-7b-finetuned-libero-goal
 SpecVLA checkpoints: /data/wulin/c/specvla-data/specvla_checkpoint/goal
-DFLASH run dir: /data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu
+DFLASH run dir: /data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_firststep_tokence_soft01_b16_4gpu
 Logs: /data/wulin/c/specvla-data/eval_logs
 ```
 
@@ -1126,7 +1137,7 @@ cd /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH
 设置本次要评测的 DFLASH checkpoint。这里以当前 Markov-ACD 第 200 epoch 为例：
 
 ```bash
-export DFLASH_CKPT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu/epoch_200_step_089400
+export DFLASH_CKPT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_firststep_tokence_soft01_b16_4gpu/epoch_200_step_089400
 export NUM_TRIALS_PER_TASK=50
 export CUDA_VISIBLE_DEVICES=0
 ```

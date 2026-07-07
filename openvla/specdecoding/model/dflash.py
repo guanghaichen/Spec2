@@ -377,8 +377,9 @@ class DFlashDraftModel(nn.Module):
     ) -> torch.Tensor:
         """Refine hidden states using the previous token available for each slot.
 
-        start_index=1 leaves slot0 unchanged. Slot0 is already the reliable one-step prediction,
-        while later slots are exactly where block-parallel DFlash lacks short causal context.
+        start_index=1 leaves slot0 unchanged. For the first-step-boost branch we set
+        start_index=0, because the anchor token is available for slot0 as a valid
+        previous-token condition and the one-step path also needs direct refinement.
         """
         if not self.causal_residual_enabled:
             return hidden_states
@@ -415,9 +416,9 @@ class DFlashDraftModel(nn.Module):
     ) -> torch.Tensor:
         """Add a lightweight previous-token-conditioned bias on logits.
 
-        The hidden block is still produced in one DFlash forward. This head only corrects
-        the decision boundary of later slots with the previous token that is available in
-        training, or the just-sampled draft token during inference.
+        The hidden block is still produced in one DFlash forward. This head corrects
+        the decision boundary with the previous token that is available in training,
+        or the anchor / just-sampled draft token during inference.
         """
         if not self.logit_markov_enabled:
             return logits

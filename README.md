@@ -453,18 +453,29 @@ git status
 git pull --ff-only origin main
 ```
 
-### 2. `.bashrc` 中固定镜像源和本地路径
+### 2. `.bashrc` 中只固定稳定根路径和镜像源
 
-4090 后续尽量不要让脚本自动访问官方 Hugging Face。把下面内容追加到 `~/.bashrc` 后重新登录，
-或执行 `source ~/.bashrc`：
+4090 后续尽量不要让脚本自动访问官方 Hugging Face。`.bashrc` 只放跨任务稳定的根目录、缓存和数据路径；
+**不要在 `.bashrc` 里 export 全局 `VLA_PATH` 或 `OPENVLA_MODEL_PATH`**。评测时的 suite-specific OpenVLA
+模型路径由 `openvla/specdecoding/decode-scripts/libero_eval_common.sh` 根据 `TASK_SUITE_NAME` 自动选择。
+如确实要临时覆盖某个评测模型路径，用命令行前缀 `VLA_PATH_OVERRIDE=/path/to/model`。
+
+把下面内容追加到 `~/.bashrc` 后重新登录，或执行 `source ~/.bashrc`：
 
 ```bash
-# SpecVLA-DFLASH paths on 4090
+# SpecVLA-DFLASH stable paths on 4090.
+# Keep suite-specific eval model paths in decode-scripts/libero_eval_common.sh.
+# Do not export global VLA_PATH here; it can make Object/Spatial/Long eval load the Goal checkpoint.
 export SPECVLA_ROOT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh
 export SPECVLA_REPO=${SPECVLA_ROOT}/SpecVLA-DFLASH
 export SPECVLA_DATA=${SPECVLA_ROOT}/specvla-data
-export VLA_PATH=${SPECVLA_ROOT}/hf_files/openvla-7b-finetuned-libero-goal
-export OPENVLA_MODEL_PATH=${VLA_PATH}
+export OPENVLA_MODEL_ROOT=${SPECVLA_ROOT}/hf_files
+export OPENVLA_GOAL_PATH=${OPENVLA_MODEL_ROOT}/openvla-7b-finetuned-libero-goal
+export OPENVLA_OBJECT_PATH=${OPENVLA_MODEL_ROOT}/openvla-7b-finetuned-libero-object
+export OPENVLA_SPATIAL_PATH=${OPENVLA_MODEL_ROOT}/openvla-7b-finetuned-libero-spatial
+export OPENVLA_LONG_PATH=${OPENVLA_MODEL_ROOT}/openvla-7b-finetuned-libero-10
+unset VLA_PATH
+unset OPENVLA_MODEL_PATH
 export LIBERO_RLDS_ROOT=${SPECVLA_ROOT}/dataset/modified_libero_rlds
 export DFLASH_DATA_OUTDIR=${SPECVLA_DATA}/dflash_goal_dataset
 export DFLASH_OUTPUT_DIR=${SPECVLA_DATA}/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu
@@ -795,10 +806,10 @@ openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_residual_cad_
 openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_puretrain_4gpu.sh
 ```
 
-该 launcher 会根据机器自动选择默认路径。3090 上的默认路径是：
+该 launcher 会根据机器自动选择训练默认路径。注意这里是 Goal 训练专用默认值，不是评测时的全局 `VLA_PATH`。评测脚本会在 `libero_eval_common.sh` 里按子集选择 OpenVLA checkpoint。3090 上的训练默认路径是：
 
 ```text
-VLA_PATH=/data/wulin/hf_files/openvla-7b-finetuned-libero-goal
+OPENVLA_GOAL_PATH=/data/wulin/hf_files/openvla-7b-finetuned-libero-goal
 DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset
 OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu
 ```

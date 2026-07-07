@@ -15,7 +15,7 @@ cd "${REPO_ROOT}"
 # -----------------------------------------------------------------------------
 # 注意：这里的 VLA_PATH 是 Goal 训练专用路径，不是评测脚本里的全局 VLA_PATH。
 # 多子集评测请交给 decode-scripts/libero_eval_common.sh 自动选择 checkpoint。
-OUTPUT_NAME="ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_firststep_tokence_soft01_b16_4gpu"
+OUTPUT_NAME="ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_tokence_soft01_b16_4gpu"
 if [[ -d "/data/wulin" ]]; then
   DEFAULT_VLA_PATH="/data/wulin/hf_files/openvla-7b-finetuned-libero-goal"
   DEFAULT_DATAPATH="/data/wulin/c/specvla-data/dflash_goal_dataset"
@@ -60,13 +60,13 @@ REFINED_HIDDEN_W="${REFINED_HIDDEN_W:-0.30}" # 残差修正后的 weak-path hidd
 REFINED_HIDDEN_TYPE="${REFINED_HIDDEN_TYPE:-smooth_l1}"
 
 # -----------------------------------------------------------------------------
-# 4. Markov-ACD / 弱路径增强
+# 4. Markov-ACD 结构参数
 # -----------------------------------------------------------------------------
 CAUSAL_RESIDUAL_START_INDEX="${CAUSAL_RESIDUAL_START_INDEX:-0}"  # 0=连 local slot0/第一跳也用前序 token 修正。
 RESIDUAL_CAD_W="${RESIDUAL_CAD_W:-0.10}"                         # refined weak hidden 追 strong anchor hidden。
 RESIDUAL_CAD_TYPE="${RESIDUAL_CAD_TYPE:-cosine}"
 RESIDUAL_CAD_WARMUP_STEPS="${RESIDUAL_CAD_WARMUP_STEPS:-4000}"   # 避免训练初期强路径尚未稳定时 CAD 过早压制 weak path。
-RESIDUAL_TOKEN_CE_W="${RESIDUAL_TOKEN_CE_W:-0.10}"               # 只监督残差修正后的 logits，下一版覆盖 p1-p5。
+RESIDUAL_TOKEN_CE_W="${RESIDUAL_TOKEN_CE_W:-0.10}"               # 只监督残差修正后的 logits，默认覆盖 p1-p5。
 RESIDUAL_TOKEN_CE_MIN_POSITION="${RESIDUAL_TOKEN_CE_MIN_POSITION:-1}"
 RESIDUAL_TOKEN_CE_MAX_POSITION="${RESIDUAL_TOKEN_CE_MAX_POSITION:-5}"
 LOGIT_MARKOV_TYPE="${LOGIT_MARKOV_TYPE:-bias}"                   # logits 级轻量 Markov bias；none 可关闭。
@@ -76,11 +76,6 @@ REFINED_HIDDEN_MIN_POSITION="${REFINED_HIDDEN_MIN_POSITION:-1}"
 REFINED_HIDDEN_MAX_POSITION="${REFINED_HIDDEN_MAX_POSITION:-5}"
 ANCHOR_LOGIT_DISTILL_W="${ANCHOR_LOGIT_DISTILL_W:-0.10}"         # weak anchor logits 追 strong anchor logits。
 ANCHOR_LOGIT_DISTILL_TEMPERATURE="${ANCHOR_LOGIT_DISTILL_TEMPERATURE:-2.0}"
-WEAK_FAR_SLOT_BOOST="${WEAK_FAR_SLOT_BOOST:-2.0}"                # p2-p5 等弱路径位置主损失加权。
-FIRST_STEP_BOOST="${FIRST_STEP_BOOST:-2.0}"                      # local slot0/第一跳单独加权，补强 t1 与各 anchor 一步预测。
-FIRST_STEP_BOOST_MIN_POSITION="${FIRST_STEP_BOOST_MIN_POSITION:-1}"
-FIRST_STEP_BOOST_MAX_POSITION="${FIRST_STEP_BOOST_MAX_POSITION:-5}"
-ANCHOR0_P2_BOOST="${ANCHOR0_P2_BOOST:-4.0}"                      # 最瓶颈的 anchor0->p2 额外加权。
 
 print_config() {
   cat <<EOF
@@ -119,11 +114,6 @@ REFINED_HIDDEN_MIN_POSITION=${REFINED_HIDDEN_MIN_POSITION}
 REFINED_HIDDEN_MAX_POSITION=${REFINED_HIDDEN_MAX_POSITION}
 RESIDUAL_TOKEN_CE_MIN_POSITION=${RESIDUAL_TOKEN_CE_MIN_POSITION}
 RESIDUAL_TOKEN_CE_MAX_POSITION=${RESIDUAL_TOKEN_CE_MAX_POSITION}
-WEAK_FAR_SLOT_BOOST=${WEAK_FAR_SLOT_BOOST}
-FIRST_STEP_BOOST=${FIRST_STEP_BOOST}
-FIRST_STEP_BOOST_MIN_POSITION=${FIRST_STEP_BOOST_MIN_POSITION}
-FIRST_STEP_BOOST_MAX_POSITION=${FIRST_STEP_BOOST_MAX_POSITION}
-ANCHOR0_P2_BOOST=${ANCHOR0_P2_BOOST}
 ================================================
 EOF
 }
@@ -178,11 +168,6 @@ torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   --anchor_logit_distill_min_position 2 \
   --anchor_logit_distill_max_position 5 \
   --anchor_logit_distill_correct_teacher_only \
-  --weak_far_slot_boost "${WEAK_FAR_SLOT_BOOST}" \
-  --first_step_boost "${FIRST_STEP_BOOST}" \
-  --first_step_boost_min_position "${FIRST_STEP_BOOST_MIN_POSITION}" \
-  --first_step_boost_max_position "${FIRST_STEP_BOOST_MAX_POSITION}" \
-  --anchor0_p2_boost "${ANCHOR0_P2_BOOST}" \
   \
   --weight_decay 0.05 \
   --lr "${LR}" \

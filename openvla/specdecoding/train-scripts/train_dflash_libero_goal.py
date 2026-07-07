@@ -142,7 +142,7 @@ def parse_args():
     )
     parser.add_argument("--causal_residual_rank", type=int, default=256, help="hidden 残差头中间维度；越大表达力越强但参数和过拟合风险也更高")
     parser.add_argument("--causal_residual_scale", type=float, default=1.0, help="hidden 残差幅度系数；0 等价于禁用残差效果")
-    parser.add_argument("--causal_residual_start_index", type=int, default=1, help="从第几个 draft slot 开始启用残差；默认跳过准确率很高的 slot0/p1")
+    parser.add_argument("--causal_residual_start_index", type=int, default=0, help="从第几个 draft slot 开始启用残差；0 表示连第一跳 slot0/p1 也使用前序 token 条件")
     parser.add_argument(
         "--causal_residual_cad_w",
         type=float,
@@ -232,36 +232,6 @@ def parse_args():
         action=argparse.BooleanOptionalAction,
         default=True,
         help="只用一步强路径预测正确的样本作为跨 anchor logits teacher，减少错误分布蒸馏",
-    )
-    parser.add_argument(
-        "--weak_far_slot_boost",
-        type=float,
-        default=1.0,
-        help="弱路径远 slot 的主损失权重倍率；用于加速 anchor0/1 等弱前缀下 p2-p5 的学习",
-    )
-    parser.add_argument(
-        "--first_step_boost",
-        type=float,
-        default=1.0,
-        help="每个 anchor 的第一跳/local slot0 主损失权重倍率；用于补强 t1 以及各 anchor 的一步预测能力",
-    )
-    parser.add_argument(
-        "--first_step_boost_min_position",
-        type=int,
-        default=1,
-        help="first_step_boost 作用的最小目标 token 位置；默认 p1",
-    )
-    parser.add_argument(
-        "--first_step_boost_max_position",
-        type=int,
-        default=5,
-        help="first_step_boost 作用的最大目标 token 位置；默认 p5，避免额外放大已经很高的 p6",
-    )
-    parser.add_argument(
-        "--anchor0_p2_boost",
-        type=float,
-        default=1.0,
-        help="瓶颈项 anchor0->p2 的主损失权重倍率；会覆盖 weak_far_slot_boost 的较小值",
     )
     parser.add_argument("--kl_w", type=float, dest="soft_w", help=argparse.SUPPRESS)
     parser.add_argument("--kl_temperature", type=float, dest="soft_temperature", help=argparse.SUPPRESS)
@@ -574,15 +544,6 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
             + ("+anchor_logit_distill" if args.anchor_logit_distill_w > 0 else "")
             + ("+weak_path_refined_hidden" if args.refined_hidden_w > 0 else "")
             + ("+residual_token_ce" if args.residual_token_ce_w > 0 else "")
-            + (
-                "+weak_path_loss_boost"
-                if (
-                    args.weak_far_slot_boost != 1.0
-                    or args.first_step_boost != 1.0
-                    or args.anchor0_p2_boost != 1.0
-                )
-                else ""
-            )
         )
         if args.include_anchor_hidden
         else "hidden_smooth_l1_main_plus_teacher_soft_ce",
@@ -620,11 +581,6 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "anchor_logit_distill_min_position": args.anchor_logit_distill_min_position,
         "anchor_logit_distill_max_position": args.anchor_logit_distill_max_position,
         "anchor_logit_distill_correct_teacher_only": args.anchor_logit_distill_correct_teacher_only,
-        "weak_far_slot_boost": args.weak_far_slot_boost,
-        "first_step_boost": args.first_step_boost,
-        "first_step_boost_min_position": args.first_step_boost_min_position,
-        "first_step_boost_max_position": args.first_step_boost_max_position,
-        "anchor0_p2_boost": args.anchor0_p2_boost,
         "slot_decay": args.slot_decay,
         "position_balance": args.position_balance,
         "hidden_loss_type": args.hidden_loss_type,
@@ -1085,48 +1041,10 @@ def compute_loss_and_accuracy(
             position_weights = torch.ones_like(target_positions)
         local_indices = torch.arange(max_block_len, device=device, dtype=torch.long)
         target_token_positions = teacher_start + local_indices + 1
-        weak_far_mask = (
-            (local_indices > 0)
-            & (local_indices >= args.causal_residual_start_index)
-            & (target_token_positions >= args.refined_hidden_min_position)
-            & (target_token_positions <= args.refined_hidden_max_position)
-        )
-        weak_path_multiplier = torch.ones(max_block_len, device=device, dtype=torch.float32)
-        if args.weak_far_slot_boost != 1.0:
-            weak_path_multiplier = torch.where(
-                weak_far_mask,
-                torch.full_like(weak_path_multiplier, args.weak_far_slot_boost),
-                weak_path_multiplier,
-            )
-        if args.first_step_boost != 1.0:
-            first_step_mask = (
-                (local_indices == 0)
-                & (target_token_positions >= args.first_step_boost_min_position)
-                & (target_token_positions <= args.first_step_boost_max_position)
-            )
-            weak_path_multiplier = torch.where(
-                first_step_mask,
-                torch.maximum(
-                    weak_path_multiplier,
-                    torch.full_like(weak_path_multiplier, args.first_step_boost),
-                ),
-                weak_path_multiplier,
-            )
-        if anchor == 0 and args.anchor0_p2_boost != 1.0:
-            anchor0_p2_mask = target_token_positions == 2
-            weak_path_multiplier = torch.where(
-                anchor0_p2_mask,
-                torch.maximum(
-                    weak_path_multiplier,
-                    torch.full_like(weak_path_multiplier, args.anchor0_p2_boost),
-                ),
-                weak_path_multiplier,
-            )
         loss_weight = (
             valid_mask
             * slot_weights.unsqueeze(0)
             * position_weights.unsqueeze(0)
-            * weak_path_multiplier.unsqueeze(0)
         )
         current_weight_sum = loss_weight.sum()
         if current_weight_sum.item() == 0:
@@ -1588,16 +1506,6 @@ def main():
             "WARNING: --anchor_logit_distill_w > 0 is most useful with --logit_markov_type bias; "
             "otherwise it distills raw draft logits only.",
         )
-    if args.weak_far_slot_boost <= 0:
-        raise ValueError("--weak_far_slot_boost must be > 0.")
-    if args.first_step_boost <= 0:
-        raise ValueError("--first_step_boost must be > 0.")
-    if args.first_step_boost_min_position < 1:
-        raise ValueError("--first_step_boost_min_position must be >= 1.")
-    if args.first_step_boost_max_position < args.first_step_boost_min_position:
-        raise ValueError("--first_step_boost_max_position must be >= --first_step_boost_min_position.")
-    if args.anchor0_p2_boost <= 0:
-        raise ValueError("--anchor0_p2_boost must be > 0.")
     if args.action_dim <= 0:
         raise ValueError("--action_dim must be > 0.")
     if args.include_anchor_hidden and args.block_size < 3:

@@ -728,7 +728,7 @@ cd /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH
 export PYTHONPATH="$PWD"
 ```
 
-路径可以通过 `VLA_PATH`、`LIBERO_RLDS_ROOT`、`DFLASH_DATA_OUTDIR` 覆盖；
+数据生成路径可以通过 `VLA_PATH`、`LIBERO_RLDS_ROOT`、`DFLASH_DATA_OUTDIR` 覆盖；
 数据生成脚本也支持显式 `--vla_path`、`--data_root_dir`、`--outdir` 参数。这样可以避免意外触发 Hugging Face 下载。
 
 生成 DFLASH 原始数据的入口：
@@ -958,9 +958,12 @@ Logs: /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_log
 ```
 
 如果权重被复制或重命名，可以用下面变量覆盖。DFlash 评测用 `SPEC_CKPT` 指向从 3090 搬到 4090 的
-checkpoint；SpecVLA baseline 才需要 `SPECVLA_GOAL_CKPT`：
+checkpoint；SpecVLA baseline 才需要 `SPECVLA_GOAL_CKPT`。OpenVLA 模型路径不要再用全局 `VLA_PATH`
+覆盖 eval launcher，因为 `.bashrc` 里常固定的是 Goal 模型，容易污染 Object/Spatial/Long；如确实要覆盖，
+使用 `VLA_PATH_OVERRIDE`：
 
 ```bash
+VLA_PATH_OVERRIDE=/path/to/openvla-suite-model
 SPEC_CKPT=/path/to/goal_ckpt
 SPECVLA_GOAL_CKPT=/path/to/goal_ckpt
 ```
@@ -1078,7 +1081,7 @@ python openvla/specdecoding/test-speed/summarize_eval_summaries.py \
 一次性覆盖变量可以写在 `bash` 前面：
 
 ```text
-VLA_PATH
+VLA_PATH_OVERRIDE
 SPEC_CKPT
 SPECVLA_CKPT
 SPECVLA_GOAL_CKPT

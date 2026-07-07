@@ -62,7 +62,9 @@ init_libero_eval_env() {
     DEFAULT_NVIDIA_EGL_VENDOR_JSON=""
   fi
 
-  VLA_PATH="${VLA_PATH:-${DEFAULT_VLA_PATH}}"
+  # Do not let a global VLA_PATH from ~/.bashrc leak across suites. The default
+  # must follow TASK_SUITE_NAME; use VLA_PATH_OVERRIDE for an intentional override.
+  VLA_PATH="${VLA_PATH_OVERRIDE:-${DEFAULT_VLA_PATH}}"
   DFLASH_OUTPUT_DIR="${DFLASH_OUTPUT_DIR:-${DEFAULT_DFLASH_OUTPUT_DIR}}"
   SPECVLA_CKPT="${SPECVLA_CKPT:-}"
   SPECVLA_GOAL_CKPT="${SPECVLA_GOAL_CKPT:-}"
@@ -79,7 +81,8 @@ init_libero_eval_env() {
 
   if [[ ! -d "${VLA_PATH}" ]]; then
     echo "VLA_PATH does not exist or is not a directory: ${VLA_PATH}" >&2
-    echo "Set VLA_PATH=/path/to/openvla-7b-finetuned-${TASK_SUITE_NAME}." >&2
+    echo "Default model path is selected from TASK_SUITE_NAME=${TASK_SUITE_NAME}." >&2
+    echo "For an intentional override, set VLA_PATH_OVERRIDE=/path/to/openvla-suite-model." >&2
     exit 1
   fi
 
@@ -191,6 +194,7 @@ print_common_eval_config() {
   echo "__EGL_VENDOR_LIBRARY_FILENAMES=${__EGL_VENDOR_LIBRARY_FILENAMES:-}"
   echo "TASK_SUITE_NAME=${TASK_SUITE_NAME:-}"
   echo "VLA_PATH=${VLA_PATH}"
+  echo "VLA_PATH_OVERRIDE=${VLA_PATH_OVERRIDE:-}"
   echo "SPEC_CKPT=${SPEC_CKPT:-}"
   echo "LOG_DIR=${LOG_DIR}"
   echo "NUM_TRIALS_PER_TASK=${NUM_TRIALS_PER_TASK}"

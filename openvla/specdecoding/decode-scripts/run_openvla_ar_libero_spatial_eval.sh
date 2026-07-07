@@ -9,6 +9,8 @@ SYNC_CUDA_TIMING="${SYNC_CUDA_TIMING:-False}"
 TIMING_SCOPE="${TIMING_SCOPE:-last_task}"
 
 print_common_eval_config
+echo "SYNC_CUDA_TIMING=${SYNC_CUDA_TIMING}"
+echo "TIMING_SCOPE=${TIMING_SCOPE}"
 
 python openvla/experiments/robot/libero/run_libero_goal_AR.py \
   --model_family openvla \

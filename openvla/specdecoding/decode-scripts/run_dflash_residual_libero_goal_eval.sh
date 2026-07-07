@@ -10,4 +10,7 @@ export SYNC_CUDA_TIMING="${SYNC_CUDA_TIMING:-False}"
 export TIMING_SCOPE="${TIMING_SCOPE:-last_task}"
 export RUN_ID_NOTE="${RUN_ID_NOTE:-dflash-residual-relaxed-e${EVAL_EPOCH}-r${ACCEPT_THRESHOLD}}"
 
+echo "SYNC_CUDA_TIMING=${SYNC_CUDA_TIMING}"
+echo "TIMING_SCOPE=${TIMING_SCOPE}"
+
 bash "${SCRIPT_DIR}/run_dflash_libero_goal_eval.sh"

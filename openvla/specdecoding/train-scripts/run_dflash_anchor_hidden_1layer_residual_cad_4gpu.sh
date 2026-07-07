@@ -15,7 +15,7 @@ cd "${REPO_ROOT}"
 # -----------------------------------------------------------------------------
 # 注意：这里的 VLA_PATH 是 Goal 训练专用路径，不是评测脚本里的全局 VLA_PATH。
 # 多子集评测请交给 decode-scripts/libero_eval_common.sh 自动选择 checkpoint。
-OUTPUT_NAME="ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_tokence_soft01_b16_4gpu"
+OUTPUT_NAME="ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu"
 if [[ -d "/data/wulin" ]]; then
   DEFAULT_VLA_PATH="/data/wulin/hf_files/openvla-7b-finetuned-libero-goal"
   DEFAULT_DATAPATH="/data/wulin/c/specvla-data/dflash_goal_dataset"
@@ -50,6 +50,7 @@ WARMUP_STEPS="${WARMUP_STEPS:-1000}"
 NUM_EPOCHS="${NUM_EPOCHS:-200}"
 SAVE_EVERY="${SAVE_EVERY:-10}"
 HIDDEN_NOISE="${HIDDEN_NOISE:-0.03}"
+SLOT_DECAY="${SLOT_DECAY:-0.90}"              # 块内位置整体递减；0.90 轻度偏向前几个 slot。
 
 # -----------------------------------------------------------------------------
 # 3. 主损失权重
@@ -93,6 +94,7 @@ WARMUP_STEPS=${WARMUP_STEPS}
 NUM_EPOCHS=${NUM_EPOCHS}
 SAVE_EVERY=${SAVE_EVERY}
 HIDDEN_NOISE=${HIDDEN_NOISE}
+SLOT_DECAY=${SLOT_DECAY}
 
 [损失权重]
 SOFT_W=${SOFT_W}
@@ -124,7 +126,7 @@ export CUDA_VISIBLE_DEVICES
 
 torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   openvla/specdecoding/train-scripts/train_dflash_libero_goal.py \
-  --run_name dflash-anchor-hidden-1layer-finalhidden-markov-acd-firststep-tokence-soft01-b16-4gpu \
+  --run_name dflash-anchor-hidden-1layer-finalhidden-markov-acd-start0-slotdecay090-tokence-soft01-b16-4gpu \
   --vla_path "${VLA_PATH}" \
   --datapath "${DATAPATH}" \
   --output_dir "${OUTPUT_DIR}" \
@@ -138,7 +140,7 @@ torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   --hidden_w 1.0 \
   --cos_w 0.05 \
   --soft_w "${SOFT_W}" \
-  --slot_decay 1.0 \
+  --slot_decay "${SLOT_DECAY}" \
   --hidden_noise "${HIDDEN_NOISE}" \
   \
   --anchor_consistency_w 0 \

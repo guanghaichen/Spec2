@@ -113,7 +113,7 @@ def parse_args():
     parser.add_argument("--soft_w", type=float, default=0, help="teacher soft distribution 蒸馏权重；用目标模型 logits 的软分布辅助 token 层对齐")
     parser.add_argument("--soft_temperature", type=float, default=2.0, help="soft distribution 蒸馏温度；越大分布越平滑")
     parser.add_argument("--cos_w", type=float, default=0.05, help="hidden cosine 辅助约束权重；强调方向一致性，通常小权重即可")
-    parser.add_argument("--slot_decay", type=float, default=0.85, help="块内位置衰减权重；1.0 表示 p1-p6 不衰减，<1 时更重视靠前 slot")
+    parser.add_argument("--slot_decay", type=float, default=0.90, help="块内位置衰减权重；1.0 表示 p1-p6 不衰减，<1 时更重视靠前 slot，推荐默认 0.90")
 
     # ---- 旧版跨 anchor hidden 一致性，当前主实验关闭 ----
     parser.add_argument("--anchor_consistency_w", type=float, default=0.0, help="旧版跨 anchor 一致性 loss 权重；0 表示关闭，主实验改用 Markov-ACD")

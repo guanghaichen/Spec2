@@ -162,8 +162,9 @@ openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_residual_cad_
    变成弱路径追强路径影子、但不贴真实 target 表示。
 
 本轮代码已经删除所有手工位置加权参数。保留 `causal_residual_start_index=0`，因为这不是手工加权，而是结构选择：
-所有待预测 slot，包括第一跳，都可以使用“前一个 token”条件。`slot_decay=1.0` 表示不人为衰减远 slot；
-`position_balance=True` 是 multi-anchor 数据重复次数的归一化，不是针对某个位置精挑细选地加权。
+所有待预测 slot，包括第一跳，都可以使用“前一个 token”条件。当前 `slot_decay=0.90`，表示按块内距离
+对后续 slot 做平滑整体衰减，轻度偏向更影响 acceptance length 的前几个 slot；这不是针对某个具体位置
+精挑细选地加权。`position_balance=True` 是 multi-anchor 数据重复次数的归一化，不是手工位置补丁。
 
 ### 当前 loss 和训练策略
 
@@ -347,7 +348,7 @@ EVAL_EPOCH=200 DFLASH_USE_CAUSAL_RESIDUAL_SAMPLING=True \
 --anchor_logit_distill_max_position 5
 --anchor_logit_distill_correct_teacher_only
 --soft_w 0.10
---slot_decay 1.0
+--slot_decay 0.90
 ```
 
 SwanLab/JSONL 会额外记录：
@@ -501,7 +502,7 @@ unset VLA_PATH
 unset OPENVLA_MODEL_PATH
 export LIBERO_RLDS_ROOT=${SPECVLA_ROOT}/dataset/modified_libero_rlds
 export DFLASH_DATA_OUTDIR=${SPECVLA_DATA}/dflash_goal_dataset
-export DFLASH_OUTPUT_DIR=${SPECVLA_DATA}/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_tokence_soft01_b16_4gpu
+export DFLASH_OUTPUT_DIR=${SPECVLA_DATA}/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu
 export SPECVLA_CKPT_ROOT=${SPECVLA_DATA}/specvla_checkpoint
 export SPECVLA_GOAL_CKPT=${SPECVLA_CKPT_ROOT}/goal
 export LOG_DIR=${SPECVLA_DATA}/eval_logs
@@ -712,7 +713,7 @@ find /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_go
 3090 继续负责四卡训练。训练完成后，在本地终端用 `scp -3` 从 3090 搬到 4090：
 
 ```bash
-TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_tokence_soft01_b16_4gpu
+TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu
 CKPT=epoch_190_step_169670
 
 scp -3 -r \
@@ -834,7 +835,7 @@ openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_puretrain_4gp
 ```text
 OPENVLA_GOAL_PATH=/data/wulin/hf_files/openvla-7b-finetuned-libero-goal
 DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset
-OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_tokence_soft01_b16_4gpu
+OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu
 ```
 
 Markov-ACD 主训练配置：
@@ -861,7 +862,7 @@ anchor_logit_distill_temperature = 2.0
 anchor_logit_distill_min/max_position = 2/5
 soft_w = 0.10
 refined_hidden_loss_type = smooth_l1
-slot_decay = 1.0
+slot_decay = 0.90
 position_balance = true
 hidden_noise = 0.03
 batch_size = 16 per GPU，有效 batch size = 64
@@ -888,7 +889,7 @@ CAUSAL_RESIDUAL_START_INDEX=0 \
   bash openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_residual_cad_4gpu.sh
 ```
 
-如果要复现实验，请优先使用新的 `*_markov_acd_start0_tokence_soft01_b16_4gpu` 输出目录；不要和旧的 puretrain、weak-path、Residual-CAD
+如果要复现实验，请优先使用新的 `*_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu` 输出目录；不要和旧的 puretrain、weak-path、Residual-CAD
 目录混写。
 
 2026-06-29 重新检查到的 3090 数据和上一版 puretrain 训练产物状态：
@@ -932,7 +933,7 @@ run_config.json 记录: world_size=4, global_effective_batch=32, train_files=285
 推荐加 `-3`，让数据经由本地转发，不要求 3090 能直接连到 4090：
 
 ```bash
-TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_tokence_soft01_b16_4gpu
+TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu
 CKPT=epoch_190_step_169670
 
 scp -3 -r \
@@ -943,7 +944,7 @@ scp -3 -r \
 如果要复制 3090 当前 `latest_checkpoint.txt` 指向的最新 checkpoint，可以在本地终端执行：
 
 ```bash
-TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_tokence_soft01_b16_4gpu
+TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu
 CKPT=$(ssh 3090_wulin "basename \"\$(cat ${TRAIN_DIR}/latest_checkpoint.txt)\"")
 
 scp -3 -r \
@@ -988,7 +989,7 @@ openvla/specdecoding/decode-scripts/
 ```text
 OpenVLA goal model: /data/wulin/hf_files/openvla-7b-finetuned-libero-goal
 SpecVLA checkpoints: /data/wulin/c/specvla-data/specvla_checkpoint/goal
-DFLASH run dir: /data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_tokence_soft01_b16_4gpu
+DFLASH run dir: /data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu
 Logs: /data/wulin/c/specvla-data/eval_logs
 ```
 
@@ -1158,7 +1159,7 @@ cd /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH
 设置本次要评测的 DFLASH checkpoint。这里以当前 Markov-ACD 第 200 epoch 为例：
 
 ```bash
-export DFLASH_CKPT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_tokence_soft01_b16_4gpu/epoch_200_step_089400
+export DFLASH_CKPT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu/epoch_200_step_089400
 export NUM_TRIALS_PER_TASK=50
 export CUDA_VISIBLE_DEVICES=0
 ```

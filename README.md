@@ -420,6 +420,115 @@ dflash_data_format           full_prefix_plus_action_hidden_v4
 - Relaxed acceptance 可能保持实际动作效果，但 token 层面不等于 strict equality。必须做消融并诚实报告阈值。
 
 
+## 后续扩展：OpenVLA-OFT Layer-ACD Early Exit
+
+这一节是后续实验备忘录，**不是当前正在跑的主线**。当前优先级仍是完成 OpenVLA 自回归 action-token
+场景下的 DFLASH / Markov-ACD 训练和 4090 串行推理评测。等这部分结果稳定后，再考虑把同一思想迁移到
+[OpenVLA-OFT](https://openvla-oft.github.io/)。
+
+### 动机
+
+OpenVLA-OFT 已经不是原始 OpenVLA 那种 7 个 action token 自回归解码，而是 parallel decoding、
+action chunking 和 continuous action head。因此，当前 DFLASH speculative decoding 主线即使成功，也主要证明
+“能加速自回归 OpenVLA”。审稿人可能会追问：如果 VLA action head 本来就是并行的，这个思路是否还有价值？
+
+可以用一个小实验回答这个问题：把 Markov-ACD 的核心抽象成 **弱计算路径追强计算路径**。在 OpenVLA 中，
+弱路径是短 anchor / 薄前缀；在 OpenVLA-OFT 中，弱路径可以是 **早期 LLaMA layer hidden**，强路径是
+**最终层 hidden / full OpenVLA-OFT action chunk**。这样就从 speculative decoding 扩展成
+parallel action-chunk VLA 的 early-exit acceleration。
+
+### 粗略方案
+
+暂定名字可以叫 **Layer-ACD Early Exit**：
+
+```text
+early layer hidden h_l
+    -> Markov/Layer-aware residual refinement
+    -> early action head
+    -> predicted action chunk
+```
+
+训练时固定一个 OpenVLA-OFT teacher，对同一输入保存：
+
+```text
+early hidden:      h_l, 例如 layer 16 / 20 / 24 / 28
+final hidden:      h_L
+teacher action:    full OpenVLA-OFT action chunk
+ground-truth act:  dataset action chunk
+```
+
+然后训练一个轻量 early-exit module：
+
+```text
+refined_h_l = h_l + ResidualMLP(h_l, layer_embed, action_step_embed, action_dim_embed)
+early_action_chunk = ActionHead(refined_h_l)
+```
+
+这里的 residual head 对应当前 DFLASH 里的 Markov-aware residual refinement，只是条件从“前一个 token”
+变成 “layer id / action step / action dimension”等并行 action-chunk 结构信息。核心不是复制 speculative decoding，
+而是复用“弱路径 hidden 经轻量修正后追强路径”的思想。
+
+### 训练 loss
+
+第一版不要设计太复杂，先验证早退是否能保住控制性能：
+
+```text
+total =
+    hidden_distill(refined_h_l, final_h_L)
+  + action_distill(early_action_chunk, teacher_action_chunk)
+  + action_L1(early_action_chunk, gt_action_chunk)
+  + cosine_hidden_loss(refined_h_l, final_h_L)
+```
+
+可以加一个轻量 horizon decay，让 action chunk 前几步权重大一点，因为闭环控制里最靠前的动作通常最直接影响
+下一帧状态。这个 decay 应该是全局结构先验，不要做手工点名位置补丁。
+
+### 最小实验矩阵
+
+先只做 LIBERO-Goal，避免在主线没收束前铺太大：
+
+| 方法 | 说明 |
+| --- | --- |
+| OFT-full | 原始 OpenVLA-OFT，完整 LLaMA 层数和原 action head。 |
+| OFT-early-naive | 直接拿 early layer hidden 接 action head，不加 residual。 |
+| OFT-early-residual | early layer hidden + residual refinement + action head。 |
+| OFT-early-Layer-ACD | residual refinement + hidden/action distillation，是完整小实验。 |
+
+建议测试的 exit layer：
+
+```text
+layer 16 / 20 / 24 / 28
+```
+
+核心指标：
+
+```text
+LIBERO success rate
+latency / throughput
+action L1 to teacher action
+action L1 to ground-truth action
+chunk 前 1/2/4/8 步误差
+```
+
+保守成功标准：
+
+```text
+success rate drop <= 1-2%
+latency speedup >= 15-25%
+```
+
+### 风险和边界
+
+1. OpenVLA-OFT 已经很快，early-exit 的绝对速度收益可能没有自回归 OpenVLA 明显。
+2. 早期 layer hidden 可能还没有形成足够强的 action semantics，success rate 可能明显下降。
+3. 这个扩展不是 speculative decoding，本论文里只能作为 generalization / future extension / small study，
+   不要和主贡献混淆。
+4. 如果最小实验失败，也仍然有价值：它能界定当前 Markov-ACD 思想更适合 action-token autoregressive VLA，
+   而不是所有并行 action-head VLA。
+
+当前暂不实现这条线。等 OpenVLA 主实验完成后，再新开分支接入 OpenVLA-OFT 代码和数据。
+
+
 ## 新服务器 4090 从零迁移步骤
 
 旧 4090d 机器不再作为默认推理机。之后默认把新的 `ssh 4090` 作为主开发、数据生成和单卡推理评测机器；

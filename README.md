@@ -529,6 +529,155 @@ latency speedup >= 15-25%
 当前暂不实现这条线。等 OpenVLA 主实验完成后，再新开分支接入 OpenVLA-OFT 代码和数据。
 
 
+## 后续扩展：顶会级实验路线图
+
+这一节回答一个更大的问题：如果当前 OpenVLA 自回归场景已经拿到非常好的速度、Length 和成功率结果，
+下一步还需要补哪些实验，才能让论文故事达到机器人/VLA 顶会的完整度。这里仍是路线图，不代表已经完成。
+
+### 论文主结论需要被哪些证据支撑
+
+顶会论文不能只报告“某个 checkpoint 在 Goal 上更快”。更稳的主结论应该是：
+
+> Markov-ACD 通过跨 anchor 强弱路径蒸馏，让轻量块并行 draft 在保持 target-model 校验可靠性的前提下，
+> 提高 accepted length，并把 accepted length 的提升稳定转化为 wall-clock latency 下降和机器人任务成功率保持。
+
+这句话需要四类证据同时成立：
+
+1. **效果证据。** 在 LIBERO 多个 suite 上，DFLASH/Markov-ACD 的 `SR / Length / Speedup`
+   同时优于或不弱于 OpenVLA AR 和 SpecVLA baseline。
+2. **机制证据。** p2-p5 弱路径的离线准确率、在线 hit rate、accept length histogram 都能解释为什么速度提高。
+3. **消融证据。** 去掉 Markov-aware residual、Hidden-level CAD、Logit-level CAD、soft distribution、
+   `start_index=0`、`slot_decay=0.90` 等组件后，指标按预期下降。
+4. **部署证据。** 在真实控制循环里，推理延迟降低不会破坏动作质量，最好能提升闭环响应或至少保持成功率。
+
+### 必做实验清单
+
+| 层级 | 实验 | 目的 | 关键指标 |
+| --- | --- | --- | --- |
+| Main table | OpenVLA AR / SpecVLA strict / SpecVLA relaxed / DFLASH strict / DFLASH relaxed / DFLASH CADhead strict-relaxed | 证明主结果不是单一脚本偶然现象 | `SR`、`Length`、`Speedup`、`avg_accept_length`、`overall_hit_rate` |
+| Multi-suite | LIBERO Goal / Object / Spatial / Long | 证明不是只对 Goal 有效 | 每个 suite 的主表指标和 task-level breakdown |
+| Threshold sweep | relaxed threshold `0/3/6/9/12` | 分离 strict acceptance 和 relaxed acceptance 的贡献 | `SR` vs `Length` vs `Speedup` 曲线 |
+| Checkpoint sweep | epoch 30/60/90/120/150/180/200 | 找到最佳训练点，避免只报 latest | offline acc、online Length、SR |
+| Hardware timing | 4090 单实验串行，必要时再补 A100/3090 | 说明速度结果对硬件和 timing 口径敏感 | latency mean/median/p95、GPU、`SYNC_CUDA_TIMING`、`TIMING_SCOPE` |
+| Cost breakdown | target prefill、draft forward、verify、environment step | 解释速度瓶颈，不只报最终 speedup | 每部分耗时占比 |
+| Online diagnostics | per-position hit rate、accept length histogram、reject position histogram | 证明 p2-p5 是否真的被救起来 | `p1..p6 hit_rate`、histogram |
+| Robustness | 3 seeds 或多次 eval runs | 让成功率不是一次随机 rollout | mean/std 或 confidence interval |
+
+### 消融实验矩阵
+
+第一版消融不要铺得过大，但必须覆盖“为什么是 Markov-ACD，而不是普通加头”。
+
+| Variant | 改动 | 预期现象 |
+| --- | --- | --- |
+| Base hidden | 只保留 hidden/cos loss | p1/p6 高，p2-p5 弱，Length 有上限 |
+| + full prefix/action context | 对比压缩 context | 证明完整 prefix/action history 是必要条件 |
+| + final hidden variant | `[1,8,15,29,final]` vs `[1,8,15,22,29]` | 验证 final-layer 信息是否增强 draft |
+| + refined hidden supervision | 加 `refined_hidden_w` | residual head 更贴 target hidden |
+| + Markov residual | 启用 `causal_residual_type=hidden` | `accuracy - base_accuracy` 应转正 |
+| + residual token CE | 给 residual/logit 头 token 级信号 | p2-p5 token acc 更快上升 |
+| + Hidden-level CAD | 弱路径 hidden 追强路径 hidden | anchor0 远 slot 稳定提升 |
+| + Logit-level CAD | 弱路径 logits 追强路径 logits | token 决策边界更准，online hit rate 提升 |
+| start index | `start_index=1` vs `0` | `p1` 和每个 anchor 第一跳不应被牺牲 |
+| slot decay | `1.0 / 0.95 / 0.90 / 0.85` | 找到“重视前几个 slot”和“别伤远 slot”的平衡 |
+
+报告时不要把所有消融都塞进主表。可以把主论文放核心 5-6 个，附录放完整 sweep。
+
+### 分析图和论文叙事图
+
+如果主实验成功，至少需要准备这些图：
+
+1. **Accuracy-to-acceptance bridge。** 横轴是训练 epoch，纵轴同时画 `anchor0->p2-p5 acc`、
+   online p2-p5 hit rate、Length。目的是证明离线弱路径提升能转化为在线 acceptance。
+2. **Accept length histogram。** 对比 SpecVLA relaxed 和 DFLASH relaxed，展示我们是否把更多 block 推到
+   length 2/3/4，而不是只靠少数长 tail。
+3. **Latency decomposition。** AR、SpecVLA、DFLASH 的 target/draft/verify/environment 耗时分解。
+4. **Ablation waterfall。** 从 Base hidden 到 full Markov-ACD，每加入一个模块，p2-p5 acc、Length、
+   Speedup 如何变化。
+5. **Failure cases。** 收集失败 rollout：是视觉误识别、动作 token 拒绝过早、relaxed threshold 过松，
+   还是 draft 快但 target correction 频繁。
+
+### 真实机械臂实验：ALICIA-D 验证方案
+
+你手头的玄雅科技灵动 ALICIA-D 可以作为真机验证平台。根据官方公开介绍，ALICIA-D 是桌面级六轴机械臂，
+面向具身智能和数据采集场景，官方资料提到其可接入仿真、真机训练和 LeRobot 等生态；具体负载、末端、相机、
+控制接口以你手头设备和厂家文档为准。
+
+真机实验的目标不是重新证明一个大规模通用机器人策略，而是回答：
+
+> Markov-ACD 在真实闭环控制中降低推理延迟后，是否仍保持 OpenVLA policy 的任务成功率和动作质量？
+
+#### 实验分阶段
+
+| 阶段 | 目标 | 推荐规模 |
+| --- | --- | --- |
+| Real-robot smoke test | 跑通相机、标定、动作接口、限位和急停；确认 action space 与 OpenVLA 兼容 | 每个动作 primitive 5-10 次 |
+| Small imitation dataset | 采集 Alicia-D 桌面任务 demonstration，用于 fine-tune target VLA | 3-5 个任务，每任务 30-80 条 demo |
+| Target policy | 先训练能稳定完成任务的 OpenVLA target，不上 draft | 每任务成功率最好先到 60-80% 以上 |
+| Draft training | 用 target policy 生成/保存 action hidden 和 token 数据，再训练 DFLASH draft | 复用当前 Markov-ACD workflow |
+| Real rollout comparison | 同一 target policy 下比较 AR、SpecVLA、DFLASH，改变的只有 decode mode | 每任务每方法 20-30 trials |
+
+#### 任务设计
+
+优先选择桌面、低风险、容易重置、能体现闭环响应的任务：
+
+| 任务 | 描述 | 评价 |
+| --- | --- | --- |
+| Pick-place colored block | 把指定颜色方块放入指定容器 | 成功/失败、完成时间、碰撞/掉落 |
+| Push to target | 把小物体推到桌面目标区域 | 最终距离、完成时间 |
+| Insert / place into cup | 把海绵块或轻物体放入杯/盒中 | 成功/失败、重试次数 |
+| Disturbed pick | 机械臂接近前随机轻微移动目标物 | 测试低延迟闭环是否更稳 |
+| Long-horizon two-step | 先拿物体，再放到另一处或按颜色分类 | 测试累计 correction 是否影响策略 |
+
+#### 真机数据格式和控制日志
+
+每条 rollout 建议保存：
+
+```text
+timestamp
+front_camera / wrist_camera image
+instruction
+end-effector pose
+gripper state
+raw target action
+executed action
+decode mode: AR / SpecVLA / DFLASH / DFLASH-CADhead
+per-step latency
+accepted length / reject position / corrected token
+success label
+safety stop / collision / out-of-bound flag
+```
+
+#### 真机对照原则
+
+1. **同一 target policy。** AR、SpecVLA、DFLASH 必须加载同一个 target VLA 权重；只改变 decoding / draft。
+2. **交错评测顺序。** 不要先跑完 AR 再跑 DFLASH；按随机顺序交错方法，避免光照、物体位置、机械臂温度漂移。
+3. **固定随机种子和初始位姿列表。** 每个方法使用相同的 object pose set。
+4. **速度和成功率一起报告。** 如果速度提升但成功率下降，必须诚实给出 trade-off。
+5. **安全限制。** workspace bound、速度/加速度上限、急停、软限位、碰撞检查必须先于任何论文实验。
+
+#### 真机结果表
+
+最小可投稿级真机表可以这样设计：
+
+| Task | Method | Success | Completion time | Policy latency | Control freq | Avg accepted length | Notes |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Pick-place | OpenVLA AR | - | - | - | - | - | target baseline |
+| Pick-place | DFLASH relaxed | - | - | - | - | - | same target |
+| Disturbed pick | OpenVLA AR | - | - | - | - | - | latency-sensitive |
+| Disturbed pick | DFLASH relaxed | - | - | - | - | - | latency-sensitive |
+
+如果资源有限，真机部分可以先做 2-3 个任务、每任务每方法 20 trials，作为“real-robot validation”小节；
+如果效果很好，再扩成 5 个任务并加 task-level videos。
+
+### 当前优先级排序
+
+1. **先完成当前 3090 训练和 4090 串行 eval。** 没有稳定主结果，不要扩散到 OFT 或真机。
+2. **补齐主表和核心消融。** 这决定论文主线是否成立。
+3. **补 online diagnostics 和 latency breakdown。** 这决定故事是否高级，而不是只报一个 speedup。
+4. **再做 Alicia-D 真机 smoke test。** 先确认 target policy 能控制真机，再比较 decoding mode。
+5. **最后做 OpenVLA-OFT Layer-ACD。** 它是泛化扩展章节，能拔高论文，但不应抢主线资源。
+
+
 ## 新服务器 4090 从零迁移步骤
 
 旧 4090d 机器不再作为默认推理机。之后默认把新的 `ssh 4090` 作为主开发、数据生成和单卡推理评测机器；

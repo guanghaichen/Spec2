@@ -29,7 +29,7 @@ init_libero_eval_env() {
 
   if [[ -d "/data/wulin" ]]; then
     DEFAULT_VLA_PATH="/data/wulin/hf_files/openvla-7b-finetuned-libero-${TASK_SUITE_SLUG}"
-    DEFAULT_DFLASH_OUTPUT_DIR="/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu"
+    DEFAULT_DFLASH_OUTPUT_DIR="/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu"
     DEFAULT_SPECVLA_CKPT="/data/wulin/c/specvla-data/specvla_checkpoint/${TASK_SUITE_SLUG}"
     DEFAULT_LOG_DIR="/data/wulin/c/specvla-data/eval_logs"
     DEFAULT_LIBERO_PATH="/data/wulin/c/LIBERO"
@@ -38,7 +38,7 @@ init_libero_eval_env() {
   elif [[ -d "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh" ]]; then
     DEFAULT_ROOT="/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh"
     DEFAULT_VLA_PATH="${DEFAULT_ROOT}/hf_files/openvla-7b-finetuned-libero-${TASK_SUITE_SLUG}"
-    DEFAULT_DFLASH_OUTPUT_DIR="${DEFAULT_ROOT}/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu"
+    DEFAULT_DFLASH_OUTPUT_DIR="${DEFAULT_ROOT}/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu"
     DEFAULT_SPECVLA_CKPT="${DEFAULT_ROOT}/specvla-data/specvla_checkpoint/${TASK_SUITE_SLUG}"
     DEFAULT_LOG_DIR="${DEFAULT_ROOT}/specvla-data/eval_logs"
     DEFAULT_LIBERO_PATH="${DEFAULT_ROOT}/LIBERO"
@@ -46,7 +46,7 @@ init_libero_eval_env() {
     DEFAULT_NVIDIA_EGL_VENDOR_JSON=""
   elif [[ -d "/mnt/storage/cgh" ]]; then
     DEFAULT_VLA_PATH="/mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-${TASK_SUITE_SLUG}"
-    DEFAULT_DFLASH_OUTPUT_DIR="/mnt/storage/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu"
+    DEFAULT_DFLASH_OUTPUT_DIR="/mnt/storage/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu"
     DEFAULT_SPECVLA_CKPT="/mnt/storage/cgh/specvla-data/specvla_checkpoint/${TASK_SUITE_SLUG}"
     DEFAULT_LOG_DIR="/mnt/storage/cgh/specvla-data/eval_logs"
     DEFAULT_LIBERO_PATH="/mnt/storage/cgh/LIBERO"
@@ -148,7 +148,7 @@ resolve_specvla_goal_checkpoint() {
   fi
 }
 
-resolve_dflash_goal_checkpoint() {
+resolve_dflash_checkpoint() {
   EVAL_EPOCH="${EVAL_EPOCH:-latest}"
 
   if [[ -z "${SPEC_CKPT:-}" ]]; then
@@ -184,6 +184,10 @@ resolve_dflash_goal_checkpoint() {
     echo "DFLASH SPEC_CKPT does not exist or is not a directory: ${SPEC_CKPT}" >&2
     exit 1
   fi
+}
+
+resolve_dflash_goal_checkpoint() {
+  resolve_dflash_checkpoint
 }
 
 print_common_eval_config() {

@@ -204,7 +204,7 @@ Per-anchor、per-position、`base_accuracy`、残差后 `accuracy`、`causal_res
 | Pure hidden baseline | `ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu` | 完整 prefix/action hidden、1-layer draft、`[1,8,15,29,final]`、hidden+cos，`soft_w=0` | 200 epoch 完整训练 | 0.807 / 0.830 | p1/p6 很强，但 anchor0 的 p2-p5 明显弱，说明块并行远 slot 缺因果信息。 |
 | Residual-CAD weak-path | `ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu` | 增加 hidden residual head、Hidden-level CAD、refined hidden supervision，b16 四卡 | 200 epoch 完整训练 | 0.799 / 0.830 | anchor0->p2 从 0.503 抬到 0.671，但 residual 后 `accuracy` 没超过 `base_accuracy`，说明残差头训练信号还不够强。 |
 | Markov-ACD 诊断短跑 | `ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu` | 增加 logits-level Markov bias、Logit-level CAD、residual token CE、`soft_w=0.10` | 跑到 epoch 18 手动/中途停止 | 0.897 / 0.905 | p2-p5 离线准确率明显跃升，证明“跨 anchor 蒸馏 + token/logit 信号”方向有效；但该目录仍是旧短跑诊断版，run_config 里有旧 `weak_path_loss_boost` 且 `start_index=1`。 |
-| Clean Markov-ACD 下一版 | `ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu` | 删除所有手工位置加权；`causal_residual_start_index=0`；`slot_decay=0.90`；保留 Markov-aware refinement + Hidden/Logit CAD | **待跑** | - | 目标是在不靠点名位置加权的情况下，保留 Markov-ACD 对 p2-p5 的提升，同时把第一跳也纳入 residual/logit 修正。 |
+| Clean Markov-ACD 当前长跑 | `ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu` | 删除所有手工位置加权；`causal_residual_start_index=0`；`slot_decay=0.90`；保留 Markov-aware refinement + Hidden/Logit CAD | 3090 四卡训练中，epoch 120 已检查 | 0.995 / 0.996 截至 epoch 120 | p2-p5 离线准确率已接近饱和，`accuracy-base_accuracy` 约 +3.2%；最终结论等待 4090 online Length/Speedup。 |
 
 ### 位置准确率演进
 
@@ -238,8 +238,8 @@ Markov-ACD。
 最重要的变化是 anchor0 弱路径：p2 从 `0.503 -> 0.671 -> 0.860`，p3 从
 `0.716 -> 0.717 -> 0.913`，p4 从 `0.620 -> 0.647 -> 0.881`，p5 从
 `0.692 -> 0.718 -> 0.880`。这说明单纯 hidden 拟合不足以解决远 slot；加入 token/logit 级 Markov 信号和
-跨 anchor 蒸馏后，弱路径确实更快追上强路径。下一版要验证的是：去掉手工位置加权、加入 start0 和
-`slot_decay=0.90` 后，这个提升是否还能稳定保留并转化为在线 acceptance length。
+跨 anchor 蒸馏后，弱路径确实更快追上强路径。当前 Clean Markov-ACD 长跑在 epoch 120 已显示离线弱路径显著抬升；下一步要验证的是：
+这种离线提升能否稳定转化为 4090 online acceptance length 和 Speedup。
 
 ### 3090 在线 sanity check
 
@@ -265,10 +265,10 @@ hit rate 仍只有 `0.37-0.43`。后来检查发现当时主 runtime 的 `includ
 `sample_with_causal_residual`，只是直接对 `draft_hidden` 做 `lm_head` 后采样。因此该评测不能判定
 residual/CAD 机制失败，只能说明“不在推理时使用 residual 修正，仅靠训练正则”不足以明显反超。
 
-### 当前待跑版本的观察重点
+### 当前 Clean Markov-ACD 长跑版观察重点
 
-当前 commit 的下一版是 Clean Markov-ACD：删掉所有手工位置加权，使用
-`causal_residual_start_index=0` 和 `slot_decay=0.90`。开训后优先看这些指标：
+当前 Clean Markov-ACD 长跑版已经在 3090 上运行，核心设置是：删掉所有手工位置加权，使用
+`causal_residual_start_index=0` 和 `slot_decay=0.90`。训练期间优先看这些指标：
 
 ```text
 train/accuracy
@@ -283,12 +283,12 @@ train/residual_token_ce_loss
 
 判断标准：
 
-1. `anchor0 -> p2-p5` 应尽量复现 Markov-ACD 短跑里的快速上升趋势。
+1. `anchor0 -> p2-p5` 是否保持 Markov-ACD 短跑里的快速上升趋势，并在长跑中稳定到高位。
 2. `anchor0 -> p1` 不能因为照顾 p2-p5 而长期掉下去；`start_index=0` 和 `slot_decay=0.90`
    就是为了把第一跳重新纳入训练重点。
 3. `accuracy - base_accuracy` 如果长期为正，说明 residual/logit 修正头在线启用后有希望产生真实收益；
    如果长期为负，要重新检查残差头是否在破坏 base draft。
-4. 离线准确率不是最终结论；训练后仍必须搬 checkpoint 到 4090，跑 strict/relaxed、CADhead on/off 的 LIBERO rollout。
+4. 离线准确率不是最终结论；训练后仍必须搬 checkpoint 到 4090，重点跑 CAD-head strict/relaxed 的 LIBERO rollout。
 
 2026-07-06 已补上 `include_anchor_hidden=True` 推理分支里的 residual sampling 接线。默认旧 DFlash
 launcher 仍关闭该功能；专用 residual launcher 会显式开启：
@@ -409,8 +409,8 @@ dflash_data_format           full_prefix_plus_action_hidden_v4
    这一步把 anchor0->p2 从约 0.50 拉到约 0.67，但 residual 后 accuracy 没稳定超过 base accuracy。
 6. **Markov-ACD。** 进一步加入 logits-level Markov bias、Logit-level CAD、residual token CE 和低权重 soft
    distribution。短跑诊断显示 anchor0 的 p2-p5 离线准确率大幅提升。
-7. **Clean Markov-ACD 当前待跑版。** 删除所有手工位置加权，保留结构性 Markov-aware refinement 和 CAD；
-   `causal_residual_start_index=0` 覆盖第一跳，`slot_decay=0.90` 轻度偏向更影响 acceptance length 的前几个 slot。
+7. **Clean Markov-ACD 当前长跑版。** 删除所有手工位置加权，保留结构性 Markov-aware refinement 和 CAD；
+   `causal_residual_start_index=0` 覆盖第一跳，`slot_decay=0.90` 轻度偏向更影响 acceptance length 的前几个 slot。epoch 120 已显示离线 p2-p5 接近饱和，下一步看 4090 online Length/Speedup。
 
 需要始终记住的限制：
 
@@ -565,22 +565,21 @@ latency speedup >= 15-25%
 
 ### 消融实验矩阵
 
-第一版消融不要铺得过大，但必须覆盖“为什么是 Markov-ACD，而不是普通加头”。
+第一版消融要服务主故事，不要切得太碎。当前建议只保留三档 waterfall：
 
-| Variant | 改动 | 预期现象 |
-| --- | --- | --- |
-| Base hidden | 只保留 hidden/cos loss | p1/p6 高，p2-p5 弱，Length 有上限 |
-| + full prefix/action context | 对比压缩 context | 证明完整 prefix/action history 是必要条件 |
-| + final hidden variant | `[1,8,15,29,final]` vs `[1,8,15,22,29]` | 验证 final-layer 信息是否增强 draft |
-| + refined hidden supervision | 加 `refined_hidden_w` | residual head 更贴 target hidden |
-| + Markov residual | 启用 `causal_residual_type=hidden` | `accuracy - base_accuracy` 应转正 |
-| + residual token CE | 给 residual/logit 头 token 级信号 | p2-p5 token acc 更快上升 |
-| + Hidden-level CAD | 弱路径 hidden 追强路径 hidden | anchor0 远 slot 稳定提升 |
-| + Logit-level CAD | 弱路径 logits 追强路径 logits | token 决策边界更准，online hit rate 提升 |
-| start index | `start_index=1` vs `0` | `p1` 和每个 anchor 第一跳不应被牺牲 |
-| slot decay | `1.0 / 0.95 / 0.90 / 0.85` | 找到“重视前几个 slot”和“别伤远 slot”的平衡 |
+| Variant | 训练脚本 | 结构含义 | 主要看什么 |
+| --- | --- | --- | --- |
+| Pure DFlash | `run_dflash_ablation_1_pure_hidden_4gpu.sh` | 完整 prefix/action hidden + 1-layer block draft，只用 hidden/cos 几何蒸馏；无 soft、无 CAD、无残差头 | p1-p6 离线准确率、online Length 的自然上限 |
+| + Anchor-Contrastive Distillation | `run_dflash_ablation_2_anchor_cad_4gpu.sh` | 加 Hidden-level CAD 和 Logit-level CAD，让短前缀弱路径追长前缀强路径；仍无 Markov 残差头 | anchor0 的 p2-p5 是否整体抬升，Length 是否开始变长 |
+| + Markov-aware CAD Head | `run_dflash_ablation_3_markov_acd_4gpu.sh` | 在 CAD 上加入 Markov-aware hidden residual、logit bias、residual token CE 和低权重 soft loss | `accuracy-base_accuracy`、online hit rate、Length、Speedup 是否进一步提高 |
 
-报告时不要把所有消融都塞进主表。可以把主论文放核心 5-6 个，附录放完整 sweep。
+这三档足够回答审稿人最可能问的核心问题：
+
+1. 单纯块并行 hidden draft 是否已经足够？
+2. 跨 anchor 强弱路径蒸馏是否真的缓解 p2-p5 的薄前缀问题？
+3. Markov-aware CAD head 是否把离线 token/hidden 改善转化成在线 acceptance 和速度？
+
+主表不需要放所有细碎 loss 开关。更细的 hidden-CAD-only、logit-CAD-only、soft_w sweep、slot_decay sweep 可以放附录或后续补实验，只有当主表结果需要解释时再展开。
 
 ### 分析图和论文叙事图
 
@@ -1070,13 +1069,18 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 \
 openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_residual_cad_4gpu.sh
 ```
 
-上一版 pure-training baseline launcher 仍保留，做消融时使用：
+当前三档核心消融训练入口如下。它们共用 batch、学习率、层选择、完整 prefix/action hidden、`slot_decay=0.90` 等训练 recipe，只改变结构信号，方便做清楚的主线对比：
 
 ```text
-openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_puretrain_4gpu.sh
+openvla/specdecoding/train-scripts/run_dflash_ablation_1_pure_hidden_4gpu.sh   # 纯 DFlash hidden/cos 蒸馏，无 soft、无 CAD、无残差头
+openvla/specdecoding/train-scripts/run_dflash_ablation_2_anchor_cad_4gpu.sh    # 在纯 DFlash 上加入 Hidden/Logit 跨 anchor 蒸馏，无残差头
+openvla/specdecoding/train-scripts/run_dflash_ablation_3_markov_acd_4gpu.sh    # 当前完整 Markov-ACD/CAD-head recipe
 ```
 
-该 launcher 会根据机器自动选择训练默认路径。注意这里是 Goal 训练专用默认值，不是评测时的全局 `VLA_PATH`。评测脚本会在 `libero_eval_common.sh` 里按子集选择 OpenVLA checkpoint。3090 上的训练默认路径是：
+三档消融推荐按顺序跑，形成论文里的 waterfall：`Pure DFlash -> + Anchor-Contrastive Distillation -> + Markov-aware CAD Head`。
+不要一开始就铺开“只关 hidden CAD / 只关 logit CAD / 只改 soft_w”的细碎消融；第一版主故事先看 7 个 action token 准确率、online Length 和 Speedup 是否逐级提高。
+
+这些 launcher 会根据机器自动选择训练默认路径。注意这里是 Goal 训练专用默认值，不是评测时的全局 `VLA_PATH`。评测脚本会在 `libero_eval_common.sh` 里按子集选择 OpenVLA checkpoint。3090 上的训练默认路径是：
 
 ```text
 OPENVLA_GOAL_PATH=/data/wulin/hf_files/openvla-7b-finetuned-libero-goal
@@ -1135,8 +1139,24 @@ CAUSAL_RESIDUAL_START_INDEX=0 \
   bash openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_residual_cad_4gpu.sh
 ```
 
-如果要复现实验，请优先使用新的 `*_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu` 输出目录；不要和旧的 puretrain、weak-path、Residual-CAD
-目录混写。
+如果要启动三档消融，命令分别是：
+
+```bash
+# 1. Pure DFlash：只看块并行 hidden draft 自身上限
+CUDA_VISIBLE_DEVICES=0,1,2,3 \
+  bash openvla/specdecoding/train-scripts/run_dflash_ablation_1_pure_hidden_4gpu.sh
+
+# 2. + Anchor-Contrastive Distillation：验证跨 anchor 强弱路径蒸馏是否能抬 p2-p5
+CUDA_VISIBLE_DEVICES=0,1,2,3 \
+  bash openvla/specdecoding/train-scripts/run_dflash_ablation_2_anchor_cad_4gpu.sh
+
+# 3. + Markov-aware CAD Head：当前完整方案
+CUDA_VISIBLE_DEVICES=0,1,2,3 \
+  bash openvla/specdecoding/train-scripts/run_dflash_ablation_3_markov_acd_4gpu.sh
+```
+
+如果要复现实验，请优先使用新的 `*_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu` 输出目录；
+不要和旧的 puretrain、weak-path、Residual-CAD 目录混写。
 
 2026-06-29 重新检查到的 3090 数据和上一版 puretrain 训练产物状态：
 
@@ -1505,7 +1525,50 @@ CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
   bash openvla/specdecoding/decode-scripts/run_specvla_relaxed_libero_10_eval.sh
 ```
 
-评测结束后，汇总 summary。由于普通 DFLASH 和 CADhead 都写入 `dflash_strict` / `dflash_relaxed`
+### DFlash CAD-head checkpoint sweep 和自动主表
+
+当前主表优先比较五类方法：OpenVLA AR、SpecVLA strict、SpecVLA relaxed、DFlash CAD-head strict、DFlash CAD-head relaxed。
+AR baseline 的四个 suite summary 已放在：
+
+```text
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs/openvla_ar
+```
+
+DFlash CAD-head 一键评测链只跑 strict/relaxed 两个 CAD-head 版本，并自动用同 suite 的 AR `timing.mean` 计算 Speedup：
+
+```bash
+# 默认跑 libero_goal/libero_object/libero_spatial/libero_10，默认扫 120/150/180/200 四个 epoch。
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_dflash_cad_head_main_table_eval.sh
+
+# 如果只想先测 Goal 的 epoch 200：
+TASK_SUITES="libero_goal" EVAL_EPOCHS="200" \
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_dflash_cad_head_main_table_eval.sh
+```
+
+评测链结束后会写：
+
+```text
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs/main_table_dflash_cad_head.csv
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs/main_table_dflash_cad_head.md
+```
+
+如果已经手动跑完若干实验，只想重新汇总，不启动 LIBERO rollout：
+
+```bash
+LOG_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs
+python openvla/specdecoding/test-speed/summarize_main_table_eval.py \
+  --log-dir "${LOG_DIR}" \
+  --ar-dir "${LOG_DIR}/openvla_ar" \
+  --output-csv "${LOG_DIR}/main_table_dflash_cad_head.csv" \
+  --output-md "${LOG_DIR}/main_table_dflash_cad_head.md"
+```
+
+这个汇总脚本会自动过滤普通 DFlash，只收 `dflash_use_causal_residual_sampling=true` 的 DFlash CAD-head 结果；
+Speedup 一律相对同 suite 的 OpenVLA AR baseline。
+
+评测结束后，旧的手动汇总方式仍可用。由于普通 DFLASH 和 CADhead 都写入 `dflash_strict` / `dflash_relaxed`
 目录，不能只靠 `ls -t | head -1` 自动判断是哪一组；刚跑完一整套时可以先这样取最新文件，
 正式记录时必须手动核对 `run_id`、`dflash_use_causal_residual_sampling`、`SPEC_CKPT` 和
 `accept_threshold`：

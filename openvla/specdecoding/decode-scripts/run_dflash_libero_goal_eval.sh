@@ -3,12 +3,13 @@ set -euo pipefail
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/libero_eval_common.sh"
 
-init_libero_goal_eval_env
-resolve_dflash_goal_checkpoint
+TASK_SUITE_NAME="${TASK_SUITE_NAME:-libero_goal}"
+init_libero_eval_env "${TASK_SUITE_NAME}"
+resolve_dflash_checkpoint
 
 ACCEPT_THRESHOLD="${ACCEPT_THRESHOLD:-9}"
 DFLASH_NUM_DRAFT_LAYERS="${DFLASH_NUM_DRAFT_LAYERS:-1}"
-RUN_ID_NOTE="${RUN_ID_NOTE:-dflash-relaxed-${EVAL_EPOCH}-r${ACCEPT_THRESHOLD}}"
+RUN_ID_NOTE="${RUN_ID_NOTE:-dflash-relaxed-${TASK_SUITE_SLUG}-e${EVAL_EPOCH}-r${ACCEPT_THRESHOLD}}"
 SYNC_CUDA_TIMING="${SYNC_CUDA_TIMING:-False}"
 TIMING_SCOPE="${TIMING_SCOPE:-last_task}"
 DFLASH_USE_CAUSAL_RESIDUAL_SAMPLING="${DFLASH_USE_CAUSAL_RESIDUAL_SAMPLING:-False}"
@@ -29,7 +30,7 @@ python openvla/experiments/robot/libero/run_libero_goal_Spec_Relaxed.py \
   --draft_backend dflash \
   --use_spec True \
   --parallel_draft False \
-  --task_suite_name libero_goal \
+  --task_suite_name "${TASK_SUITE_NAME}" \
   --num_trials_per_task "${NUM_TRIALS_PER_TASK}" \
   --center_crop True \
   --accept_threshold "${ACCEPT_THRESHOLD}" \

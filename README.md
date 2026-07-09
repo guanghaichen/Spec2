@@ -1497,7 +1497,29 @@ CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
 MuJoCo、图像预处理、磁盘和 Python 调度资源，速度数值只作工程参考。2026-07-05 的 3090 临时并行评测
 就是这种口径，不应直接写成论文速度。
 
-其它 suite baseline 可以照下面跑。每条命令都会自动使用对应 suite 的 OpenVLA 和 SpecVLA checkpoint：
+SpecVLA strict / relaxed 的四个 suite 可以用一键脚本自动续跑。它会扫描 `eval_logs/specvla_strict` 和
+`eval_logs/specvla_relaxed`，默认跳过已有 summary 或已有 txt/timing/summary artifact 的 run。因此如果 Goal strict
+已经跑过或正在跑，就不会重复启动。正式启动前建议先 dry-run 看计划：
+
+```bash
+# 只打印将跳过/将运行的项，不启动 LIBERO。
+DRY_RUN=True CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_specvla_main_table_eval.sh
+
+# 确认无误后正式续跑缺失项。
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_specvla_main_table_eval.sh
+```
+
+如果某个失败 run 留下了 txt，脚本也会默认跳过它；这种情况下可用 `FORCE_RERUN=True` 强制重跑，或手动删除对应 artifact。
+脚本结束后会写：
+
+```text
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs/main_table_specvla_baselines.csv
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs/main_table_specvla_baselines.md
+```
+
+其它 suite baseline 也仍可照下面逐个跑。每条命令都会自动使用对应 suite 的 OpenVLA 和 SpecVLA checkpoint：
 
 ```bash
 # Object

@@ -1175,7 +1175,7 @@ SwanLab = 使用环境默认配置
 2. `pack_dflash_dataset_hdf5.py` 可把旧 `.ckpt` 无损合并成一个 `.h5` 文件，样本内容不变。
 3. `train_dflash_libero_goal.py` 默认 `--dataset_format auto`，若路径是 `.h5` 或目录内存在 HDF5 数据，就按 HDF5 读取；否则再回退旧 shard / `.ckpt`。
 4. HDF5 文件属性 `complete=true` 时才允许训练；合并/生成中途的半成品不会被误读。
-5. 训练 launcher 默认 `NUM_WORKERS=1`、`DATALOADER_PREFETCH_FACTOR=1`、关闭 pin/persistent workers，并默认不保存 optimizer state / latest 根目录副本，减少共享硬盘压力。
+5. 训练 launcher 和底层 `train_dflash_libero_goal.py` 默认都使用 `NUM_WORKERS=1`、`DATALOADER_PREFETCH_FACTOR=1`、关闭 pin/persistent workers，并默认不保存 optimizer state / latest 根目录副本，减少共享硬盘压力。只有明确需要断点续训时，才手动打开 `SAVE_TRAINING_STATE=True`。
 
 3090 上把旧数据合并成单文件 HDF5：
 

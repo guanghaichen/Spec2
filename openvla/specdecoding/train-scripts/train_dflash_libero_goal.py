@@ -94,7 +94,7 @@ def parse_args():
     # ---- 训练规模与优化器 ----
     parser.add_argument("--batch_size", type=int, default=8, help="每张卡的 micro batch size；DDP 下全局 batch = batch_size * 卡数 * gradient_accumulation_steps")
     parser.add_argument("--gradient_accumulation_steps", type=int, default=1, help="梯度累积步数；显存不够时可增大它来保持全局 batch")
-    parser.add_argument("--num_workers", type=int, default=4, help="DataLoader worker 数；共享硬盘上建议设为 1，减少并发随机读")
+    parser.add_argument("--num_workers", type=int, default=1, help="DataLoader worker 数；共享硬盘上建议设为 1，减少并发随机读")
     parser.add_argument("--dataloader_prefetch_factor", type=int, default=1, help="每个 DataLoader worker 预取 batch 数；默认 1，避免共享硬盘被预取队列打满")
     parser.add_argument("--pin_memory", action=argparse.BooleanOptionalAction, default=False, help="是否启用 DataLoader pinned memory；默认关闭以降低主机内存/IO 压力")
     parser.add_argument("--persistent_workers", action=argparse.BooleanOptionalAction, default=False, help="是否保持 DataLoader worker 常驻；默认关闭，避免训练结束后 worker/文件句柄残留")
@@ -107,8 +107,8 @@ def parse_args():
     parser.add_argument("--warmup_steps", type=int, default=2000, help="学习率 warmup 步数；<=0 时退回 warmup_ratio")
     parser.add_argument("--warmup_ratio", type=float, default=0.03, help="当 warmup_steps<=0 时使用")
     parser.add_argument("--save_every", type=int, default=5, help="按 epoch 保存 checkpoint 的间隔；例如 10 表示每 10 个 epoch 保存一次")
-    parser.add_argument("--save_training_state", action=argparse.BooleanOptionalAction, default=True, help="是否保存 optimizer/scheduler 续训状态；关闭可让每个 checkpoint 少写约 1.2GB")
-    parser.add_argument("--save_latest_root_copy", action=argparse.BooleanOptionalAction, default=True, help="是否在 output_dir 根目录额外保存 latest pytorch_model.bin；关闭可减少每次保存约 600MB 写入")
+    parser.add_argument("--save_training_state", action=argparse.BooleanOptionalAction, default=False, help="是否保存 optimizer/scheduler 续训状态；默认关闭以减少共享硬盘写入；需要断点续训时再显式打开")
+    parser.add_argument("--save_latest_root_copy", action=argparse.BooleanOptionalAction, default=False, help="是否在 output_dir 根目录额外保存 latest pytorch_model.bin；默认关闭以减少每次保存约 600MB 写入")
     parser.add_argument("--seed", type=int, default=7, help="随机种子")
 
     # ---- Draft 结构与输入 hidden 组织方式 ----

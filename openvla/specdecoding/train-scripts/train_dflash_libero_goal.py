@@ -9,7 +9,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(SCRIPT_DIR))
 sys.path.insert(0, str(REPO_ROOT))
 
 import torch
@@ -23,6 +25,7 @@ from torch.utils.data.distributed import DistributedSampler
 from tqdm import tqdm
 from transformers import AutoConfig, AutoImageProcessor, AutoModelForVision2Seq, AutoProcessor
 
+from dflash_hdf5_utils import get_hdf5_sample_count, read_sample as read_hdf5_sample, resolve_hdf5_path
 from openvla.prismatic.extern.hf.configuration_prismatic import OpenVLAConfig# 导入VLA配置类
 from openvla.prismatic.extern.hf.modeling_prismatic import OpenVLAForActionPrediction# 导入VLA模型
 from openvla.prismatic.extern.hf.processing_prismatic import PrismaticImageProcessor, PrismaticProcessor
@@ -67,9 +70,9 @@ def parse_args():
     parser.add_argument(
         "--dataset_format",
         type=str,
-        choices=["auto", "files", "shards"],
+        choices=["auto", "files", "shards", "hdf5"],
         default="auto",
-        help="离线数据格式：files=每样本一个 .ckpt；shards=少量 shard 顺序读；auto=优先识别 shard manifest，否则回退 .ckpt",
+        help="离线数据格式：hdf5=单文件 HDF5；files=每样本一个 .ckpt；shards=少量 shard；auto=优先识别 HDF5，其次 shard，最后回退 .ckpt",
     )
     parser.add_argument(
         "--shard_sample_shuffle",
@@ -409,6 +412,14 @@ def load_shard_entries(path: str) -> Tuple[List[Dict[str, Any]], int]:
     return entries, total
 
 
+def load_hdf5_entry(path: str) -> Tuple[List[Dict[str, Any]], int]:
+    hdf5_path = resolve_hdf5_path(path)
+    if hdf5_path is None:
+        raise FileNotFoundError(f"No DFlash HDF5 dataset found at {path}")
+    total = get_hdf5_sample_count(hdf5_path)
+    return [{"path": str(hdf5_path), "count": total}], total
+
+
 # 递归遍历 datapath 目录，找到所有 .ckpt 结尾的文件（旧版离线数据），按文件名排序后返回
 def list_files(path: str, refresh_cache: bool = False) -> List[str]:
     cache_path = get_dataset_file_cache_path(path)
@@ -433,6 +444,11 @@ def list_files(path: str, refresh_cache: bool = False) -> List[str]:
 
 def list_dataset_entries(path: str, dataset_format: str, refresh_cache: bool = False) -> Tuple[List[Any], str, int]:
     """根据目录内容选择读取格式。返回 entries、格式名、样本总数。"""
+    if dataset_format in {"auto", "hdf5"} and resolve_hdf5_path(path) is not None:
+        entries, total = load_hdf5_entry(path)
+        return entries, "hdf5", total
+    if dataset_format == "hdf5":
+        raise FileNotFoundError(f"--dataset_format=hdf5 but no .h5/.hdf5 DFlash dataset found at {path}")
     if dataset_format in {"auto", "shards"} and get_dataset_shard_manifest_path(path) is not None:
         entries, total = load_shard_entries(path)
         return entries, "shards", total
@@ -443,7 +459,7 @@ def list_dataset_entries(path: str, dataset_format: str, refresh_cache: bool = F
 
 
 def count_dataset_entries(entries: List[Any], dataset_kind: str) -> int:
-    if dataset_kind == "shards":
+    if dataset_kind in {"shards", "hdf5"}:
         return sum(int(item["count"]) for item in entries)
     return len(entries)
 
@@ -480,7 +496,7 @@ class OfflineDFlashSampleMixin:
 
     def _format_sample(self, data: Dict[str, Any], file_path: str) -> Dict[str, Any]:
         hidden_state = data["hidden_state"]
-        tokens = torch.tensor(data["predicted_tokens"], dtype=torch.long)
+        tokens = torch.as_tensor(data["predicted_tokens"], dtype=torch.long)
         data_format = data.get("dflash_data_format")
 
         if data_format != "full_prefix_plus_action_hidden_v4":
@@ -588,6 +604,49 @@ class OfflineDFlashDataset(OfflineDFlashSampleMixin, Dataset):
         file_path = self.data[index]
         data = torch.load(file_path, map_location="cpu")
         return self._format_sample(data, file_path)
+
+
+class OfflineDFlashHDF5Dataset(OfflineDFlashSampleMixin, Dataset):
+    """单文件 HDF5 数据集：一个物理文件，按样本 group 读取，避免海量小文件。"""
+
+    def __init__(
+        self,
+        hdf5_path: str,
+        expected_selected_layers: Optional[int] = None,
+        target_layer_ids: Optional[List[int]] = None,
+        selected_hidden_variant: str = "target_layers",
+    ):
+        self.hdf5_path = str(hdf5_path)
+        self.num_samples = get_hdf5_sample_count(self.hdf5_path)
+        self._h5 = None
+        self._configure_format(expected_selected_layers, target_layer_ids, selected_hidden_variant)
+
+    def __len__(self) -> int:
+        return self.num_samples
+
+    def _file(self):
+        if self._h5 is None:
+            import h5py
+
+            self._h5 = h5py.File(self.hdf5_path, "r")
+        return self._h5
+
+    def __getitem__(self, index: int) -> Dict[str, Any]:
+        data = read_hdf5_sample(self._file(), int(index))
+        return self._format_sample(data, f"{self.hdf5_path}#{index}")
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state["_h5"] = None
+        return state
+
+    def __del__(self):
+        h5 = getattr(self, "_h5", None)
+        if h5 is not None:
+            try:
+                h5.close()
+            except Exception:
+                pass
 
 
 class OfflineDFlashShardDataset(OfflineDFlashSampleMixin, IterableDataset):
@@ -1828,7 +1887,9 @@ def main():
         model = DDP(model, device_ids=[local_rank], output_device=local_rank)
 
     if is_main:
-        if args.dataset_format == "auto" and get_dataset_shard_manifest_path(args.datapath) is not None:
+        if args.dataset_format == "auto" and resolve_hdf5_path(args.datapath) is not None:
+            print(f"检测到 DFlash HDF5 单文件，将使用单文件读取: {resolve_hdf5_path(args.datapath)}")
+        elif args.dataset_format == "auto" and get_dataset_shard_manifest_path(args.datapath) is not None:
             print(f"检测到 DFlash shard manifest，将使用顺序 shard 读取: {get_dataset_shard_manifest_path(args.datapath)}")
         elif args.dataset_format == "files":
             cache_path = get_dataset_file_cache_path(args.datapath)
@@ -1887,6 +1948,23 @@ def main():
             shuffle_samples=args.shard_sample_shuffle,
         )
         train_sampler = None
+    elif dataset_kind == "hdf5":
+        if len(train_files) != 1:
+            raise ValueError("HDF5 training expects exactly one dataset file entry.")
+        train_dataset = OfflineDFlashHDF5Dataset(
+            train_files[0]["path"],
+            expected_selected_layers=len(args.target_layer_ids),
+            target_layer_ids=args.target_layer_ids,
+            selected_hidden_variant=args.selected_hidden_variant,
+        )
+        train_sampler = DistributedSampler(
+            train_dataset,
+            num_replicas=world_size,
+            rank=rank,
+            shuffle=True,
+            seed=args.seed,
+            drop_last=False,
+        ) if distributed else None
     else:
         train_dataset = OfflineDFlashDataset(
             train_files,
@@ -1932,6 +2010,8 @@ def main():
                 seed=args.seed,
                 shuffle_samples=False,
             )
+        elif dataset_kind == "hdf5":
+            raise ValueError("HDF5 validation split is not implemented; use --val_split 0 for the current DDP training workflow.")
         else:
             val_dataset = OfflineDFlashDataset(
                 val_files,

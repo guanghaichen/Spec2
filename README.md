@@ -961,20 +961,19 @@ CUDA_VISIBLE_DEVICES=0 python openvla/specdecoding/train-scripts/ge_data_all_ope
   --vla_path /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-goal \
   --data_root_dir /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/dataset/modified_libero_rlds \
   --dataset_name libero_goal_no_noops \
-  --outdir /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset_sharded \
-  --output_format shards \
-  --samples_per_shard 32
+  --outdir /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset.h5 \
+  --output_format hdf5
 ```
 
 正式生成结束后检查：
 
 ```bash
-du -sh /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset_sharded
+ls -lh /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset.h5
 python - <<'PY'
-import json
-path = '/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset_sharded/dflash_shards_manifest.json'
-m = json.load(open(path))
-print('complete', m.get('complete'), 'samples', m.get('num_samples'), 'shards', len(m.get('shards', [])))
+import h5py
+path = '/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset.h5'
+with h5py.File(path, 'r') as f:
+    print('complete', bool(f.attrs.get('complete')), 'samples', int(f.attrs.get('num_samples')), 'format', f.attrs.get('format'))
 PY
 ```
 
@@ -1061,28 +1060,27 @@ CUDA_VISIBLE_DEVICES=0 python openvla/specdecoding/train-scripts/ge_data_all_ope
   --vla_path /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-goal \
   --data_root_dir /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/dataset/modified_libero_rlds \
   --dataset_name libero_goal_no_noops \
-  --outdir /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset_sharded \
-  --output_format shards \
-  --samples_per_shard 32
+  --outdir /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset.h5 \
+  --output_format hdf5
 ```
 
 训练前确认数据大小和数量：
 
 ```bash
-du -sh /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset_sharded
+ls -lh /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset.h5
 python - <<'PY'
-import json
-path = '/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset_sharded/dflash_shards_manifest.json'
-m = json.load(open(path))
-print('complete', m.get('complete'), 'samples', m.get('num_samples'), 'shards', len(m.get('shards', [])))
+import h5py
+path = '/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset.h5'
+with h5py.File(path, 'r') as f:
+    print('complete', bool(f.attrs.get('complete')), 'samples', int(f.attrs.get('num_samples')), 'format', f.attrs.get('format'))
 PY
 ```
 
 旧 4090 历史数据目录状态如下；新 4090 重新生成或迁移后必须重新记录实际数值：
 
 ```text
-/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset_sharded
-历史样本内容来自 28,576 个有效 .ckpt；合并后约 893 个 shard，manifest 中 complete=true 才能训练。
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset.h5
+历史样本内容来自 28,576 个有效 .ckpt；单文件 HDF5 中 `complete=true` 才能训练。
 ```
 
 ### 2. 3090：完整四卡训练
@@ -1125,7 +1123,7 @@ openvla/specdecoding/train-scripts/run_dflash_ablation_3_markov_acd_4gpu.sh    #
 
 ```text
 OPENVLA_GOAL_PATH=/data/wulin/hf_files/openvla-7b-finetuned-libero-goal
-DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset_sharded  # 若不存在则 launcher 自动回退旧 dflash_goal_dataset
+DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset.h5  # 若不存在则 launcher 自动回退旧 dflash_goal_dataset
 OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu
 ```
 
@@ -1167,18 +1165,19 @@ SwanLab = 使用环境默认配置
 `run_dflash_anchor_hidden_1layer_residual_cad_4gpu.sh` 支持环境变量覆盖常用超参数，例如：
 脚本内部已经按“路径、训练规模、loss 权重、Markov-ACD 结构参数”分区写了中文注释，启动时也会打印完整配置，训练前优先检查这份打印。
 
-### 训练 IO 修复：shard 数据格式
+### 训练 IO 修复：单文件 HDF5 数据格式
 
 2026-07-11 排查到服务器卡顿的主因不是 GPU，而是训练数据读取：旧数据是 `28,576` 个单样本 `.ckpt`，总大小约 `419G`。200 epoch 等价于重复随机读取约 `84TB` 小文件；4 卡 DDP 再叠加 DataLoader worker/prefetch，会让共享硬盘随机读非常高。SwanLab 逐指标上传和 checkpoint 写 optimizer state 是次要问题。
 
-当前修复：
+当前最终修复改为**单文件 HDF5**，而不是多 shard：
 
-1. `ge_data_all_openvla_token_only_libero_goal.py` 默认 `--output_format shards --samples_per_shard 32`，直接生成 shard。
-2. `pack_dflash_dataset_shards.py` 可把旧 `.ckpt` 无损合并成 shard，样本内容不变。
-3. `train_dflash_libero_goal.py` 默认 `--dataset_format auto`，若目录存在 `dflash_shards_manifest.json` 就按 shard 顺序读；manifest 的 `complete` 不是 `true` 时会拒绝训练。
-4. 训练 launcher 默认 `NUM_WORKERS=1`、`DATALOADER_PREFETCH_FACTOR=1`、关闭 pin/persistent workers，并默认不保存 optimizer state / latest 根目录副本，减少共享硬盘压力。
+1. `ge_data_all_openvla_token_only_libero_goal.py` 默认 `--output_format hdf5`，直接生成一个 `.h5` 文件。
+2. `pack_dflash_dataset_hdf5.py` 可把旧 `.ckpt` 无损合并成一个 `.h5` 文件，样本内容不变。
+3. `train_dflash_libero_goal.py` 默认 `--dataset_format auto`，若路径是 `.h5` 或目录内存在 HDF5 数据，就按 HDF5 读取；否则再回退旧 shard / `.ckpt`。
+4. HDF5 文件属性 `complete=true` 时才允许训练；合并/生成中途的半成品不会被误读。
+5. 训练 launcher 默认 `NUM_WORKERS=1`、`DATALOADER_PREFETCH_FACTOR=1`、关闭 pin/persistent workers，并默认不保存 optimizer state / latest 根目录副本，减少共享硬盘压力。
 
-3090 上把旧数据合并成 shard：
+3090 上把旧数据合并成单文件 HDF5：
 
 ```bash
 ssh 3090_wulin
@@ -1186,11 +1185,10 @@ cd /data/wulin/c/SpecVLA-DFLASH
 source /data/wulin/miniconda3/etc/profile.d/conda.sh
 conda activate specvla
 
-screen -S pack_dflash_data
-nice -n 10 ionice -c2 -n7 python openvla/specdecoding/train-scripts/pack_dflash_dataset_shards.py \
+screen -S pack_dflash_hdf5
+nice -n 10 ionice -c2 -n7 python openvla/specdecoding/train-scripts/pack_dflash_dataset_hdf5.py \
   --input_dir /data/wulin/c/specvla-data/dflash_goal_dataset \
-  --output_dir /data/wulin/c/specvla-data/dflash_goal_dataset_sharded \
-  --samples_per_shard 32 \
+  --output_file /data/wulin/c/specvla-data/dflash_goal_dataset.h5 \
   --overwrite
 ```
 
@@ -1198,15 +1196,14 @@ nice -n 10 ionice -c2 -n7 python openvla/specdecoding/train-scripts/pack_dflash_
 
 ```bash
 python - <<'PY'
-import json
-path = '/data/wulin/c/specvla-data/dflash_goal_dataset_sharded/dflash_shards_manifest.json'
-m = json.load(open(path))
-print('complete', m.get('complete'), 'samples', m.get('num_samples'), 'shards', len(m.get('shards', [])))
+import h5py
+path = '/data/wulin/c/specvla-data/dflash_goal_dataset.h5'
+with h5py.File(path, 'r') as f:
+    print('complete', bool(f.attrs.get('complete')), 'samples', int(f.attrs.get('num_samples')), 'format', f.attrs.get('format'))
 PY
 ```
 
-只有看到 `complete True` 才能开始训练。launcher 会优先使用 `/data/wulin/c/specvla-data/dflash_goal_dataset_sharded`；如果该目录不存在，才回退旧 `.ckpt` 目录。
-
+只有看到 `complete True` 才能开始训练。launcher 会优先使用 `/data/wulin/c/specvla-data/dflash_goal_dataset.h5`；如果该文件不存在，才回退旧 `.ckpt` 目录。
 
 2026-07-07 中途检查 Markov-ACD 训练时发现：p2-p6 提升非常明显，但每个 anchor 的第一跳/local slot0
 没有吃到 Markov/Residual/token-CE 增强，导致 t1 以及各 anchor 的一步预测仍接近旧版。当前干净版本因此改为

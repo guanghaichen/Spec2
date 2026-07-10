@@ -18,23 +18,23 @@ cd "${REPO_ROOT}"
 OUTPUT_NAME="ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu"
 if [[ -d "/data/wulin" ]]; then
   DEFAULT_VLA_PATH="/data/wulin/hf_files/openvla-7b-finetuned-libero-goal"
-  DEFAULT_DATAPATH="/data/wulin/c/specvla-data/dflash_goal_dataset_sharded"
-  [[ -d "${DEFAULT_DATAPATH}" ]] || DEFAULT_DATAPATH="/data/wulin/c/specvla-data/dflash_goal_dataset"
+  DEFAULT_DATAPATH="/data/wulin/c/specvla-data/dflash_goal_dataset.h5"
+  [[ -f "${DEFAULT_DATAPATH}" ]] || DEFAULT_DATAPATH="/data/wulin/c/specvla-data/dflash_goal_dataset"
   DEFAULT_OUTPUT_DIR="/data/wulin/c/specvla-data/${OUTPUT_NAME}"
 elif [[ -d "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh" ]]; then
   DEFAULT_VLA_PATH="/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-goal"
-  DEFAULT_DATAPATH="/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset_sharded"
-  [[ -d "${DEFAULT_DATAPATH}" ]] || DEFAULT_DATAPATH="/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset"
+  DEFAULT_DATAPATH="/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset.h5"
+  [[ -f "${DEFAULT_DATAPATH}" ]] || DEFAULT_DATAPATH="/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset"
   DEFAULT_OUTPUT_DIR="/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/${OUTPUT_NAME}"
 elif [[ -d "/mnt/storage/cgh" ]]; then
   DEFAULT_VLA_PATH="/mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-goal"
-  DEFAULT_DATAPATH="/mnt/storage/cgh/specvla-data/dflash_goal_dataset_sharded"
-  [[ -d "${DEFAULT_DATAPATH}" ]] || DEFAULT_DATAPATH="/mnt/storage/cgh/specvla-data/dflash_goal_dataset"
+  DEFAULT_DATAPATH="/mnt/storage/cgh/specvla-data/dflash_goal_dataset.h5"
+  [[ -f "${DEFAULT_DATAPATH}" ]] || DEFAULT_DATAPATH="/mnt/storage/cgh/specvla-data/dflash_goal_dataset"
   DEFAULT_OUTPUT_DIR="/mnt/storage/cgh/specvla-data/${OUTPUT_NAME}"
 else
   DEFAULT_VLA_PATH="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/data/models--openvla--openvla-7b-finetuned-libero-goal"
-  DEFAULT_DATAPATH="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset_sharded"
-  [[ -d "${DEFAULT_DATAPATH}" ]] || DEFAULT_DATAPATH="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset"
+  DEFAULT_DATAPATH="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset.h5"
+  [[ -f "${DEFAULT_DATAPATH}" ]] || DEFAULT_DATAPATH="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset"
   DEFAULT_OUTPUT_DIR="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/${OUTPUT_NAME}"
 fi
 
@@ -155,6 +155,7 @@ SAVE_TRAINING_STATE_ARG="$(bool_arg save_training_state "${SAVE_TRAINING_STATE}"
 SAVE_LATEST_ROOT_COPY_ARG="$(bool_arg save_latest_root_copy "${SAVE_LATEST_ROOT_COPY}")"
 
 export CUDA_VISIBLE_DEVICES
+export HDF5_USE_FILE_LOCKING="${HDF5_USE_FILE_LOCKING:-FALSE}"
 
 torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   openvla/specdecoding/train-scripts/train_dflash_libero_goal.py \

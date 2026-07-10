@@ -7,8 +7,12 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(SCRIPT_DIR))
 sys.path.insert(0, str(REPO_ROOT))
+
+from dflash_hdf5_utils import finalize_hdf5_file, init_hdf5_file, write_sample as write_hdf5_sample
 
 
 def resolve_default_path(env_names, candidates, fallback):
@@ -45,11 +49,11 @@ DEFAULT_RLDS_ROOT = resolve_default_path(
 if os.environ.get("DFLASH_DATA_OUTDIR") or os.environ.get("OUTDIR"):
     DEFAULT_OUTDIR = Path(os.environ.get("DFLASH_DATA_OUTDIR") or os.environ["OUTDIR"])
 elif Path("/data/wulin").exists():
-    DEFAULT_OUTDIR = Path("/data/wulin/c/specvla-data/dflash_goal_dataset_sharded")
+    DEFAULT_OUTDIR = Path("/data/wulin/c/specvla-data/dflash_goal_dataset.h5")
 elif Path("/mnt/storage/cgh").exists():
-    DEFAULT_OUTDIR = Path("/mnt/storage/cgh/specvla-data/dflash_goal_dataset_sharded")
+    DEFAULT_OUTDIR = Path("/mnt/storage/cgh/specvla-data/dflash_goal_dataset.h5")
 else:
-    DEFAULT_OUTDIR = Path("/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset_sharded")
+    DEFAULT_OUTDIR = Path("/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset.h5")
 
 #参数：开始/结束的数据idx，gpu-idx，用于多线程并行生成
 parser = argparse.ArgumentParser(description='sp')
@@ -68,15 +72,15 @@ parser.add_argument('--image_aug', action=argparse.BooleanOptionalAction, defaul
 parser.add_argument(
     '--output_format',
     type=str,
-    choices=['shards', 'files'],
-    default=os.environ.get('DFLASH_DATA_OUTPUT_FORMAT', 'shards'),
-    help='输出格式：shards=少量顺序读取 shard；files=兼容旧版，每样本一个 .ckpt',
+    choices=['hdf5', 'shards', 'files'],
+    default=os.environ.get('DFLASH_DATA_OUTPUT_FORMAT', 'hdf5'),
+    help='输出格式：hdf5=单文件 HDF5；shards=少量 shard；files=兼容旧版，每样本一个 .ckpt',
 )
 parser.add_argument(
     '--samples_per_shard',
     type=int,
     default=int(os.environ.get('DFLASH_SAMPLES_PER_SHARD', '32')),
-    help='output_format=shards 时，每个 shard 保存多少条样本；默认 32，约数百 MB，训练读盘更平滑',
+    help='output_format=shards 时每个 shard 保存多少条样本；HDF5/files 模式忽略该参数',
 )
 args = parser.parse_args()
 
@@ -216,23 +220,38 @@ print('start enumerating')
 class DFlashDatasetWriter:
     """DFlash 离线数据写出器。
 
-    files 模式兼容旧版：每个样本一个 data_x.ckpt。
-    shards 模式是当前推荐模式：每 N 个样本写进一个大 shard，并生成 manifest，训练时顺序读，显著降低随机小文件 IO。
+    hdf5 模式是当前默认：所有样本进入一个 .h5 文件，训练时按 sample group 读取。
+    shards/files 仅用于兼容旧实验。
     """
 
-    def __init__(self, outdir: str, output_format: str = "shards", samples_per_shard: int = 32):
+    def __init__(self, outdir: str, output_format: str = "hdf5", samples_per_shard: int = 32):
         if samples_per_shard <= 0:
             raise ValueError("--samples_per_shard must be > 0")
-        self.outdir = Path(outdir)
         self.output_format = output_format
         self.samples_per_shard = samples_per_shard
-        self.outdir.mkdir(parents=True, exist_ok=True)
         self.write_idx = 0
         self.shard_idx = 0
         self.buffer: List[Dict[str, Any]] = []
         self.shards: List[Dict[str, Any]] = []
+        self.h5 = None
+
+        self.outdir = Path(outdir)
+        if self.output_format == "hdf5":
+            self.h5 = init_hdf5_file(self.outdir, source="ge_data_all_openvla_token_only_libero_goal.py", overwrite=True)
+            self.out_path = Path(self.h5.filename)
+        else:
+            self.outdir.mkdir(parents=True, exist_ok=True)
+            self.out_path = self.outdir
 
     def write(self, data_point: Dict[str, Any]) -> None:
+        if self.output_format == "hdf5":
+            assert self.h5 is not None
+            write_hdf5_sample(self.h5["samples"], self.write_idx, data_point)
+            self.write_idx += 1
+            self.h5.attrs["num_samples"] = self.write_idx
+            if self.write_idx % 32 == 0:
+                self.h5.flush()
+            return
         if self.output_format == "files":
             torch.save(data_point, self.outdir / f"data_{self.write_idx}.ckpt")
             self.write_idx += 1
@@ -243,7 +262,7 @@ class DFlashDatasetWriter:
             self.flush()
 
     def flush(self) -> None:
-        if not self.buffer:
+        if self.output_format != "shards" or not self.buffer:
             return
         shard_name = f"shard_{self.shard_idx:06d}.pt"
         shard_path = self.outdir / shard_name
@@ -260,7 +279,7 @@ class DFlashDatasetWriter:
         self.shards.append({"file": shard_name, "count": len(self.buffer)})
         self.shard_idx += 1
         self.buffer = []
-        self.write_manifest()
+        self.write_manifest(complete=False)
 
     def write_manifest(self, complete: bool = False) -> None:
         if self.output_format != "shards":
@@ -279,11 +298,16 @@ class DFlashDatasetWriter:
         os.replace(tmp_path, self.outdir / "dflash_shards_manifest.json")
 
     def close(self) -> None:
+        if self.output_format == "hdf5":
+            assert self.h5 is not None
+            finalize_hdf5_file(self.h5, self.write_idx)
+            self.h5.close()
+            return
         self.flush()
-        self.write_manifest()
-
+        self.write_manifest(complete=True)
 
 writer = DFlashDatasetWriter(outdir, output_format=args.output_format, samples_per_shard=args.samples_per_shard)
+print(f'writer output: {writer.out_path}')
 
 #from transformers.modeling_outputs import CausalLMOutputWithPast
 gen_model_cfg.unnorm_key = gen_model_cfg.task_suite_name# 反归一化动作时用的 key，告诉模型这是 libero_goal 任务集的动作统计量（均值/方差）

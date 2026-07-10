@@ -7,7 +7,7 @@ import random
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT))
@@ -18,7 +18,7 @@ import torch.nn.functional as F
 from torch import nn
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import AdamW
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, IterableDataset, get_worker_info
 from torch.utils.data.distributed import DistributedSampler
 from tqdm import tqdm
 from transformers import AutoConfig, AutoImageProcessor, AutoModelForVision2Seq, AutoProcessor
@@ -65,6 +65,19 @@ def parse_args():
         help="离线数据路径（预计算的 .ckpt 文件）",
     )
     parser.add_argument(
+        "--dataset_format",
+        type=str,
+        choices=["auto", "files", "shards"],
+        default="auto",
+        help="离线数据格式：files=每样本一个 .ckpt；shards=少量 shard 顺序读；auto=优先识别 shard manifest，否则回退 .ckpt",
+    )
+    parser.add_argument(
+        "--shard_sample_shuffle",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="使用 shard 数据时，是否在每个 shard 内打乱样本顺序；默认开启",
+    )
+    parser.add_argument(
         "--output_dir",
         type=str,
         default=os.environ.get(
@@ -78,7 +91,10 @@ def parse_args():
     # ---- 训练规模与优化器 ----
     parser.add_argument("--batch_size", type=int, default=8, help="每张卡的 micro batch size；DDP 下全局 batch = batch_size * 卡数 * gradient_accumulation_steps")
     parser.add_argument("--gradient_accumulation_steps", type=int, default=1, help="梯度累积步数；显存不够时可增大它来保持全局 batch")
-    parser.add_argument("--num_workers", type=int, default=4, help="DataLoader worker 数")
+    parser.add_argument("--num_workers", type=int, default=4, help="DataLoader worker 数；共享硬盘上建议设为 1，减少并发随机读")
+    parser.add_argument("--dataloader_prefetch_factor", type=int, default=1, help="每个 DataLoader worker 预取 batch 数；默认 1，避免共享硬盘被预取队列打满")
+    parser.add_argument("--pin_memory", action=argparse.BooleanOptionalAction, default=False, help="是否启用 DataLoader pinned memory；默认关闭以降低主机内存/IO 压力")
+    parser.add_argument("--persistent_workers", action=argparse.BooleanOptionalAction, default=False, help="是否保持 DataLoader worker 常驻；默认关闭，避免训练结束后 worker/文件句柄残留")
     parser.add_argument("--num_epochs", type=int, default=200, help="最大训练 epochs")
     parser.add_argument("--lr", type=float, default=5e-5, help="AdamW 学习率；当前 4 卡 batch=64 时推荐 5e-5 起步")
     parser.add_argument("--weight_decay", type=float, default=5e-2, help="AdamW weight decay；用于抑制 draft 过度记忆训练集")
@@ -88,6 +104,8 @@ def parse_args():
     parser.add_argument("--warmup_steps", type=int, default=2000, help="学习率 warmup 步数；<=0 时退回 warmup_ratio")
     parser.add_argument("--warmup_ratio", type=float, default=0.03, help="当 warmup_steps<=0 时使用")
     parser.add_argument("--save_every", type=int, default=5, help="按 epoch 保存 checkpoint 的间隔；例如 10 表示每 10 个 epoch 保存一次")
+    parser.add_argument("--save_training_state", action=argparse.BooleanOptionalAction, default=True, help="是否保存 optimizer/scheduler 续训状态；关闭可让每个 checkpoint 少写约 1.2GB")
+    parser.add_argument("--save_latest_root_copy", action=argparse.BooleanOptionalAction, default=True, help="是否在 output_dir 根目录额外保存 latest pytorch_model.bin；关闭可减少每次保存约 600MB 写入")
     parser.add_argument("--seed", type=int, default=7, help="随机种子")
 
     # ---- Draft 结构与输入 hidden 组织方式 ----
@@ -252,6 +270,10 @@ def parse_args():
     parser.add_argument("--swanlab_project", type=str, default="dflash-libero-goal", help="dflash_openvla")
     parser.add_argument("--swanlab_workspace", type=str, default=None, help="SwanLab workspace/org")
     parser.add_argument("--swanlab_mode", type=str, default="cloud", choices=["cloud", "local", "offline", "disabled"], help="SwanLab 模式")
+    parser.add_argument("--swanlab_log_every_steps", type=int, default=200, help="SwanLab 标量记录间隔；本地 metrics.jsonl 仍由 --log_every_steps 控制")
+    parser.add_argument("--swanlab_detail_every_steps", type=int, default=1000, help="SwanLab 详细 anchor/position 指标记录间隔；避免产生百万级 records")
+    parser.add_argument("--swanlab_log_detail_metrics", action=argparse.BooleanOptionalAction, default=True, help="是否把详细 anchor/position 指标写入 SwanLab；即使开启也会按 detail interval 降采样")
+    parser.add_argument("--swanlab_log_all_metrics", action=argparse.BooleanOptionalAction, default=False, help="调试用：每次 SwanLab log 都上传全量指标；共享服务器上不建议开启")
     parser.add_argument("--refresh_file_cache", action="store_true", help="强制重新扫描数据目录并刷新 .ckpt 文件清单缓存")
     parser.add_argument("--val_split", type=float, default=0.1, help="验证集比例，0 表示不划分验证集")
     parser.add_argument("--patience", type=int, default=3, help="早停耐心值（epoch 数）；验证 loss 不下降多少个 epoch 后停止")
@@ -332,11 +354,62 @@ def distributed_log_metrics(metrics: Dict[str, torch.Tensor], distributed: bool)
         reduced[key] = tensor
     return reduced
 
+SHARD_MANIFEST_NAMES = ("dflash_shards_manifest.json", "shards_manifest.json")
+
+
 def get_dataset_file_cache_path(path: str) -> Path:
     return Path(path) / ".dflash_ckpt_index.json"
 
 
-# 递归遍历 datapath 目录，找到所有 .ckpt 结尾的文件（离线数据），按文件名排序后返回
+def get_dataset_shard_manifest_path(path: str) -> Optional[Path]:
+    """返回 shard manifest 路径；支持直接传 manifest 文件或传 shard 目录。"""
+    dataset_path = Path(path)
+    if dataset_path.is_file() and dataset_path.name in SHARD_MANIFEST_NAMES:
+        return dataset_path
+    if dataset_path.is_dir():
+        for manifest_name in SHARD_MANIFEST_NAMES:
+            candidate = dataset_path / manifest_name
+            if candidate.exists():
+                return candidate
+    return None
+
+
+def load_shard_entries(path: str) -> Tuple[List[Dict[str, Any]], int]:
+    """读取合并后的 DFlash shard manifest。"""
+    manifest_path = get_dataset_shard_manifest_path(path)
+    if manifest_path is None:
+        raise FileNotFoundError(f"No DFlash shard manifest found under {path}")
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        manifest = json.load(f)
+    if manifest.get("complete") is False:
+        raise RuntimeError(
+            f"{manifest_path} is an incomplete DFlash shard manifest. "
+            "Wait until data generation/packing finishes before starting training."
+        )
+    manifest_root = manifest_path.parent
+    entries = []
+    total = 0
+    for shard_idx, item in enumerate(manifest.get("shards", [])):
+        rel_file = item.get("file") or item.get("path")
+        if not rel_file:
+            raise ValueError(f"{manifest_path} contains a shard without file/path at index {shard_idx}")
+        shard_path = Path(rel_file)
+        if not shard_path.is_absolute():
+            shard_path = manifest_root / shard_path
+        count = int(item.get("count", 0))
+        if count <= 0:
+            raise ValueError(f"{manifest_path} shard {shard_path} has invalid count={count}")
+        entries.append({"path": str(shard_path), "count": count, "index": shard_idx})
+        total += count
+    if not entries:
+        raise ValueError(f"{manifest_path} does not contain any shards")
+    manifest_total = int(manifest.get("num_samples", total))
+    if manifest_total != total:
+        raise ValueError(f"{manifest_path} num_samples={manifest_total} but shard counts sum to {total}")
+    return entries, total
+
+
+# 递归遍历 datapath 目录，找到所有 .ckpt 结尾的文件（旧版离线数据），按文件名排序后返回
 def list_files(path: str, refresh_cache: bool = False) -> List[str]:
     cache_path = get_dataset_file_cache_path(path)
     if not refresh_cache and cache_path.exists():
@@ -357,30 +430,40 @@ def list_files(path: str, refresh_cache: bool = False) -> List[str]:
         json.dump({"root": path, "count": len(datapath), "files": datapath}, f, ensure_ascii=False, indent=2)
     return datapath
 
-# 数据集类
-class OfflineDFlashDataset(Dataset):
-    def __init__(
+
+def list_dataset_entries(path: str, dataset_format: str, refresh_cache: bool = False) -> Tuple[List[Any], str, int]:
+    """根据目录内容选择读取格式。返回 entries、格式名、样本总数。"""
+    if dataset_format in {"auto", "shards"} and get_dataset_shard_manifest_path(path) is not None:
+        entries, total = load_shard_entries(path)
+        return entries, "shards", total
+    if dataset_format == "shards":
+        raise FileNotFoundError(f"--dataset_format=shards but no shard manifest found in {path}")
+    files = list_files(path, refresh_cache=refresh_cache)
+    return files, "files", len(files)
+
+
+def count_dataset_entries(entries: List[Any], dataset_kind: str) -> int:
+    if dataset_kind == "shards":
+        return sum(int(item["count"]) for item in entries)
+    return len(entries)
+
+
+class OfflineDFlashSampleMixin:
+    """单样本解析逻辑。旧版 .ckpt 和新版 shard 内样本共用同一套校验与张量整理。"""
+
+    def _configure_format(
         self,
-        datapath: List[str],
         expected_selected_layers: Optional[int] = None,
         target_layer_ids: Optional[List[int]] = None,
         selected_hidden_variant: str = "target_layers",
-    ):
-        self.data = datapath# 所有 .ckpt 文件的路径列表
-        self.expected_selected_layers = expected_selected_layers# 期望的 selected layers 数量（用于校验数据兼容性）
+    ) -> None:
+        self.expected_selected_layers = expected_selected_layers
         self.target_layer_ids = target_layer_ids
         self.selected_hidden_variant = normalize_selected_hidden_variant(selected_hidden_variant)
 
-    def __len__(self) -> int:
-        return len(self.data)
-
     @staticmethod
     def _collapse_step_hidden(step_hidden_list: List[torch.Tensor], key: str, file_path: str) -> torch.Tensor:
-        """将每个解码步的 hidden 压成 [num_steps, hidden_dim]。
-
-        当前 DFlash 训练只接受新版导出格式：每步已经是 [hidden_dim]，
-        即“当前新生成 token”的 hidden，不再兼容旧的整段前缀快照格式。
-        """
+        """将每个解码步的 hidden 压成 [num_steps, hidden_dim]。"""
         if len(step_hidden_list) == 0:
             raise ValueError(f"{file_path} hidden_state[{key}] is empty.")
 
@@ -395,21 +478,20 @@ class OfflineDFlashDataset(Dataset):
                 )
         return torch.stack(collapsed, dim=0)
 
-    def __getitem__(self, index: int) -> Dict[str, Any]:
-        data = torch.load(self.data[index], map_location="cpu")
-        hidden_state = data["hidden_state"]# 目标模型的 hidden states
-        tokens = torch.tensor(data["predicted_tokens"], dtype=torch.long)# 目标模型生成的 token 序列
+    def _format_sample(self, data: Dict[str, Any], file_path: str) -> Dict[str, Any]:
+        hidden_state = data["hidden_state"]
+        tokens = torch.tensor(data["predicted_tokens"], dtype=torch.long)
         data_format = data.get("dflash_data_format")
 
         if data_format != "full_prefix_plus_action_hidden_v4":
             raise ValueError(
-                f"{self.data[index]} uses unsupported dflash_data_format={data_format!r}. "
+                f"{file_path} uses unsupported dflash_data_format={data_format!r}. "
                 "Please regenerate the offline DFlash dataset with full_prefix_plus_action_hidden_v4 format."
             )
 
         if not isinstance(hidden_state, dict):
             raise ValueError(
-                f"{self.data[index]} uses an unsupported legacy hidden_state format. "
+                f"{file_path} uses an unsupported legacy hidden_state format. "
                 "Please regenerate the offline DFlash dataset with the current exporter."
             )
         required_keys = {"prompt_selected", "prompt_position_ids", "prompt_length", "action_last", "action_selected"}
@@ -417,50 +499,48 @@ class OfflineDFlashDataset(Dataset):
             required_keys.add("prompt_last")
         if not required_keys.issubset(hidden_state):
             raise ValueError(
-                f"{self.data[index]} is missing one of {sorted(required_keys)} in hidden_state. "
+                f"{file_path} is missing one of {sorted(required_keys)} in hidden_state. "
                 "Please regenerate the offline DFlash dataset."
             )
 
-        action_last_hidden = self._collapse_step_hidden(hidden_state["action_last"], "action_last", self.data[index])
-        action_selected_hidden = self._collapse_step_hidden(
-            hidden_state["action_selected"], "action_selected", self.data[index]
-        )
+        action_last_hidden = self._collapse_step_hidden(hidden_state["action_last"], "action_last", file_path)
+        action_selected_hidden = self._collapse_step_hidden(hidden_state["action_selected"], "action_selected", file_path)
         data_layer_ids = hidden_state.get("layer_ids", self.target_layer_ids)
         if data_layer_ids is None:
-            raise ValueError(f"{self.data[index]} is missing hidden_state['layer_ids']; cannot validate selected hidden layout.")
+            raise ValueError(f"{file_path} is missing hidden_state['layer_ids']; cannot validate selected hidden layout.")
         data_layer_ids = [int(layer_id) for layer_id in data_layer_ids]
         if self.target_layer_ids is not None and data_layer_ids != list(self.target_layer_ids):
             raise ValueError(
-                f"{self.data[index]} layer_ids={data_layer_ids} != configured target_layer_ids={self.target_layer_ids}. "
+                f"{file_path} layer_ids={data_layer_ids} != configured target_layer_ids={self.target_layer_ids}. "
                 "Please use matching --target_layer_ids or regenerate data."
             )
         if action_last_hidden.shape[0] + 1 != tokens.shape[0] or action_selected_hidden.shape[0] + 1 != tokens.shape[0]:
             raise ValueError(
-                f"{self.data[index]} hidden/tokens length mismatch: "
+                f"{file_path} hidden/tokens length mismatch: "
                 f"action_selected={action_selected_hidden.shape[0]}, "
                 f"action_last={action_last_hidden.shape[0]}, tokens={tokens.shape[0]}."
             )
         if self.expected_selected_layers is not None:
             expected_hidden = self.expected_selected_layers * action_last_hidden.shape[-1]
-            if action_selected_hidden.shape[-1] != expected_hidden:# 确保加载的数据的 selected_hidden 维度与预期一致
+            if action_selected_hidden.shape[-1] != expected_hidden:
                 raise ValueError(
-                    f"{self.data[index]} action_selected dim={action_selected_hidden.shape[-1]} "
+                    f"{file_path} action_selected dim={action_selected_hidden.shape[-1]} "
                     f"!= expected {expected_hidden}. Please regenerate data with matching hidden_layer_ids."
                 )
             if hidden_state["prompt_selected"].shape[-1] != expected_hidden:
                 raise ValueError(
-                    f"{self.data[index]} prompt_selected dim={hidden_state['prompt_selected'].shape[-1]} "
+                    f"{file_path} prompt_selected dim={hidden_state['prompt_selected'].shape[-1]} "
                     f"!= expected {expected_hidden}. Please regenerate data with matching hidden_layer_ids."
                 )
         prompt_length = int(hidden_state["prompt_length"])
         if hidden_state["prompt_selected"].shape[0] != prompt_length:
             raise ValueError(
-                f"{self.data[index]} prompt_length={prompt_length} but "
+                f"{file_path} prompt_length={prompt_length} but "
                 f"prompt_selected has length={hidden_state['prompt_selected'].shape[0]}."
             )
         if hidden_state["prompt_position_ids"].shape[0] != prompt_length:
             raise ValueError(
-                f"{self.data[index]} prompt_position_ids length={hidden_state['prompt_position_ids'].shape[0]} "
+                f"{file_path} prompt_position_ids length={hidden_state['prompt_position_ids'].shape[0]} "
                 f"!= prompt_length={prompt_length}."
             )
         prompt_selected = apply_selected_hidden_variant(
@@ -468,25 +548,134 @@ class OfflineDFlashDataset(Dataset):
             hidden_state.get("prompt_last"),
             data_layer_ids,
             self.selected_hidden_variant,
-            self.data[index],
+            file_path,
         )
         action_selected_hidden = apply_selected_hidden_variant(
             action_selected_hidden,
             action_last_hidden,
             data_layer_ids,
             self.selected_hidden_variant,
-            self.data[index],
+            file_path,
         )
-        # 返回单个样本的dict
         return {
-            "prompt_selected": prompt_selected,# 完整 prefill/prefix 目标层 [prefix_len, L*hidden]
+            "prompt_selected": prompt_selected,
             "prompt_position_ids": hidden_state["prompt_position_ids"].long(),
             "prompt_length": prompt_length,
-            "action_selected": action_selected_hidden,# token0..token5 的目标层
-            "target_hidden": action_last_hidden,# token0..token5 的最后层，用于预测 token1..token6
-            "tokens": tokens,# 目标模型生成的 token 序列
-            "length": tokens.shape[0] - 1,# 可监督 hidden/logit 的长度
+            "action_selected": action_selected_hidden,
+            "target_hidden": action_last_hidden,
+            "tokens": tokens,
+            "length": tokens.shape[0] - 1,
         }
+
+
+class OfflineDFlashDataset(OfflineDFlashSampleMixin, Dataset):
+    """旧版 map-style 数据集：每个样本一个 .ckpt 文件。"""
+
+    def __init__(
+        self,
+        datapath: List[str],
+        expected_selected_layers: Optional[int] = None,
+        target_layer_ids: Optional[List[int]] = None,
+        selected_hidden_variant: str = "target_layers",
+    ):
+        self.data = datapath
+        self._configure_format(expected_selected_layers, target_layer_ids, selected_hidden_variant)
+
+    def __len__(self) -> int:
+        return len(self.data)
+
+    def __getitem__(self, index: int) -> Dict[str, Any]:
+        file_path = self.data[index]
+        data = torch.load(file_path, map_location="cpu")
+        return self._format_sample(data, file_path)
+
+
+class OfflineDFlashShardDataset(OfflineDFlashSampleMixin, IterableDataset):
+    """新版 shard 数据集：每个 shard 顺序读取一次，避免训练时大量随机小文件 IO。"""
+
+    def __init__(
+        self,
+        shards: List[Dict[str, Any]],
+        total_samples: int,
+        expected_selected_layers: Optional[int] = None,
+        target_layer_ids: Optional[List[int]] = None,
+        selected_hidden_variant: str = "target_layers",
+        rank: int = 0,
+        world_size: int = 1,
+        seed: int = 7,
+        shuffle_samples: bool = True,
+    ):
+        self.shards = shards
+        self.total_samples = int(total_samples)
+        self.rank = int(rank)
+        self.world_size = max(1, int(world_size))
+        self.seed = int(seed)
+        self.shuffle_samples = bool(shuffle_samples)
+        self.epoch = 0
+        self.samples_per_rank = int(math.ceil(self.total_samples / self.world_size))
+        self._configure_format(expected_selected_layers, target_layer_ids, selected_hidden_variant)
+
+    def __len__(self) -> int:
+        return self.samples_per_rank
+
+    def set_epoch(self, epoch: int) -> None:
+        self.epoch = int(epoch)
+
+    @staticmethod
+    def _load_shard_samples(shard_path: str) -> List[Dict[str, Any]]:
+        payload = torch.load(shard_path, map_location="cpu")
+        if isinstance(payload, dict) and "samples" in payload:
+            samples = payload["samples"]
+        elif isinstance(payload, list):
+            samples = payload
+        else:
+            raise ValueError(f"Unsupported DFlash shard payload in {shard_path}")
+        if not isinstance(samples, list) or not samples:
+            raise ValueError(f"DFlash shard {shard_path} has no samples")
+        return samples
+
+    def _iter_from_shards(self, worker_shards: List[Dict[str, Any]], target_count: int, worker_id: int):
+        if not worker_shards:
+            raise RuntimeError(
+                f"Rank {self.rank} worker {worker_id} received no DFlash shards. "
+                "Reduce --num_workers or regenerate shards."
+            )
+        rng = random.Random(self.seed + self.epoch * 1009 + self.rank * 9176 + worker_id * 37)
+        yielded = 0
+        cycle = 0
+        while yielded < target_count:
+            shard_order = list(worker_shards)
+            rng.shuffle(shard_order)
+            for shard in shard_order:
+                shard_path = shard["path"]
+                samples = self._load_shard_samples(shard_path)
+                order = list(range(len(samples)))
+                if self.shuffle_samples:
+                    rng.shuffle(order)
+                for sample_idx in order:
+                    yield self._format_sample(samples[sample_idx], f"{shard_path}#{sample_idx}")
+                    yielded += 1
+                    if yielded >= target_count:
+                        return
+            cycle += 1
+            if cycle > 1000:
+                raise RuntimeError("DFlash shard dataset cycled too many times while padding rank samples")
+
+    def __iter__(self):
+        worker_info = get_worker_info()
+        worker_id = worker_info.id if worker_info is not None else 0
+        num_workers = worker_info.num_workers if worker_info is not None else 1
+
+        shard_rng = random.Random(self.seed + self.epoch * 1009)
+        shards = list(self.shards)
+        shard_rng.shuffle(shards)
+        rank_shards = [shard for shard_idx, shard in enumerate(shards) if shard_idx % self.world_size == self.rank]
+        worker_shards = [shard for shard_idx, shard in enumerate(rank_shards) if shard_idx % num_workers == worker_id]
+
+        worker_start = self.samples_per_rank * worker_id // num_workers
+        worker_end = self.samples_per_rank * (worker_id + 1) // num_workers
+        worker_target = worker_end - worker_start
+        return self._iter_from_shards(worker_shards, worker_target, worker_id)
 
 # 将不定长的样本 padding 到 batch 内最长的长度，形成 [batch_size, max_len, ...] 的统一张量
 class DataCollatorForOfflineDFlash:
@@ -598,6 +787,12 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "warmup_ratio": args.warmup_ratio,
         "grad_clip": args.grad_clip,
         "log_every_steps": args.log_every_steps,
+        "save_training_state": args.save_training_state,
+        "save_latest_root_copy": args.save_latest_root_copy,
+        "num_workers": args.num_workers,
+        "dataloader_prefetch_factor": args.dataloader_prefetch_factor,
+        "pin_memory": args.pin_memory,
+        "persistent_workers": args.persistent_workers,
         "resume_from_checkpoint": args.resume_from_checkpoint,
         "val_split": args.val_split,
         "patience": args.patience,
@@ -606,6 +801,10 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "swanlab_project": args.swanlab_project,
         "swanlab_workspace": args.swanlab_workspace,
         "swanlab_mode": args.swanlab_mode,
+        "swanlab_log_every_steps": args.swanlab_log_every_steps,
+        "swanlab_detail_every_steps": args.swanlab_detail_every_steps,
+        "swanlab_log_detail_metrics": args.swanlab_log_detail_metrics,
+        "swanlab_log_all_metrics": args.swanlab_log_all_metrics,
     }
 
 
@@ -628,26 +827,29 @@ def save_checkpoint(
     raw_model = unwrap_model(model)
     # 保存模型权重
     torch.save(raw_model.state_dict(), save_dir / "pytorch_model.bin")
-    # 保存训练状态（用于恢复训练，包含早停与最优权重信息）
-    torch.save(
-        {
-            "epoch": epoch,
-            "global_step": global_step,
-            "optimizer": optimizer.state_dict(),
-            "scheduler": scheduler.state_dict(),
-            "swanlab_run_id": swanlab_run_id,
-            "best_val_loss": best_val_loss,
-            "best_val_acc": best_val_acc,
-            "patience_counter": patience_counter,
-        },
-        save_dir / "training_state.pt",
-    )
+    # 保存训练状态（用于恢复训练，包含 optimizer/scheduler，体积通常约 1.2GB）。
+    # 共享服务器上建议由启动脚本关闭，避免 checkpoint 阶段形成明显写盘峰值。
+    if args.save_training_state:
+        torch.save(
+            {
+                "epoch": epoch,
+                "global_step": global_step,
+                "optimizer": optimizer.state_dict(),
+                "scheduler": scheduler.state_dict(),
+                "swanlab_run_id": swanlab_run_id,
+                "best_val_loss": best_val_loss,
+                "best_val_acc": best_val_acc,
+                "patience_counter": patience_counter,
+            },
+            save_dir / "training_state.pt",
+        )
     # 保存超参数配置
     with open(save_dir / "dflash_config.json", "w") as f:
         json.dump(config_payload, f, indent=2)
-    torch.save(raw_model.state_dict(), Path(output_dir) / "pytorch_model.bin")
-    with open(Path(output_dir) / "dflash_config.json", "w") as f:
-        json.dump(config_payload, f, indent=2)
+    if args.save_latest_root_copy:
+        torch.save(raw_model.state_dict(), Path(output_dir) / "pytorch_model.bin")
+        with open(Path(output_dir) / "dflash_config.json", "w") as f:
+            json.dump(config_payload, f, indent=2)
     with open(Path(output_dir) / "latest_checkpoint.txt", "w") as f:
         f.write(str(save_dir))
 
@@ -769,6 +971,49 @@ def numeric_payload_for_swanlab(payload: Dict[str, Any], default_prefix: str = "
 
 def count_trainable_parameters(model: nn.Module) -> int:
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+def is_swanlab_detail_metric(metric_key: str) -> bool:
+    """判断是否为高基数的细粒度位置指标。
+
+    这些指标对诊断很有用，但每次都传 SwanLab 会被拆成大量 records，
+    训练结束后补传会卡住共享服务器 IO/网络。因此默认只低频上传它们。
+    """
+    leaf = metric_key.split("/", 1)[-1]
+    if leaf.startswith("position_") and leaf.endswith("_acc"):
+        return True
+    if leaf.startswith("anchor_") and leaf.endswith("_acc"):
+        parts = leaf.split("_")
+        return len(parts) > 1 and parts[1].isdigit()
+    return False
+
+
+def build_swanlab_metrics_payload(
+    payload: Dict[str, Any],
+    args,
+    default_prefix: str,
+    step: Optional[int] = None,
+) -> Dict[str, float]:
+    """构造低 IO 的 SwanLab payload。
+
+    metrics.jsonl 仍保留全量指标；SwanLab 只承担在线观察，不再每 20 step 上传
+    所有 anchor-position 明细，避免百万级 record 上传和本地 swanlog 膨胀。
+    """
+    numeric = numeric_payload_for_swanlab(payload, default_prefix=default_prefix)
+    if args.swanlab_log_all_metrics:
+        return numeric
+
+    detail_every = max(1, int(args.swanlab_detail_every_steps))
+    include_detail = (
+        args.swanlab_log_detail_metrics
+        and step is not None
+        and step % detail_every == 0
+    )
+    return {
+        key: value
+        for key, value in numeric.items()
+        if include_detail or not is_swanlab_detail_metric(key)
+    }
 
 # 学习率调度策略，先warmup，再linear decay
 def build_scheduler(optimizer: AdamW, total_steps: int, warmup_steps: int, warmup_ratio: float):
@@ -1582,25 +1827,42 @@ def main():
     if distributed:
         model = DDP(model, device_ids=[local_rank], output_device=local_rank)
 
-    cache_path = get_dataset_file_cache_path(args.datapath)
     if is_main:
-        if args.refresh_file_cache:
-            print(f"正在刷新数据文件缓存: {cache_path}")
-        elif cache_path.exists():
-            print(f"正在加载数据文件缓存: {cache_path}")
+        if args.dataset_format == "auto" and get_dataset_shard_manifest_path(args.datapath) is not None:
+            print(f"检测到 DFlash shard manifest，将使用顺序 shard 读取: {get_dataset_shard_manifest_path(args.datapath)}")
+        elif args.dataset_format == "files":
+            cache_path = get_dataset_file_cache_path(args.datapath)
+            if args.refresh_file_cache:
+                print(f"正在刷新数据文件缓存: {cache_path}")
+            elif cache_path.exists():
+                print(f"正在加载数据文件缓存: {cache_path}")
+            else:
+                print(f"首次扫描数据目录并建立缓存: {args.datapath}")
         else:
-            print(f"首次扫描数据目录并建立缓存: {args.datapath}")
-        datapath = list_files(args.datapath, refresh_cache=args.refresh_file_cache)
+            print(f"正在解析 DFlash 数据目录: {args.datapath} format={args.dataset_format}")
+        datapath, dataset_kind, dataset_total_samples = list_dataset_entries(
+            args.datapath,
+            dataset_format=args.dataset_format,
+            refresh_cache=args.refresh_file_cache,
+        )
     if distributed:
         dist.barrier()
-        datapath = list_files(args.datapath, refresh_cache=False)
+        datapath, dataset_kind, dataset_total_samples = list_dataset_entries(
+            args.datapath,
+            dataset_format=args.dataset_format,
+            refresh_cache=False,
+        )
     elif not is_main:
-        datapath = list_files(args.datapath, refresh_cache=args.refresh_file_cache)
+        datapath, dataset_kind, dataset_total_samples = list_dataset_entries(
+            args.datapath,
+            dataset_format=args.dataset_format,
+            refresh_cache=args.refresh_file_cache,
+        )
     if not datapath:
-        raise ValueError(f"No .ckpt files found in {args.datapath}")
+        raise ValueError(f"No DFlash data found in {args.datapath}")
     random.Random(args.seed).shuffle(datapath)
 
-    # 划分训练集 / 验证集
+    # 划分训练集 / 验证集。DDP 主训练默认 val_split=0；非 DDP 调试时可以切分。
     val_loader = None
     if args.val_split > 0:
         val_size = max(1, int(len(datapath) * args.val_split))
@@ -1609,49 +1871,85 @@ def main():
     else:
         train_files = datapath
         val_files = []
+    train_sample_count = count_dataset_entries(train_files, dataset_kind)
+    val_sample_count = count_dataset_entries(val_files, dataset_kind)
 
-    train_dataset = OfflineDFlashDataset(
-        train_files,
-        expected_selected_layers=len(args.target_layer_ids),
-        target_layer_ids=args.target_layer_ids,
-        selected_hidden_variant=args.selected_hidden_variant,
-    )
-    collator = DataCollatorForOfflineDFlash()
-    train_sampler = DistributedSampler(
-        train_dataset,
-        num_replicas=world_size,
-        rank=rank,
-        shuffle=True,
-        seed=args.seed,
-        drop_last=False,
-    ) if distributed else None
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=args.batch_size,
-        shuffle=train_sampler is None,
-        sampler=train_sampler,
-        num_workers=args.num_workers,
-        collate_fn=collator,
-        pin_memory=device.type == "cuda",
-        persistent_workers=args.num_workers > 0,
-    )
-
-    if val_files:
-        val_dataset = OfflineDFlashDataset(
-            val_files,
+    if dataset_kind == "shards":
+        train_dataset = OfflineDFlashShardDataset(
+            train_files,
+            total_samples=train_sample_count,
+            expected_selected_layers=len(args.target_layer_ids),
+            target_layer_ids=args.target_layer_ids,
+            selected_hidden_variant=args.selected_hidden_variant,
+            rank=rank,
+            world_size=world_size,
+            seed=args.seed,
+            shuffle_samples=args.shard_sample_shuffle,
+        )
+        train_sampler = None
+    else:
+        train_dataset = OfflineDFlashDataset(
+            train_files,
             expected_selected_layers=len(args.target_layer_ids),
             target_layer_ids=args.target_layer_ids,
             selected_hidden_variant=args.selected_hidden_variant,
         )
-        val_loader = DataLoader(
-            val_dataset,
-            batch_size=args.batch_size,
-            shuffle=False,
-            num_workers=args.num_workers,
-            collate_fn=collator,
-            pin_memory=device.type == "cuda",
-            persistent_workers=args.num_workers > 0,
-        )
+        train_sampler = DistributedSampler(
+            train_dataset,
+            num_replicas=world_size,
+            rank=rank,
+            shuffle=True,
+            seed=args.seed,
+            drop_last=False,
+        ) if distributed else None
+
+    collator = DataCollatorForOfflineDFlash()
+    train_loader_kwargs = {
+        "batch_size": args.batch_size,
+        "num_workers": args.num_workers,
+        "collate_fn": collator,
+        "pin_memory": bool(args.pin_memory and device.type == "cuda"),
+        "persistent_workers": bool(args.persistent_workers and args.num_workers > 0),
+    }
+    if train_sampler is not None:
+        train_loader_kwargs["sampler"] = train_sampler
+    elif dataset_kind != "shards":
+        train_loader_kwargs["shuffle"] = True
+    if args.num_workers > 0:
+        train_loader_kwargs["prefetch_factor"] = max(1, int(args.dataloader_prefetch_factor))
+    train_loader = DataLoader(train_dataset, **train_loader_kwargs)
+
+    if val_files:
+        if dataset_kind == "shards":
+            val_dataset = OfflineDFlashShardDataset(
+                val_files,
+                total_samples=val_sample_count,
+                expected_selected_layers=len(args.target_layer_ids),
+                target_layer_ids=args.target_layer_ids,
+                selected_hidden_variant=args.selected_hidden_variant,
+                rank=0,
+                world_size=1,
+                seed=args.seed,
+                shuffle_samples=False,
+            )
+        else:
+            val_dataset = OfflineDFlashDataset(
+                val_files,
+                expected_selected_layers=len(args.target_layer_ids),
+                target_layer_ids=args.target_layer_ids,
+                selected_hidden_variant=args.selected_hidden_variant,
+            )
+        val_loader_kwargs = {
+            "batch_size": args.batch_size,
+            "shuffle": False,
+            "num_workers": args.num_workers,
+            "collate_fn": collator,
+            "pin_memory": bool(args.pin_memory and device.type == "cuda"),
+            "persistent_workers": bool(args.persistent_workers and args.num_workers > 0),
+        }
+        if args.num_workers > 0:
+            val_loader_kwargs["prefetch_factor"] = max(1, int(args.dataloader_prefetch_factor))
+        val_loader = DataLoader(val_dataset, **val_loader_kwargs)
 
     optimizer = AdamW(
         model.parameters(),
@@ -1688,8 +1986,13 @@ def main():
     config_payload = build_dflash_config_dict(args)
     config_payload.update(
         {
+            "dataset_kind": dataset_kind,
+            "train_entries": len(train_files),
+            "val_entries": len(val_files),
             "train_files": len(train_files),
             "val_files": len(val_files),
+            "train_samples": train_sample_count,
+            "val_samples": val_sample_count,
             "trainable_params": trainable_params,
             "trainable_params_m": round(trainable_params / 1e6, 2),
             "steps_per_epoch": steps_per_epoch,
@@ -1709,8 +2012,13 @@ def main():
                 "event": "run_start",
                 "timestamp": datetime.now().isoformat(),
                 "run_name": args.run_name,
+                "dataset_kind": dataset_kind,
+                "train_entries": len(train_files),
+                "val_entries": len(val_files),
                 "train_files": len(train_files),
                 "val_files": len(val_files),
+                "train_samples": train_sample_count,
+                "val_samples": val_sample_count,
                 "trainable_params": trainable_params,
                 "steps_per_epoch": steps_per_epoch,
                 "total_optimizer_steps": total_optimizer_steps,
@@ -1719,8 +2027,9 @@ def main():
             },
         )
         print(
-            f"训练集={len(train_files)} "
-            f"验证集={len(val_files)} "
+            f"数据格式={dataset_kind} "
+            f"训练entries={len(train_files)} 训练样本={train_sample_count} "
+            f"验证entries={len(val_files)} 验证样本={val_sample_count} "
             f"Draft参数={trainable_params/1e6:.2f}M "
             f"effective_batch={args.batch_size * args.gradient_accumulation_steps * world_size} "
             f"steps_per_epoch={steps_per_epoch} "
@@ -1754,6 +2063,8 @@ def main():
     try:
         for epoch in range(start_epoch, args.num_epochs + 1):
             model.train()
+            if hasattr(train_dataset, "set_epoch"):
+                train_dataset.set_epoch(epoch)
             if train_sampler is not None:
                 train_sampler.set_epoch(epoch)
             optimizer.zero_grad(set_to_none=True)
@@ -1887,14 +2198,23 @@ def main():
                         }
                         train_payload.update(detail_metrics_to_log("train", train_detail_accumulator))
                         append_jsonl(metrics_log_path, train_payload)
-                        if swanlab_run is not None:
-                            swan_payload = numeric_payload_for_swanlab(train_payload, default_prefix="train")
+                        if (
+                            swanlab_run is not None
+                            and args.swanlab_log_every_steps > 0
+                            and global_step % args.swanlab_log_every_steps == 0
+                        ):
+                            swan_payload = build_swanlab_metrics_payload(
+                                train_payload,
+                                args,
+                                default_prefix="train",
+                                step=global_step,
+                            )
                             swan_payload["train/log_steps"] = float(train_log_steps)
                             swanlab_run = safe_swanlab_log(
                                 swanlab_run,
                                 swan_payload,
                                 step=global_step,
-                        )
+                            )
                         print(
                             f"train step={global_step} epoch={epoch} "
                             f"loss={train_payload['train/loss']:.4f} "
@@ -2005,7 +2325,12 @@ def main():
                 if swanlab_run is not None:
                     swanlab_run = safe_swanlab_log(
                         swanlab_run,
-                        numeric_payload_for_swanlab(val_payload, default_prefix="val"),
+                        build_swanlab_metrics_payload(
+                            val_payload,
+                            args,
+                            default_prefix="val",
+                            step=global_step,
+                        ),
                         step=global_step,
                     )
 

@@ -24,6 +24,15 @@ SLOT_DECAY="${SLOT_DECAY:-0.90}"              # 三档共用，保持位置训�
 HIDDEN_W="${HIDDEN_W:-1.0}"
 COS_W="${COS_W:-0.05}"                       # hidden 几何辅助项，不引入 token/soft 标签。
 
+# 共享服务器 IO 控制：优先使用 sharded 数据；默认不保存 optimizer state，减少硬盘写入。
+DATASET_FORMAT="${DATASET_FORMAT:-auto}"
+NUM_WORKERS="${NUM_WORKERS:-1}"
+DATALOADER_PREFETCH_FACTOR="${DATALOADER_PREFETCH_FACTOR:-1}"
+SWANLAB_LOG_EVERY_STEPS="${SWANLAB_LOG_EVERY_STEPS:-200}"
+SWANLAB_DETAIL_EVERY_STEPS="${SWANLAB_DETAIL_EVERY_STEPS:-1000}"
+SAVE_TRAINING_STATE="${SAVE_TRAINING_STATE:-False}"
+SAVE_LATEST_ROOT_COPY="${SAVE_LATEST_ROOT_COPY:-False}"
+
 case "${ABLATION_STAGE}" in
   pure_hidden)
     RUN_NAME="${RUN_NAME:-dflash-ablation-1-pure-hidden-1layer-finalhidden-b16-4gpu}"
@@ -67,20 +76,24 @@ esac
 
 if [[ -d "/data/wulin" ]]; then
   DEFAULT_VLA_PATH="/data/wulin/hf_files/openvla-7b-finetuned-libero-goal"
-  DEFAULT_DATAPATH="/data/wulin/c/specvla-data/dflash_goal_dataset"
+  DEFAULT_DATAPATH="/data/wulin/c/specvla-data/dflash_goal_dataset_sharded"
+  [[ -d "${DEFAULT_DATAPATH}" ]] || DEFAULT_DATAPATH="/data/wulin/c/specvla-data/dflash_goal_dataset"
   DEFAULT_OUTPUT_DIR="/data/wulin/c/specvla-data/${OUTPUT_NAME}"
 elif [[ -d "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh" ]]; then
   DEFAULT_ROOT="/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh"
   DEFAULT_VLA_PATH="${DEFAULT_ROOT}/hf_files/openvla-7b-finetuned-libero-goal"
-  DEFAULT_DATAPATH="${DEFAULT_ROOT}/specvla-data/dflash_goal_dataset"
+  DEFAULT_DATAPATH="${DEFAULT_ROOT}/specvla-data/dflash_goal_dataset_sharded"
+  [[ -d "${DEFAULT_DATAPATH}" ]] || DEFAULT_DATAPATH="${DEFAULT_ROOT}/specvla-data/dflash_goal_dataset"
   DEFAULT_OUTPUT_DIR="${DEFAULT_ROOT}/specvla-data/${OUTPUT_NAME}"
 elif [[ -d "/mnt/storage/cgh" ]]; then
   DEFAULT_VLA_PATH="/mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-goal"
-  DEFAULT_DATAPATH="/mnt/storage/cgh/specvla-data/dflash_goal_dataset"
+  DEFAULT_DATAPATH="/mnt/storage/cgh/specvla-data/dflash_goal_dataset_sharded"
+  [[ -d "${DEFAULT_DATAPATH}" ]] || DEFAULT_DATAPATH="/mnt/storage/cgh/specvla-data/dflash_goal_dataset"
   DEFAULT_OUTPUT_DIR="/mnt/storage/cgh/specvla-data/${OUTPUT_NAME}"
 else
   DEFAULT_VLA_PATH="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/data/models--openvla--openvla-7b-finetuned-libero-goal"
-  DEFAULT_DATAPATH="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset"
+  DEFAULT_DATAPATH="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset_sharded"
+  [[ -d "${DEFAULT_DATAPATH}" ]] || DEFAULT_DATAPATH="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset"
   DEFAULT_OUTPUT_DIR="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/${OUTPUT_NAME}"
 fi
 
@@ -108,6 +121,7 @@ CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}
 NPROC_PER_NODE=${NPROC_PER_NODE}
 VLA_PATH=${VLA_PATH}
 DATAPATH=${DATAPATH}
+DATASET_FORMAT=${DATASET_FORMAT}
 OUTPUT_DIR=${OUTPUT_DIR}
 
 [共同训练设置]
@@ -133,6 +147,18 @@ ANCHOR_LOGIT_DISTILL_W=${ANCHOR_LOGIT_DISTILL_W}
 =============================================
 EOF
 
+bool_arg() {
+  local name="$1"
+  local value="$2"
+  if [[ "${value}" == "True" || "${value}" == "true" || "${value}" == "1" ]]; then
+    printf -- "--%s" "${name}"
+  else
+    printf -- "--no-%s" "${name}"
+  fi
+}
+SAVE_TRAINING_STATE_ARG="$(bool_arg save_training_state "${SAVE_TRAINING_STATE}")"
+SAVE_LATEST_ROOT_COPY_ARG="$(bool_arg save_latest_root_copy "${SAVE_LATEST_ROOT_COPY}")"
+
 export CUDA_VISIBLE_DEVICES
 
 torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
@@ -140,6 +166,7 @@ torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   --run_name "${RUN_NAME}" \
   --vla_path "${VLA_PATH}" \
   --datapath "${DATAPATH}" \
+  --dataset_format "${DATASET_FORMAT}" \
   --output_dir "${OUTPUT_DIR}" \
   --num_draft_layers 1 \
   --block_size 7 \
@@ -185,4 +212,12 @@ torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   --num_epochs "${NUM_EPOCHS}" \
   --warmup_steps "${WARMUP_STEPS}" \
   --save_every "${SAVE_EVERY}" \
+  "${SAVE_TRAINING_STATE_ARG}" \
+  "${SAVE_LATEST_ROOT_COPY_ARG}" \
+  --num_workers "${NUM_WORKERS}" \
+  --dataloader_prefetch_factor "${DATALOADER_PREFETCH_FACTOR}" \
+  --no-pin_memory \
+  --no-persistent_workers \
+  --swanlab_log_every_steps "${SWANLAB_LOG_EVERY_STEPS}" \
+  --swanlab_detail_every_steps "${SWANLAB_DETAIL_EVERY_STEPS}" \
   --val_split 0

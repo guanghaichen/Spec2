@@ -18,19 +18,23 @@ cd "${REPO_ROOT}"
 OUTPUT_NAME="ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu"
 if [[ -d "/data/wulin" ]]; then
   DEFAULT_VLA_PATH="/data/wulin/hf_files/openvla-7b-finetuned-libero-goal"
-  DEFAULT_DATAPATH="/data/wulin/c/specvla-data/dflash_goal_dataset"
+  DEFAULT_DATAPATH="/data/wulin/c/specvla-data/dflash_goal_dataset_sharded"
+  [[ -d "${DEFAULT_DATAPATH}" ]] || DEFAULT_DATAPATH="/data/wulin/c/specvla-data/dflash_goal_dataset"
   DEFAULT_OUTPUT_DIR="/data/wulin/c/specvla-data/${OUTPUT_NAME}"
 elif [[ -d "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh" ]]; then
   DEFAULT_VLA_PATH="/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-goal"
-  DEFAULT_DATAPATH="/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset"
+  DEFAULT_DATAPATH="/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset_sharded"
+  [[ -d "${DEFAULT_DATAPATH}" ]] || DEFAULT_DATAPATH="/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset"
   DEFAULT_OUTPUT_DIR="/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/${OUTPUT_NAME}"
 elif [[ -d "/mnt/storage/cgh" ]]; then
   DEFAULT_VLA_PATH="/mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-goal"
-  DEFAULT_DATAPATH="/mnt/storage/cgh/specvla-data/dflash_goal_dataset"
+  DEFAULT_DATAPATH="/mnt/storage/cgh/specvla-data/dflash_goal_dataset_sharded"
+  [[ -d "${DEFAULT_DATAPATH}" ]] || DEFAULT_DATAPATH="/mnt/storage/cgh/specvla-data/dflash_goal_dataset"
   DEFAULT_OUTPUT_DIR="/mnt/storage/cgh/specvla-data/${OUTPUT_NAME}"
 else
   DEFAULT_VLA_PATH="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/data/models--openvla--openvla-7b-finetuned-libero-goal"
-  DEFAULT_DATAPATH="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset"
+  DEFAULT_DATAPATH="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset_sharded"
+  [[ -d "${DEFAULT_DATAPATH}" ]] || DEFAULT_DATAPATH="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset"
   DEFAULT_OUTPUT_DIR="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/${OUTPUT_NAME}"
 fi
 
@@ -51,6 +55,15 @@ NUM_EPOCHS="${NUM_EPOCHS:-200}"
 SAVE_EVERY="${SAVE_EVERY:-10}"
 HIDDEN_NOISE="${HIDDEN_NOISE:-0.03}"
 SLOT_DECAY="${SLOT_DECAY:-0.90}"              # 块内位置整体递减；0.90 轻度偏向前几个 slot。
+
+# 共享服务器 IO 控制：DFlash 数据集是 419G/2.8万小文件，默认降低随机读并发。
+NUM_WORKERS="${NUM_WORKERS:-1}"
+DATALOADER_PREFETCH_FACTOR="${DATALOADER_PREFETCH_FACTOR:-1}"
+DATASET_FORMAT="${DATASET_FORMAT:-auto}"
+SWANLAB_LOG_EVERY_STEPS="${SWANLAB_LOG_EVERY_STEPS:-200}"
+SWANLAB_DETAIL_EVERY_STEPS="${SWANLAB_DETAIL_EVERY_STEPS:-1000}"
+SAVE_TRAINING_STATE="${SAVE_TRAINING_STATE:-False}"       # False 时每个 checkpoint 少写约 1.2GB optimizer state。
+SAVE_LATEST_ROOT_COPY="${SAVE_LATEST_ROOT_COPY:-False}"   # False 时每次保存少写根目录 latest 600MB。
 
 # -----------------------------------------------------------------------------
 # 3. 主损失权重
@@ -85,6 +98,7 @@ CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}
 NPROC_PER_NODE=${NPROC_PER_NODE}
 VLA_PATH=${VLA_PATH}
 DATAPATH=${DATAPATH}
+DATASET_FORMAT=${DATASET_FORMAT}
 OUTPUT_DIR=${OUTPUT_DIR}
 
 [训练规模]
@@ -95,6 +109,12 @@ NUM_EPOCHS=${NUM_EPOCHS}
 SAVE_EVERY=${SAVE_EVERY}
 HIDDEN_NOISE=${HIDDEN_NOISE}
 SLOT_DECAY=${SLOT_DECAY}
+NUM_WORKERS=${NUM_WORKERS}
+DATALOADER_PREFETCH_FACTOR=${DATALOADER_PREFETCH_FACTOR}
+SWANLAB_LOG_EVERY_STEPS=${SWANLAB_LOG_EVERY_STEPS}
+SWANLAB_DETAIL_EVERY_STEPS=${SWANLAB_DETAIL_EVERY_STEPS}
+SAVE_TRAINING_STATE=${SAVE_TRAINING_STATE}
+SAVE_LATEST_ROOT_COPY=${SAVE_LATEST_ROOT_COPY}
 
 [损失权重]
 SOFT_W=${SOFT_W}
@@ -122,6 +142,18 @@ EOF
 
 print_config
 
+bool_arg() {
+  local name="$1"
+  local value="$2"
+  if [[ "${value}" == "True" || "${value}" == "true" || "${value}" == "1" ]]; then
+    printf -- "--%s" "${name}"
+  else
+    printf -- "--no-%s" "${name}"
+  fi
+}
+SAVE_TRAINING_STATE_ARG="$(bool_arg save_training_state "${SAVE_TRAINING_STATE}")"
+SAVE_LATEST_ROOT_COPY_ARG="$(bool_arg save_latest_root_copy "${SAVE_LATEST_ROOT_COPY}")"
+
 export CUDA_VISIBLE_DEVICES
 
 torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
@@ -129,6 +161,7 @@ torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   --run_name dflash-anchor-hidden-1layer-finalhidden-markov-acd-start0-slotdecay090-tokence-soft01-b16-4gpu \
   --vla_path "${VLA_PATH}" \
   --datapath "${DATAPATH}" \
+  --dataset_format "${DATASET_FORMAT}" \
   --output_dir "${OUTPUT_DIR}" \
   \
   --num_draft_layers 1 \
@@ -178,4 +211,12 @@ torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   --num_epochs "${NUM_EPOCHS}" \
   --warmup_steps "${WARMUP_STEPS}" \
   --save_every "${SAVE_EVERY}" \
+  "${SAVE_TRAINING_STATE_ARG}" \
+  "${SAVE_LATEST_ROOT_COPY_ARG}" \
+  --num_workers "${NUM_WORKERS}" \
+  --dataloader_prefetch_factor "${DATALOADER_PREFETCH_FACTOR}" \
+  --no-pin_memory \
+  --no-persistent_workers \
+  --swanlab_log_every_steps "${SWANLAB_LOG_EVERY_STEPS}" \
+  --swanlab_detail_every_steps "${SWANLAB_DETAIL_EVERY_STEPS}" \
   --val_split 0

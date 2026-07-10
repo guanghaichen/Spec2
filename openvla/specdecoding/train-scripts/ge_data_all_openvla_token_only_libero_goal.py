@@ -1,10 +1,11 @@
 """关键：调用modeling_prismatic.py的OpenVLAForActionPrediction来生成动作和hidden states"""
 import argparse
 import copy
+import json
 import os
 import sys
 from pathlib import Path
-from typing import Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT))
@@ -44,11 +45,11 @@ DEFAULT_RLDS_ROOT = resolve_default_path(
 if os.environ.get("DFLASH_DATA_OUTDIR") or os.environ.get("OUTDIR"):
     DEFAULT_OUTDIR = Path(os.environ.get("DFLASH_DATA_OUTDIR") or os.environ["OUTDIR"])
 elif Path("/data/wulin").exists():
-    DEFAULT_OUTDIR = Path("/data/wulin/specvla-data/dflash_goal_dataset")
+    DEFAULT_OUTDIR = Path("/data/wulin/c/specvla-data/dflash_goal_dataset_sharded")
 elif Path("/mnt/storage/cgh").exists():
-    DEFAULT_OUTDIR = Path("/mnt/storage/cgh/specvla-data/dflash_goal_dataset")
+    DEFAULT_OUTDIR = Path("/mnt/storage/cgh/specvla-data/dflash_goal_dataset_sharded")
 else:
-    DEFAULT_OUTDIR = Path("/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset")
+    DEFAULT_OUTDIR = Path("/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/dflash_goal_dataset_sharded")
 
 #参数：开始/结束的数据idx，gpu-idx，用于多线程并行生成
 parser = argparse.ArgumentParser(description='sp')
@@ -64,6 +65,19 @@ parser.add_argument('--data_root_dir', type=str, default=None)
 parser.add_argument('--dataset_name', type=str, default='libero_goal_no_noops')
 parser.add_argument('--shuffle_buffer_size', type=int, default=100_000)
 parser.add_argument('--image_aug', action=argparse.BooleanOptionalAction, default=True)
+parser.add_argument(
+    '--output_format',
+    type=str,
+    choices=['shards', 'files'],
+    default=os.environ.get('DFLASH_DATA_OUTPUT_FORMAT', 'shards'),
+    help='输出格式：shards=少量顺序读取 shard；files=兼容旧版，每样本一个 .ckpt',
+)
+parser.add_argument(
+    '--samples_per_shard',
+    type=int,
+    default=int(os.environ.get('DFLASH_SAMPLES_PER_SHARD', '32')),
+    help='output_format=shards 时，每个 shard 保存多少条样本；默认 32，约数百 MB，训练读盘更平滑',
+)
 args = parser.parse_args()
 
 #Config
@@ -163,6 +177,7 @@ print(f'repo root: {REPO_ROOT}')
 print(f'vla path: {cfg.vla_path}')
 print(f'rlds root: {cfg.data_root_dir}')
 print(f'output dir: {outdir}')
+print(f'output format: {args.output_format}, samples_per_shard: {args.samples_per_shard}')
 # 加载投影器和动作分词器
 processor = AutoProcessor.from_pretrained(cfg.vla_path, trust_remote_code=False)# 使用已注册的本地 PrismaticProcessor，避免联网拉 HF dynamic module
 action_tokenizer = ActionTokenizer(processor.tokenizer)
@@ -198,13 +213,77 @@ dataloader = DataLoader(# 构建 DataLoader，把样本按 batch_size 分组，�
     )
 print('start enumerating')
 
-write_idx = 0
-def writedata(name,data_point):
-    global write_idx
-    if not os.path.exists(name):
-        os.makedirs(name)
-    torch.save(data_point, f'{name}/data_{write_idx}.ckpt')# 把 PyTorch tensor 字典直接序列化保存。这不是标准 checkpoint，而是单个数据样本的 tensor 包
-    write_idx += 1
+class DFlashDatasetWriter:
+    """DFlash 离线数据写出器。
+
+    files 模式兼容旧版：每个样本一个 data_x.ckpt。
+    shards 模式是当前推荐模式：每 N 个样本写进一个大 shard，并生成 manifest，训练时顺序读，显著降低随机小文件 IO。
+    """
+
+    def __init__(self, outdir: str, output_format: str = "shards", samples_per_shard: int = 32):
+        if samples_per_shard <= 0:
+            raise ValueError("--samples_per_shard must be > 0")
+        self.outdir = Path(outdir)
+        self.output_format = output_format
+        self.samples_per_shard = samples_per_shard
+        self.outdir.mkdir(parents=True, exist_ok=True)
+        self.write_idx = 0
+        self.shard_idx = 0
+        self.buffer: List[Dict[str, Any]] = []
+        self.shards: List[Dict[str, Any]] = []
+
+    def write(self, data_point: Dict[str, Any]) -> None:
+        if self.output_format == "files":
+            torch.save(data_point, self.outdir / f"data_{self.write_idx}.ckpt")
+            self.write_idx += 1
+            return
+        self.buffer.append(data_point)
+        self.write_idx += 1
+        if len(self.buffer) >= self.samples_per_shard:
+            self.flush()
+
+    def flush(self) -> None:
+        if not self.buffer:
+            return
+        shard_name = f"shard_{self.shard_idx:06d}.pt"
+        shard_path = self.outdir / shard_name
+        tmp_path = self.outdir / f".{shard_name}.tmp"
+        torch.save(
+            {
+                "format": "dflash_shard_v1",
+                "dflash_data_format": "full_prefix_plus_action_hidden_v4",
+                "samples": self.buffer,
+            },
+            tmp_path,
+        )
+        os.replace(tmp_path, shard_path)
+        self.shards.append({"file": shard_name, "count": len(self.buffer)})
+        self.shard_idx += 1
+        self.buffer = []
+        self.write_manifest()
+
+    def write_manifest(self, complete: bool = False) -> None:
+        if self.output_format != "shards":
+            return
+        manifest = {
+            "format": "dflash_shards_v1",
+            "dflash_data_format": "full_prefix_plus_action_hidden_v4",
+            "num_samples": self.write_idx,
+            "samples_per_shard": self.samples_per_shard,
+            "complete": bool(complete),
+            "shards": self.shards,
+        }
+        tmp_path = self.outdir / ".dflash_shards_manifest.json.tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(manifest, f, ensure_ascii=False, indent=2)
+        os.replace(tmp_path, self.outdir / "dflash_shards_manifest.json")
+
+    def close(self) -> None:
+        self.flush()
+        self.write_manifest()
+
+
+writer = DFlashDatasetWriter(outdir, output_format=args.output_format, samples_per_shard=args.samples_per_shard)
 
 #from transformers.modeling_outputs import CausalLMOutputWithPast
 gen_model_cfg.unnorm_key = gen_model_cfg.task_suite_name# 反归一化动作时用的 key，告诉模型这是 libero_goal 任务集的动作统计量（均值/方差）
@@ -245,7 +324,7 @@ for batch_idx, batch in enumerate(pbar):
             # 老的 SpecVLA 路径：hidden_state=(first_layer_hidden, last_layer_hidden)，两个 list 的长度都应等于解码步数。
             saved_steps = len(td["hidden_state"][1])
         if saved_steps == len(token):# 只保留"hidden 步数 == 动作 token 数"的样本
-            writedata(outdir,td)# 保存张量字典，一个字典对应一次vlm推理
+            writer.write(td)# 保存张量字典；默认写入 shard，训练时顺序读取
             write_sample_num += 1
         sample_num += 1
         pbar.set_postfix({'valid': write_sample_num, 'drop': sample_num - write_sample_num})
@@ -253,6 +332,7 @@ for batch_idx, batch in enumerate(pbar):
             break
 
 pbar.close()
+writer.close()
 print('generation ended')
 print('sample num',sample_num)
 print('valid sample num',write_sample_num)

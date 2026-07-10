@@ -193,7 +193,7 @@ Per-anchor、per-position、`base_accuracy`、残差后 `accuracy`、`causal_res
 ## 实验演进与诊断记录
 
 这一节是给后续自己和 AI 快速接上下文用的研究日志。指标来自 3090 上各训练目录的
-`metrics.jsonl/run_config.json/latest_checkpoint.txt`，读取时间为 2026-07-07。这里的离线 token accuracy
+`metrics.jsonl/run_config.json/latest_checkpoint.txt`，读取时间更新到 2026-07-11。这里的离线 token accuracy
 只说明 draft 在 teacher-forced 训练视角下是否学到模式，最终仍要用 4090 串行 LIBERO rollout 的
 `SR / Length / Speedup` 判断。
 
@@ -204,7 +204,28 @@ Per-anchor、per-position、`base_accuracy`、残差后 `accuracy`、`causal_res
 | Pure hidden baseline | `ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_puretrain_4gpu` | 完整 prefix/action hidden、1-layer draft、`[1,8,15,29,final]`、hidden+cos，`soft_w=0` | 200 epoch 完整训练 | 0.807 / 0.830 | p1/p6 很强，但 anchor0 的 p2-p5 明显弱，说明块并行远 slot 缺因果信息。 |
 | Residual-CAD weak-path | `ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu` | 增加 hidden residual head、Hidden-level CAD、refined hidden supervision，b16 四卡 | 200 epoch 完整训练 | 0.799 / 0.830 | anchor0->p2 从 0.503 抬到 0.671，但 residual 后 `accuracy` 没超过 `base_accuracy`，说明残差头训练信号还不够强。 |
 | Markov-ACD 诊断短跑 | `ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu` | 增加 logits-level Markov bias、Logit-level CAD、residual token CE、`soft_w=0.10` | 跑到 epoch 18 手动/中途停止 | 0.897 / 0.905 | p2-p5 离线准确率明显跃升，证明“跨 anchor 蒸馏 + token/logit 信号”方向有效；但该目录仍是旧短跑诊断版，run_config 里有旧 `weak_path_loss_boost` 且 `start_index=1`。 |
-| Clean Markov-ACD 当前长跑 | `ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu` | 删除所有手工位置加权；`causal_residual_start_index=0`；`slot_decay=0.90`；保留 Markov-aware refinement + Hidden/Logit CAD | 3090 四卡训练中，epoch 120 已检查 | 0.995 / 0.996 截至 epoch 120 | p2-p5 离线准确率已接近饱和，`accuracy-base_accuracy` 约 +3.2%；最终结论等待 4090 online Length/Speedup。 |
+| Clean Markov-ACD 完整长跑 | `ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu` | 删除所有手工位置加权；`causal_residual_start_index=0`；`slot_decay=0.90`；低权重 `soft_w=0.10`；Markov-aware refinement + Hidden/Logit CAD + residual token CE | 3090 四卡 200 epoch 已完成 | 0.999 / 1.000；`base_accuracy` 末值 0.974 / 最好 0.987 | 离线 teacher-forced 视角几乎饱和：p1-p5 到 1.000，p6 约 0.996。最终是否有效必须看 4090 online Length/Speedup，建议优先测 epoch 100/150/200。 |
+
+### 2026-07-11 最新 Markov-ACD 200 epoch 结果
+
+最新完整训练目录：
+
+```text
+/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu
+```
+
+训练配置要点：4 卡 3090，`batch_size=16/GPU`，有效 batch 64，`lr=5e-5`，`warmup_steps=1000`，`num_epochs=200`，`slot_decay=0.90`，`soft_w=0.10`，`causal_residual_start_index=0`。
+
+| epoch | step | loss | soft_loss | hidden_loss | CAD loss | refined hidden | residual CE | logit CAD | acc | base_acc | p1 | p2 | p3 | p4 | p5 | p6 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 440 | 3.228 | 14.468 | 1.015 | 0.012 | 1.029 | 4.156 | 0.030 | 0.536 | 0.534 | 0.350 | 0.127 | 0.466 | 0.333 | 0.500 | 0.905 |
+| 10 | 4460 | 2.155 | 7.199 | 0.857 | 0.319 | 0.871 | 0.438 | 2.151 | 0.894 | 0.845 | 0.897 | 0.848 | 0.841 | 0.802 | 0.802 | 0.956 |
+| 50 | 22340 | 1.706 | 5.890 | 0.749 | 0.323 | 0.753 | 0.184 | 0.707 | 0.963 | 0.934 | 0.974 | 0.932 | 0.955 | 0.931 | 0.944 | 0.983 |
+| 100 | 44700 | 1.556 | 5.520 | 0.706 | 0.320 | 0.702 | 0.132 | 0.250 | 0.989 | 0.962 | 0.998 | 0.984 | 0.988 | 0.984 | 0.986 | 0.986 |
+| 150 | 67040 | 1.514 | 5.435 | 0.694 | 0.310 | 0.688 | 0.112 | 0.114 | 0.998 | 0.973 | 0.999 | 1.000 | 1.000 | 1.000 | 1.000 | 0.994 |
+| 200 | 89400 | 1.517 | 5.519 | 0.690 | 0.308 | 0.685 | 0.111 | 0.102 | 0.999 | 0.975 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 0.996 |
+
+诊断结论：训练集上的 Markov-ACD/CAD-head 信号很强，弱路径 p2-p5 已被明显拉起；但这是 offline teacher-forced 统计，不能直接等价为接收长度。下一步优先把 epoch 100/150/200 搬到 4090，跑 CAD-head strict/relaxed 的 online rollout。
 
 ### 位置准确率演进
 
@@ -940,14 +961,21 @@ CUDA_VISIBLE_DEVICES=0 python openvla/specdecoding/train-scripts/ge_data_all_ope
   --vla_path /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-goal \
   --data_root_dir /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/dataset/modified_libero_rlds \
   --dataset_name libero_goal_no_noops \
-  --outdir /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset
+  --outdir /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset_sharded \
+  --output_format shards \
+  --samples_per_shard 32
 ```
 
 正式生成结束后检查：
 
 ```bash
-du -sh /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset
-find /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset -maxdepth 1 -name 'data_*.ckpt' | wc -l
+du -sh /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset_sharded
+python - <<'PY'
+import json
+path = '/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset_sharded/dflash_shards_manifest.json'
+m = json.load(open(path))
+print('complete', m.get('complete'), 'samples', m.get('num_samples'), 'shards', len(m.get('shards', [])))
+PY
 ```
 
 历史 4090/3090 的有效样本规模约为 `28.5k`，大小约 `419G`。新 4090 重新生成后，
@@ -959,19 +987,27 @@ find /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_go
 
 ```bash
 TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu
-CKPT=epoch_190_step_169670
+DEST_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu
 
-scp -3 -r \
-  3090_wulin:${TRAIN_DIR}/${CKPT} \
-  4090:/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/${CKPT}
+ssh 4090 "mkdir -p ${DEST_DIR}"
+
+for CKPT in epoch_100_step_044700 epoch_150_step_067050 epoch_200_step_089400; do
+  ssh 4090 "mkdir -p ${DEST_DIR}/${CKPT}"
+  scp -3 3090_wulin:${TRAIN_DIR}/${CKPT}/pytorch_model.bin 4090:${DEST_DIR}/${CKPT}/pytorch_model.bin
+  scp -3 3090_wulin:${TRAIN_DIR}/${CKPT}/dflash_config.json 4090:${DEST_DIR}/${CKPT}/dflash_config.json
+done
+
+for FILE in dflash_config.json metrics.jsonl training_summary_markov_acd_start0_slotdecay090.csv training_summary_markov_acd_start0_slotdecay090.md; do
+  scp -3 3090_wulin:${TRAIN_DIR}/${FILE} 4090:${DEST_DIR}/${FILE}
+done
 ```
 
 复制后检查：
 
 ```bash
-ssh 4090 "ls -lh \
-  /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/${CKPT}/dflash_config.json \
-  /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/${CKPT}/pytorch_model.bin"
+ssh 4090 "for CKPT in epoch_100_step_044700 epoch_150_step_067050 epoch_200_step_089400; do \
+  ls -lh ${DEST_DIR}/\${CKPT}/dflash_config.json ${DEST_DIR}/\${CKPT}/pytorch_model.bin; \
+done"
 ```
 
 ## 服务器分工和训练流程
@@ -1025,23 +1061,28 @@ CUDA_VISIBLE_DEVICES=0 python openvla/specdecoding/train-scripts/ge_data_all_ope
   --vla_path /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-goal \
   --data_root_dir /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/dataset/modified_libero_rlds \
   --dataset_name libero_goal_no_noops \
-  --outdir /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset
+  --outdir /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset_sharded \
+  --output_format shards \
+  --samples_per_shard 32
 ```
 
 训练前确认数据大小和数量：
 
 ```bash
-du -sh /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset
-find /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset \
-  -maxdepth 1 -name 'data_*.ckpt' | wc -l
+du -sh /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset_sharded
+python - <<'PY'
+import json
+path = '/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset_sharded/dflash_shards_manifest.json'
+m = json.load(open(path))
+print('complete', m.get('complete'), 'samples', m.get('num_samples'), 'shards', len(m.get('shards', [])))
+PY
 ```
 
 旧 4090 历史数据目录状态如下；新 4090 重新生成或迁移后必须重新记录实际数值：
 
 ```text
-/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset
-大小: 419G
-样本数: 28,639 个 data_*.ckpt
+/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset_sharded
+历史样本内容来自 28,576 个有效 .ckpt；合并后约 893 个 shard，manifest 中 complete=true 才能训练。
 ```
 
 ### 2. 3090：完整四卡训练
@@ -1084,7 +1125,7 @@ openvla/specdecoding/train-scripts/run_dflash_ablation_3_markov_acd_4gpu.sh    #
 
 ```text
 OPENVLA_GOAL_PATH=/data/wulin/hf_files/openvla-7b-finetuned-libero-goal
-DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset
+DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset_sharded  # 若不存在则 launcher 自动回退旧 dflash_goal_dataset
 OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu
 ```
 
@@ -1125,6 +1166,47 @@ SwanLab = 使用环境默认配置
 
 `run_dflash_anchor_hidden_1layer_residual_cad_4gpu.sh` 支持环境变量覆盖常用超参数，例如：
 脚本内部已经按“路径、训练规模、loss 权重、Markov-ACD 结构参数”分区写了中文注释，启动时也会打印完整配置，训练前优先检查这份打印。
+
+### 训练 IO 修复：shard 数据格式
+
+2026-07-11 排查到服务器卡顿的主因不是 GPU，而是训练数据读取：旧数据是 `28,576` 个单样本 `.ckpt`，总大小约 `419G`。200 epoch 等价于重复随机读取约 `84TB` 小文件；4 卡 DDP 再叠加 DataLoader worker/prefetch，会让共享硬盘随机读非常高。SwanLab 逐指标上传和 checkpoint 写 optimizer state 是次要问题。
+
+当前修复：
+
+1. `ge_data_all_openvla_token_only_libero_goal.py` 默认 `--output_format shards --samples_per_shard 32`，直接生成 shard。
+2. `pack_dflash_dataset_shards.py` 可把旧 `.ckpt` 无损合并成 shard，样本内容不变。
+3. `train_dflash_libero_goal.py` 默认 `--dataset_format auto`，若目录存在 `dflash_shards_manifest.json` 就按 shard 顺序读；manifest 的 `complete` 不是 `true` 时会拒绝训练。
+4. 训练 launcher 默认 `NUM_WORKERS=1`、`DATALOADER_PREFETCH_FACTOR=1`、关闭 pin/persistent workers，并默认不保存 optimizer state / latest 根目录副本，减少共享硬盘压力。
+
+3090 上把旧数据合并成 shard：
+
+```bash
+ssh 3090_wulin
+cd /data/wulin/c/SpecVLA-DFLASH
+source /data/wulin/miniconda3/etc/profile.d/conda.sh
+conda activate specvla
+
+screen -S pack_dflash_data
+nice -n 10 ionice -c2 -n7 python openvla/specdecoding/train-scripts/pack_dflash_dataset_shards.py \
+  --input_dir /data/wulin/c/specvla-data/dflash_goal_dataset \
+  --output_dir /data/wulin/c/specvla-data/dflash_goal_dataset_sharded \
+  --samples_per_shard 32 \
+  --overwrite
+```
+
+检查合并是否完成：
+
+```bash
+python - <<'PY'
+import json
+path = '/data/wulin/c/specvla-data/dflash_goal_dataset_sharded/dflash_shards_manifest.json'
+m = json.load(open(path))
+print('complete', m.get('complete'), 'samples', m.get('num_samples'), 'shards', len(m.get('shards', [])))
+PY
+```
+
+只有看到 `complete True` 才能开始训练。launcher 会优先使用 `/data/wulin/c/specvla-data/dflash_goal_dataset_sharded`；如果该目录不存在，才回退旧 `.ckpt` 目录。
+
 
 2026-07-07 中途检查 Markov-ACD 训练时发现：p2-p6 提升非常明显，但每个 anchor 的第一跳/local slot0
 没有吃到 Markov/Residual/token-CE 增强，导致 t1 以及各 anchor 的一步预测仍接近旧版。当前干净版本因此改为
@@ -1563,8 +1645,9 @@ DFlash CAD-head 一键评测链只跑 strict/relaxed 两个 CAD-head 版本，�
 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
   bash openvla/specdecoding/decode-scripts/run_dflash_cad_head_main_table_eval.sh
 
-# 如果只想先测 Goal 的 epoch 200：
-TASK_SUITES="libero_goal" EVAL_EPOCHS="200" \
+# 当前推荐先测 Goal 的 epoch 100/150/200：
+TASK_SUITES="libero_goal" EVAL_EPOCHS="100 150 200" \
+DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu \
 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
   bash openvla/specdecoding/decode-scripts/run_dflash_cad_head_main_table_eval.sh
 ```

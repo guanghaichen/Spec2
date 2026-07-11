@@ -1395,6 +1395,25 @@ TIMING_SCOPE=full_suite SYNC_CUDA_TIMING=True \
   bash openvla/specdecoding/decode-scripts/run_specvla_relaxed_libero_goal_eval.sh
 ```
 
+### Goal：一键复现 SpecVLA baseline
+
+为了严格复现上游 SpecVLA 的 Goal 评测语义，使用下面的一键 launcher。它串行运行
+OpenVLA AR、SpecVLA strict（`r=0`）和 SpecVLA relaxed（`r=9`），统一使用 `seed=7`、
+`50 trials/task`、`SYNC_CUDA_TIMING=False`、`TIMING_SCOPE=last_task`：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 \
+  bash openvla/specdecoding/decode-scripts/run_specvla_goal_upstream_compatible_eval.sh
+```
+
+脚本会使用唯一的 `RUN_TAG` 防止旧日志混入，并在
+`<LOG_DIR>/reproduction/<RUN_TAG>_comparison.txt` 汇总 `SR / Length / Avg Accept / Mean Step / Speedup`。
+若要先 smoke test，可写 `NUM_TRIALS_PER_TASK=1`；论文复现必须回到默认的 `50`。
+
+本仓库在这一模式下还对齐了两个容易被忽略的源码细节：成功终止 action 不写入 timing JSON，且
+Length 的 CUDA 标量会在计时结束后才 materialize，不把统计开销混入 SpecVLA 的 wall-clock 时间。
+这仍不能消除 RTX 4090 与论文 A100 80G 的硬件差异，但排除了可控的评测代码差异。
+
 ### 非 Goal suite 的 AR / SpecVLA baseline
 
 当前已补齐 Object、Spatial、Long 三个 suite 的 baseline launcher。这里的 Long 对应代码里的

@@ -238,8 +238,6 @@ def eval_libero(cfg: GenerateConfig) -> None:
                         processor=processor,
                         return_time=True,# 返回模型推理耗时
                     )
-                    total_time.append(time)# 一个 episode 中所有 policy call 的推理耗时
-
                     # Normalize gripper action [0,1] -> [-1,+1] because the environment expects the latter
                     action = normalize_gripper_action(action, binarize=True)
 
@@ -255,6 +253,9 @@ def eval_libero(cfg: GenerateConfig) -> None:
                         total_successes += 1
                         break
                     t += 1
+                    # Match upstream SpecVLA timing: successful terminal
+                    # actions are not included in the timing JSON.
+                    total_time.append(time)
 
                 except Exception as e:
                     print(f"Caught exception: {e}")

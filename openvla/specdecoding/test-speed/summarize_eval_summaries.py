@@ -33,7 +33,17 @@ def main():
     if ar_mean is None:
         raise ValueError(f"AR summary has no timing.mean: {args.ar_summary}")
 
-    rows = []
+    rows = [
+        {
+            "method": method_name(ar),
+            "sr": ar.get("success_rate"),
+            "length": None,
+            "avg_accept_length": None,
+            "mean_time": ar_mean,
+            "speedup": 1.0,
+            "path": ar["_path"],
+        }
+    ]
     for summary_path in args.summaries:
         summary = load_summary(Path(summary_path))
         timing_mean = summary.get("timing", {}).get("mean")

@@ -636,6 +636,11 @@ class SpecVLAforActionPrediction(nn.Module):
         #print('init accept threshold',accept_threshold)
         self.norm_stats = base_model.norm_stats
         self.last_dflash_stats = None
+        self.last_generation_stats = None
+        # EAGLE's per-block values stay on CUDA until the caller has recorded
+        # inference time. Materializing them inside eagenerate would mix
+        # metric collection into the paper-style timing path.
+        self._pending_generation_stats = None
 
         # Compute action bins
         self.bins = base_model.bins
@@ -698,6 +703,47 @@ class SpecVLAforActionPrediction(nn.Module):
         #print(self.ea_layer.fc.weight)
         #exit()
         #self.base_model.language_model = LlamaSpecForCausalLM(language_model)
+
+    def get_generation_stats(self):
+        """Return generation metrics without adding CUDA scalar reads to decoding."""
+        pending = self._pending_generation_stats
+        if pending is None:
+            return self.last_generation_stats
+
+        if pending.get("backend") != "eagle":
+            self._pending_generation_stats = None
+            return self.last_generation_stats
+
+        def as_int(value):
+            if torch.is_tensor(value):
+                return int(value.detach().item())
+            return int(value)
+
+        progress_lengths = [as_int(value) for value in pending["progress_lengths"]]
+        raw_accept_lengths = [as_int(value) for value in pending["raw_accept_lengths"]]
+        accept_lengths = [max(progress - 1, 0) for progress in progress_lengths]
+        num_blocks = len(progress_lengths)
+        progressed_tokens = min(pending["generated_tokens"], sum(progress_lengths))
+        self.last_generation_stats = {
+            "backend": "eagle",
+            "generated_tokens": pending["generated_tokens"],
+            "num_blocks": num_blocks,
+            "progressed_tokens": progressed_tokens,
+            "progress_lengths": progress_lengths,
+            "length": (progressed_tokens / num_blocks) if num_blocks > 0 else 0.0,
+            "table1_length": (progressed_tokens / num_blocks) if num_blocks > 0 else 0.0,
+            "avg_progress_length": (progressed_tokens / num_blocks) if num_blocks > 0 else 0.0,
+            "accept_lengths": accept_lengths,
+            "raw_accept_lengths": raw_accept_lengths,
+            "avg_accept_length": (sum(accept_lengths) / num_blocks) if num_blocks > 0 else 0.0,
+            "accepted_tokens": sum(accept_lengths),
+            "compared_tokens": 0,
+            "overall_hit_rate": None,
+            "per_position": [],
+        }
+        self._pending_generation_stats = None
+        return self.last_generation_stats
+
     def _prepare_decoder_attention_mask(
             self, attention_mask, input_shape, inputs_embeds, past_key_values_length
     ):
@@ -1371,6 +1417,7 @@ class SpecVLAforActionPrediction(nn.Module):
             return_hidden_states = legacy_output_hidden
         self.last_dflash_stats = None
         self.last_generation_stats = None
+        self._pending_generation_stats = None
 
         # 设置generate方法的参数
         if return_hidden_states:
@@ -1476,7 +1523,7 @@ class SpecVLAforActionPrediction(nn.Module):
             #print(last_layer_hidden[0].shape)
             return actions, predicted_action_token_ids,(first_layer_hidden,last_layer_hidden)
         if return_generation_stats:
-            return actions, self.last_generation_stats
+            return actions, self.get_generation_stats()
         if return_dflash_stats:
             return actions, self.last_dflash_stats
 
@@ -1765,7 +1812,6 @@ class SpecVLAforActionPrediction(nn.Module):
         input_len = input_ids.shape[1]-1
         max_length = max_length - self.ea_layer.total_tokens - 10
         new_token = 0
-        accept_lengths = []
         raw_accept_lengths = []
         progress_lengths = []
         idx = -1
@@ -1790,10 +1836,6 @@ class SpecVLAforActionPrediction(nn.Module):
             best_candidate, accept_length, sample_p = evaluate_posterior(
                 logits, candidates, logits_processor,accept_threshold=accept_threshold
             )
-            if torch.is_tensor(accept_length):
-                raw_accept_length = int(accept_length.item())
-            else:
-                raw_accept_length = int(accept_length)
             previous_new_token = new_token
             input_ids, draft_tokens, retrieve_indices, tree_mask, tree_position_ids, new_token,prompt_embeds,past_key_value_data,attention_mask = update_inference_inputs(
                 prompt_embeds,
@@ -1814,11 +1856,11 @@ class SpecVLAforActionPrediction(nn.Module):
                 sample_p,
                 attention_mask
             )
-            block_progress = int(new_token - previous_new_token)
-            if block_progress > 0:
-                progress_lengths.append(block_progress)
-                accept_lengths.append(max(block_progress - 1, 0))
-                raw_accept_lengths.append(raw_accept_length)
+            # Keep CUDA scalars deferred. The action conversion in
+            # predict_action synchronizes before get_generation_stats() turns
+            # them into Python numbers, outside the recorded timing interval.
+            progress_lengths.append(new_token - previous_new_token)
+            raw_accept_lengths.append(accept_length)
             if self.tokenizer.eos_token_id in input_ids[0, input_len:].tolist():
                 break
             if new_token > max_new_tokens:
@@ -1835,23 +1877,11 @@ class SpecVLAforActionPrediction(nn.Module):
         if len(stop_token_ids_index) > 0:
                     input_ids = input_ids[:,:stop_token_ids_index[0]]
 
-        num_blocks = len(progress_lengths)
-        progressed_tokens = min(max_new_tokens, sum(progress_lengths))
-        self.last_generation_stats = {
+        self._pending_generation_stats = {
             "backend": "eagle",
             "generated_tokens": max_new_tokens,
-            "num_blocks": num_blocks,
-            "progressed_tokens": progressed_tokens,
             "progress_lengths": progress_lengths,
-            "length": (progressed_tokens / num_blocks) if num_blocks > 0 else 0.0,
-            "table1_length": (progressed_tokens / num_blocks) if num_blocks > 0 else 0.0,
-            "avg_progress_length": (progressed_tokens / num_blocks) if num_blocks > 0 else 0.0,
-            "accept_lengths": accept_lengths,
             "raw_accept_lengths": raw_accept_lengths,
-            "avg_accept_length": (sum(accept_lengths) / num_blocks) if num_blocks > 0 else 0.0,
-            "accepted_tokens": sum(accept_lengths),
-            "compared_tokens": 0,
-            "overall_hit_rate": None,
         }
         if not log:
             return input_ids[:,input_len+1:]

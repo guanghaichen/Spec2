@@ -227,15 +227,16 @@ def get_vla_action(vla, processor, base_vla_name, obs, task_label, unnorm_key, r
         predict_kwargs["generate_mode"] = generate_mode
     if return_dflash_stats:
         predict_kwargs["return_dflash_stats"] = True
-    if return_generation_stats:
-        predict_kwargs["return_generation_stats"] = True
-
     action = vla.predict_action(**predict_kwargs)# 调用 OpenVLAForActionPrediction.predict_action()
     if sync_cuda_timing and torch.cuda.is_available():
         torch.cuda.synchronize()
     end_time = time.time()
     if return_time:
-        if return_dflash_stats or return_generation_stats:
+        if return_generation_stats:
+            stats_getter = getattr(vla, "get_generation_stats", None)
+            generation_stats = stats_getter() if stats_getter is not None else getattr(vla, "last_generation_stats", None)
+            return action, (end_time, start_time), generation_stats
+        if return_dflash_stats:
             return action[0], (end_time, start_time), action[1]
         return action,(end_time,start_time)
     return action

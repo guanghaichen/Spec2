@@ -17,7 +17,11 @@ EVAL_EPOCHS="${EVAL_EPOCHS:-120 150 180 200}"
 RUN_STRICT="${RUN_STRICT:-True}"
 RUN_RELAXED="${RUN_RELAXED:-True}"
 STRICT_ACCEPT_THRESHOLD="${STRICT_ACCEPT_THRESHOLD:-0}"
-RELAXED_ACCEPT_THRESHOLD="${RELAXED_ACCEPT_THRESHOLD:-9}"
+# A global RELAXED_ACCEPT_THRESHOLD intentionally overrides every suite. If it
+# is unset, Long/libero_10 follows the Spec-VLA paper with r=5 and the other
+# three suites use r=9.
+RELAXED_ACCEPT_THRESHOLD="${RELAXED_ACCEPT_THRESHOLD:-}"
+RELAXED_ACCEPT_THRESHOLD_LONG="${RELAXED_ACCEPT_THRESHOLD_LONG:-5}"
 
 # 初始化一次只是为了拿到当前机器的 LOG_DIR 默认值；真正评测时每个 suite 会重新 init。
 FIRST_SUITE="${TASK_SUITES%% *}"
@@ -41,6 +45,13 @@ EOF
 
 for suite in ${TASK_SUITES}; do
   suite_slug="${suite#libero_}"
+  if [[ -n "${RELAXED_ACCEPT_THRESHOLD}" ]]; then
+    relaxed_accept_threshold="${RELAXED_ACCEPT_THRESHOLD}"
+  elif [[ "${suite}" == "libero_10" ]]; then
+    relaxed_accept_threshold="${RELAXED_ACCEPT_THRESHOLD_LONG}"
+  else
+    relaxed_accept_threshold=9
+  fi
   for epoch in ${EVAL_EPOCHS}; do
     if [[ "${RUN_STRICT}" == "True" ]]; then
       echo "[CAD strict] suite=${suite} epoch=${epoch}"
@@ -53,8 +64,8 @@ for suite in ${TASK_SUITES}; do
     if [[ "${RUN_RELAXED}" == "True" ]]; then
       echo "[CAD relaxed] suite=${suite} epoch=${epoch}"
       SPEC_CKPT="" TASK_SUITE_NAME="${suite}" EVAL_EPOCH="${epoch}" \
-        ACCEPT_THRESHOLD="${RELAXED_ACCEPT_THRESHOLD}" \
-        RUN_ID_NOTE="dflash-cad-relaxed-${suite_slug}-e${epoch}-r${RELAXED_ACCEPT_THRESHOLD}" \
+        ACCEPT_THRESHOLD="${relaxed_accept_threshold}" \
+        RUN_ID_NOTE="dflash-cad-relaxed-${suite_slug}-e${epoch}-r${relaxed_accept_threshold}" \
         bash "${SCRIPT_DIR}/run_dflash_residual_libero_goal_eval.sh"
     fi
   done

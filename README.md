@@ -1417,8 +1417,18 @@ Length 的 CUDA 标量会在计时结束后才 materialize，不把统计开销�
 ### 非 Goal suite 的 AR / SpecVLA baseline
 
 当前已补齐 Object、Spatial、Long 三个 suite 的 baseline launcher。这里的 Long 对应代码里的
-`libero_10`。这些脚本只覆盖 AR、SpecVLA strict、SpecVLA relaxed；DFLASH 暂时只保留 Goal
-脚本，等新 draft 方案稳定后再扩展。
+`libero_10`。这些专用脚本覆盖 AR、SpecVLA strict、SpecVLA relaxed；DFLASH 使用保留
+`goal` 名称的通用 launcher，但可通过 `TASK_SUITE_NAME` 评测四个已有权重的 suite。
+
+Relaxed acceptance 的默认阈值按论文设置：Goal/Object/Spatial 使用 `r=9`，Long（`libero_10`）
+使用 `r=5`。`run_specvla_relaxed_libero_10_eval.sh` 与所有支持 `TASK_SUITE_NAME=libero_10` 的
+DFLASH relaxed launcher 都会自动选 `r=5`；只有显式传入 `ACCEPT_THRESHOLD` 时才覆盖该规则。
+例如评测 DFLASH CAD-head 的第 200 epoch Long checkpoint：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 TASK_SUITE_NAME=libero_10 EVAL_EPOCH=200 \
+  bash openvla/specdecoding/decode-scripts/run_dflash_residual_libero_goal_eval.sh
+```
 
 | LIBERO suite | AR | SpecVLA strict | SpecVLA relaxed |
 | --- | --- | --- | --- |

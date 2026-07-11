@@ -7,7 +7,14 @@ TASK_SUITE_NAME="${TASK_SUITE_NAME:-libero_goal}"
 init_libero_eval_env "${TASK_SUITE_NAME}"
 resolve_dflash_checkpoint
 
-ACCEPT_THRESHOLD="${ACCEPT_THRESHOLD:-9}"
+# Keep relaxed DFlash comparable with Spec-VLA: Long/libero_10 uses r=5,
+# while Goal/Object/Spatial use r=9. An explicit environment value wins.
+if [[ "${TASK_SUITE_NAME}" == "libero_10" ]]; then
+  DEFAULT_RELAXED_ACCEPT_THRESHOLD=5
+else
+  DEFAULT_RELAXED_ACCEPT_THRESHOLD=9
+fi
+ACCEPT_THRESHOLD="${ACCEPT_THRESHOLD:-${DEFAULT_RELAXED_ACCEPT_THRESHOLD}}"
 DFLASH_NUM_DRAFT_LAYERS="${DFLASH_NUM_DRAFT_LAYERS:-1}"
 RUN_ID_NOTE="${RUN_ID_NOTE:-dflash-relaxed-${TASK_SUITE_SLUG}-e${EVAL_EPOCH}-r${ACCEPT_THRESHOLD}}"
 SYNC_CUDA_TIMING="${SYNC_CUDA_TIMING:-False}"

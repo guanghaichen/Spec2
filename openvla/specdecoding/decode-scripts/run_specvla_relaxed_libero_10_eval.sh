@@ -6,7 +6,8 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/libero_eval_common.sh"
 init_libero_eval_env libero_10
 resolve_specvla_checkpoint
 
-ACCEPT_THRESHOLD="${ACCEPT_THRESHOLD:-9}"
+# Spec-VLA paper: Long (libero_10) uses r=5; Goal/Object/Spatial use r=9.
+ACCEPT_THRESHOLD="${ACCEPT_THRESHOLD:-5}"
 RUN_ID_NOTE="${RUN_ID_NOTE:-specvla-relaxed-10-r${ACCEPT_THRESHOLD}}"
 SYNC_CUDA_TIMING="${SYNC_CUDA_TIMING:-False}"
 TIMING_SCOPE="${TIMING_SCOPE:-last_task}"

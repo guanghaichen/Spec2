@@ -443,9 +443,9 @@ dflash_data_format           full_prefix_plus_action_hidden_v4
 
 ## 后续扩展：OpenVLA-OFT Layer-ACD Early Exit
 
-这一节是后续实验备忘录，**不是当前正在跑的主线**。当前优先级仍是完成 OpenVLA 自回归 action-token
-场景下的 DFLASH / Markov-ACD 训练和 4090 串行推理评测。等这部分结果稳定后，再考虑把同一思想迁移到
-[OpenVLA-OFT](https://openvla-oft.github.io/)。
+这一节现在已进入独立实现与复现阶段，但仍是 DFLASH 主实验之外的补充章节。当前完整代码、环境、训练和
+评测说明见 [openvla-oft/README_SPECVLA_DFLASH_CN.md](openvla-oft/README_SPECVLA_DFLASH_CN.md)。代码固定了
+[OpenVLA-OFT](https://openvla-oft.github.io/) 上游版本，并沿用 `4090 评测 / 3090 数据和训练` 的机器分工。
 
 ### 动机
 
@@ -460,13 +460,13 @@ parallel action-chunk VLA 的 early-exit acceleration。
 
 ### 粗略方案
 
-暂定名字可以叫 **Layer-ACD Early Exit**：
+当前实现名为 **Layer-ACD Early Exit**：
 
 ```text
-early layer hidden h_l
-    -> Markov/Layer-aware residual refinement
-    -> early action head
-    -> predicted action chunk
+early layer action hidden h_l
+    -> Chunk-aware residual adapter
+    -> frozen official OFT L1 action head
+    -> predicted parallel action chunk
 ```
 
 训练时固定一个 OpenVLA-OFT teacher，对同一输入保存：
@@ -481,13 +481,13 @@ ground-truth act:  dataset action chunk
 然后训练一个轻量 early-exit module：
 
 ```text
-refined_h_l = h_l + ResidualMLP(h_l, layer_embed, action_step_embed, action_dim_embed)
+refined_h_l = h_l + ChunkMixerResidual(h_l)
 early_action_chunk = ActionHead(refined_h_l)
 ```
 
-这里的 residual head 对应当前 DFLASH 里的 Markov-aware residual refinement，只是条件从“前一个 token”
-变成 “layer id / action step / action dimension”等并行 action-chunk 结构信息。核心不是复制 speculative decoding，
-而是复用“弱路径 hidden 经轻量修正后追强路径”的思想。
+adapter 先把 56 个 action hidden 投到低维 bottleneck，再做两层 action-token self-attention，最后预测回
+4096 维 residual。它显式保留 OFT 并行 action chunk 内的跨 token 关系，同时复用“弱路径 hidden 经轻量修正后
+追强路径”的思想，而不是复制 speculative decoding。
 
 ### 训练 loss
 
@@ -497,12 +497,11 @@ early_action_chunk = ActionHead(refined_h_l)
 total =
     hidden_distill(refined_h_l, final_h_L)
   + action_distill(early_action_chunk, teacher_action_chunk)
-  + action_L1(early_action_chunk, gt_action_chunk)
   + cosine_hidden_loss(refined_h_l, final_h_L)
 ```
 
-可以加一个轻量 horizon decay，让 action chunk 前几步权重大一点，因为闭环控制里最靠前的动作通常最直接影响
-下一帧状态。这个 decay 应该是全局结构先验，不要做手工点名位置补丁。
+第一版 action loss 使用冻结官方 action head 输出的 teacher continuous action，而不直接混入额外标签设计；
+先证明早退是否保住 OFT 自己的 action mapping，再决定是否有必要加入 ground-truth action loss。
 
 ### 最小实验矩阵
 
@@ -547,7 +546,9 @@ latency speedup >= 15-25%
 4. 如果最小实验失败，也仍然有价值：它能界定当前 Markov-ACD 思想更适合 action-token autoregressive VLA，
    而不是所有并行 action-head VLA。
 
-当前暂不实现这条线。等 OpenVLA 主实验完成后，再新开分支接入 OpenVLA-OFT 代码和数据。
+当前已完成统一代码接入、3090 Goal smoke、teacher HDF5、DDP adapter trainer、hook early-exit runtime 与
+4090/3090 脚本。待 DFLASH 当前主表评测结束后，先在 4090 完成 OFT Goal 50-trial baseline，再在 3090 收集
+teacher feature 并训练 layer-16 adapter。
 
 
 ## 后续扩展：顶会级实验路线图

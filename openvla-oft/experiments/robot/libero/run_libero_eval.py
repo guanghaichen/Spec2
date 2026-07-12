@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import sys
+import time
 from collections import deque
 from dataclasses import dataclass
 from enum import Enum
@@ -16,10 +17,11 @@ from typing import Optional, Union
 
 import draccus
 import numpy as np
+import torch
 import tqdm
 from libero.libero import benchmark
 
-import wandb
+wandb = None  # Lazy import only when cfg.use_wandb=True; avoids slow wandb import for local eval.
 
 # Append current directory so that interpreter can find experiments.robot
 sys.path.append("../..")
@@ -33,11 +35,13 @@ from experiments.robot.libero.libero_utils import (
 )
 from experiments.robot.openvla_utils import (
     get_action_head,
+    get_early_exit_adapter,
     get_noisy_action_projector,
     get_processor,
     get_proprio_projector,
     resize_image_for_policy,
 )
+from experiments.early_exit.feature_store import TeacherFeatureWriter
 from experiments.robot.robot_utils import (
     DATE_TIME,
     get_action,
@@ -106,6 +110,18 @@ class GenerateConfig:
     load_in_8bit: bool = False                       # (For OpenVLA only) Load with 8-bit quantization
     load_in_4bit: bool = False                       # (For OpenVLA only) Load with 4-bit quantization
 
+    # Layer early-exit experiment. Leave both unset for the official OFT baseline.
+    early_exit_checkpoint: Optional[str] = None      # Directory containing layer_exit_adapter.pt/config
+    early_exit_layer: Optional[int] = None           # Number of LLaMA decoder layers to execute
+    record_action_timing: bool = False               # Record policy-query latency for baseline/early-exit comparison
+    sync_cuda_timing: bool = True                    # Synchronize CUDA before/after a timed policy query
+
+    # Teacher collection writes one HDF5 file, not a large collection of shards.
+    teacher_feature_output: Optional[str] = None
+    teacher_feature_layer: Optional[int] = None
+    teacher_feature_limit: int = 0                   # 0 means collect every policy query in this evaluation
+    save_rollout_videos: bool = True
+
     #################################################################################################################
     # LIBERO environment-specific parameters
     #################################################################################################################
@@ -139,6 +155,14 @@ def validate_config(cfg: GenerateConfig) -> None:
 
     assert not (cfg.load_in_8bit and cfg.load_in_4bit), "Cannot use both 8-bit and 4-bit quantization!"
 
+    if cfg.early_exit_checkpoint is not None:
+        assert cfg.early_exit_layer is not None, "early_exit_layer is required with early_exit_checkpoint"
+        assert cfg.use_l1_regression and not cfg.use_diffusion, "Layer early exit supports OFT L1 regression only"
+    if cfg.teacher_feature_output is not None:
+        assert cfg.teacher_feature_layer is not None, "teacher_feature_layer is required for feature collection"
+        assert cfg.early_exit_checkpoint is None, "Collect teacher features with the full OFT model, not early exit"
+        assert cfg.use_l1_regression and not cfg.use_diffusion, "Teacher collection supports OFT L1 regression only"
+
     # Validate task suite
     assert cfg.task_suite_name in [suite.value for suite in TaskSuite], f"Invalid task suite: {cfg.task_suite_name}"
 
@@ -162,6 +186,10 @@ def initialize_model(cfg: GenerateConfig):
     if cfg.use_l1_regression or cfg.use_diffusion:
         action_head = get_action_head(cfg, model.llm_dim)
 
+    early_exit_adapter = None
+    if cfg.early_exit_checkpoint is not None:
+        early_exit_adapter = get_early_exit_adapter(cfg.early_exit_checkpoint, model.llm_dim)
+
     # Load noisy action projector if using diffusion
     noisy_action_projector = None
     if cfg.use_diffusion:
@@ -173,7 +201,7 @@ def initialize_model(cfg: GenerateConfig):
         processor = get_processor(cfg)
         check_unnorm_key(cfg, model)
 
-    return model, action_head, proprio_projector, noisy_action_projector, processor
+    return model, action_head, proprio_projector, noisy_action_projector, early_exit_adapter, processor
 
 
 def check_unnorm_key(cfg: GenerateConfig, model) -> None:
@@ -207,6 +235,10 @@ def setup_logging(cfg: GenerateConfig):
 
     # Initialize Weights & Biases logging if enabled
     if cfg.use_wandb:
+        global wandb
+        import wandb as wandb_module
+
+        wandb = wandb_module
         wandb.init(
             entity=cfg.wandb_entity,
             project=cfg.wandb_project,
@@ -285,6 +317,9 @@ def run_episode(
     action_head=None,
     proprio_projector=None,
     noisy_action_projector=None,
+    early_exit_adapter=None,
+    teacher_feature_writer=None,
+    query_times=None,
     initial_state=None,
     log_file=None,
 ):
@@ -326,8 +361,13 @@ def run_episode(
 
             # If action queue is empty, requery model
             if len(action_queue) == 0:
-                # Query model to get action
-                actions = get_action(
+                collect_teacher = teacher_feature_writer is not None and (
+                    cfg.teacher_feature_limit <= 0 or teacher_feature_writer.count < cfg.teacher_feature_limit
+                )
+                if cfg.record_action_timing and cfg.sync_cuda_timing and torch.cuda.is_available():
+                    torch.cuda.synchronize()
+                query_start = time.perf_counter()
+                query_output = get_action(
                     cfg,
                     model,
                     observation,
@@ -337,7 +377,20 @@ def run_episode(
                     proprio_projector=proprio_projector,
                     noisy_action_projector=noisy_action_projector,
                     use_film=cfg.use_film,
+                    early_exit_adapter=early_exit_adapter,
+                    early_exit_layer=cfg.early_exit_layer,
+                    return_teacher_features=collect_teacher,
                 )
+                if cfg.record_action_timing and cfg.sync_cuda_timing and torch.cuda.is_available():
+                    torch.cuda.synchronize()
+                if query_times is not None:
+                    query_times.append(time.perf_counter() - query_start)
+
+                if collect_teacher:
+                    actions, teacher_features = query_output
+                    teacher_feature_writer.append(teacher_features, np.asarray(actions))
+                else:
+                    actions = query_output
                 action_queue.extend(actions)
 
             # Get action from queue
@@ -369,6 +422,9 @@ def run_task(
     action_head=None,
     proprio_projector=None,
     noisy_action_projector=None,
+    early_exit_adapter=None,
+    teacher_feature_writer=None,
+    query_times=None,
     total_episodes=0,
     total_successes=0,
     log_file=None,
@@ -418,6 +474,9 @@ def run_task(
             action_head,
             proprio_projector,
             noisy_action_projector,
+            early_exit_adapter,
+            teacher_feature_writer,
+            query_times,
             initial_state,
             log_file,
         )
@@ -430,9 +489,10 @@ def run_task(
             total_successes += 1
 
         # Save replay video
-        save_rollout_video(
-            replay_images, total_episodes, success=success, task_description=task_description, log_file=log_file
-        )
+        if cfg.save_rollout_videos:
+            save_rollout_video(
+                replay_images, total_episodes, success=success, task_description=task_description, log_file=log_file
+            )
 
         # Log results
         log_message(f"Success: {success}", log_file)
@@ -468,13 +528,34 @@ def eval_libero(cfg: GenerateConfig) -> float:
     set_seed_everywhere(cfg.seed)
 
     # Initialize model and components
-    model, action_head, proprio_projector, noisy_action_projector, processor = initialize_model(cfg)
+    model, action_head, proprio_projector, noisy_action_projector, early_exit_adapter, processor = initialize_model(cfg)
 
     # Get expected image dimensions
     resize_size = get_image_resize_size(cfg)
 
     # Setup logging
     log_file, local_log_filepath, run_id = setup_logging(cfg)
+
+    teacher_feature_writer = None
+    if cfg.teacher_feature_output is not None:
+        teacher_feature_writer = TeacherFeatureWriter(
+            cfg.teacher_feature_output,
+            num_action_tokens=7 * NUM_ACTIONS_CHUNK,
+            hidden_size=model.llm_dim,
+            metadata={
+                "pretrained_checkpoint": str(cfg.pretrained_checkpoint),
+                "task_suite_name": str(cfg.task_suite_name),
+                "early_exit_layer": cfg.teacher_feature_layer,
+                "hidden_size": model.llm_dim,
+                "num_action_tokens": 7 * NUM_ACTIONS_CHUNK,
+                "num_actions_chunk": NUM_ACTIONS_CHUNK,
+                "action_dim": 7,
+            },
+        )
+        cfg.early_exit_layer = cfg.teacher_feature_layer
+        log_message(f"Collecting layer-{cfg.teacher_feature_layer} teacher features to {cfg.teacher_feature_output}", log_file)
+
+    query_times = [] if cfg.record_action_timing else None
 
     # Initialize LIBERO task suite
     benchmark_dict = benchmark.get_benchmark_dict()
@@ -496,6 +577,9 @@ def eval_libero(cfg: GenerateConfig) -> float:
             action_head,
             proprio_projector,
             noisy_action_projector,
+            early_exit_adapter,
+            teacher_feature_writer,
+            query_times,
             total_episodes,
             total_successes,
             log_file,
@@ -509,6 +593,25 @@ def eval_libero(cfg: GenerateConfig) -> float:
     log_message(f"Total episodes: {total_episodes}", log_file)
     log_message(f"Total successes: {total_successes}", log_file)
     log_message(f"Overall success rate: {final_success_rate:.4f} ({final_success_rate * 100:.1f}%)", log_file)
+
+    if teacher_feature_writer is not None:
+        collected_samples = teacher_feature_writer.count
+        teacher_feature_writer.close()
+        log_message(f"Saved {collected_samples} teacher feature samples", log_file)
+
+    if query_times is not None:
+        timing = {
+            "num_policy_queries": len(query_times),
+            "mean_policy_query_seconds": float(np.mean(query_times)) if query_times else None,
+            "median_policy_query_seconds": float(np.median(query_times)) if query_times else None,
+            "p95_policy_query_seconds": float(np.percentile(query_times, 95)) if query_times else None,
+            "sync_cuda_timing": cfg.sync_cuda_timing,
+            "early_exit_layer": cfg.early_exit_layer,
+            "early_exit_checkpoint": cfg.early_exit_checkpoint,
+        }
+        summary_path = Path(local_log_filepath).with_suffix(".summary.json")
+        summary_path.write_text(json.dumps({"run_id": run_id, "success_rate": final_success_rate, "timing": timing}, indent=2) + "\n")
+        log_message(f"Saved timing summary to {summary_path}", log_file)
 
     # Log to wandb if enabled
     if cfg.use_wandb:

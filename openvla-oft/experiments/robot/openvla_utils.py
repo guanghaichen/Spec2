@@ -27,11 +27,12 @@ from prismatic.extern.hf.processing_prismatic import PrismaticImageProcessor, Pr
 from prismatic.models.action_heads import DiffusionActionHead, L1RegressionActionHead
 from prismatic.models.film_vit_wrapper import FiLMedPrismaticVisionBackbone
 from prismatic.models.projectors import NoisyActionProjector, ProprioProjector
+from experiments.early_exit.adapter import LayerExitResidualAdapter
 from prismatic.vla.constants import (
     ACTION_DIM,
     ACTION_PROPRIO_NORMALIZATION_TYPE,
+    NormalizationType,
 )
-from prismatic.vla.datasets.rlds.utils.data_utils import NormalizationType
 
 # Initialize important constants
 DATE = time.strftime("%Y_%m_%d")
@@ -45,7 +46,17 @@ np.set_printoptions(formatter={"float": lambda x: "{0:0.3f}".format(x)})
 
 def model_is_on_hf_hub(model_path: str) -> bool:
     """Checks whether a model path points to a model on Hugging Face Hub."""
-    # If the API call below runs without error, the model is on the hub
+    if model_path is None:
+        return False
+
+    model_path = str(model_path)
+
+    # Local checkpoint paths should never trigger a Hugging Face API call.
+    # This keeps offline/local evaluation deterministic and avoids long network timeouts.
+    if os.path.exists(model_path) or model_path.startswith(("/", "./", "../")):
+        return False
+
+    # If the API call below runs without error, the model is on the hub.
     try:
         HfApi().model_info(model_path)
         return True
@@ -517,6 +528,18 @@ def get_action_head(cfg: Any, llm_dim: int) -> Union[L1RegressionActionHead, Dif
     return action_head
 
 
+def get_early_exit_adapter(checkpoint_dir: str, llm_dim: int) -> LayerExitResidualAdapter:
+    """Load a trained OFT layer-exit adapter without touching the base policy."""
+    adapter = LayerExitResidualAdapter.from_pretrained(checkpoint_dir, map_location="cpu")
+    if adapter.config.hidden_size != llm_dim:
+        raise ValueError(
+            f"Adapter hidden size {adapter.config.hidden_size} does not match OFT LLM dim {llm_dim}"
+        )
+    adapter = adapter.to(dtype=torch.bfloat16, device=DEVICE)
+    adapter.eval()
+    return adapter
+
+
 def resize_image_for_policy(img: np.ndarray, resize_size: Union[int, Tuple[int, int]]) -> np.ndarray:
     """
     Resize an image to match the policy's expected input size.
@@ -722,7 +745,10 @@ def get_vla_action(
     proprio_projector: Optional[torch.nn.Module] = None,
     noisy_action_projector: Optional[torch.nn.Module] = None,
     use_film: bool = False,
-) -> List[np.ndarray]:
+    early_exit_adapter: Optional[torch.nn.Module] = None,
+    early_exit_layer: Optional[int] = None,
+    return_teacher_features: bool = False,
+) -> Union[List[np.ndarray], Tuple[List[np.ndarray], Dict[str, torch.Tensor]]]:
     """
     Generate action predictions with the VLA policy.
 
@@ -783,7 +809,7 @@ def get_vla_action(
             action, _ = vla.predict_action(**inputs, unnorm_key=cfg.unnorm_key, do_sample=False)
         else:
             # Custom action head for continuous actions
-            action, _ = vla.predict_action(
+            prediction = vla.predict_action(
                 **inputs,
                 unnorm_key=cfg.unnorm_key,
                 do_sample=False,
@@ -792,7 +818,15 @@ def get_vla_action(
                 noisy_action_projector=noisy_action_projector,
                 action_head=action_head,
                 use_film=use_film,
+                early_exit_adapter=early_exit_adapter,
+                early_exit_layer=early_exit_layer,
+                return_teacher_features=return_teacher_features,
             )
+
+            if return_teacher_features:
+                action, _, teacher_features = prediction
+                return [action[i] for i in range(len(action))], teacher_features
+            action, _ = prediction
 
     # Return action chunk as list of actions
     return [action[i] for i in range(len(action))]

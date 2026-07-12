@@ -151,3 +151,10 @@ data/
 # Rollout videos and wandb logs
 rollouts/
 wandb/
+
+# Local OpenVLA-OFT experiment artifacts and the custom Transformers checkout.
+oft_runs/
+teacher_features/
+checkpoints/
+*.h5
+third_party/

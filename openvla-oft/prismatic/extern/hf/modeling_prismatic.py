@@ -35,6 +35,8 @@ from prismatic.vla.constants import (
     NormalizationType,
 )
 
+from experiments.early_exit.runtime import run_language_model_until_layer, slice_action_hidden_states
+
 from .configuration_prismatic import OpenVLAConfig, PrismaticConfig
 
 # Set up logger
@@ -884,6 +886,9 @@ class OpenVLAForActionPrediction(PrismaticForConditionalGeneration):
         NUM_PATCHES,
         NUM_PROMPT_TOKENS,
         action_head=None,
+        early_exit_adapter=None,
+        early_exit_layer: Optional[int] = None,
+        return_teacher_features: bool = False,
     ):
         """Run L1 regression-based continuous action prediction or discrete action tokens prediction."""
         # Zero out action token embeddings
@@ -895,8 +900,11 @@ class OpenVLAForActionPrediction(PrismaticForConditionalGeneration):
             input_embeddings, projected_patch_embeddings, attention_mask
         )
 
-        # Forward pass through language model
-        language_model_output = self.language_model(
+        action_start = NUM_PATCHES + NUM_PROMPT_TOKENS
+        num_action_tokens = ACTION_DIM * NUM_ACTIONS_CHUNK
+        teacher_features = None
+
+        language_model_kwargs = dict(
             input_ids=None,
             attention_mask=multimodal_attention_mask,
             position_ids=None,
@@ -905,17 +913,54 @@ class OpenVLAForActionPrediction(PrismaticForConditionalGeneration):
             labels=None,
             use_cache=None,
             output_attentions=False,
-            output_hidden_states=True,
             return_dict=True,
         )
 
-        # Extract hidden states for action tokens
-        last_hidden_states = language_model_output.hidden_states[-1]  # (B, seq_len, D)
-        actions_hidden_states = last_hidden_states[
-            :,
-            NUM_PATCHES + NUM_PROMPT_TOKENS : NUM_PATCHES + NUM_PROMPT_TOKENS + ACTION_DIM * NUM_ACTIONS_CHUNK,
-            :,
-        ]  # (B, act_chunk_len, D)
+        if early_exit_adapter is not None:
+            if action_head is None:
+                raise ValueError("Layer early exit currently requires OFT's continuous L1 action head")
+            if early_exit_layer is None:
+                raise ValueError("early_exit_layer is required when early_exit_adapter is provided")
+            early_exit_output = run_language_model_until_layer(
+                self.language_model,
+                early_exit_layer=early_exit_layer,
+                output_hidden_states=False,
+                **language_model_kwargs,
+            )
+            early_action_hidden_states = slice_action_hidden_states(
+                early_exit_output.hidden_states,
+                action_start=action_start,
+                num_action_tokens=num_action_tokens,
+            )
+            actions_hidden_states = early_exit_adapter(early_action_hidden_states)
+            language_model_output = None
+        else:
+            language_model_output = self.language_model(
+                output_hidden_states=True,
+                **language_model_kwargs,
+            )
+            last_hidden_states = language_model_output.hidden_states[-1]
+            actions_hidden_states = slice_action_hidden_states(
+                last_hidden_states,
+                action_start=action_start,
+                num_action_tokens=num_action_tokens,
+            )
+            if return_teacher_features:
+                if early_exit_layer is None:
+                    raise ValueError("early_exit_layer is required when collecting teacher features")
+                if early_exit_layer >= len(language_model_output.hidden_states):
+                    raise ValueError(
+                        f"early_exit_layer={early_exit_layer} exceeds available hidden states "
+                        f"({len(language_model_output.hidden_states) - 1} decoder layers)"
+                    )
+                teacher_features = {
+                    "early_hidden": slice_action_hidden_states(
+                        language_model_output.hidden_states[early_exit_layer],
+                        action_start=action_start,
+                        num_action_tokens=num_action_tokens,
+                    ),
+                    "final_hidden": actions_hidden_states,
+                }
 
         # Handle different prediction methods
         if action_head is not None:
@@ -925,6 +970,8 @@ class OpenVLAForActionPrediction(PrismaticForConditionalGeneration):
             normalized_actions = normalized_actions.float().cpu().detach().numpy()
         else:
             # Discrete token-based prediction
+            if language_model_output is None:
+                raise RuntimeError("Discrete action prediction is unavailable after layer early exit")
             predicted_action_token_ids = (
                 language_model_output.logits[
                     :,
@@ -939,7 +986,7 @@ class OpenVLAForActionPrediction(PrismaticForConditionalGeneration):
             normalized_actions = self.bin_centers[discretized_actions]
             normalized_actions = normalized_actions.reshape(NUM_ACTIONS_CHUNK, ACTION_DIM)
 
-        return normalized_actions, actions_hidden_states
+        return normalized_actions, actions_hidden_states, teacher_features
 
     def predict_action(
         self,
@@ -950,6 +997,9 @@ class OpenVLAForActionPrediction(PrismaticForConditionalGeneration):
         action_head=None,
         noisy_action_projector=None,
         use_film: bool = False,
+        early_exit_adapter=None,
+        early_exit_layer: Optional[int] = None,
+        return_teacher_features: bool = False,
         **kwargs: str,
     ) -> np.ndarray:
         """Predict actions from input sequence, with options for different prediction methods.
@@ -1041,7 +1091,7 @@ class OpenVLAForActionPrediction(PrismaticForConditionalGeneration):
             )
         else:
             # Run regression or discrete token-based prediction
-            normalized_actions, actions_hidden_states = self._regression_or_discrete_prediction(
+            normalized_actions, actions_hidden_states, teacher_features = self._regression_or_discrete_prediction(
                 input_embeddings,
                 all_actions_mask,
                 projected_patch_embeddings,
@@ -1050,11 +1100,18 @@ class OpenVLAForActionPrediction(PrismaticForConditionalGeneration):
                 NUM_PATCHES,
                 NUM_PROMPT_TOKENS,
                 action_head,
+                early_exit_adapter=early_exit_adapter,
+                early_exit_layer=early_exit_layer,
+                return_teacher_features=return_teacher_features,
             )
 
         # Unnormalize predicted actions
         actions = self._unnormalize_actions(normalized_actions, unnorm_key)
 
+        if use_diffusion and (early_exit_adapter is not None or return_teacher_features):
+            raise ValueError("Layer early-exit experiments currently support OFT L1 regression only")
+        if return_teacher_features:
+            return actions, actions_hidden_states, teacher_features
         return actions, actions_hidden_states
 
     @staticmethod

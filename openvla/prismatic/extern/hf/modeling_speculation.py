@@ -719,11 +719,15 @@ class SpecVLAforActionPrediction(nn.Module):
                 return int(value.detach().item())
             return int(value)
 
-        progress_lengths = [as_int(value) for value in pending["progress_lengths"]]
-        raw_accept_lengths = [as_int(value) for value in pending["raw_accept_lengths"]]
-        accept_lengths = [max(progress - 1, 0) for progress in progress_lengths]
-        num_blocks = len(progress_lengths)
-        progressed_tokens = min(pending["generated_tokens"], sum(progress_lengths))
+        num_blocks = max(int(pending["num_blocks"]), 0)
+        progressed_tokens = min(
+            int(pending["generated_tokens"]), as_int(pending["progressed_tokens"])
+        )
+        # Each tree verification block advances one correction token plus its
+        # accepted prefix, so accepted = progressed - verification blocks.
+        accepted_tokens = max(progressed_tokens - num_blocks, 0)
+        progress_lengths = [progressed_tokens] if num_blocks > 0 else []
+        accept_lengths = [accepted_tokens] if num_blocks > 0 else []
         self.last_generation_stats = {
             "backend": "eagle",
             "generated_tokens": pending["generated_tokens"],
@@ -734,9 +738,9 @@ class SpecVLAforActionPrediction(nn.Module):
             "table1_length": (progressed_tokens / num_blocks) if num_blocks > 0 else 0.0,
             "avg_progress_length": (progressed_tokens / num_blocks) if num_blocks > 0 else 0.0,
             "accept_lengths": accept_lengths,
-            "raw_accept_lengths": raw_accept_lengths,
-            "avg_accept_length": (sum(accept_lengths) / num_blocks) if num_blocks > 0 else 0.0,
-            "accepted_tokens": sum(accept_lengths),
+            "raw_accept_lengths": accept_lengths,
+            "avg_accept_length": (accepted_tokens / num_blocks) if num_blocks > 0 else 0.0,
+            "accepted_tokens": accepted_tokens,
             "compared_tokens": 0,
             "overall_hit_rate": None,
             "per_position": [],
@@ -1812,8 +1816,6 @@ class SpecVLAforActionPrediction(nn.Module):
         input_len = input_ids.shape[1]-1
         max_length = max_length - self.ea_layer.total_tokens - 10
         new_token = 0
-        raw_accept_lengths = []
-        progress_lengths = []
         idx = -1
         for idx in range(max_length):
             # with Timer("all"):
@@ -1836,7 +1838,6 @@ class SpecVLAforActionPrediction(nn.Module):
             best_candidate, accept_length, sample_p = evaluate_posterior(
                 logits, candidates, logits_processor,accept_threshold=accept_threshold
             )
-            previous_new_token = new_token
             input_ids, draft_tokens, retrieve_indices, tree_mask, tree_position_ids, new_token,prompt_embeds,past_key_value_data,attention_mask = update_inference_inputs(
                 prompt_embeds,
                 #prompt_hidden_states,
@@ -1856,11 +1857,6 @@ class SpecVLAforActionPrediction(nn.Module):
                 sample_p,
                 attention_mask
             )
-            # Keep CUDA scalars deferred. The action conversion in
-            # predict_action synchronizes before get_generation_stats() turns
-            # them into Python numbers, outside the recorded timing interval.
-            progress_lengths.append(new_token - previous_new_token)
-            raw_accept_lengths.append(accept_length)
             if self.tokenizer.eos_token_id in input_ids[0, input_len:].tolist():
                 break
             if new_token > max_new_tokens:
@@ -1880,8 +1876,8 @@ class SpecVLAforActionPrediction(nn.Module):
         self._pending_generation_stats = {
             "backend": "eagle",
             "generated_tokens": max_new_tokens,
-            "progress_lengths": progress_lengths,
-            "raw_accept_lengths": raw_accept_lengths,
+            "num_blocks": idx + 1,
+            "progressed_tokens": new_token,
         }
         if not log:
             return input_ids[:,input_len+1:]

@@ -71,6 +71,8 @@ def get_vla(cfg):
             dflash_mask_token_id=getattr(cfg, "dflash_mask_token_id", None),# 掩码tokenid
             dflash_action_dim=getattr(cfg, "dflash_action_dim", ACTION_DIM),# action维度数
             dflash_use_causal_residual_sampling=getattr(cfg, "dflash_use_causal_residual_sampling", False),
+            dflash_confidence_threshold=getattr(cfg, "dflash_confidence_threshold", 0.0),
+            dflash_confidence_min_tokens=getattr(cfg, "dflash_confidence_min_tokens", 1),
         )
         # 投机采样外层包装（先让基础模型 prefill 处理输入序列，再用草稿模型快速生成候选 token，最后用基础模型验证并接受/拒绝）
         vla = SpecVLAforActionPrediction(**spec_kwargs)

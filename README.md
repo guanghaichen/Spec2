@@ -106,89 +106,66 @@ posterior token，因此支持 partial acceptance 和 partial correction。
 draft depth、target layers、anchor-hidden mode、mask token 和 selected-hidden variant。评测 DFLASH 时，
 必须让 `SPEC_CKPT` 指向包含 `dflash_config.json` 的 checkpoint 目录。
 
-### 术语和创新模块
+### 当前方案：Action-RNN Prefix Survival
 
-当前推荐训练入口是：
-
-```text
-openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_residual_cad_4gpu.sh
-```
-
-虽然文件名还保留 `residual_cad`，但默认 recipe 已经切到更干净的 **Markov-ACD**。这里的 ACD 统一指
-**Anchor-Contrastive Distillation**，即“跨 anchor 强弱路径蒸馏”：同一个目标 token 可以由不同 anchor
-预测，短前缀路径是弱路径，长前缀的一步路径是强路径。训练时让弱路径吸收强路径里更充分的因果信息，
-专门缓解 p2-p5 在 `[t_anchor, MASK, MASK, ...]` 薄前缀输入下的低命中率。
-
-当前代码里的几个模块名称统一如下：
-
-1. **Markov-aware Hidden Residual Refinement（马尔可夫感知 hidden 残差修正）**
-   对每个待预测 slot，用该 slot 的 base hidden 和“前一个 token”的 embedding 生成一个轻量残差：
-
-   ```text
-   refined_hidden_i = base_hidden_i + ResidualMLP(base_hidden_i, prev_token_i)
-   ```
-
-   训练时 `prev_token_i` 来自 target model 的真实轨迹；推理时没有真实未来 token，因此使用本次 draft
-   已经采样出来的前一个 token。DFlash transformer 主干仍只跑一次，后续只是轻量逐 slot 修正。
-
-2. **Markov-aware Logit Bias Correction（马尔可夫感知 logits 偏置修正）**
-   在 frozen `lm_head(refined_hidden_i)` 后额外加一个很小的 logits bias：
-
-   ```text
-   logits_i = lm_head(refined_hidden_i) + BiasMLP(refined_hidden_i, prev_token_i)
-   ```
-
-   它只负责把前序 token 信息作用到 token 决策边界上，不是本文单独宣称的主要创新。
-
-3. **Hidden-level CAD（hidden 层跨 anchor 蒸馏）**
-   对同一个目标位置，让短前缀弱路径的 refined hidden 追长前缀一步强路径的 hidden。例如预测 `t5` 时：
-
-   ```text
-   weak path  : anchor=0/1/2/3 -> t5
-   strong path: anchor=4       -> t5
-   ```
-
-   当前只在强路径 token 预测正确时使用该强路径作为 teacher，避免把错误强路径当成老师。
-
-4. **Logit-level CAD（logits 层跨 anchor 蒸馏）**
-   与 Hidden-level CAD 对齐，但蒸馏对象换成 logits 分布，让弱路径的 token 决策边界追强路径：
-
-   ```text
-   weak_logits(anchor=a, target=p) -> strong_logits(anchor=p-1, target=p)
-   ```
-
-5. **Causally Refined Hidden Supervision（因果修正 hidden 直接监督）**
-   这是辅助约束：让 residual 后的 `refined_hidden` 直接贴近 target model 对应位置 hidden，防止 CAD-only
-   变成弱路径追强路径影子、但不贴真实 target 表示。
-
-本轮代码已经删除所有手工位置加权参数。保留 `causal_residual_start_index=0`，因为这不是手工加权，而是结构选择：
-所有待预测 slot，包括第一跳，都可以使用“前一个 token”条件。当前 `slot_decay=0.90`，表示按块内距离
-对后续 slot 做平滑整体衰减，轻度偏向更影响 acceptance length 的前几个 slot；这不是针对某个具体位置
-精挑细选地加权。`position_balance=True` 是 multi-anchor 数据重复次数的归一化，不是手工位置补丁。
-
-### 当前 loss 和训练策略
-
-当前 Markov-ACD recipe 的总 loss 是：
+当前推荐训练入口已经更新为：
 
 ```text
-total = hidden_loss
-      + 0.05 * cosine_hidden_loss
-      + 0.10 * teacher_soft_distribution_loss
-      + 0.30 * refined_hidden_loss
-      + 0.10 * residual_token_ce_loss
-      + 0.10 * hidden_level_cad_loss
-      + 0.10 * logit_level_cad_loss
+openvla/specdecoding/train-scripts/run_dflash_action_rnn_prefix_3layer_4gpu.sh
 ```
 
-其中 `hidden_loss/cosine_hidden_loss` 训练 base draft hidden，`teacher_soft_distribution_loss`
-参考 SpecVLA 风格的 teacher soft distribution 但权重较低，`residual_token_ce_loss` 只给 residual/logit
-修正头一个明确的 token 级信号。`hidden_level_cad_loss` 和 `logit_level_cad_loss` 才是当前最重要的跨
-anchor 训练信号。
+上一版 **Markov-ACD** 仍完整保留用于历史 checkpoint 和消融，但不再是下一轮主训练。原因是其推理路径会对
+每个 slot 重复执行 hidden residual、完整 `lm_head` 和全词表 logit bias；即使 Length 提高，这些串行大词表
+投影也可能吃掉投机解码节省的时间。新版结构统一称为 **Action-RNN Prefix Survival**：
 
-Per-anchor、per-position、`base_accuracy`、残差后 `accuracy`、`causal_residual_cad_loss/component/pairs`、
-`anchor_logit_distill_loss/component/pairs` 都会记录到 SwanLab 和本地 `metrics.jsonl`。当前 recipe
-的长期控制信号仍是 LIBERO simulator behavior，不是离线 validation split 的 early stopping；四卡训练默认
-`--val_split 0`，每 10 个 epoch 保存一次 checkpoint。
+1. **三层并行 DFlash 主干。** 完整 prompt/action target hidden 仍只经过一次块并行 draft forward，模型深度
+   从 1 层增至 3 层，提高 base hidden 对视觉、指令和动作结构的表达能力。
+2. **动作子词表前缀状态头。** 只取冻结 `lm_head` 中对应 256 个 OpenVLA 动作 token 的权重行，对整块做一次
+   小投影；随后递推一个 256 维前缀状态。第 i 步输入当前并行 hidden、前一个动作 token、动作维度 embedding
+   和上一状态，输出 256 类动作 bias。训练时使用 teacher 真实前缀，推理时使用刚刚生成的 draft 前缀。
+3. **跨 Anchor Logit Distillation。** 对同一目标位置，短前缀弱路径的最终动作分布追一步强路径，并对 strong
+   path `stop_gradient`。这保留了本项目“不同 anchor 是同一目标的强弱因果视角”的核心设计。
+4. **Expected Prefix Survival。** 不再靠指定 p2/p3 等位置的 boost。先用 teacher/student 动作分布的
+   `1 - total_variation` 估计逐位置可接受概率，再对块内概率做累乘，直接优化连续可接受前缀。
+   因为前面一处错误会同时破坏后面所有前缀，早期位置会自然得到更重要的梯度。
+5. **Confidence Truncation。** 小置信度头学习逐 slot 可接受概率。推理可在低置信位置前缩短 proposal，减少
+   明知大概率会失败的验证开销。默认阈值为 `0.0`，先测无截断基线，再单独扫阈值，避免未经校准就改变结果。
+
+新版明确关闭旧 `causal_residual_type hidden` 和 `logit_markov_type bias`，因此旧头不会和新头叠加计算。
+`position_balance=True` 只抵消 multi-anchor 中后部绝对位置被重复监督更多次的统计偏差；`slot_decay=1.0`，
+位置重要性完全交给 Prefix Survival，而不是手工位置补丁。
+
+### 当前 Loss 和指标
+
+三层 Action-RNN 默认总损失为：
+
+```text
+total = 0.30 * hidden_smooth_l1
+      + 0.02 * hidden_cosine
+      + 0.10 * action_token_ce
+      + 0.90 * action_distribution_l1
+      + 0.50 * prefix_survival
+      + 0.10 * action_confidence_bce
+      + 0.10 * cross_anchor_logit_distillation
+```
+
+`action_distribution_l1` 只比较 256 类动作分布，不再让损失被 3 万多个无关语言 token 稀释；
+`prefix_survival` 与最终 acceptance length 的目标最接近；hidden 两项退为稳定表征的辅助监督。
+SwanLab 和 `metrics.jsonl` 新增记录：
+
+```text
+action_token_ce_loss / component
+action_distill_l1_loss / component
+prefix_survival_loss / component
+action_confidence_loss / component
+action_accept_probability_proxy
+expected_prefix_length
+confidence_mae
+```
+
+在线 summary JSON 还会记录 `conditional_prefix`：`p_k` 表示已经连续接受前 k-1 个 token 后，第 k 个仍被
+接受的条件概率。它比独立 `per_position` 命中率更能解释真实 Length。长期控制信号仍是 4090 上的
+`SR / Length / Speedup`；四卡训练保持 `--val_split 0`，每 10 epoch 保存 checkpoint。
 
 ## 实验演进与诊断记录
 
@@ -205,6 +182,7 @@ Per-anchor、per-position、`base_accuracy`、残差后 `accuracy`、`causal_res
 | Residual-CAD weak-path | `ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu` | 增加 hidden residual head、Hidden-level CAD、refined hidden supervision，b16 四卡 | 200 epoch 完整训练 | 0.799 / 0.830 | anchor0->p2 从 0.503 抬到 0.671，但 residual 后 `accuracy` 没超过 `base_accuracy`，说明残差头训练信号还不够强。 |
 | Markov-ACD 诊断短跑 | `ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu` | 增加 logits-level Markov bias、Logit-level CAD、residual token CE、`soft_w=0.10` | 跑到 epoch 18 手动/中途停止 | 0.897 / 0.905 | p2-p5 离线准确率明显跃升，证明“跨 anchor 蒸馏 + token/logit 信号”方向有效；但该目录仍是旧短跑诊断版，run_config 里有旧 `weak_path_loss_boost` 且 `start_index=1`。 |
 | Clean Markov-ACD 完整长跑 | `ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu` | 删除所有手工位置加权；`causal_residual_start_index=0`；`slot_decay=0.90`；低权重 `soft_w=0.10`；Markov-aware refinement + Hidden/Logit CAD + residual token CE | 3090 四卡 200 epoch 已完成 | 0.999 / 1.000；`base_accuracy` 末值 0.974 / 最好 0.987 | 离线 teacher-forced 视角几乎饱和：p1-p5 到 1.000，p6 约 0.996。最终是否有效必须看 4090 online Length/Speedup，建议优先测 epoch 100/150/200。 |
+| Action-RNN Prefix Survival 3-layer | `ckpt_goal_dflash_action_rnn_prefix_3layer_b8x2_4gpu` | 三层并行主干、256 类动作前缀状态头、动作分布 L1、期望前缀存活、置信度头、Logit CAD | 代码就绪，待 3090 四卡训练 | - | 针对上一版离线近饱和但在线 p2-p5 和速度未同步提升的问题；同时移除每 slot 的完整词表投影开销。 |
 
 ### 2026-07-11 最新 Markov-ACD 200 epoch 结果
 
@@ -227,6 +205,25 @@ Per-anchor、per-position、`base_accuracy`、残差后 `accuracy`、`causal_res
 
 诊断结论：训练集上的 Markov-ACD/CAD-head 信号很强，弱路径 p2-p5 已被明显拉起；但这是 offline teacher-forced 统计，不能直接等价为接收长度。下一步优先把 epoch 100/150/200 搬到 4090，跑 CAD-head strict/relaxed 的 online rollout。
 
+### 2026-07-12 Goal 在线结果与新方案靶点
+
+在 4090、`SYNC_CUDA_TIMING=False`、`TIMING_SCOPE=last_task` 下，epoch 200 的完整 Goal 结果如下。
+Speedup 使用同轮 AR mean step time `0.161929s` 作为分子：
+
+| 方法 | SR | mean step time | Speedup vs AR | Length | avg accept | online per-position hit |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| OpenVLA AR | 0.774 | 0.161929s | 1.000x | - | - | - |
+| SpecVLA strict | 0.768 | 0.178630s | 0.907x | 1.631 | 0.631 | - |
+| SpecVLA relaxed | 0.734 | 0.141256s | 1.146x | 2.361 | 1.361 | - |
+| DFlash Markov-ACD strict | 0.788 | 0.182786s | 0.886x | 2.109 | 1.008 | 0.687/0.326/0.411/0.393/0.468/0.577 |
+| DFlash Markov-ACD relaxed | 0.768 | 0.158210s | 1.024x | 2.607 | 1.479 | 0.819/0.446/0.528/0.511/0.535/0.560 |
+
+这组结果说明两件事。第一，离线准确率接近 1.0 并没有转化成同等 online hit rate，teacher-forced
+前缀与推理时自生成前缀之间仍有明显 exposure gap。第二，DFlash strict 的 Length 高于 SpecVLA strict，
+却更慢；Length 只描述每个验证块推进多少 token，不包含 draft 自己的成本。旧 Markov-ACD 对每个 slot
+重复完整 `lm_head`/全词表修正，额外串行开销足以抵消较长前缀。这正是三层 Action-RNN 新实验同时优化
+“模型能力、连续前缀目标、推理头成本”的直接依据，而不是单纯继续堆离线 accuracy。
+
 ### 位置准确率演进
 
 `position_i_acc` 是所有 anchor 路径上预测绝对 action 位置 `pi` 的平均准确率。它能看整体训练是否健康，
@@ -237,7 +234,6 @@ Per-anchor、per-position、`base_accuracy`、残差后 `accuracy`、`causal_res
 | Pure hidden baseline 末值 | 0.886 | 0.690 | 0.780 | 0.704 | 0.750 | 0.962 |
 | Pure hidden baseline 最好值 | 0.969 | 0.781 | 0.854 | 0.789 | 0.831 | 1.000 |
 | Residual-CAD weak-path 末值 | 0.846 | 0.728 | 0.764 | 0.691 | 0.751 | 0.942 |
-| Residual-CAD weak-path 最好值 | 0.906 | 0.828 | 0.802 | 0.773 | 0.806 | 0.987 |
 | Markov-ACD 诊断短跑末值 | 0.820 | 0.819 | 0.899 | 0.868 | 0.877 | 0.972 |
 | Markov-ACD 诊断短跑最好值 | 0.885 | 0.844 | 0.903 | 0.892 | 0.925 | 0.990 |
 
@@ -259,8 +255,9 @@ Markov-ACD。
 最重要的变化是 anchor0 弱路径：p2 从 `0.503 -> 0.671 -> 0.860`，p3 从
 `0.716 -> 0.717 -> 0.913`，p4 从 `0.620 -> 0.647 -> 0.881`，p5 从
 `0.692 -> 0.718 -> 0.880`。这说明单纯 hidden 拟合不足以解决远 slot；加入 token/logit 级 Markov 信号和
-跨 anchor 蒸馏后，弱路径确实更快追上强路径。当前 Clean Markov-ACD 长跑在 epoch 120 已显示离线弱路径显著抬升；下一步要验证的是：
-这种离线提升能否稳定转化为 4090 online acceptance length 和 Speedup。
+跨 anchor 蒸馏后，弱路径确实更快追上强路径。Clean Markov-ACD 的 200 epoch 长跑最终离线接近饱和，
+但 4090 在线结果没有得到同等提升；因此下一轮不再继续追求 teacher-forced 饱和，而是改攻 online exposure
+gap、连续前缀目标和草稿头开销。
 
 ### 3090 在线 sanity check
 
@@ -286,9 +283,9 @@ hit rate 仍只有 `0.37-0.43`。后来检查发现当时主 runtime 的 `includ
 `sample_with_causal_residual`，只是直接对 `draft_hidden` 做 `lm_head` 后采样。因此该评测不能判定
 residual/CAD 机制失败，只能说明“不在推理时使用 residual 修正，仅靠训练正则”不足以明显反超。
 
-### 当前 Clean Markov-ACD 长跑版观察重点
+### 历史 Clean Markov-ACD 长跑版观察重点
 
-当前 Clean Markov-ACD 长跑版已经在 3090 上运行，核心设置是：删掉所有手工位置加权，使用
+该 Clean Markov-ACD 长跑已经在 3090 上完成，核心设置是：删掉所有手工位置加权，使用
 `causal_residual_start_index=0` 和 `slot_decay=0.90`。训练期间优先看这些指标：
 
 ```text
@@ -432,6 +429,9 @@ dflash_data_format           full_prefix_plus_action_hidden_v4
    distribution。短跑诊断显示 anchor0 的 p2-p5 离线准确率大幅提升。
 7. **Clean Markov-ACD 当前长跑版。** 删除所有手工位置加权，保留结构性 Markov-aware refinement 和 CAD；
    `causal_residual_start_index=0` 覆盖第一跳，`slot_decay=0.90` 轻度偏向更影响 acceptance length 的前几个 slot。epoch 120 已显示离线 p2-p5 接近饱和，下一步看 4090 online Length/Speedup。
+8. **Action-RNN Prefix Survival。** 在线评测证明旧头的 teacher-forced/online gap 和逐 slot 全词表开销仍是瓶颈。
+   新版改为三层并行主干、256 类低秩前缀状态、动作分布蒸馏、连续前缀存活目标和可选置信截断；跨
+   anchor logit distillation 保留为本项目的因果强弱路径约束。
 
 需要始终记住的限制：
 
@@ -1096,18 +1096,18 @@ source /data/wulin/miniconda3/etc/profile.d/conda.sh
 conda activate specvla
 ```
 
-3090 当前有 8 张 RTX 3090，但默认完整训练只使用 0-3 四张卡。当前优先跑
-Markov-ACD 新分支：
+3090 当前有 8 张 RTX 3090，但默认完整训练只使用 0-3 四张卡。当前优先跑三层
+Action-RNN Prefix Survival：
 
 ```bash
 CUDA_VISIBLE_DEVICES=0,1,2,3 \
-  bash openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_residual_cad_4gpu.sh
+  bash openvla/specdecoding/train-scripts/run_dflash_action_rnn_prefix_3layer_4gpu.sh
 ```
 
 当前推荐 launcher：
 
 ```text
-openvla/specdecoding/train-scripts/run_dflash_anchor_hidden_1layer_residual_cad_4gpu.sh
+openvla/specdecoding/train-scripts/run_dflash_action_rnn_prefix_3layer_4gpu.sh
 ```
 
 当前三档核心消融训练入口如下。它们共用 batch、学习率、层选择、完整 prefix/action hidden、`slot_decay=0.90` 等训练 recipe，只改变结构信号，方便做清楚的主线对比：
@@ -1126,43 +1126,50 @@ openvla/specdecoding/train-scripts/run_dflash_ablation_3_markov_acd_4gpu.sh    #
 ```text
 OPENVLA_GOAL_PATH=/data/wulin/hf_files/openvla-7b-finetuned-libero-goal
 DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset.h5  # 若不存在则 launcher 自动回退旧 dflash_goal_dataset
-OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu
+OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_action_rnn_prefix_3layer_b8x2_4gpu
 ```
 
-Markov-ACD 主训练配置：
+Action-RNN Prefix Survival 主训练配置：
 
 ```text
 torchrun --nproc_per_node 4
-num_draft_layers = 1
+num_draft_layers = 3
 selected_hidden_variant = replace_22_with_final
-causal_residual_type = hidden
-causal_residual_start_index = 0
-causal_residual_cad_w = 0.10
-causal_residual_cad_type = cosine
-causal_residual_cad_warmup_steps = 4000
-causal_residual_cad_correct_teacher_only = true
-causal_residual_min/max_position = 2/5
-refined_hidden_w = 0.30
-refined_hidden_min/max_position = 1/5
-residual_token_ce_w = 0.10
-residual_token_ce_min/max_position = 1/5
-logit_markov_type = bias
-logit_markov_rank = 256
+action_head_type = slot_rnn
+action_head_rank = 256
+action_vocab_size = 256
+action_confidence_enabled = true
+hidden_w / cos_w = 0.30 / 0.02
+action_token_ce_w = 0.10
+action_distill_l1_w = 0.90
+prefix_survival_w = 0.50
+action_confidence_w = 0.10
 anchor_logit_distill_w = 0.10
 anchor_logit_distill_temperature = 2.0
-anchor_logit_distill_min/max_position = 2/5
-soft_w = 0.10
-refined_hidden_loss_type = smooth_l1
-slot_decay = 0.90
+anchor_logit_distill_min/max_position = 2/6
+causal_residual_type / logit_markov_type = none / none
+soft_w = 0
+slot_decay = 1.0
 position_balance = true
 hidden_noise = 0.03
-batch_size = 16 per GPU，有效 batch size = 64
+batch_size = 8 per GPU，gradient_accumulation = 2，有效 batch size = 64
 epochs = 200
 warmup = 1000 optimizer steps
 save_every = 10
 val_split = 0
 SwanLab = 使用环境默认配置
 ```
+
+训练完成并把 checkpoint 搬到 4090 后，Goal strict + relaxed 一键评测：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=200 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_dflash_action_rnn_goal_pair_eval.sh
+```
+
+该脚本会显式启用新动作前缀头，但默认 `DFLASH_CONFIDENCE_THRESHOLD=0.0`。先用这个设置比较纯模型能力和
+头部开销；随后可用例如 `DFLASH_CONFIDENCE_THRESHOLD=0.3` 做独立阈值 sweep。summary JSON 会同时保存
+`per_position`、`conditional_prefix`、`confidence_truncated_blocks`，不要只看独立位置命中率。
 
 `run_dflash_anchor_hidden_1layer_residual_cad_4gpu.sh` 支持环境变量覆盖常用超参数，例如：
 脚本内部已经按“路径、训练规模、loss 权重、Markov-ACD 结构参数”分区写了中文注释，启动时也会打印完整配置，训练前优先检查这份打印。

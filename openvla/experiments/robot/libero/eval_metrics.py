@@ -68,6 +68,9 @@ def summarize_generation_stats(step_stats_list):
     total_accept_length = sum(accept_lengths)
     total_accepted = sum(int(item.get("accepted_tokens", 0)) for item in valid_stats)
     total_compared = sum(int(item.get("compared_tokens", 0)) for item in valid_stats)
+    confidence_truncated_blocks = sum(
+        int(item.get("confidence_truncated_blocks", 0)) for item in valid_stats
+    )
 
     position_hits = {}
     position_counts = {}
@@ -102,9 +105,40 @@ def summarize_generation_stats(step_stats_list):
     # incorrectly report a fixed action length such as 7 for SpecVLA.
     length = avg_progress_length if avg_progress_length is not None else avg_generated_length
 
+    # 连续前缀条件命中率：第 k 项表示已经连续命中前 k-1 个 token 后，
+    # 第 k 个仍被接受的条件概率。它比独立 per-position hit rate 更贴近真实 Length。
+    conditional_prefix = []
+    previous_survivors = total_blocks
+    configured_max_position = max(
+        (max(int(item.get("block_size", 1)) - 1, 0) for item in valid_stats),
+        default=0,
+    )
+    max_prefix_position = max(
+        max(accept_lengths, default=0),
+        max(position_counts, default=0),
+        configured_max_position,
+    )
+    for pos in range(1, max_prefix_position + 1):
+        survivors = sum(int(length_value >= pos) for length_value in accept_lengths)
+        conditional_prefix.append(
+            {
+                "position": pos,
+                "eligible_blocks": previous_survivors,
+                "survived_blocks": survivors,
+                "conditional_hit_rate": (
+                    survivors / previous_survivors if previous_survivors > 0 else None
+                ),
+            }
+        )
+        previous_survivors = survivors
+
     return {
         "backend": valid_stats[0].get("backend"),
         "use_causal_residual_sampling": valid_stats[0].get("use_causal_residual_sampling"),
+        "action_head_type": valid_stats[0].get("action_head_type"),
+        "confidence_threshold": valid_stats[0].get("confidence_threshold"),
+        "confidence_min_tokens": valid_stats[0].get("confidence_min_tokens"),
+        "confidence_truncated_blocks": confidence_truncated_blocks,
         "num_steps": len(valid_stats),
         "num_blocks": total_blocks,
         "generated_tokens": total_generated,
@@ -120,6 +154,7 @@ def summarize_generation_stats(step_stats_list):
         "accept_length_histogram": dict(sorted(Counter(accept_lengths).items())),
         "progress_length_histogram": dict(sorted(Counter(progress_lengths).items())),
         "per_position": per_position,
+        "conditional_prefix": conditional_prefix,
     }
 
 
@@ -149,6 +184,8 @@ def write_eval_summary(
         "dflash_use_causal_residual_sampling": getattr(
             cfg, "dflash_use_causal_residual_sampling", None
         ),
+        "dflash_confidence_threshold": getattr(cfg, "dflash_confidence_threshold", None),
+        "dflash_confidence_min_tokens": getattr(cfg, "dflash_confidence_min_tokens", None),
         "pretrained_checkpoint": str(cfg.pretrained_checkpoint),
         "spec_checkpoint": str(getattr(cfg, "spec_checkpoint", "")),
         "num_trials_per_task": cfg.num_trials_per_task,
@@ -180,4 +217,18 @@ def format_generation_summary(summary, prefix="Speculative stats"):
     ]
     if summary.get("overall_hit_rate") is not None:
         parts.append(f"overall_hit_rate={summary['overall_hit_rate']:.3f}")
+    if summary.get("confidence_truncated_blocks"):
+        parts.append(f"confidence_truncated={summary['confidence_truncated_blocks']}")
     return f"{prefix}: " + ", ".join(parts)
+
+
+def format_conditional_prefix(summary, prefix="Conditional prefix hit rate"):
+    if summary is None or not summary.get("conditional_prefix"):
+        return None
+    values = []
+    for item in summary["conditional_prefix"]:
+        rate = item.get("conditional_hit_rate")
+        values.append(
+            f"p{item['position']}={rate:.3f}" if rate is not None else f"p{item['position']}=None"
+        )
+    return f"{prefix}: " + ", ".join(values)

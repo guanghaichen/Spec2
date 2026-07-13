@@ -46,6 +46,7 @@ from experiments.robot.libero.libero_utils import (
     save_rollout_video,
 )
 from experiments.robot.libero.eval_metrics import (
+    format_conditional_prefix,
     format_generation_summary,
     summarize_generation_stats,
     write_eval_summary,
@@ -84,6 +85,8 @@ class GenerateConfig:
     dflash_target_layer_ids: Optional[list[int]] = None
     dflash_mask_token_id: Optional[int] = None
     dflash_use_causal_residual_sampling: bool = False
+    dflash_confidence_threshold: float = 0.0
+    dflash_confidence_min_tokens: int = 1
     #################################################################################################################
     # LIBERO environment-specific parameters
     #################################################################################################################
@@ -352,6 +355,10 @@ def eval_libero(cfg: GenerateConfig) -> None:
         total_summary_line = format_generation_summary(total_generation_summary, prefix="Total speculative stats")
         print(total_summary_line)
         log_file.write(f"{total_summary_line}\n")
+        conditional_line = format_conditional_prefix(total_generation_summary)
+        if conditional_line is not None:
+            print(conditional_line)
+            log_file.write(f"{conditional_line}\n")
     # Save local log file
     log_file.close()
    # print('total time')

@@ -563,6 +563,8 @@ class SpecVLAforActionPrediction(nn.Module):
             dflash_include_anchor_hidden=False,# 是否启用SpecVLA式当前anchor hidden注入
             dflash_selected_hidden_variant="target_layers",# DFlash条件hidden层选择，默认保持原始target layers
             dflash_use_causal_residual_sampling=False,# 是否在推理采样时启用前序token残差修正
+            dflash_confidence_threshold=0.0,# 动作顺序头低于该置信度时缩短草稿块；0 表示关闭
+            dflash_confidence_min_tokens=1,# 置信截断前至少生成多少个草稿 token
     ):
 
         super().__init__()
@@ -576,6 +578,10 @@ class SpecVLAforActionPrediction(nn.Module):
         self.dflash_include_anchor_hidden = dflash_include_anchor_hidden
         self.dflash_selected_hidden_variant = normalize_selected_hidden_variant(dflash_selected_hidden_variant)
         self.dflash_use_causal_residual_sampling = dflash_use_causal_residual_sampling
+        self.dflash_confidence_threshold = float(dflash_confidence_threshold)
+        self.dflash_confidence_min_tokens = max(1, int(dflash_confidence_min_tokens))
+        if not 0.0 <= self.dflash_confidence_threshold < 1.0:
+            raise ValueError("dflash_confidence_threshold must be in [0, 1).")
         self.dflash_causal_residual_type = "none"
         self.dflash_causal_residual_rank = 256
         self.dflash_causal_residual_scale = 1.0
@@ -583,6 +589,11 @@ class SpecVLAforActionPrediction(nn.Module):
         self.dflash_logit_markov_type = "none"
         self.dflash_logit_markov_rank = 256
         self.dflash_logit_markov_scale = 1.0
+        self.dflash_action_head_type = "none"
+        self.dflash_action_head_rank = 256
+        self.dflash_action_token_start = 0
+        self.dflash_action_vocab_size = 256
+        self.dflash_action_confidence_enabled = False
         self.dflash_mask_token_id = (
             dflash_mask_token_id
             if dflash_mask_token_id is not None
@@ -621,6 +632,21 @@ class SpecVLAforActionPrediction(nn.Module):
             )
             self.dflash_logit_markov_scale = saved_dflash_cfg.get(
                 "logit_markov_scale", self.dflash_logit_markov_scale
+            )
+            self.dflash_action_head_type = saved_dflash_cfg.get(
+                "action_head_type", self.dflash_action_head_type
+            )
+            self.dflash_action_head_rank = saved_dflash_cfg.get(
+                "action_head_rank", self.dflash_action_head_rank
+            )
+            self.dflash_action_token_start = saved_dflash_cfg.get(
+                "action_token_start", self.dflash_action_token_start
+            )
+            self.dflash_action_vocab_size = saved_dflash_cfg.get(
+                "action_vocab_size", self.dflash_action_vocab_size
+            )
+            self.dflash_action_confidence_enabled = saved_dflash_cfg.get(
+                "action_confidence_enabled", self.dflash_action_confidence_enabled
             )
             if dflash_target_layer_ids is None:
                 dflash_target_layer_ids = saved_dflash_cfg.get("target_layer_ids")
@@ -664,6 +690,11 @@ class SpecVLAforActionPrediction(nn.Module):
             target_config.dflash_logit_markov_type = self.dflash_logit_markov_type
             target_config.dflash_logit_markov_rank = self.dflash_logit_markov_rank
             target_config.dflash_logit_markov_scale = self.dflash_logit_markov_scale
+            target_config.dflash_action_head_type = self.dflash_action_head_type
+            target_config.dflash_action_head_rank = self.dflash_action_head_rank
+            target_config.dflash_action_token_start = self.dflash_action_token_start
+            target_config.dflash_action_vocab_size = self.dflash_action_vocab_size
+            target_config.dflash_action_confidence_enabled = self.dflash_action_confidence_enabled
             # # 实例化草稿模型
             self.ea_layer = DFlashDraftModel(target_config)
             load_model_path = os.path.join(ea_model_path, "pytorch_model.bin")
@@ -896,6 +927,7 @@ class SpecVLAforActionPrediction(nn.Module):
         progress_lengths = []
         total_accepted = 0
         total_compared = 0
+        confidence_truncated_blocks = 0
 
         anchor_idx = 0
         while anchor_idx < max_new_tokens - 1:
@@ -952,6 +984,28 @@ class SpecVLAforActionPrediction(nn.Module):
             )
             if (
                 self.dflash_use_causal_residual_sampling
+                and getattr(self.ea_layer, "action_sequential_enabled", False)
+            ):
+                base_draft_logits = self.ea_layer.project_action_logits(
+                    draft_hidden,
+                    self.base_model.language_model.lm_head,
+                )
+                proposed_tokens, draft_logits, _ = self.ea_layer.sample_action_block(
+                    base_logits=base_draft_logits,
+                    hidden_states=draft_hidden,
+                    first_prev_token_ids=block_input_ids[:, :1],
+                    action_position_ids=action_position_ids,
+                    temperature=0.0,
+                    confidence_threshold=self.dflash_confidence_threshold,
+                    confidence_min_tokens=self.dflash_confidence_min_tokens,
+                )
+                if proposed_tokens.shape[1] < q_len:
+                    confidence_truncated_blocks += 1
+                    q_len = proposed_tokens.shape[1]
+                    block_input_ids = block_input_ids[:, :q_len]
+                    noise_position_ids = noise_position_ids[:, :q_len]
+            elif (
+                self.dflash_use_causal_residual_sampling
                 and (
                     getattr(self.ea_layer, "causal_residual_enabled", False)
                     or getattr(self.ea_layer, "logit_markov_enabled", False)
@@ -965,7 +1019,8 @@ class SpecVLAforActionPrediction(nn.Module):
                     start_index=self.dflash_causal_residual_start_index,
                 )
             else:
-                draft_logits = self.base_model.language_model.lm_head(draft_hidden)
+                base_draft_logits = self.base_model.language_model.lm_head(draft_hidden)
+                draft_logits = base_draft_logits
                 proposed_tokens = dflash_sample(draft_logits, temperature=0.0)
             
             # 目标模型验证
@@ -1043,6 +1098,10 @@ class SpecVLAforActionPrediction(nn.Module):
             "block_size": block_size,
             "generated_tokens": max_new_tokens,
             "use_causal_residual_sampling": bool(self.dflash_use_causal_residual_sampling),
+            "action_head_type": getattr(self.ea_layer, "action_head_type", "none"),
+            "confidence_threshold": self.dflash_confidence_threshold,
+            "confidence_min_tokens": self.dflash_confidence_min_tokens,
+            "confidence_truncated_blocks": confidence_truncated_blocks,
             "num_blocks": num_blocks,
             "bootstrapped_tokens": 1,
             "progressed_tokens": progressed_tokens,
@@ -1126,6 +1185,7 @@ class SpecVLAforActionPrediction(nn.Module):
         total_accepted = 0
         total_compared = 0
         anchor_decode_steps = 0
+        confidence_truncated_blocks = 0
 
         anchor_idx = 0
         while anchor_idx < max_new_tokens - 1:
@@ -1206,6 +1266,26 @@ class SpecVLAforActionPrediction(nn.Module):
             )
             if (
                 self.dflash_use_causal_residual_sampling
+                and getattr(self.ea_layer, "action_sequential_enabled", False)
+            ):
+                base_draft_logits = self.ea_layer.project_action_logits(
+                    draft_hidden,
+                    self.base_model.language_model.lm_head,
+                )
+                proposed_tokens, draft_logits, _ = self.ea_layer.sample_action_block(
+                    base_logits=base_draft_logits,
+                    hidden_states=draft_hidden,
+                    first_prev_token_ids=anchor_input_ids,
+                    action_position_ids=action_position_ids,
+                    temperature=0.0,
+                    confidence_threshold=self.dflash_confidence_threshold,
+                    confidence_min_tokens=self.dflash_confidence_min_tokens,
+                )
+                if proposed_tokens.shape[1] < q_len:
+                    confidence_truncated_blocks += 1
+                    q_len = proposed_tokens.shape[1]
+            elif (
+                self.dflash_use_causal_residual_sampling
                 and (
                     getattr(self.ea_layer, "causal_residual_enabled", False)
                     or getattr(self.ea_layer, "logit_markov_enabled", False)
@@ -1219,7 +1299,8 @@ class SpecVLAforActionPrediction(nn.Module):
                     start_index=self.dflash_causal_residual_start_index,
                 )
             else:
-                draft_logits = self.base_model.language_model.lm_head(draft_hidden)
+                base_draft_logits = self.base_model.language_model.lm_head(draft_hidden)
+                draft_logits = base_draft_logits
                 proposed_tokens = dflash_sample(draft_logits, temperature=0.0)
 
             # slot0 的 target posterior 已经由 target decode(t_anchor) 得到；
@@ -1320,6 +1401,10 @@ class SpecVLAforActionPrediction(nn.Module):
             "causal_residual_type": getattr(self.ea_layer, "causal_residual_type", "none"),
             "causal_residual_start_index": self.dflash_causal_residual_start_index,
             "use_causal_residual_sampling": bool(self.dflash_use_causal_residual_sampling),
+            "action_head_type": getattr(self.ea_layer, "action_head_type", "none"),
+            "confidence_threshold": self.dflash_confidence_threshold,
+            "confidence_min_tokens": self.dflash_confidence_min_tokens,
+            "confidence_truncated_blocks": confidence_truncated_blocks,
             "num_blocks": num_blocks,
             "bootstrapped_tokens": 1,
             "progressed_tokens": progressed_tokens,

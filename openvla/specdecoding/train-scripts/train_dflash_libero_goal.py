@@ -113,7 +113,7 @@ def parse_args():
 
     # ---- Draft 结构与输入 hidden 组织方式 ----
     parser.add_argument("--block_size", type=int, default=7, help="一次投机生成的 action token 块大小；OpenVLA action 默认 7 维")
-    parser.add_argument("--num_draft_layers", type=int, default=3, help="DFlash Draft Transformer 层数；当前轻量实验通常设为 1")
+    parser.add_argument("--num_draft_layers", type=int, default=3, help="DFlash Draft Transformer 层数；新版动作顺序头实验默认使用 3 层")
     parser.add_argument("--target_layer_ids", type=int, nargs="*", default=[1, 8, 15, 22, 29], help="离线数据保存的 OpenVLA 多层 hidden；当前数据为 [1,8,15,22,29]")
     parser.add_argument(
         "--selected_hidden_variant",
@@ -135,6 +135,44 @@ def parse_args():
     parser.add_argument("--soft_temperature", type=float, default=2.0, help="soft distribution 蒸馏温度；越大分布越平滑")
     parser.add_argument("--cos_w", type=float, default=0.05, help="hidden cosine 辅助约束权重；强调方向一致性，通常小权重即可")
     parser.add_argument("--slot_decay", type=float, default=0.90, help="块内位置衰减权重；1.0 表示 p1-p6 不衰减，<1 时更重视靠前 slot，推荐默认 0.90")
+
+    # ---- 动作子词表顺序头：并行主干 + 低开销前缀状态递推 ----
+    parser.add_argument(
+        "--action_head_type",
+        type=str,
+        default="none",
+        choices=["none", "slot_rnn"],
+        help="动作专用顺序头；slot_rnn 只在 256 个动作 token 上递推前缀状态，避免每个 slot 重跑完整 lm_head",
+    )
+    parser.add_argument("--action_head_rank", type=int, default=256, help="动作顺序头的低秩状态维度")
+    parser.add_argument("--action_vocab_size", type=int, default=256, help="OpenVLA 动作子词表大小，默认 256 个离散动作 bin")
+    parser.add_argument(
+        "--action_token_start",
+        type=int,
+        default=None,
+        help="动作 token 在 tokenizer 词表中的起始 ID；默认自动推断为 tokenizer.vocab_size-action_vocab_size",
+    )
+    parser.add_argument(
+        "--action_confidence_enabled",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="是否训练逐 slot 接受概率头；推理时可按置信度缩短低质量草稿块",
+    )
+    parser.add_argument("--action_token_ce_w", type=float, default=0.0, help="动作子词表 hard CE 权重；直接提高真实 action token 命中率")
+    parser.add_argument("--action_distill_l1_w", type=float, default=0.0, help="动作子词表 teacher/student 概率 L1 蒸馏权重")
+    parser.add_argument("--action_distill_temperature", type=float, default=1.0, help="动作分布蒸馏温度")
+    parser.add_argument(
+        "--prefix_survival_w",
+        type=float,
+        default=0.0,
+        help="期望前缀存活损失权重；直接优化连续命中前缀，而非彼此独立的位置准确率",
+    )
+    parser.add_argument(
+        "--action_confidence_w",
+        type=float,
+        default=0.0,
+        help="置信度头监督权重；目标为 teacher/student 动作分布的重叠概率",
+    )
 
     # ---- 旧版跨 anchor hidden 一致性，当前主实验关闭 ----
     parser.add_argument("--anchor_consistency_w", type=float, default=0.0, help="旧版跨 anchor 一致性 loss 权重；0 表示关闭，主实验改用 Markov-ACD")
@@ -792,6 +830,10 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
             + ("+anchor_logit_distill" if args.anchor_logit_distill_w > 0 else "")
             + ("+weak_path_refined_hidden" if args.refined_hidden_w > 0 else "")
             + ("+residual_token_ce" if args.residual_token_ce_w > 0 else "")
+            + ("+action_slot_rnn" if args.action_head_type != "none" else "")
+            + ("+action_distribution_l1" if args.action_distill_l1_w > 0 else "")
+            + ("+prefix_survival" if args.prefix_survival_w > 0 else "")
+            + ("+confidence" if args.action_confidence_w > 0 else "")
         )
         if args.include_anchor_hidden
         else "hidden_smooth_l1_main_plus_teacher_soft_ce",
@@ -800,6 +842,16 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "soft_w": args.soft_w,
         "soft_temperature": args.soft_temperature,
         "cos_w": args.cos_w,
+        "action_head_type": args.action_head_type,
+        "action_head_rank": args.action_head_rank,
+        "action_vocab_size": args.action_vocab_size,
+        "action_token_start": args.action_token_start,
+        "action_confidence_enabled": args.action_confidence_enabled,
+        "action_token_ce_w": args.action_token_ce_w,
+        "action_distill_l1_w": args.action_distill_l1_w,
+        "action_distill_temperature": args.action_distill_temperature,
+        "prefix_survival_w": args.prefix_survival_w,
+        "action_confidence_w": args.action_confidence_w,
         "anchor_consistency_w": args.anchor_consistency_w,
         "anchor_consistency_type": args.anchor_consistency_type,
         "anchor_consistency_warmup_steps": args.anchor_consistency_warmup_steps,
@@ -1200,6 +1252,15 @@ def compute_loss_and_accuracy(
     anchor_logit_distill_sum = torch.zeros((), device=device, dtype=torch.float32)
     anchor_logit_distill_weight_sum = torch.zeros((), device=device, dtype=torch.float32)
     anchor_logit_distill_pairs = torch.zeros((), device=device, dtype=torch.float32)
+    action_token_ce_sum = torch.zeros((), device=device, dtype=torch.float32)
+    action_distill_l1_sum = torch.zeros((), device=device, dtype=torch.float32)
+    prefix_survival_sum = torch.zeros((), device=device, dtype=torch.float32)
+    action_confidence_sum = torch.zeros((), device=device, dtype=torch.float32)
+    action_accept_prob_proxy_sum = torch.zeros((), device=device, dtype=torch.float32)
+    confidence_abs_error_sum = torch.zeros((), device=device, dtype=torch.float32)
+    confidence_weight_sum = torch.zeros((), device=device, dtype=torch.float32)
+    expected_prefix_sum = torch.zeros((), device=device, dtype=torch.float32)
+    expected_prefix_blocks = torch.zeros((), device=device, dtype=torch.float32)
     weight_sum = torch.zeros((), device=device, dtype=torch.float32)
     total_positions = torch.zeros((), device=device, dtype=torch.float32)
     total_correct = torch.zeros((), device=device, dtype=torch.float32)
@@ -1310,10 +1371,25 @@ def compute_loss_and_accuracy(
         student_hidden = pred_hidden[:, :max_block_len, :].float()# 草稿预测的最终层 hidden [B, block, hidden]
         refined_student_hidden = refined_pred_hidden[:, :max_block_len, :].float()
         teacher_hidden = target_hidden[:, teacher_start : teacher_start + max_block_len, :].float()# H(已知token..)
-        # 草稿预测最终层hidden过lm头取logits
-        base_student_logits = lm_head(student_hidden.to(torch.bfloat16)).float()
-        student_logits = lm_head(refined_student_hidden.to(torch.bfloat16)).float()
-        if args.logit_markov_type != "none":
+        # 新版只取 lm_head 的 256 个动作行做块投影，随后在动作子词表上递推前缀状态。
+        action_confidence_logits = None
+        if draft_model.action_sequential_enabled:
+            base_student_logits = draft_model.project_action_logits(
+                student_hidden.to(torch.bfloat16),
+                lm_head,
+            ).float()
+            student_logits, action_confidence_logits = draft_model.apply_action_sequential_head(
+                base_student_logits,
+                pred_hidden[:, :max_block_len, :],
+                prev_token_ids=prev_token_ids,
+                action_position_ids=action_position_ids,
+            )
+            base_metric_logits = draft_model.action_logits_from_full(base_student_logits)
+        else:
+            base_student_logits = lm_head(student_hidden.to(torch.bfloat16)).float()
+            student_logits = lm_head(refined_student_hidden.to(torch.bfloat16)).float()
+            base_metric_logits = base_student_logits
+        if args.logit_markov_type != "none" and not draft_model.action_sequential_enabled:
             student_logits = draft_model.apply_logit_markov_bias(
                 student_logits,
                 refined_pred_hidden[:, :max_block_len, :],
@@ -1355,14 +1431,76 @@ def compute_loss_and_accuracy(
             continue
         weight_sum += current_weight_sum
 
+        need_teacher_logits = (
+            args.soft_w > 0
+            or args.action_distill_l1_w > 0
+            or args.prefix_survival_w > 0
+            or args.action_confidence_w > 0
+        )
+        teacher_logits = None
+        teacher_probs = None
+        if need_teacher_logits:
+            with torch.no_grad():
+                if draft_model.action_sequential_enabled:
+                    teacher_logits = draft_model.project_action_logits(
+                        teacher_hidden.to(torch.bfloat16),
+                        lm_head,
+                    ).float()
+                else:
+                    teacher_logits = lm_head(teacher_hidden.to(torch.bfloat16)).float()
+
         # SpecVLA 风格的 soft distribution 交叉熵：学习 teacher 的相对偏好，而不是 hard token id。
         if args.soft_w > 0:
             with torch.no_grad():
-                teacher_logits = lm_head(teacher_hidden.to(torch.bfloat16)).float()
                 teacher_probs = F.softmax(teacher_logits / args.soft_temperature, dim=-1)
             student_log_probs = F.log_softmax(student_logits / args.soft_temperature, dim=-1)
             soft_ce = -(teacher_probs * student_log_probs).sum(dim=-1) * (args.soft_temperature ** 2)
             soft_sum += (soft_ce * loss_weight).sum()
+
+        if draft_model.action_sequential_enabled:
+            local_target_tokens = draft_model.action_token_ids_to_local(target_tokens)
+            if args.action_token_ce_w > 0:
+                action_ce = F.cross_entropy(
+                    student_logits.reshape(-1, student_logits.shape[-1]),
+                    local_target_tokens.reshape(-1),
+                    reduction="none",
+                ).view_as(target_tokens)
+                action_token_ce_sum += (action_ce * loss_weight).sum()
+
+            if args.action_distill_l1_w > 0 or args.prefix_survival_w > 0 or args.action_confidence_w > 0:
+                temperature = float(args.action_distill_temperature)
+                if teacher_probs is None or temperature != float(args.soft_temperature):
+                    with torch.no_grad():
+                        teacher_probs = F.softmax(teacher_logits / temperature, dim=-1)
+                student_probs = F.softmax(student_logits / temperature, dim=-1)
+                probability_l1 = (student_probs - teacher_probs).abs().sum(dim=-1)
+                # 1-TV 是两分布在一次 maximal coupling 下取到相同 token 的概率。
+                accept_probability_proxy = (1.0 - 0.5 * probability_l1).clamp(min=0.0, max=1.0)
+                action_distill_l1_sum += (probability_l1 * loss_weight).sum()
+                action_accept_prob_proxy_sum += (accept_probability_proxy * loss_weight).sum()
+
+                survival_input = torch.where(
+                    valid_mask.bool(),
+                    accept_probability_proxy,
+                    torch.ones_like(accept_probability_proxy),
+                )
+                cumulative_survival = torch.cumprod(survival_input, dim=1)
+                prefix_survival_sum += ((1.0 - cumulative_survival) * loss_weight).sum()
+                expected_prefix_sum += (cumulative_survival * valid_mask).sum()
+                expected_prefix_blocks += valid_mask[:, 0].sum()
+
+                if action_confidence_logits is not None:
+                    confidence_target = accept_probability_proxy.detach()
+                    confidence_reg = F.binary_cross_entropy_with_logits(
+                        action_confidence_logits,
+                        confidence_target,
+                        reduction="none",
+                    )
+                    action_confidence_sum += (confidence_reg * loss_weight).sum()
+                    confidence_abs_error_sum += (
+                        (action_confidence_logits.sigmoid() - confidence_target).abs() * loss_weight
+                    ).sum()
+                    confidence_weight_sum += current_weight_sum
 
         # hidden 蒸馏是主任务；默认 SmoothL1，参考 SpecVLA 的 hidden/value regression 经验。
         if args.hidden_loss_type == "smooth_l1":
@@ -1381,9 +1519,13 @@ def compute_loss_and_accuracy(
         cos_reg = 1.0 - F.cosine_similarity(student_hidden, teacher_hidden, dim=-1)
         cos_sum += (cos_reg * loss_weight).sum()
 
-        base_pred_tokens = base_student_logits.argmax(dim=-1)
+        base_pred_tokens = base_metric_logits.argmax(dim=-1)
+        if draft_model.action_sequential_enabled:
+            base_pred_tokens = draft_model.action_local_ids_to_token(base_pred_tokens)
         base_correct_mask = (base_pred_tokens == target_tokens) & valid_mask.bool()
         pred_tokens = student_logits.argmax(dim=-1)# 草稿模型走贪婪解码
+        if draft_model.action_sequential_enabled:
+            pred_tokens = draft_model.action_local_ids_to_token(pred_tokens)
         correct_mask = (pred_tokens == target_tokens) & valid_mask.bool()
 
         if args.refined_hidden_w > 0 and args.causal_residual_type != "none":
@@ -1590,6 +1732,13 @@ def compute_loss_and_accuracy(
     refined_hidden_loss = refined_hidden_sum / refined_hidden_denom
     residual_token_ce_loss = residual_token_ce_sum / residual_token_ce_denom
     anchor_logit_distill_loss = anchor_logit_distill_sum / anchor_logit_distill_denom
+    action_token_ce_loss = action_token_ce_sum / loss_denom
+    action_distill_l1_loss = action_distill_l1_sum / loss_denom
+    prefix_survival_loss = prefix_survival_sum / loss_denom
+    action_confidence_loss = action_confidence_sum / confidence_weight_sum.clamp_min(1.0)
+    action_accept_probability_proxy = action_accept_prob_proxy_sum / loss_denom
+    confidence_mae = confidence_abs_error_sum / confidence_weight_sum.clamp_min(1.0)
+    expected_prefix_length = expected_prefix_sum / expected_prefix_blocks.clamp_min(1.0)
     hidden_component = args.hidden_w * hidden_loss
     soft_component = args.soft_w * soft_loss
     cos_component = args.cos_w * cos_loss
@@ -1608,6 +1757,10 @@ def compute_loss_and_accuracy(
     refined_hidden_component = args.refined_hidden_w * refined_hidden_loss
     residual_token_ce_component = args.residual_token_ce_w * residual_token_ce_loss
     anchor_logit_distill_component = args.anchor_logit_distill_w * anchor_logit_distill_loss
+    action_token_ce_component = args.action_token_ce_w * action_token_ce_loss
+    action_distill_l1_component = args.action_distill_l1_w * action_distill_l1_loss
+    prefix_survival_component = args.prefix_survival_w * prefix_survival_loss
+    action_confidence_component = args.action_confidence_w * action_confidence_loss
     total_loss = (
         hidden_component
         + soft_component
@@ -1617,6 +1770,10 @@ def compute_loss_and_accuracy(
         + refined_hidden_component
         + residual_token_ce_component
         + anchor_logit_distill_component
+        + action_token_ce_component
+        + action_distill_l1_component
+        + prefix_survival_component
+        + action_confidence_component
     )
     accuracy = total_correct / metric_denom
     base_accuracy = base_total_correct / metric_denom
@@ -1632,6 +1789,10 @@ def compute_loss_and_accuracy(
         "refined_hidden_loss": refined_hidden_loss,
         "residual_token_ce_loss": residual_token_ce_loss,
         "anchor_logit_distill_loss": anchor_logit_distill_loss,
+        "action_token_ce_loss": action_token_ce_loss,
+        "action_distill_l1_loss": action_distill_l1_loss,
+        "prefix_survival_loss": prefix_survival_loss,
+        "action_confidence_loss": action_confidence_loss,
         "soft_component": soft_component,
         "hidden_component": hidden_component,
         "cos_component": cos_component,
@@ -1640,6 +1801,10 @@ def compute_loss_and_accuracy(
         "refined_hidden_component": refined_hidden_component,
         "residual_token_ce_component": residual_token_ce_component,
         "anchor_logit_distill_component": anchor_logit_distill_component,
+        "action_token_ce_component": action_token_ce_component,
+        "action_distill_l1_component": action_distill_l1_component,
+        "prefix_survival_component": prefix_survival_component,
+        "action_confidence_component": action_confidence_component,
         "anchor_consistency_scale": anchor_consistency_scale.detach(),
         "causal_residual_cad_scale": causal_residual_cad_scale.detach(),
         "anchor_consistency_pairs": anchor_consistency_pairs.detach(),
@@ -1649,6 +1814,9 @@ def compute_loss_and_accuracy(
         "accuracy": accuracy,
         "base_accuracy": base_accuracy,
         "residual_token_ce_accuracy": residual_token_ce_accuracy,
+        "action_accept_probability_proxy": action_accept_probability_proxy,
+        "expected_prefix_length": expected_prefix_length,
+        "confidence_mae": confidence_mae,
         "anchor_correct": anchor_correct.detach(),
         "anchor_total": anchor_total.detach(),
         "position_correct": position_correct.detach(),
@@ -1677,6 +1845,10 @@ def evaluate(
     total_causal_residual_cad = 0.0
     total_refined_hidden = 0.0
     total_anchor_logit_distill = 0.0
+    total_action_token_ce = 0.0
+    total_action_distill_l1 = 0.0
+    total_prefix_survival = 0.0
+    total_action_confidence = 0.0
     total_soft_component = 0.0
     total_hidden_component = 0.0
     total_cos_component = 0.0
@@ -1684,6 +1856,10 @@ def evaluate(
     total_causal_residual_cad_component = 0.0
     total_refined_hidden_component = 0.0
     total_anchor_logit_distill_component = 0.0
+    total_action_token_ce_component = 0.0
+    total_action_distill_l1_component = 0.0
+    total_prefix_survival_component = 0.0
+    total_action_confidence_component = 0.0
     total_anchor_consistency_scale = 0.0
     total_causal_residual_cad_scale = 0.0
     total_anchor_consistency_pairs = 0.0
@@ -1691,6 +1867,9 @@ def evaluate(
     total_anchor_logit_distill_pairs = 0.0
     total_acc = 0.0
     total_base_acc = 0.0
+    total_action_accept_probability_proxy = 0.0
+    total_expected_prefix_length = 0.0
+    total_confidence_mae = 0.0
     total_samples = 0
     detail_accumulator = None
 
@@ -1705,6 +1884,10 @@ def evaluate(
         total_causal_residual_cad += metrics["causal_residual_cad_loss"].item() * bs
         total_refined_hidden += metrics["refined_hidden_loss"].item() * bs
         total_anchor_logit_distill += metrics["anchor_logit_distill_loss"].item() * bs
+        total_action_token_ce += metrics["action_token_ce_loss"].item() * bs
+        total_action_distill_l1 += metrics["action_distill_l1_loss"].item() * bs
+        total_prefix_survival += metrics["prefix_survival_loss"].item() * bs
+        total_action_confidence += metrics["action_confidence_loss"].item() * bs
         total_soft_component += metrics["soft_component"].item() * bs
         total_hidden_component += metrics["hidden_component"].item() * bs
         total_cos_component += metrics["cos_component"].item() * bs
@@ -1712,6 +1895,10 @@ def evaluate(
         total_causal_residual_cad_component += metrics["causal_residual_cad_component"].item() * bs
         total_refined_hidden_component += metrics["refined_hidden_component"].item() * bs
         total_anchor_logit_distill_component += metrics["anchor_logit_distill_component"].item() * bs
+        total_action_token_ce_component += metrics["action_token_ce_component"].item() * bs
+        total_action_distill_l1_component += metrics["action_distill_l1_component"].item() * bs
+        total_prefix_survival_component += metrics["prefix_survival_component"].item() * bs
+        total_action_confidence_component += metrics["action_confidence_component"].item() * bs
         total_anchor_consistency_scale += metrics["anchor_consistency_scale"].item() * bs
         total_causal_residual_cad_scale += metrics["causal_residual_cad_scale"].item() * bs
         total_anchor_consistency_pairs += metrics["anchor_consistency_pairs"].item()
@@ -1719,6 +1906,9 @@ def evaluate(
         total_anchor_logit_distill_pairs += metrics["anchor_logit_distill_pairs"].item()
         total_acc += metrics["accuracy"].item() * bs
         total_base_acc += metrics["base_accuracy"].item() * bs
+        total_action_accept_probability_proxy += metrics["action_accept_probability_proxy"].item() * bs
+        total_expected_prefix_length += metrics["expected_prefix_length"].item() * bs
+        total_confidence_mae += metrics["confidence_mae"].item() * bs
         total_samples += bs
         detail_accumulator = accumulate_detail_metrics(detail_accumulator, metrics)
 
@@ -1733,6 +1923,10 @@ def evaluate(
         "val/causal_residual_cad_loss": total_causal_residual_cad / denom,
         "val/refined_hidden_loss": total_refined_hidden / denom,
         "val/anchor_logit_distill_loss": total_anchor_logit_distill / denom,
+        "val/action_token_ce_loss": total_action_token_ce / denom,
+        "val/action_distill_l1_loss": total_action_distill_l1 / denom,
+        "val/prefix_survival_loss": total_prefix_survival / denom,
+        "val/action_confidence_loss": total_action_confidence / denom,
         "val/soft_component": total_soft_component / denom,
         "val/hidden_component": total_hidden_component / denom,
         "val/cos_component": total_cos_component / denom,
@@ -1740,6 +1934,10 @@ def evaluate(
         "val/causal_residual_cad_component": total_causal_residual_cad_component / denom,
         "val/refined_hidden_component": total_refined_hidden_component / denom,
         "val/anchor_logit_distill_component": total_anchor_logit_distill_component / denom,
+        "val/action_token_ce_component": total_action_token_ce_component / denom,
+        "val/action_distill_l1_component": total_action_distill_l1_component / denom,
+        "val/prefix_survival_component": total_prefix_survival_component / denom,
+        "val/action_confidence_component": total_action_confidence_component / denom,
         "val/anchor_consistency_scale": total_anchor_consistency_scale / denom,
         "val/causal_residual_cad_scale": total_causal_residual_cad_scale / denom,
         "val/anchor_consistency_pairs_per_sample": total_anchor_consistency_pairs / denom,
@@ -1747,6 +1945,9 @@ def evaluate(
         "val/anchor_logit_distill_pairs_per_sample": total_anchor_logit_distill_pairs / denom,
         "val/accuracy": total_acc / denom,
         "val/base_accuracy": total_base_acc / denom,
+        "val/action_accept_probability_proxy": total_action_accept_probability_proxy / denom,
+        "val/expected_prefix_length": total_expected_prefix_length / denom,
+        "val/confidence_mae": total_confidence_mae / denom,
     }
     result.update(detail_metrics_to_log("val", detail_accumulator))
     return result
@@ -1773,6 +1974,10 @@ def main():
         "refined_hidden_w",
         "residual_token_ce_w",
         "anchor_logit_distill_w",
+        "action_token_ce_w",
+        "action_distill_l1_w",
+        "prefix_survival_w",
+        "action_confidence_w",
     ):
         if getattr(args, loss_name) < 0:
             raise ValueError(f"--{loss_name} must be >= 0.")
@@ -1782,6 +1987,36 @@ def main():
         raise ValueError("--causal_residual_cad_warmup_steps must be >= 0.")
     if args.anchor_logit_distill_temperature <= 0:
         raise ValueError("--anchor_logit_distill_temperature must be > 0.")
+    if args.action_head_rank <= 0:
+        raise ValueError("--action_head_rank must be > 0.")
+    if args.action_vocab_size <= 0:
+        raise ValueError("--action_vocab_size must be > 0.")
+    if args.action_distill_temperature <= 0:
+        raise ValueError("--action_distill_temperature must be > 0.")
+    action_loss_enabled = any(
+        weight > 0
+        for weight in (
+            args.action_token_ce_w,
+            args.action_distill_l1_w,
+            args.prefix_survival_w,
+            args.action_confidence_w,
+        )
+    )
+    if action_loss_enabled and args.action_head_type == "none":
+        raise ValueError("动作子词表损失要求 --action_head_type slot_rnn.")
+    if args.action_confidence_w > 0 and not args.action_confidence_enabled:
+        raise ValueError("--action_confidence_w > 0 requires --action_confidence_enabled.")
+    if args.action_head_type != "none" and (
+        args.causal_residual_type != "none"
+        or args.logit_markov_type != "none"
+        or args.causal_residual_cad_w > 0
+        or args.refined_hidden_w > 0
+        or args.residual_token_ce_w > 0
+    ):
+        raise ValueError(
+            "动作顺序头与旧 hidden residual/full-vocab Markov 路径不能叠加；"
+            "请关闭 causal_residual、logit_markov、residual CAD/refined/CE。"
+        )
     if args.anchor_logit_distill_min_position < 1:
         raise ValueError("--anchor_logit_distill_min_position must be >= 1.")
     if args.anchor_logit_distill_max_position < args.anchor_logit_distill_min_position:
@@ -1804,7 +2039,11 @@ def main():
         raise ValueError("--causal_residual_cad_w > 0 requires --causal_residual_type hidden.")
     if args.refined_hidden_w > 0 and args.causal_residual_type == "none":
         raise ValueError("--refined_hidden_w > 0 requires --causal_residual_type hidden.")
-    if args.anchor_logit_distill_w > 0 and args.logit_markov_type == "none":
+    if (
+        args.anchor_logit_distill_w > 0
+        and args.logit_markov_type == "none"
+        and args.action_head_type == "none"
+    ):
         rank0_print(
             is_main,
             "WARNING: --anchor_logit_distill_w > 0 is most useful with --logit_markov_type bias; "
@@ -1851,6 +2090,15 @@ def main():
     # 如果用户没有通过命令行参数指定噪声掩码
     if args.mask_token_id is None:
         args.mask_token_id = processor.tokenizer.pad_token_id# 则使用加载的 OpenVLA 模型对应的 tokenizer 的 pad_token_id 作为默认值
+    if args.action_token_start is None:
+        args.action_token_start = int(processor.tokenizer.vocab_size) - int(args.action_vocab_size)
+    action_token_end = args.action_token_start + args.action_vocab_size
+    lm_head_vocab_size = int(vla.language_model.lm_head.weight.shape[0])
+    if args.action_token_start < 0 or action_token_end > lm_head_vocab_size:
+        raise ValueError(
+            "动作 token 区间超出 lm_head 词表："
+            f"[{args.action_token_start}, {action_token_end}) vs {lm_head_vocab_size}."
+        )
 
     target_config = copy.deepcopy(vla.language_model.config)# 只保留草稿模型真正需要的结构配置
     num_target_layers = target_config.num_hidden_layers
@@ -1881,6 +2129,11 @@ def main():
     draft_config.dflash_logit_markov_type = args.logit_markov_type
     draft_config.dflash_logit_markov_rank = args.logit_markov_rank
     draft_config.dflash_logit_markov_scale = args.logit_markov_scale
+    draft_config.dflash_action_head_type = args.action_head_type
+    draft_config.dflash_action_head_rank = args.action_head_rank
+    draft_config.dflash_action_vocab_size = args.action_vocab_size
+    draft_config.dflash_action_token_start = args.action_token_start
+    draft_config.dflash_action_confidence_enabled = args.action_confidence_enabled
     model = DFlashDraftModel(draft_config).to(device=device, dtype=torch.bfloat16)# 实例化草稿模型
     trainable_params = count_trainable_parameters(model)
     if distributed:
@@ -2157,6 +2410,10 @@ def main():
             train_refined_hidden_sum = 0.0
             train_residual_token_ce_sum = 0.0
             train_anchor_logit_distill_sum = 0.0
+            train_action_token_ce_sum = 0.0
+            train_action_distill_l1_sum = 0.0
+            train_prefix_survival_sum = 0.0
+            train_action_confidence_sum = 0.0
             train_soft_component_sum = 0.0
             train_hidden_component_sum = 0.0
             train_cos_component_sum = 0.0
@@ -2165,6 +2422,10 @@ def main():
             train_refined_hidden_component_sum = 0.0
             train_residual_token_ce_component_sum = 0.0
             train_anchor_logit_distill_component_sum = 0.0
+            train_action_token_ce_component_sum = 0.0
+            train_action_distill_l1_component_sum = 0.0
+            train_prefix_survival_component_sum = 0.0
+            train_action_confidence_component_sum = 0.0
             train_anchor_consistency_scale_sum = 0.0
             train_causal_residual_cad_scale_sum = 0.0
             train_anchor_consistency_pairs_sum = 0.0
@@ -2173,6 +2434,9 @@ def main():
             train_acc_sum = 0.0
             train_base_acc_sum = 0.0
             train_residual_token_ce_acc_sum = 0.0
+            train_action_accept_probability_proxy_sum = 0.0
+            train_expected_prefix_length_sum = 0.0
+            train_confidence_mae_sum = 0.0
             train_detail_accumulator = None
             train_log_steps = 0
             pbar = tqdm(train_loader, desc=f"train {epoch}/{args.num_epochs}", dynamic_ncols=True) if is_main else train_loader
@@ -2213,6 +2477,10 @@ def main():
                 train_refined_hidden_sum += log_metrics["refined_hidden_loss"].item()
                 train_residual_token_ce_sum += log_metrics["residual_token_ce_loss"].item()
                 train_anchor_logit_distill_sum += log_metrics["anchor_logit_distill_loss"].item()
+                train_action_token_ce_sum += log_metrics["action_token_ce_loss"].item()
+                train_action_distill_l1_sum += log_metrics["action_distill_l1_loss"].item()
+                train_prefix_survival_sum += log_metrics["prefix_survival_loss"].item()
+                train_action_confidence_sum += log_metrics["action_confidence_loss"].item()
                 train_soft_component_sum += log_metrics["soft_component"].item()
                 train_hidden_component_sum += log_metrics["hidden_component"].item()
                 train_cos_component_sum += log_metrics["cos_component"].item()
@@ -2221,6 +2489,10 @@ def main():
                 train_refined_hidden_component_sum += log_metrics["refined_hidden_component"].item()
                 train_residual_token_ce_component_sum += log_metrics["residual_token_ce_component"].item()
                 train_anchor_logit_distill_component_sum += log_metrics["anchor_logit_distill_component"].item()
+                train_action_token_ce_component_sum += log_metrics["action_token_ce_component"].item()
+                train_action_distill_l1_component_sum += log_metrics["action_distill_l1_component"].item()
+                train_prefix_survival_component_sum += log_metrics["prefix_survival_component"].item()
+                train_action_confidence_component_sum += log_metrics["action_confidence_component"].item()
                 train_anchor_consistency_scale_sum += log_metrics["anchor_consistency_scale"].item()
                 train_causal_residual_cad_scale_sum += log_metrics["causal_residual_cad_scale"].item()
                 train_anchor_consistency_pairs_sum += log_metrics["anchor_consistency_pairs"].item()
@@ -2229,6 +2501,9 @@ def main():
                 train_acc_sum += log_metrics["accuracy"].item()
                 train_base_acc_sum += log_metrics["base_accuracy"].item()
                 train_residual_token_ce_acc_sum += log_metrics["residual_token_ce_accuracy"].item()
+                train_action_accept_probability_proxy_sum += log_metrics["action_accept_probability_proxy"].item()
+                train_expected_prefix_length_sum += log_metrics["expected_prefix_length"].item()
+                train_confidence_mae_sum += log_metrics["confidence_mae"].item()
                 train_detail_accumulator = accumulate_detail_metrics(train_detail_accumulator, log_metrics)
                 train_log_steps += 1
 
@@ -2258,6 +2533,10 @@ def main():
                             "train/refined_hidden_loss": train_refined_hidden_sum / denom_log_steps,
                             "train/residual_token_ce_loss": train_residual_token_ce_sum / denom_log_steps,
                             "train/anchor_logit_distill_loss": train_anchor_logit_distill_sum / denom_log_steps,
+                            "train/action_token_ce_loss": train_action_token_ce_sum / denom_log_steps,
+                            "train/action_distill_l1_loss": train_action_distill_l1_sum / denom_log_steps,
+                            "train/prefix_survival_loss": train_prefix_survival_sum / denom_log_steps,
+                            "train/action_confidence_loss": train_action_confidence_sum / denom_log_steps,
                             "train/soft_component": train_soft_component_sum / denom_log_steps,
                             "train/hidden_component": train_hidden_component_sum / denom_log_steps,
                             "train/cos_component": train_cos_component_sum / denom_log_steps,
@@ -2266,6 +2545,10 @@ def main():
                             "train/refined_hidden_component": train_refined_hidden_component_sum / denom_log_steps,
                             "train/residual_token_ce_component": train_residual_token_ce_component_sum / denom_log_steps,
                             "train/anchor_logit_distill_component": train_anchor_logit_distill_component_sum / denom_log_steps,
+                            "train/action_token_ce_component": train_action_token_ce_component_sum / denom_log_steps,
+                            "train/action_distill_l1_component": train_action_distill_l1_component_sum / denom_log_steps,
+                            "train/prefix_survival_component": train_prefix_survival_component_sum / denom_log_steps,
+                            "train/action_confidence_component": train_action_confidence_component_sum / denom_log_steps,
                             "train/anchor_consistency_scale": train_anchor_consistency_scale_sum / denom_log_steps,
                             "train/causal_residual_cad_scale": train_causal_residual_cad_scale_sum / denom_log_steps,
                             "train/anchor_consistency_pairs_per_batch": train_anchor_consistency_pairs_sum / denom_log_steps,
@@ -2274,6 +2557,9 @@ def main():
                             "train/accuracy": train_acc_sum / denom_log_steps,
                             "train/base_accuracy": train_base_acc_sum / denom_log_steps,
                             "train/residual_token_ce_accuracy": train_residual_token_ce_acc_sum / denom_log_steps,
+                            "train/action_accept_probability_proxy": train_action_accept_probability_proxy_sum / denom_log_steps,
+                            "train/expected_prefix_length": train_expected_prefix_length_sum / denom_log_steps,
+                            "train/confidence_mae": train_confidence_mae_sum / denom_log_steps,
                             "train/lr": scheduler.get_last_lr()[0],
                         }
                         train_payload.update(detail_metrics_to_log("train", train_detail_accumulator))
@@ -2312,6 +2598,10 @@ def main():
                             f"alogit*={train_payload['train/anchor_logit_distill_component']:.4f} "
                             f"refh={train_payload['train/refined_hidden_loss']:.4f} "
                             f"refh*={train_payload['train/refined_hidden_component']:.4f} "
+                            f"ace={train_payload['train/action_token_ce_loss']:.4f} "
+                            f"l1={train_payload['train/action_distill_l1_loss']:.4f} "
+                            f"prefix={train_payload['train/expected_prefix_length']:.3f} "
+                            f"conf_mae={train_payload['train/confidence_mae']:.3f} "
                             f"acc={train_payload['train/accuracy']:.3f} "
                             f"base_acc={train_payload['train/base_accuracy']:.3f} "
                             f"lr={train_payload['train/lr']:.2e}",
@@ -2326,6 +2616,10 @@ def main():
                         train_refined_hidden_sum = 0.0
                         train_residual_token_ce_sum = 0.0
                         train_anchor_logit_distill_sum = 0.0
+                        train_action_token_ce_sum = 0.0
+                        train_action_distill_l1_sum = 0.0
+                        train_prefix_survival_sum = 0.0
+                        train_action_confidence_sum = 0.0
                         train_soft_component_sum = 0.0
                         train_hidden_component_sum = 0.0
                         train_cos_component_sum = 0.0
@@ -2334,6 +2628,10 @@ def main():
                         train_refined_hidden_component_sum = 0.0
                         train_residual_token_ce_component_sum = 0.0
                         train_anchor_logit_distill_component_sum = 0.0
+                        train_action_token_ce_component_sum = 0.0
+                        train_action_distill_l1_component_sum = 0.0
+                        train_prefix_survival_component_sum = 0.0
+                        train_action_confidence_component_sum = 0.0
                         train_anchor_consistency_scale_sum = 0.0
                         train_causal_residual_cad_scale_sum = 0.0
                         train_anchor_consistency_pairs_sum = 0.0
@@ -2342,6 +2640,9 @@ def main():
                         train_acc_sum = 0.0
                         train_base_acc_sum = 0.0
                         train_residual_token_ce_acc_sum = 0.0
+                        train_action_accept_probability_proxy_sum = 0.0
+                        train_expected_prefix_length_sum = 0.0
+                        train_confidence_mae_sum = 0.0
                         train_detail_accumulator = None
                         train_log_steps = 0
 
@@ -2354,6 +2655,8 @@ def main():
                         rescad=f"{log_metrics['causal_residual_cad_loss'].item():.3f}",
                         alogit=f"{log_metrics['anchor_logit_distill_loss'].item():.3f}",
                         refh=f"{log_metrics['refined_hidden_loss'].item():.3f}",
+                        ace=f"{log_metrics['action_token_ce_loss'].item():.3f}",
+                        pref=f"{log_metrics['expected_prefix_length'].item():.2f}",
                         L=f"{log_metrics['loss'].item():.3f}",
                         acc=f"{log_metrics['accuracy'].item():.3f}",
                         bacc=f"{log_metrics['base_accuracy'].item():.3f}",
@@ -2430,6 +2733,10 @@ def main():
                     f"alogit*={val_metrics['val/anchor_logit_distill_component']:.4f} "
                     f"refh={val_metrics['val/refined_hidden_loss']:.4f} "
                     f"refh*={val_metrics['val/refined_hidden_component']:.4f} "
+                    f"ace={val_metrics['val/action_token_ce_loss']:.4f} "
+                    f"l1={val_metrics['val/action_distill_l1_loss']:.4f} "
+                    f"prefix={val_metrics['val/expected_prefix_length']:.3f} "
+                    f"conf_mae={val_metrics['val/confidence_mae']:.3f} "
                     f"acc={current_val_acc:.3f} "
                     f"base_acc={val_metrics['val/base_accuracy']:.3f} "
                     f"| best_loss={best_val_loss:.4f} best_acc={best_val_acc:.3f} "

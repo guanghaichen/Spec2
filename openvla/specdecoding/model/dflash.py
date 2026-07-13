@@ -361,6 +361,60 @@ class DFlashDraftModel(nn.Module):
             self.logit_markov_hidden = None
             self.logit_markov_out = None
 
+        # 新版动作专用顺序修正头：DFlash 主干仍一次并行产生整块 hidden/base logits，
+        # 此处只在 256 个动作 token 上递推一个很小的状态，避免逐 slot 重跑完整 lm_head。
+        self.action_head_type = getattr(config, "dflash_action_head_type", "none")
+        self.action_head_rank = int(getattr(config, "dflash_action_head_rank", 256))
+        self.action_token_start = int(getattr(config, "dflash_action_token_start", 0))
+        self.action_vocab_size = int(getattr(config, "dflash_action_vocab_size", 256))
+        self.action_token_end = self.action_token_start + self.action_vocab_size
+        self.action_confidence_enabled = bool(
+            getattr(config, "dflash_action_confidence_enabled", False)
+        )
+        if self.action_head_type not in ("none", "slot_rnn"):
+            raise ValueError(
+                f"Unsupported dflash_action_head_type={self.action_head_type!r}; "
+                "expected 'none' or 'slot_rnn'."
+            )
+        if self.action_head_type == "slot_rnn":
+            vocab_size = int(getattr(config, "vocab_size", 0))
+            if self.action_head_rank <= 0:
+                raise ValueError("dflash_action_head_rank must be > 0.")
+            if self.action_vocab_size <= 0:
+                raise ValueError("dflash_action_vocab_size must be > 0.")
+            if self.action_token_start < 0 or self.action_token_end > vocab_size:
+                raise ValueError(
+                    "DFlash action-token range must lie inside the target vocabulary: "
+                    f"[{self.action_token_start}, {self.action_token_end}) vs vocab_size={vocab_size}."
+                )
+            rank = self.action_head_rank
+            self.action_head_norm = LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+            self.action_head_hidden = nn.Linear(config.hidden_size, rank, bias=False)
+            self.action_head_token = nn.Embedding(self.action_vocab_size, rank)
+            self.action_head_slot = nn.Embedding(self.action_dim, rank)
+            self.action_head_state = nn.Linear(4 * rank, 2 * rank)
+            self.action_head_out = nn.Linear(rank, self.action_vocab_size, bias=False)
+            self.action_confidence_head = (
+                nn.Linear(2 * rank, 1) if self.action_confidence_enabled else None
+            )
+            nn.init.normal_(self.action_head_hidden.weight, mean=0.0, std=0.02)
+            nn.init.normal_(self.action_head_token.weight, mean=0.0, std=0.02)
+            nn.init.normal_(self.action_head_slot.weight, mean=0.0, std=0.02)
+            nn.init.normal_(self.action_head_state.weight, mean=0.0, std=0.02)
+            nn.init.zeros_(self.action_head_state.bias)
+            nn.init.normal_(self.action_head_out.weight, mean=0.0, std=1e-4)
+            if self.action_confidence_head is not None:
+                nn.init.normal_(self.action_confidence_head.weight, mean=0.0, std=0.02)
+                nn.init.zeros_(self.action_confidence_head.bias)
+        else:
+            self.action_head_norm = None
+            self.action_head_hidden = None
+            self.action_head_token = None
+            self.action_head_slot = None
+            self.action_head_state = None
+            self.action_head_out = None
+            self.action_confidence_head = None
+
     @property
     def causal_residual_enabled(self) -> bool:
         return self.causal_residual_type == "hidden"
@@ -368,6 +422,173 @@ class DFlashDraftModel(nn.Module):
     @property
     def logit_markov_enabled(self) -> bool:
         return self.logit_markov_type == "bias"
+
+    @property
+    def action_sequential_enabled(self) -> bool:
+        return self.action_head_type == "slot_rnn"
+
+    def action_logits_from_full(self, logits: torch.Tensor) -> torch.Tensor:
+        """只取 OpenVLA 动作 token 对应的连续词表区间。"""
+        if logits.shape[-1] == self.action_vocab_size:
+            return logits
+        if logits.shape[-1] < self.action_token_end:
+            raise ValueError(
+                f"logits vocab={logits.shape[-1]} is smaller than action_token_end={self.action_token_end}."
+            )
+        return logits[..., self.action_token_start : self.action_token_end]
+
+    def project_action_logits(self, hidden_states: torch.Tensor, lm_head: nn.Module) -> torch.Tensor:
+        """只使用 frozen lm_head 的动作行，避免计算 3 万多个无关语言 token。"""
+        action_weight = lm_head.weight[self.action_token_start : self.action_token_end]
+        action_bias = None
+        if getattr(lm_head, "bias", None) is not None:
+            action_bias = lm_head.bias[self.action_token_start : self.action_token_end]
+        return F.linear(hidden_states, action_weight, action_bias)
+
+    def action_token_ids_to_local(self, token_ids: torch.LongTensor) -> torch.LongTensor:
+        """把全词表 token id 映射到动作子词表 [0, action_vocab_size)。"""
+        local_ids = token_ids.long() - self.action_token_start
+        # 合法训练/推理路径中的 token 都来自动作区间；clamp 仅用于避免坏输入引发越界崩溃。
+        return local_ids.clamp(min=0, max=self.action_vocab_size - 1)
+
+    def action_local_ids_to_token(self, local_ids: torch.LongTensor) -> torch.LongTensor:
+        return local_ids.long() + self.action_token_start
+
+    def _action_head_step(
+        self,
+        state: torch.Tensor,
+        hidden_state: torch.Tensor,
+        prev_token_ids: torch.LongTensor,
+        action_position_ids: torch.LongTensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
+        """执行一个低秩 slot-aware 前缀状态更新，返回新状态、动作 bias 和置信度。"""
+        if not self.action_sequential_enabled:
+            raise RuntimeError("_action_head_step requires dflash_action_head_type='slot_rnn'.")
+        hidden_feat = self.action_head_hidden(self.action_head_norm(hidden_state))
+        token_feat = self.action_head_token(self.action_token_ids_to_local(prev_token_ids))
+        slot_feat = self.action_head_slot(action_position_ids.long())
+        return self._action_head_step_from_features(state, hidden_feat, token_feat, slot_feat)
+
+    def _action_head_step_from_features(
+        self,
+        state: torch.Tensor,
+        hidden_feat: torch.Tensor,
+        token_feat: torch.Tensor,
+        slot_feat: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
+        gate_raw, candidate_raw = self.action_head_state(
+            torch.cat([state, hidden_feat, token_feat, slot_feat], dim=-1)
+        ).chunk(2, dim=-1)
+        gate = torch.sigmoid(gate_raw)
+        candidate = torch.tanh(candidate_raw)
+        new_state = gate * state + (1.0 - gate) * candidate
+        action_bias = self.action_head_out(torch.tanh(new_state))
+        confidence_logits = None
+        if self.action_confidence_head is not None:
+            confidence_logits = self.action_confidence_head(
+                torch.cat([new_state, hidden_feat], dim=-1)
+            ).squeeze(-1)
+        return new_state, action_bias, confidence_logits
+
+    def apply_action_sequential_head(
+        self,
+        base_logits: torch.Tensor,
+        hidden_states: torch.Tensor,
+        prev_token_ids: torch.LongTensor,
+        action_position_ids: torch.LongTensor,
+    ) -> tuple[torch.Tensor, torch.Tensor | None]:
+        """训练时用 teacher 前缀递推，输出动作子词表 logits 与逐位置置信度。"""
+        base_action_logits = self.action_logits_from_full(base_logits)
+        if not self.action_sequential_enabled:
+            return base_action_logits, None
+        if hidden_states.shape[:2] != prev_token_ids.shape:
+            raise ValueError("hidden_states and prev_token_ids must share [B, T].")
+        if hidden_states.shape[:2] != action_position_ids.shape:
+            raise ValueError("hidden_states and action_position_ids must share [B, T].")
+
+        state = hidden_states.new_zeros(hidden_states.shape[0], self.action_head_rank)
+        hidden_features = self.action_head_hidden(self.action_head_norm(hidden_states))
+        token_features = self.action_head_token(self.action_token_ids_to_local(prev_token_ids))
+        slot_features = self.action_head_slot(action_position_ids.long())
+        corrected_logits = []
+        confidence_logits = []
+        for slot_idx in range(hidden_states.shape[1]):
+            state, bias, confidence = self._action_head_step_from_features(
+                state,
+                hidden_features[:, slot_idx, :],
+                token_features[:, slot_idx, :],
+                slot_features[:, slot_idx, :],
+            )
+            corrected_logits.append(base_action_logits[:, slot_idx, :] + bias)
+            if confidence is not None:
+                confidence_logits.append(confidence)
+        stacked_confidence = (
+            torch.stack(confidence_logits, dim=1) if confidence_logits else None
+        )
+        return torch.stack(corrected_logits, dim=1), stacked_confidence
+
+    def sample_action_block(
+        self,
+        base_logits: torch.Tensor,
+        hidden_states: torch.Tensor,
+        first_prev_token_ids: torch.LongTensor,
+        action_position_ids: torch.LongTensor,
+        temperature: float = 0.0,
+        confidence_threshold: float = 0.0,
+        confidence_min_tokens: int = 1,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
+        """推理时使用刚采样出的动作前缀递推；低置信度时可提前结束草稿块。"""
+        if not self.action_sequential_enabled:
+            raise RuntimeError("sample_action_block requires dflash_action_head_type='slot_rnn'.")
+        if first_prev_token_ids.ndim == 2:
+            first_prev_token_ids = first_prev_token_ids[:, 0]
+        if first_prev_token_ids.ndim != 1:
+            raise ValueError("first_prev_token_ids must be [B] or [B, 1].")
+        if confidence_threshold < 0 or confidence_threshold >= 1:
+            raise ValueError("confidence_threshold must be in [0, 1).")
+        confidence_min_tokens = max(1, int(confidence_min_tokens))
+
+        base_action_logits = self.action_logits_from_full(base_logits)
+        state = hidden_states.new_zeros(hidden_states.shape[0], self.action_head_rank)
+        hidden_features = self.action_head_hidden(self.action_head_norm(hidden_states))
+        slot_features = self.action_head_slot(action_position_ids.long())
+        prev_token_ids = first_prev_token_ids.long()
+        sampled_tokens = []
+        corrected_logits = []
+        confidence_probs = []
+        for slot_idx in range(hidden_states.shape[1]):
+            token_feat = self.action_head_token(self.action_token_ids_to_local(prev_token_ids))
+            state, bias, confidence = self._action_head_step_from_features(
+                state,
+                hidden_features[:, slot_idx, :],
+                token_feat,
+                slot_features[:, slot_idx, :],
+            )
+            if confidence is not None:
+                confidence_prob = confidence.sigmoid()
+                confidence_probs.append(confidence_prob)
+                if (
+                    confidence_threshold > 0
+                    and len(sampled_tokens) >= confidence_min_tokens
+                    and bool((confidence_prob < confidence_threshold).all().item())
+                ):
+                    break
+            step_logits = base_action_logits[:, slot_idx, :] + bias
+            local_token = sample(step_logits.unsqueeze(1), temperature=temperature)[:, 0]
+            token_ids = self.action_local_ids_to_token(local_token)
+            sampled_tokens.append(token_ids)
+            corrected_logits.append(step_logits)
+            prev_token_ids = token_ids
+
+        if not sampled_tokens:
+            raise RuntimeError("DFlash action head produced an empty proposal.")
+        return (
+            torch.stack(sampled_tokens, dim=1),
+            torch.stack(corrected_logits, dim=1),
+            torch.stack(confidence_probs[: len(sampled_tokens)], dim=1)
+            if confidence_probs
+            else None,
+        )
 
     def apply_causal_residual(
         self,

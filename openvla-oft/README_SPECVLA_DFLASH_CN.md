@@ -113,5 +113,5 @@ CUDA_VISIBLE_DEVICES=0 EARLY_EXIT_LAYER=16 \
 ## 当前状态
 
 - 3090 已完成 Goal 1 trial/task 的 OFT smoke：10 条 rollout 中 9 条成功，证明官方模型、LIBERO、EGL、两图+proprio输入和 action chunk 推理可运行。
-- 4090 的 OFT 环境/权重尚待后台准备；在 DFlash 主表评测占用 GPU 时不要启动 OFT GPU 任务。
+- 4090 已完成 oft 环境、custom Transformers fork、repo 内 openvla-oft editable 安装和 Goal OFT 权重准备；在 DFlash 主表评测占用 GPU 时不要启动 OFT GPU 任务。
 - Adapter、teacher HDF5、训练器、早退入口与脚本已纳入本私有仓库；下一步是 4090 baseline 与 3090 teacher feature collection。

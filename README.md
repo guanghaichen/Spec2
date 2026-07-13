@@ -547,8 +547,9 @@ latency speedup >= 15-25%
    而不是所有并行 action-head VLA。
 
 当前已完成统一代码接入、3090 Goal smoke、teacher HDF5、DDP adapter trainer、hook early-exit runtime 与
-4090/3090 脚本。待 DFLASH 当前主表评测结束后，先在 4090 完成 OFT Goal 50-trial baseline，再在 3090 收集
-teacher feature 并训练 layer-16 adapter。
+4090/3090 脚本。4090 已准备 oft 环境、custom Transformers fork 和 openvla-7b-oft-finetuned-libero-goal
+权重；待 DFLASH 当前主表评测释放 GPU 后，先在 4090 完成 OFT Goal 50-trial baseline，再在 3090 收集 teacher
+feature 并训练 layer-16 adapter。
 
 
 ## 后续扩展：顶会级实验路线图

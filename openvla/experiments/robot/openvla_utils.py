@@ -36,7 +36,7 @@ def get_vla(cfg):
     """从checkpoint中加载vla模型，分两大分支：投机模式与标准模式"""
     # Load VLA checkpoint.
     print("[*] Instantiating Pretrained VLA model")
-    print("[*] Loading in BF16 with Flash-Attention Enabled")
+    print("[*] Loading target model in BF16 (attention backend follows the checkpoint/runtime config)")
 
     # 注册vla模型的配置类、图像处理器、通用处理器
     AutoConfig.register("openvla", OpenVLAConfig)
@@ -73,6 +73,10 @@ def get_vla(cfg):
             dflash_use_causal_residual_sampling=getattr(cfg, "dflash_use_causal_residual_sampling", False),
             dflash_confidence_threshold=getattr(cfg, "dflash_confidence_threshold", 0.0),
             dflash_confidence_min_tokens=getattr(cfg, "dflash_confidence_min_tokens", 1),
+            dflash_acceptance_mode=getattr(cfg, "dflash_acceptance_mode", "token"),
+            dflash_tree_mode=getattr(cfg, "dflash_tree_mode", "off"),
+            dflash_tree_branch_position=getattr(cfg, "dflash_tree_branch_position", 0),
+            dflash_tree_first_anchor_only=getattr(cfg, "dflash_tree_first_anchor_only", True),
         )
         # 投机采样外层包装（先让基础模型 prefill 处理输入序列，再用草稿模型快速生成候选 token，最后用基础模型验证并接受/拒绝）
         vla = SpecVLAforActionPrediction(**spec_kwargs)

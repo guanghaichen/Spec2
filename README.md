@@ -24,8 +24,8 @@
 | --- | --- | --- |
 | 离线数据生成 | `openvla/specdecoding/train-scripts/ge_data_all_openvla_token_only_libero_goal.py` | 在 RLDS demonstration 上贪心运行 OpenVLA，并保存完整 prefix/action hidden context。 |
 | 离线 DFLASH 训练 | `openvla/specdecoding/train-scripts/train_dflash_libero_goal.py` | Dataset、multi-anchor 监督、loss、checkpoint、SwanLab、DDP。 |
-| DFLASH 模型结构 | `openvla/specdecoding/model/dflash.py` | Context projection、action-dimension embedding、非因果 block attention、RoPE。 |
-| 在线 draft 和 target 校验 | `openvla/prismatic/extern/hf/modeling_speculation.py` | 加载 DFLASH checkpoint，一次 draft 一个 block，再用 OpenVLA 接受/纠正。 |
+| DFLASH 模型结构 | `openvla/specdecoding/model/dflash.py` | Context projection、action-dimension embedding、非因果 block attention、Action-RNN 与单分叉候选。 |
+| 在线 draft 和 target 校验 | `openvla/prismatic/extern/hf/modeling_speculation.py` | 一层 draft、动作组 relaxed 接受、双路径树校验、partial accept/correction 与胜出路径 KV 提交。 |
 | LIBERO 推理评测 | `openvla/experiments/robot/libero/run_libero_goal_AR.py`、`run_libero_goal_Spec.py`、`run_libero_goal_Spec_Relaxed.py` | 执行 rollout，并记录成功率、耗时、Length、acceptance 统计。 |
 
 `openvla/specdecoding/train-scripts/train_deepspeed_libero_goal.py` 和原始
@@ -86,9 +86,10 @@ anchor token，并产生了该位置 hidden state。DFLASH draft 接收：
 同时吐出”。随后 target model 并行得到 proposal 的 posterior token，接受最长合法前缀；如果遇到拒绝
 位置，就写入 target model 自己的 posterior token，因此支持 partial acceptance 和 partial correction。
 
-当前主评测使用 `accept_threshold=9`，也就是基于 token distance 的 relaxed acceptance，而不是严格相等。
-只有在做 strict-acceptance 消融时才把阈值设成 `0` 或显式 strict 脚本。报告实验时必须同时写清楚阈值、
-仿真成功率和 accepted length。
+当前 strict 评测要求 token 完全相等。Goal relaxed 仍以 `accept_threshold=9` 为基础，但新版会把
+`(x,y,z)`、`(roll,pitch,yaw)` 分别作为动作组检查总平方 bin 误差；gripper 始终要求精确相等。
+报告实验时必须同时写清楚 `acceptance_mode`、阈值、仿真成功率和 accepted length，不能把 relaxed
+结果表述成 lossless strict 结果。
 
 ### Context、层选择和 position invariant
 
@@ -138,6 +139,32 @@ openvla/specdecoding/train-scripts/run_dflash_action_rnn_prefix_1layer_4gpu.sh
 `position_balance=True` 只抵消 multi-anchor 中后部绝对位置被重复监督更多次的统计偏差；`slot_decay=1.0`，
 位置重要性完全交给 Prefix Survival，而不是手工位置补丁。
 
+### 当前推理机制：动作组接受 + 校准单分叉树
+
+2026-07-14 的下一轮主实验在 **一层 Draft** 上加入两项推理机制。二者不增加第二次 DFlash
+Transformer forward，也不替换 target model 的最终裁决：
+
+1. **动作组 relaxed 接受（Action-Group Relaxed Acceptance）。** 旧规则逐 token 检查
+   `abs(draft_id-target_id) <= r`。新版对当前块中可见的平移维度和旋转维度分别检查
+   `sum(delta_bin^2) <= n_visible * r^2`，等价于保留旧规则最坏角点的平方误差预算；动作组未通过时仍回退
+   逐 token 结果，gripper 永远精确检查。它只用于 relaxed；strict 的输出语义完全不变。
+2. **校准单分叉双路径验证（Calibrated Single-Fork Verification）。** DFlash 主干只 forward 一次，
+   Action-RNN 先生成主路径，再在一个固定的 `p2/p3/p4/p5` 位置取 runner-up token，并从该处复制轻量
+   RNN state 滚出一条备选后缀。两条路径由 target 使用祖先可见的 tree attention **一次**校验；最长合法
+   前缀胜出，平局选择主路径。树只用于最薄弱的 `anchor=0` 首块，避免在后续短块支付无效开销。
+3. **静态位置而非在线置信度门。** strict 评测开始时，在真实 observation 上比较
+   `off/p2/p3/p4/p5` 的完整、CUDA 同步动作延迟；所有候选必须和 tree-off 产生完全相同的 strict action。
+   使用配对单侧 sign test，并对四个候选做 Bonferroni 校正；只有显著更快且实际触发过分叉的位置才进入
+   正式评测，否则自动回退 `off`。校准阶段不写入论文计时统计，正式路径不做 GPU-to-CPU 置信度判断。
+4. **显式提交胜出路径。** target tree forward 后不能简单裁掉 cache 尾部，因为主/备路径节点在 KV 中
+   交错排列。代码会按胜出路径索引 gather target KV 和多层 hidden，再提交成连续 action history；拒绝点
+   仍写 target posterior，因此 partial acceptance/correction 的原语义保持不变。
+
+一键 strict+relaxed 脚本会先做 strict 校准，再把选中的静态分叉位置复用于 relaxed，避免两个结果使用
+不同的树预算。summary JSON 会记录 `tree_triggered_blocks`、`tree_selected_alternate_blocks`、
+`tree_extra_accepted`、`avg_main_path_accept_length`、`action_group_rescued_blocks` 和
+`action_group_extra_accepted`。这些字段可直接判断“更长 Length”究竟来自备选路径还是 relaxed 动作组。
+
 ### 当前 Loss 和指标
 
 一层 Action-RNN 默认总损失为：
@@ -161,7 +188,15 @@ action_distill_l1_loss / component
 prefix_survival_loss / component
 action_accept_probability_proxy
 expected_prefix_length
+rollout_accuracy / rollout_top2_accuracy
+rollout_expected_prefix_length
+rollout_position_1..6_acc / rollout_position_1..6_top2_acc
 ```
+
+原有 `position_*_acc` 使用 teacher 前 token，是 teacher-forced 训练指标。新增 `rollout_*` 只在
+`anchor=0` 上让 Action-RNN 使用自己刚生成的 token 回滚，并且复用同一次 DFlash hidden，不增加 Draft
+Transformer forward；其中 top-2 覆盖率是单分叉树能否救回主路径错误的直接先验。论文诊断时必须优先
+对照 `rollout_*` 与在线 per-position hit rate，不能再用 teacher-forced 高准确率替代真实推理能力。
 
 在线 summary JSON 还会记录 `conditional_prefix`：`p_k` 表示已经连续接受前 k-1 个 token 后，第 k 个仍被
 接受的条件概率。它比独立 `per_position` 命中率更能解释真实 Length。长期控制信号仍是 4090 上的
@@ -203,6 +238,26 @@ CUDA_VISIBLE_DEVICES=0 python openvla/specdecoding/train-scripts/ge_data_all_ope
   --output_format hdf5 --seed 7
 ```
 
+生成完成后先检查单文件元数据和第一个样本；`complete=False` 说明进程中断，禁止直接训练：
+
+```bash
+python - <<'PY'
+import h5py
+
+path = "/data/wulin/c/specvla-data/dflash_goal_dataset_envfix_20260714.h5"
+with h5py.File(path, "r") as h5:
+    print("complete:", bool(h5.attrs["complete"]))
+    print("format:", h5.attrs["dflash_data_format"])
+    print("layers:", list(h5.attrs["hidden_layer_ids"]))
+    print("samples:", len(h5["samples"]))
+    sample = h5["samples"][next(iter(h5["samples"]))]
+    print("predicted_tokens", sample["predicted_tokens"].shape)
+    hidden = sample["hidden_state"]
+    for name in ("action_last", "action_selected"):
+        print(name, hidden[name].shape)
+PY
+```
+
 只有 HDF5 的 `complete=True`、`dflash_data_format=full_prefix_plus_action_hidden_v4`，且抽样 shape 为
 `predicted_tokens=[7]`、`action_last=[6,4096]`、`action_selected=[6,20480]` 时才能训练。训练命令：
 
@@ -213,13 +268,35 @@ OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_action_rnn_prefix_1layer_
   bash openvla/specdecoding/train-scripts/run_dflash_action_rnn_prefix_1layer_4gpu.sh
 ```
 
-把选定 checkpoint 搬到 4090 后，在 4090 仓库中运行 Goal strict + relaxed：
+训练结束后先在 3090 确认 checkpoint（每 10 epoch 一份，主实验通常先测 epoch 200）：
+
+```bash
+find /data/wulin/c/specvla-data/ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu \
+  -maxdepth 1 -type d -name 'epoch_200_step_*' -print
+```
+
+然后在**本地终端**经本机中转到 4090；下面的 `CKPT_3090` 会自动读取训练输出记录的最新目录：
+
+```bash
+CKPT_3090="$(ssh 3090_wulin \
+  'cat /data/wulin/c/specvla-data/ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu/latest_checkpoint.txt')"
+ssh 4090 'mkdir -p /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu'
+scp -3 -r "3090_wulin:${CKPT_3090}" \
+  '4090:/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu/'
+```
+
+把 checkpoint 搬到 4090 后，在 4090 仓库中运行 Goal strict + relaxed：
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 EVAL_EPOCH=200 \
 DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu \
   bash openvla/specdecoding/decode-scripts/run_dflash_action_rnn_goal_pair_eval.sh
 ```
+
+脚本固定 `dflash_num_draft_layers=1`。strict 会先用 64 个真实 observation 自动选择
+`tree=off/p2/p3/p4/p5`，随后正式计时；relaxed 读取 strict summary 中的选择并使用动作组接受。
+`SYNC_CUDA_TIMING=False` 与 `TIMING_SCOPE=last_task` 继续保持 SpecVLA 上游论文式口径；只有树校准内部临时
+使用 CUDA 同步以比较真实完成时间，校准样本不会写入最终 timing JSON。
 
 ## 实验演进与诊断记录
 
@@ -236,7 +313,7 @@ DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-d
 | Residual-CAD weak-path | `ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu` | 增加 hidden residual head、Hidden-level CAD、refined hidden supervision，b16 四卡 | 200 epoch 完整训练 | 0.799 / 0.830 | anchor0->p2 从 0.503 抬到 0.671，但 residual 后 `accuracy` 没超过 `base_accuracy`，说明残差头训练信号还不够强。 |
 | Markov-ACD 诊断短跑 | `ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu` | 增加 logits-level Markov bias、Logit-level CAD、residual token CE、`soft_w=0.10` | 跑到 epoch 18 手动/中途停止 | 0.897 / 0.905 | p2-p5 离线准确率明显跃升，证明“跨 anchor 蒸馏 + token/logit 信号”方向有效；但该目录仍是旧短跑诊断版，run_config 里有旧 `weak_path_loss_boost` 且 `start_index=1`。 |
 | Clean Markov-ACD 完整长跑 | `ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu` | 删除所有手工位置加权；`causal_residual_start_index=0`；`slot_decay=0.90`；低权重 `soft_w=0.10`；Markov-aware refinement + Hidden/Logit CAD + residual token CE | 3090 四卡 200 epoch 已完成 | 0.999 / 1.000；`base_accuracy` 末值 0.974 / 最好 0.987 | 离线 teacher-forced 视角几乎饱和：p1-p5 到 1.000，p6 约 0.996。最终是否有效必须看 4090 online Length/Speedup，建议优先测 epoch 100/150/200。 |
-| Action-RNN Prefix Survival 1-layer | `ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu` | 一层并行主干、冻结 `lm_head` 的 256 个动作行、低秩动作前缀残差、动作分布 L1、期望前缀存活、Logit CAD；不使用置信度头 | 代码就绪，待新环境数据生成后在 3090 四卡训练 | - | 针对上一版离线近饱和但 online p2-p5 和速度未同步提升的问题；保留正确的 `lm_head` 基准，同时移除每 slot 的完整词表投影开销。三层版本仅作容量消融。 |
+| Action-RNN Prefix Survival + Group/Tree Verify 1-layer | `ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu` | 一层并行主干、冻结 `lm_head` 动作行、低秩动作前缀残差、Prefix Survival、跨 anchor logit 蒸馏；推理加入动作组接受与校准单分叉树 | 代码与运行级测试就绪，待新环境数据生成后在 3090 四卡训练 | - | 新增 anchor0 自回滚 top-1/top-2 指标；树若不能在真实整动作延迟上显著胜过 off 会自动关闭，避免以额外节点换来负加速。 |
 
 ### 2026-07-11 最新 Markov-ACD 200 epoch 结果
 
@@ -491,6 +568,10 @@ dflash_data_format           full_prefix_plus_action_hidden_v4
    新版主实验使用一层并行主干；先以冻结 `lm_head` 的 256 个动作行产生正确基准 logits，再由低秩动作
    前缀状态只学习 residual bias。训练加入动作分布蒸馏、连续前缀存活目标和跨 anchor logit distillation，
    当前配方不训练置信度头；三层主干只作为容量消融。
+9. **动作组接受与校准单分叉树。** relaxed 从独立 token 距离扩展到平移/旋转组的误差预算；strict 首先
+   在 `off/p2/p3/p4/p5` 中用真实整动作延迟选择一个静态分叉。一个 DFlash forward 产生主路径和 top-2
+   备选后缀，target 一次 tree-attention forward 校验两路，并显式 gather 胜出路径 KV。若树没有统计显著的
+   净加速，正式评测自动回退 tree-off，不用置信度启发式赌速度。
 
 需要始终记住的限制：
 
@@ -499,14 +580,11 @@ dflash_data_format           full_prefix_plus_action_hidden_v4
 - 低 hidden loss 不等于有效 speculative speedup。真正决定速度的是在线 acceptance distribution 和 target-call count。
 - Relaxed acceptance 可能保持实际动作效果，但 token 层面不等于 strict equality。必须做消融并诚实报告阈值。
 
-尚未实现、需要先做 correctness test 再决定是否进入主线的推理优化是 **Full-block Verification +
-All-accepted Anchor Reuse**。当前 anchor-hidden 路径每块先做一次 target 单 token anchor decode，再只把
-`q-1` 个 proposal 喂给 target 校验；即使整块全收，最后一个 proposal 仍要在下一轮单独 decode。
-候选优化会在校验时喂满 `q` 个 proposal：前 `q-1` 个 logits 维持原校验语义，额外的最后一个输入顺便
-得到最后 proposal 的 target hidden/KV 和下一 token logits。只有整块全收时才复用这些结果并跳过下一轮
-anchor decode；一旦拒绝，仍把 cache 裁到纠正 token 之前，走原有 target correction。这样不改变接受规则，
-理论上能在高接受率区域减少 target launch；在正式并入前必须逐 token 对齐 AR 输出，并分别测全收/首位拒绝/
-中途拒绝/尾部不足一个 block 四类边界。
+当前 target 校验仍只输入 `q-1` 个 proposal，这是正确的 next-token shift：anchor logits 校验 `p1`，输入
+`p1..p(q-1)` 后各节点 logits 分别校验 `p2..pq`。单分叉树沿用同一语义，不额外输入无法被本块消费的
+最后 token。已经加入的测试覆盖树祖先 mask、主/备路径 target logits 与两次线性校验的数值等价、动作组
+边界和胜出路径 KV gather。以后若实现 full-block anchor reuse，必须作为独立优化重新做 strict 输出等价和
+真实延迟消融，不能混入当前主结果。
 
 
 ## 后续扩展：OpenVLA-OFT Layer-ACD Early Exit
@@ -770,8 +848,8 @@ safety stop / collision / out-of-bound flag
 
 ## 新服务器 4090 从零迁移步骤
 
-旧 4090d 机器不再作为默认推理机。之后默认把新的 `ssh 4090` 作为主开发、数据生成和单卡推理评测机器；
-3090 仍作为四卡训练机器。新 4090 的固定工作根目录约定为：
+旧 4090d 机器不再作为默认推理机。之后默认把新的 `ssh 4090` 作为主开发和单卡推理评测机器；
+3090 负责数据生成和四卡训练。新 4090 的固定工作根目录约定为：
 
 ```text
 /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh
@@ -837,8 +915,6 @@ export OPENVLA_LONG_PATH=${OPENVLA_MODEL_ROOT}/openvla-7b-finetuned-libero-10
 unset VLA_PATH
 unset OPENVLA_MODEL_PATH
 export LIBERO_RLDS_ROOT=${SPECVLA_ROOT}/dataset/modified_libero_rlds
-export DFLASH_DATA_OUTDIR=${SPECVLA_DATA}/dflash_goal_dataset
-export DFLASH_OUTPUT_DIR=${SPECVLA_DATA}/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu
 export SPECVLA_CKPT_ROOT=${SPECVLA_DATA}/specvla_checkpoint
 export SPECVLA_GOAL_CKPT=${SPECVLA_CKPT_ROOT}/goal
 export LOG_DIR=${SPECVLA_DATA}/eval_logs
@@ -859,6 +935,9 @@ export PYTHONPATH=${SPECVLA_REPO}:${SPECVLA_REPO}/openvla:${LIBERO_PATH}:${PYTHO
 export PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 export PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
 ```
+
+`DATAPATH`、`DFLASH_OUTPUT_DIR` 和 `SPEC_CKPT` 属于具体实验，不写进 `.bashrc`；在训练或评测命令前显式传入，
+避免旧 Markov-ACD 路径悄悄覆盖当前 Action-RNN 实验。
 
 ### 3. 创建 conda 环境
 
@@ -905,6 +984,8 @@ pip install -e .
 `scaled_dot_product_attention`；OpenVLA target 在当前加载路径里也没有强制
 `attn_implementation="flash_attention_2"`。因此如果 4090 上安装 flash-attn 卡住，可以先不装，
 直接跑 AR / SpecVLA / DFlash 评测。代价只是可能比 flash-attn 路径慢一些或显存更高。
+当前单分叉验证树需要显式 4D ancestor mask，因此只支持 eager/SDPA；若模型被强制加载为
+`flash_attention_2`，代码会明确报错而不是静默产生路径串扰。当前推荐环境无需安装 flash-attn。
 
 只有在后续明确要复现上游 flash-attn 配置、或某个模型配置强制要求 flash-attn 时，再安装它。
 安装时必须匹配 Python、PyTorch 和 CUDA，优先去
@@ -1088,6 +1169,8 @@ Action-RNN Prefix Survival：
 
 ```bash
 CUDA_VISIBLE_DEVICES=0,1,2,3 \
+DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset_envfix_20260714.h5 \
+OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu \
   bash openvla/specdecoding/train-scripts/run_dflash_action_rnn_prefix_1layer_4gpu.sh
 ```
 
@@ -1116,7 +1199,7 @@ openvla/specdecoding/train-scripts/run_dflash_ablation_3_markov_acd_4gpu.sh    #
 
 ```text
 OPENVLA_GOAL_PATH=/data/wulin/hf_files/openvla-7b-finetuned-libero-goal
-DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset.h5  # 若不存在则 launcher 自动回退旧 dflash_goal_dataset
+DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset_envfix_20260714.h5
 OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu
 ```
 
@@ -1161,7 +1244,9 @@ CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=200 NUM_TRIALS_PER_TASK=50 \
 
 该脚本只评测 Goal，不会误把 Goal draft 用到 Object/Spatial/Long。checkpoint 中的
 `dflash_config.json` 是 Draft 深度和选层的唯一真值；launcher 里的默认值只用于兼容旧 checkpoint。
-summary JSON 会同时保存 `per_position` 与 `conditional_prefix`，不要只看独立位置命中率。
+脚本先跑 strict 自动校准，再把同一分叉位置传给 action-group relaxed。summary JSON 会同时保存
+`per_position`、`conditional_prefix`、主路径 acceptance、树额外接受量和动作组救回量，不要只看独立位置
+命中率。训练日志中的 `rollout_position_*` 才是与 anchor0 真实自生成前缀最接近的离线诊断。
 
 `run_dflash_anchor_hidden_1layer_residual_cad_4gpu.sh` 支持环境变量覆盖常用超参数，例如：
 脚本内部已经按“路径、训练规模、loss 权重、Markov-ACD 结构参数”分区写了中文注释，启动时也会打印完整配置，训练前优先检查这份打印。
@@ -1178,7 +1263,7 @@ summary JSON 会同时保存 `per_position` 与 `conditional_prefix`，不要只
 4. HDF5 文件属性 `complete=true` 时才允许训练；合并/生成中途的半成品不会被误读。
 5. 训练 launcher 和底层 `train_dflash_libero_goal.py` 默认都使用 `NUM_WORKERS=1`、`DATALOADER_PREFETCH_FACTOR=1`、关闭 pin/persistent workers，并默认不保存 optimizer state / latest 根目录副本，减少共享硬盘压力。只有明确需要断点续训时，才手动打开 `SAVE_TRAINING_STATE=True`。
 
-3090 上把旧数据合并成单文件 HDF5：
+下面只用于抢救历史 `.ckpt` artifact，**不能替代 2026-07-14 环境修复后的重新生成**：
 
 ```bash
 ssh 3090_wulin
@@ -1189,7 +1274,7 @@ conda activate specvla
 screen -S pack_dflash_hdf5
 nice -n 10 ionice -c2 -n7 python openvla/specdecoding/train-scripts/pack_dflash_dataset_hdf5.py \
   --input_dir /data/wulin/c/specvla-data/dflash_goal_dataset \
-  --output_file /data/wulin/c/specvla-data/dflash_goal_dataset.h5 \
+  --output_file /data/wulin/c/specvla-data/dflash_goal_dataset_legacy_packed.h5 \
   --overwrite
 ```
 
@@ -1198,13 +1283,14 @@ nice -n 10 ionice -c2 -n7 python openvla/specdecoding/train-scripts/pack_dflash_
 ```bash
 python - <<'PY'
 import h5py
-path = '/data/wulin/c/specvla-data/dflash_goal_dataset.h5'
+path = '/data/wulin/c/specvla-data/dflash_goal_dataset_legacy_packed.h5'
 with h5py.File(path, 'r') as f:
     print('complete', bool(f.attrs.get('complete')), 'samples', int(f.attrs.get('num_samples')), 'format', f.attrs.get('format'))
 PY
 ```
 
-只有看到 `complete True` 才能开始训练。launcher 会优先使用 `/data/wulin/c/specvla-data/dflash_goal_dataset.h5`；如果该文件不存在，才回退旧 `.ckpt` 目录。
+只有看到 `complete True` 才说明合并完整；它仍是旧环境数据。当前 Action-RNN launcher 默认只认
+`dflash_goal_dataset_envfix_20260714.h5`，文件不存在就直接退出，不再悄悄回退旧 `.ckpt`。
 
 2026-07-07 中途检查 Markov-ACD 训练时发现：p2-p6 提升非常明显，但每个 anchor 的第一跳/local slot0
 没有吃到 Markov/Residual/token-CE 增强，导致 t1 以及各 anchor 的一步预测仍接近旧版。当前干净版本因此改为
@@ -1947,6 +2033,7 @@ numpy==1.26.4
 accelerate==1.9.0
 opencv-python==4.12.0.88
 protobuf==4.21.12
+swanlab==0.7.20
 wrapt==1.14.2
 pynput==1.8.2
 termcolor==3.3.0
@@ -1956,6 +2043,18 @@ transformers==4.40.1
 torch==2.2.0+cu121
 torchvision==0.17.0+cu121
 torchaudio==2.2.0+cu121
+```
+
+这里必须固定 `swanlab==0.7.20`：`swanlab==0.8.2` 会调用 protobuf 6 才有的
+`runtime_version`，而当前 TensorFlow/RLDS/WandB 环境需要 `protobuf==4.21.12`。
+两台机器已实际验证 `SwanLab 0.7.20 + protobuf 4.21.12 + TensorFlow 2.15.0`
+可以同时导入，且训练使用的 `swanlab.init/log/finish` 接口可用。安装时使用：
+
+```bash
+python -m pip install --no-deps --force-reinstall \
+  swanlab==0.7.20 protobuf==4.21.12 \
+  -i https://pypi.tuna.tsinghua.edu.cn/simple \
+  --trusted-host pypi.tuna.tsinghua.edu.cn
 ```
 
 这些版本的来源和优先级：

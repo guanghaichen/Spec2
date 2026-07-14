@@ -380,6 +380,9 @@ def distributed_log_metrics(metrics: Dict[str, torch.Tensor], distributed: bool)
         "position_total",
         "anchor_position_correct",
         "anchor_position_total",
+        "rollout_position_correct",
+        "rollout_position_top2_correct",
+        "rollout_position_total",
         "anchor_consistency_pairs",
         "causal_residual_cad_pairs",
     }
@@ -1095,6 +1098,8 @@ def is_swanlab_detail_metric(metric_key: str) -> bool:
     leaf = metric_key.split("/", 1)[-1]
     if leaf.startswith("position_") and leaf.endswith("_acc"):
         return True
+    if leaf.startswith("rollout_position_") and leaf.endswith(("_acc", "_top2_acc")):
+        return True
     if leaf.startswith("anchor_") and leaf.endswith("_acc"):
         parts = leaf.split("_")
         return len(parts) > 1 and parts[1].isdigit()
@@ -1152,6 +1157,9 @@ def new_detail_accumulator(num_positions: int) -> Dict[str, torch.Tensor]:
         "position_total": torch.zeros(num_positions, dtype=torch.float32),
         "anchor_position_correct": torch.zeros(num_positions, num_positions, dtype=torch.float32),
         "anchor_position_total": torch.zeros(num_positions, num_positions, dtype=torch.float32),
+        "rollout_position_correct": torch.zeros(num_positions, dtype=torch.float32),
+        "rollout_position_top2_correct": torch.zeros(num_positions, dtype=torch.float32),
+        "rollout_position_total": torch.zeros(num_positions, dtype=torch.float32),
     }
 
 
@@ -1163,6 +1171,9 @@ def accumulate_detail_metrics(accumulator: Optional[Dict[str, torch.Tensor]], me
         "position_total",
         "anchor_position_correct",
         "anchor_position_total",
+        "rollout_position_correct",
+        "rollout_position_top2_correct",
+        "rollout_position_total",
     ]
     if accumulator is None:
         accumulator = new_detail_accumulator(metrics["anchor_correct"].numel())
@@ -1181,12 +1192,22 @@ def detail_metrics_to_log(prefix: str, accumulator: Optional[Dict[str, torch.Ten
     position_total = accumulator["position_total"]
     anchor_position_correct = accumulator["anchor_position_correct"]
     anchor_position_total = accumulator["anchor_position_total"]
+    rollout_position_correct = accumulator["rollout_position_correct"]
+    rollout_position_top2_correct = accumulator["rollout_position_top2_correct"]
+    rollout_position_total = accumulator["rollout_position_total"]
 
     for idx in range(anchor_total.numel()):
         if anchor_total[idx] > 0:
             payload[f"{prefix}/anchor_{idx}_acc"] = (anchor_correct[idx] / anchor_total[idx]).item()
         if position_total[idx] > 0:
             payload[f"{prefix}/position_{idx + 1}_acc"] = (position_correct[idx] / position_total[idx]).item()
+        if rollout_position_total[idx] > 0:
+            payload[f"{prefix}/rollout_position_{idx + 1}_acc"] = (
+                rollout_position_correct[idx] / rollout_position_total[idx]
+            ).item()
+            payload[f"{prefix}/rollout_position_{idx + 1}_top2_acc"] = (
+                rollout_position_top2_correct[idx] / rollout_position_total[idx]
+            ).item()
 
     for anchor in range(anchor_position_total.shape[0]):
         for position in range(anchor_position_total.shape[1]):
@@ -1267,12 +1288,21 @@ def compute_loss_and_accuracy(
     total_positions = torch.zeros((), device=device, dtype=torch.float32)
     total_correct = torch.zeros((), device=device, dtype=torch.float32)
     base_total_correct = torch.zeros((), device=device, dtype=torch.float32)
+    rollout_total_positions = torch.zeros((), device=device, dtype=torch.float32)
+    rollout_total_correct = torch.zeros((), device=device, dtype=torch.float32)
+    rollout_total_top2_correct = torch.zeros((), device=device, dtype=torch.float32)
+    rollout_runner_up_rescues = torch.zeros((), device=device, dtype=torch.float32)
+    rollout_prefix_sum = torch.zeros((), device=device, dtype=torch.float32)
+    rollout_prefix_blocks = torch.zeros((), device=device, dtype=torch.float32)
     anchor_correct = torch.zeros(seq_len, device=device, dtype=torch.float32)
     anchor_total = torch.zeros(seq_len, device=device, dtype=torch.float32)
     position_correct = torch.zeros(seq_len, device=device, dtype=torch.float32)
     position_total = torch.zeros(seq_len, device=device, dtype=torch.float32)
     anchor_position_correct = torch.zeros(seq_len, seq_len, device=device, dtype=torch.float32)
     anchor_position_total = torch.zeros(seq_len, seq_len, device=device, dtype=torch.float32)
+    rollout_position_correct = torch.zeros(seq_len, device=device, dtype=torch.float32)
+    rollout_position_top2_correct = torch.zeros(seq_len, device=device, dtype=torch.float32)
+    rollout_position_total = torch.zeros(seq_len, device=device, dtype=torch.float32)
     causal_slot0_hidden: Dict[int, torch.Tensor] = {}
     causal_slot0_mask: Dict[int, torch.Tensor] = {}
     far_slot_entries = []
@@ -1530,6 +1560,57 @@ def compute_loss_and_accuracy(
             pred_tokens = draft_model.action_local_ids_to_token(pred_tokens)
         correct_mask = (pred_tokens == target_tokens) & valid_mask.bool()
 
+        # 现有逐 anchor 指标使用真实前 token 做 teacher forcing，不能代表 anchor=0
+        # 的真实推理。这里仅复用已经算好的 DFlash hidden，让轻量 Action-RNN
+        # 自己回滚一次，不增加任何 Draft Transformer forward；top-2 覆盖率也直接
+        # 衡量单分叉验证树是否有可利用的 runner-up 候选。
+        if draft_model.action_sequential_enabled and anchor == 0:
+            with torch.no_grad():
+                rollout_tokens, rollout_logits, _ = draft_model.sample_action_block(
+                    base_logits=base_student_logits.detach(),
+                    hidden_states=pred_hidden[:, :max_block_len, :].detach(),
+                    first_prev_token_ids=tokens[:, known_token_index : known_token_index + 1],
+                    action_position_ids=action_position_ids,
+                    temperature=0.0,
+                    confidence_threshold=0.0,
+                )
+                rollout_valid = valid_mask.bool()
+                rollout_correct_mask = (rollout_tokens == target_tokens) & rollout_valid
+                local_rollout_targets = draft_model.action_token_ids_to_local(target_tokens)
+                top2_local_ids = torch.topk(
+                    rollout_logits,
+                    k=min(2, rollout_logits.shape[-1]),
+                    dim=-1,
+                ).indices
+                rollout_top2_mask = (
+                    top2_local_ids == local_rollout_targets.unsqueeze(-1)
+                ).any(dim=-1) & rollout_valid
+                rollout_total_positions += valid_count
+                rollout_total_correct += rollout_correct_mask.sum().float()
+                rollout_total_top2_correct += rollout_top2_mask.sum().float()
+                rollout_runner_up_rescues += (
+                    rollout_top2_mask & ~rollout_correct_mask
+                ).sum().float()
+
+                prefix_survives = torch.cumprod(
+                    (rollout_correct_mask | ~rollout_valid).float(),
+                    dim=1,
+                ) * rollout_valid.float()
+                rollout_prefix_sum += prefix_survives.sum()
+                rollout_prefix_blocks += rollout_valid[:, 0].sum().float()
+                for local_pos in range(max_block_len):
+                    pos_mask = rollout_valid[:, local_pos]
+                    pos_count = pos_mask.sum().float()
+                    if pos_count.item() == 0:
+                        continue
+                    rollout_position_total[local_pos] += pos_count
+                    rollout_position_correct[local_pos] += rollout_correct_mask[
+                        :, local_pos
+                    ].sum().float()
+                    rollout_position_top2_correct[local_pos] += rollout_top2_mask[
+                        :, local_pos
+                    ].sum().float()
+
         if args.refined_hidden_w > 0 and args.causal_residual_type != "none":
             refined_pos_mask = (
                 (local_indices >= args.causal_residual_start_index)
@@ -1779,6 +1860,11 @@ def compute_loss_and_accuracy(
     )
     accuracy = total_correct / metric_denom
     base_accuracy = base_total_correct / metric_denom
+    rollout_metric_denom = rollout_total_positions.clamp_min(1.0)
+    rollout_accuracy = rollout_total_correct / rollout_metric_denom
+    rollout_top2_accuracy = rollout_total_top2_correct / rollout_metric_denom
+    rollout_runner_up_rescue_rate = rollout_runner_up_rescues / rollout_metric_denom
+    rollout_expected_prefix_length = rollout_prefix_sum / rollout_prefix_blocks.clamp_min(1.0)
     residual_token_ce_accuracy = residual_token_ce_correct / residual_token_ce_total.clamp_min(1.0)
 
     return {
@@ -1815,6 +1901,10 @@ def compute_loss_and_accuracy(
         "refined_hidden_weight_sum": refined_hidden_weight_sum.detach(),
         "accuracy": accuracy,
         "base_accuracy": base_accuracy,
+        "rollout_accuracy": rollout_accuracy,
+        "rollout_top2_accuracy": rollout_top2_accuracy,
+        "rollout_runner_up_rescue_rate": rollout_runner_up_rescue_rate,
+        "rollout_expected_prefix_length": rollout_expected_prefix_length,
         "residual_token_ce_accuracy": residual_token_ce_accuracy,
         "action_accept_probability_proxy": action_accept_probability_proxy,
         "expected_prefix_length": expected_prefix_length,
@@ -1825,6 +1915,9 @@ def compute_loss_and_accuracy(
         "position_total": position_total.detach(),
         "anchor_position_correct": anchor_position_correct.detach(),
         "anchor_position_total": anchor_position_total.detach(),
+        "rollout_position_correct": rollout_position_correct.detach(),
+        "rollout_position_top2_correct": rollout_position_top2_correct.detach(),
+        "rollout_position_total": rollout_position_total.detach(),
     }
 
 
@@ -1869,6 +1962,10 @@ def evaluate(
     total_anchor_logit_distill_pairs = 0.0
     total_acc = 0.0
     total_base_acc = 0.0
+    total_rollout_acc = 0.0
+    total_rollout_top2_acc = 0.0
+    total_rollout_runner_up_rescue_rate = 0.0
+    total_rollout_expected_prefix_length = 0.0
     total_action_accept_probability_proxy = 0.0
     total_expected_prefix_length = 0.0
     total_confidence_mae = 0.0
@@ -1908,6 +2005,10 @@ def evaluate(
         total_anchor_logit_distill_pairs += metrics["anchor_logit_distill_pairs"].item()
         total_acc += metrics["accuracy"].item() * bs
         total_base_acc += metrics["base_accuracy"].item() * bs
+        total_rollout_acc += metrics["rollout_accuracy"].item() * bs
+        total_rollout_top2_acc += metrics["rollout_top2_accuracy"].item() * bs
+        total_rollout_runner_up_rescue_rate += metrics["rollout_runner_up_rescue_rate"].item() * bs
+        total_rollout_expected_prefix_length += metrics["rollout_expected_prefix_length"].item() * bs
         total_action_accept_probability_proxy += metrics["action_accept_probability_proxy"].item() * bs
         total_expected_prefix_length += metrics["expected_prefix_length"].item() * bs
         total_confidence_mae += metrics["confidence_mae"].item() * bs
@@ -1947,6 +2048,10 @@ def evaluate(
         "val/anchor_logit_distill_pairs_per_sample": total_anchor_logit_distill_pairs / denom,
         "val/accuracy": total_acc / denom,
         "val/base_accuracy": total_base_acc / denom,
+        "val/rollout_accuracy": total_rollout_acc / denom,
+        "val/rollout_top2_accuracy": total_rollout_top2_acc / denom,
+        "val/rollout_runner_up_rescue_rate": total_rollout_runner_up_rescue_rate / denom,
+        "val/rollout_expected_prefix_length": total_rollout_expected_prefix_length / denom,
         "val/action_accept_probability_proxy": total_action_accept_probability_proxy / denom,
         "val/expected_prefix_length": total_expected_prefix_length / denom,
         "val/confidence_mae": total_confidence_mae / denom,
@@ -2438,6 +2543,10 @@ def main():
             train_anchor_logit_distill_pairs_sum = 0.0
             train_acc_sum = 0.0
             train_base_acc_sum = 0.0
+            train_rollout_acc_sum = 0.0
+            train_rollout_top2_acc_sum = 0.0
+            train_rollout_runner_up_rescue_rate_sum = 0.0
+            train_rollout_expected_prefix_length_sum = 0.0
             train_residual_token_ce_acc_sum = 0.0
             train_action_accept_probability_proxy_sum = 0.0
             train_expected_prefix_length_sum = 0.0
@@ -2505,6 +2614,14 @@ def main():
                 train_anchor_logit_distill_pairs_sum += log_metrics["anchor_logit_distill_pairs"].item()
                 train_acc_sum += log_metrics["accuracy"].item()
                 train_base_acc_sum += log_metrics["base_accuracy"].item()
+                train_rollout_acc_sum += log_metrics["rollout_accuracy"].item()
+                train_rollout_top2_acc_sum += log_metrics["rollout_top2_accuracy"].item()
+                train_rollout_runner_up_rescue_rate_sum += log_metrics[
+                    "rollout_runner_up_rescue_rate"
+                ].item()
+                train_rollout_expected_prefix_length_sum += log_metrics[
+                    "rollout_expected_prefix_length"
+                ].item()
                 train_residual_token_ce_acc_sum += log_metrics["residual_token_ce_accuracy"].item()
                 train_action_accept_probability_proxy_sum += log_metrics["action_accept_probability_proxy"].item()
                 train_expected_prefix_length_sum += log_metrics["expected_prefix_length"].item()
@@ -2561,6 +2678,10 @@ def main():
                             "train/anchor_logit_distill_pairs_per_batch": train_anchor_logit_distill_pairs_sum / denom_log_steps,
                             "train/accuracy": train_acc_sum / denom_log_steps,
                             "train/base_accuracy": train_base_acc_sum / denom_log_steps,
+                            "train/rollout_accuracy": train_rollout_acc_sum / denom_log_steps,
+                            "train/rollout_top2_accuracy": train_rollout_top2_acc_sum / denom_log_steps,
+                            "train/rollout_runner_up_rescue_rate": train_rollout_runner_up_rescue_rate_sum / denom_log_steps,
+                            "train/rollout_expected_prefix_length": train_rollout_expected_prefix_length_sum / denom_log_steps,
                             "train/residual_token_ce_accuracy": train_residual_token_ce_acc_sum / denom_log_steps,
                             "train/action_accept_probability_proxy": train_action_accept_probability_proxy_sum / denom_log_steps,
                             "train/expected_prefix_length": train_expected_prefix_length_sum / denom_log_steps,
@@ -2609,6 +2730,9 @@ def main():
                             f"conf_mae={train_payload['train/confidence_mae']:.3f} "
                             f"acc={train_payload['train/accuracy']:.3f} "
                             f"base_acc={train_payload['train/base_accuracy']:.3f} "
+                            f"roll={train_payload['train/rollout_accuracy']:.3f} "
+                            f"roll2={train_payload['train/rollout_top2_accuracy']:.3f} "
+                            f"rollL={train_payload['train/rollout_expected_prefix_length']:.2f} "
                             f"lr={train_payload['train/lr']:.2e}",
                             flush=True,
                         )
@@ -2644,6 +2768,10 @@ def main():
                         train_anchor_logit_distill_pairs_sum = 0.0
                         train_acc_sum = 0.0
                         train_base_acc_sum = 0.0
+                        train_rollout_acc_sum = 0.0
+                        train_rollout_top2_acc_sum = 0.0
+                        train_rollout_runner_up_rescue_rate_sum = 0.0
+                        train_rollout_expected_prefix_length_sum = 0.0
                         train_residual_token_ce_acc_sum = 0.0
                         train_action_accept_probability_proxy_sum = 0.0
                         train_expected_prefix_length_sum = 0.0
@@ -2665,6 +2793,8 @@ def main():
                         L=f"{log_metrics['loss'].item():.3f}",
                         acc=f"{log_metrics['accuracy'].item():.3f}",
                         bacc=f"{log_metrics['base_accuracy'].item():.3f}",
+                        racc=f"{log_metrics['rollout_accuracy'].item():.3f}",
+                        r2=f"{log_metrics['rollout_top2_accuracy'].item():.3f}",
                         lr=f"{scheduler.get_last_lr()[0]:.2e}",
                         step=global_step,
                     )

@@ -412,7 +412,7 @@ for batch_idx, batch in enumerate(pbar):
             # 老的 SpecVLA 路径：hidden_state=(first_layer_hidden, last_layer_hidden)，两个 list 的长度都应等于解码步数。
             saved_steps = len(td["hidden_state"][1])
         if saved_steps == len(token):# 只保留"hidden 步数 == 动作 token 数"的样本
-            writer.write(td)# 保存张量字典；默认写入 shard，训练时顺序读取
+            writer.write(td)# 保存张量字典；当前默认直接写入单文件 HDF5
             write_sample_num += 1
         sample_num += 1
         pbar.set_postfix({'valid': write_sample_num, 'drop': sample_num - write_sample_num})

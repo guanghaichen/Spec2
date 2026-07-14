@@ -13,25 +13,21 @@ NUM_DRAFT_LAYERS="${NUM_DRAFT_LAYERS:-3}"
 OUTPUT_NAME="${OUTPUT_NAME:-ckpt_goal_dflash_action_rnn_prefix_${NUM_DRAFT_LAYERS}layer_b8x2_4gpu}"
 if [[ -d "/data/wulin" ]]; then
   DEFAULT_VLA_PATH="/data/wulin/hf_files/openvla-7b-finetuned-libero-goal"
-  DEFAULT_DATAPATH="/data/wulin/c/specvla-data/dflash_goal_dataset.h5"
-  [[ -f "${DEFAULT_DATAPATH}" ]] || DEFAULT_DATAPATH="/data/wulin/c/specvla-data/dflash_goal_dataset"
+  DEFAULT_DATAPATH="/data/wulin/c/specvla-data/dflash_goal_dataset_envfix_20260714.h5"
   DEFAULT_OUTPUT_DIR="/data/wulin/c/specvla-data/${OUTPUT_NAME}"
 elif [[ -d "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh" ]]; then
   ROOT="/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh"
   DEFAULT_VLA_PATH="${ROOT}/hf_files/openvla-7b-finetuned-libero-goal"
-  DEFAULT_DATAPATH="${ROOT}/specvla-data/dflash_goal_dataset.h5"
-  [[ -f "${DEFAULT_DATAPATH}" ]] || DEFAULT_DATAPATH="${ROOT}/specvla-data/dflash_goal_dataset"
+  DEFAULT_DATAPATH="${ROOT}/specvla-data/dflash_goal_dataset_envfix_20260714.h5"
   DEFAULT_OUTPUT_DIR="${ROOT}/specvla-data/${OUTPUT_NAME}"
 elif [[ -d "/mnt/storage/cgh" ]]; then
   DEFAULT_VLA_PATH="/mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-goal"
-  DEFAULT_DATAPATH="/mnt/storage/cgh/specvla-data/dflash_goal_dataset.h5"
-  [[ -f "${DEFAULT_DATAPATH}" ]] || DEFAULT_DATAPATH="/mnt/storage/cgh/specvla-data/dflash_goal_dataset"
+  DEFAULT_DATAPATH="/mnt/storage/cgh/specvla-data/dflash_goal_dataset_envfix_20260714.h5"
   DEFAULT_OUTPUT_DIR="/mnt/storage/cgh/specvla-data/${OUTPUT_NAME}"
 else
   ROOT="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh"
   DEFAULT_VLA_PATH="${ROOT}/data/models--openvla--openvla-7b-finetuned-libero-goal"
-  DEFAULT_DATAPATH="${ROOT}/specvla-data/dflash_goal_dataset.h5"
-  [[ -f "${DEFAULT_DATAPATH}" ]] || DEFAULT_DATAPATH="${ROOT}/specvla-data/dflash_goal_dataset"
+  DEFAULT_DATAPATH="${ROOT}/specvla-data/dflash_goal_dataset_envfix_20260714.h5"
   DEFAULT_OUTPUT_DIR="${ROOT}/specvla-data/${OUTPUT_NAME}"
 fi
 
@@ -40,6 +36,12 @@ DATAPATH="${DATAPATH:-${DEFAULT_DATAPATH}}"
 OUTPUT_DIR="${OUTPUT_DIR:-${DEFAULT_OUTPUT_DIR}}"
 CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3}"
 NPROC_PER_NODE="${NPROC_PER_NODE:-4}"
+
+if [[ ! -f "${DATAPATH}" ]]; then
+  echo "DFlash HDF5 data file does not exist: ${DATAPATH}" >&2
+  echo "Regenerate the environment-aligned Goal data or pass DATAPATH=/path/to/new_dataset.h5." >&2
+  exit 1
+fi
 
 # 训练规模：8 * 2 * 4 = global batch 64，与上一版 b16 四卡实验一致。
 BATCH_SIZE="${BATCH_SIZE:-8}"

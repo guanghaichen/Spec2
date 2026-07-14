@@ -132,6 +132,10 @@ class GenerateConfig:
     dflash_use_causal_residual_sampling: bool = False
     dflash_confidence_threshold: float = 0.0
     dflash_confidence_min_tokens: int = 1
+    dflash_acceptance_mode: str = "action_group"
+    dflash_tree_mode: str = "off"
+    dflash_tree_branch_position: int = 0
+    dflash_tree_first_anchor_only: bool = True
     #################################################################################################################
     # LIBERO environment-specific parameters
     #################################################################################################################

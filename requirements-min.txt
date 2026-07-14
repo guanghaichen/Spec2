@@ -6,4 +6,6 @@ transformers==4.40.1
 numpy==1.26.4
 draccus==0.8.0
 tensorflow==2.15.0
+swanlab==0.7.20
+protobuf==4.21.12
 deepspeed==0.16.6

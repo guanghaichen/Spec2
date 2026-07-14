@@ -24,7 +24,7 @@ def tiny_config():
         pretraining_tp=1,
         num_attention_heads=4,
         num_key_value_heads=4,
-        num_hidden_layers=3,
+        num_hidden_layers=1,
         max_position_embeddings=64,
         rope_theta=10000,
         rms_norm_eps=1e-6,
@@ -85,6 +85,40 @@ class DFlashActionHeadTest(unittest.TestCase):
         self.assertEqual(confidence.shape, (batch_size, block_len))
         self.assertTrue(torch.all(sampled_tokens >= 96))
         self.assertTrue(torch.all(sampled_tokens < 128))
+
+    def test_single_fork_reuses_main_path_and_rolls_alternate_suffix(self):
+        torch.manual_seed(11)
+        model = DFlashDraftModel(tiny_config())
+        block_len = 6
+        base_logits = torch.randn(1, block_len, 128)
+        hidden = torch.randn(1, block_len, 32)
+        first_token = torch.tensor([[101]])
+        action_positions = torch.arange(block_len).unsqueeze(0)
+
+        main_tokens, main_logits, _ = model.sample_action_block(
+            base_logits,
+            hidden,
+            first_token,
+            action_positions,
+        )
+        proposal = model.sample_action_tree(
+            base_logits,
+            hidden,
+            first_token,
+            action_positions,
+            branch_index=2,
+        )
+
+        self.assertEqual(proposal.token_paths.shape, (2, block_len))
+        self.assertTrue(torch.equal(proposal.token_paths[0], main_tokens[0]))
+        self.assertTrue(torch.equal(proposal.main_logits, main_logits))
+        self.assertTrue(torch.equal(proposal.token_paths[1, :2], main_tokens[0, :2]))
+        self.assertNotEqual(
+            proposal.token_paths[1, 2].item(),
+            main_tokens[0, 2].item(),
+        )
+        self.assertEqual(proposal.branch_index, 2)
+        self.assertIsNotNone(proposal.branch_score)
 
     def test_new_even_layer_sample_does_not_require_duplicate_prompt_last(self):
         train_module = load_training_module()
@@ -181,6 +215,9 @@ class DFlashActionHeadTest(unittest.TestCase):
         self.assertTrue(torch.isfinite(metrics["loss"]))
         self.assertGreater(metrics["action_token_ce_loss"].item(), 0.0)
         self.assertGreaterEqual(metrics["expected_prefix_length"].item(), 0.0)
+        self.assertGreaterEqual(metrics["rollout_accuracy"].item(), 0.0)
+        self.assertGreaterEqual(metrics["rollout_top2_accuracy"].item(), metrics["rollout_accuracy"].item())
+        self.assertGreaterEqual(metrics["rollout_expected_prefix_length"].item(), 0.0)
         metrics["loss"].backward()
         self.assertIsNotNone(model.action_head_out.weight.grad)
 

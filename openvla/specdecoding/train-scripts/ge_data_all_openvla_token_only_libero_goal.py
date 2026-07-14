@@ -40,6 +40,7 @@ DEFAULT_VLA_PATH = resolve_default_path(
 DEFAULT_RLDS_ROOT = resolve_default_path(
     ("LIBERO_RLDS_ROOT", "RLDS_ROOT", "DATA_ROOT_DIR"),
     (
+        "/data/wulin/c/datasets/modified_libero_rlds",
         "/data/wulin/datasets/modified_libero_rlds",
         "/mnt/storage/cgh/dataset/modified_libero_rlds",
         "/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/SpecVLA-main/dataset/modified_libero_rlds",
@@ -67,8 +68,22 @@ parser.add_argument('--outdir', type=str, default=None)# 输出目录；默认�
 parser.add_argument('--vla_path', type=str, default=None)
 parser.add_argument('--data_root_dir', type=str, default=None)
 parser.add_argument('--dataset_name', type=str, default='libero_goal_no_noops')
+parser.add_argument('--seed', type=int, default=7, help='Python/NumPy/PyTorch/TensorFlow 随机种子')
+parser.add_argument('--max_samples', type=int, default=None, help='最多处理多少条 RLDS 样本；默认处理全部，用于 smoke test')
 parser.add_argument('--shuffle_buffer_size', type=int, default=100_000)
 parser.add_argument('--image_aug', action=argparse.BooleanOptionalAction, default=True)
+parser.add_argument(
+    '--save_pixel_values',
+    action=argparse.BooleanOptionalAction,
+    default=False,
+    help='是否把图像张量写入离线数据；DFlash 训练不读取它，默认关闭可节省约 30GB',
+)
+parser.add_argument(
+    '--overwrite',
+    action=argparse.BooleanOptionalAction,
+    default=False,
+    help='允许覆盖已存在的 HDF5；默认拒绝，避免误删数百 GB 数据',
+)
 parser.add_argument(
     '--output_format',
     type=str,
@@ -116,7 +131,7 @@ class GenerateConfig:
     wandb_project: str = "YOUR_WANDB_PROJECT"        # Name of W&B project to log to (use default!)
     wandb_entity: str = "YOUR_WANDB_ENTITY"          # Name of entity to log under
 
-    seed: int = 7                                    # Random Seed (for reproducibility)
+    seed: int = args.seed                            # Random Seed (for reproducibility)
     use_spec: bool = False# 是否使用 SpecVLA 相关功能（预留开关）
     save_all_hidden_states: bool = False             # 调试用：保存每步所有层 hidden
     hidden_layer_ids: Optional[list[int]] = [1, 8, 15, 22, 29]     # DFlash 用：只保存指定层（层号按 decoder layer，从0开始）
@@ -165,6 +180,10 @@ from experiments.robot.openvla_utils import get_processor
 from torch.nn.parallel import DistributedDataParallel as DDP
 from peft import LoraConfig, PeftModel, get_peft_model, prepare_model_for_kbit_training
 from accelerate import PartialState
+import tensorflow as tf
+
+set_seed_everywhere(gen_model_cfg.seed)
+tf.random.set_seed(gen_model_cfg.seed)
 
 AutoConfig.register("openvla", OpenVLAConfig)
 AutoImageProcessor.register(OpenVLAConfig, PrismaticImageProcessor)
@@ -182,6 +201,8 @@ print(f'vla path: {cfg.vla_path}')
 print(f'rlds root: {cfg.data_root_dir}')
 print(f'output dir: {outdir}')
 print(f'output format: {args.output_format}, samples_per_shard: {args.samples_per_shard}')
+print(f'seed: {args.seed}, max_samples: {args.max_samples}, image_aug: {args.image_aug}')
+print(f'save_pixel_values: {args.save_pixel_values}, overwrite: {args.overwrite}')
 # 加载投影器和动作分词器
 processor = AutoProcessor.from_pretrained(cfg.vla_path, trust_remote_code=False)# 使用已注册的本地 PrismaticProcessor，避免联网拉 HF dynamic module
 action_tokenizer = ActionTokenizer(processor.tokenizer)
@@ -224,7 +245,13 @@ class DFlashDatasetWriter:
     shards/files 仅用于兼容旧实验。
     """
 
-    def __init__(self, outdir: str, output_format: str = "hdf5", samples_per_shard: int = 32):
+    def __init__(
+        self,
+        outdir: str,
+        output_format: str = "hdf5",
+        samples_per_shard: int = 32,
+        overwrite: bool = False,
+    ):
         if samples_per_shard <= 0:
             raise ValueError("--samples_per_shard must be > 0")
         self.output_format = output_format
@@ -237,7 +264,11 @@ class DFlashDatasetWriter:
 
         self.outdir = Path(outdir)
         if self.output_format == "hdf5":
-            self.h5 = init_hdf5_file(self.outdir, source="ge_data_all_openvla_token_only_libero_goal.py", overwrite=True)
+            self.h5 = init_hdf5_file(
+                self.outdir,
+                source="ge_data_all_openvla_token_only_libero_goal.py",
+                overwrite=overwrite,
+            )
             self.out_path = Path(self.h5.filename)
         else:
             self.outdir.mkdir(parents=True, exist_ok=True)
@@ -306,12 +337,28 @@ class DFlashDatasetWriter:
         self.flush()
         self.write_manifest(complete=True)
 
-writer = DFlashDatasetWriter(outdir, output_format=args.output_format, samples_per_shard=args.samples_per_shard)
+writer = DFlashDatasetWriter(
+    outdir,
+    output_format=args.output_format,
+    samples_per_shard=args.samples_per_shard,
+    overwrite=args.overwrite,
+)
+if writer.h5 is not None:
+    writer.h5.attrs["vla_path"] = str(cfg.vla_path)
+    writer.h5.attrs["data_root_dir"] = str(cfg.data_root_dir)
+    writer.h5.attrs["dataset_name"] = str(cfg.dataset_name)
+    writer.h5.attrs["seed"] = int(args.seed)
+    writer.h5.attrs["image_aug"] = bool(args.image_aug)
+    writer.h5.attrs["save_pixel_values"] = bool(args.save_pixel_values)
+    writer.h5.attrs["hidden_layer_ids"] = gen_model_cfg.hidden_layer_ids
 print(f'writer output: {writer.out_path}')
 
 #from transformers.modeling_outputs import CausalLMOutputWithPast
 gen_model_cfg.unnorm_key = gen_model_cfg.task_suite_name# 反归一化动作时用的 key，告诉模型这是 libero_goal 任务集的动作统计量（均值/方差）
-total_samples = len(vla_dataset)
+dataset_samples = len(vla_dataset)
+total_samples = min(dataset_samples, args.max_samples) if args.max_samples is not None else dataset_samples
+if total_samples <= 0:
+    raise ValueError("--max_samples must be > 0")
 sample_num = 0# 处理总数
 write_sample_num = 0# 实际写入数
 print(f'数据集总样本数: {total_samples}')
@@ -334,14 +381,15 @@ for batch_idx, batch in enumerate(pbar):
         # 把需要保存的数据打包成字典 tensor dictionary
         td={
             "input_ids": batch["input_ids"].cpu()[0],
-            "pixel_values": batch["pixel_values"],
             "hidden_state": hidden,
             "loss_mask": batch["attention_mask"].cpu()[0],
             "predicted_tokens": token,
             "dflash_data_format": "full_prefix_plus_action_hidden_v4",
         }
+        if args.save_pixel_values:
+            td["pixel_values"] = batch["pixel_values"]
         if isinstance(td["hidden_state"], dict) and "action_last" in td["hidden_state"]:
-            # v3 格式保存的是 prefill 最后位置 hidden + action token0..token5 hidden。
+            # v4 格式保存完整 prefill hidden + action token0..token5 hidden。
             # 7 个 action token 只需要 6 个 action hidden，因为 H(token_i) 用于预测 token_{i+1}。
             saved_steps = len(td["hidden_state"]["action_last"]) + 1
         else:

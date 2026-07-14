@@ -1898,6 +1898,183 @@ evaluation seed
 
 这些信息是让结果可比较而不是只停留在经验描述的最低要求。
 
+## 2026-07-14 推理 speedup 修复记录
+
+这次问题的背景是：clean upstream 复现环境在 LIBERO goal 上重新跑通后，`test_speed_for_json.py` 得到的 speedup 为 Spec 约 `1.00x`、Spec Relaxed 约 `1.31x`，已经接近原 SpecVLA 论文复现结果；而主项目 `SpecVLA-DFLASH` 之前一度出现 SpecVLA 负加速或 speedup 异常。排查结论是：不能把原因简单归结为 MuJoCo 一个包，实际漂移点至少包括 MuJoCo、robosuite、LIBERO 指向、numpy、accelerate，以及部分基础依赖。
+
+### 主要原因判断
+
+最可疑、也最直接影响 LIBERO 推理复现的差异是仿真栈：
+
+```text
+SpecVLA eval script
+-> LIBERO task/env wrapper
+-> robosuite
+-> mujoco Python package
+-> MuJoCo physics/render backend
+```
+
+其中 `robosuite==1.4.1` 只声明 `mujoco>=2.3.0`，没有上限；如果不额外 pin，现在 fresh install 会解析到更新的 MuJoCo，而不是作者 W&B 快照里记录过的 `mujoco==3.3.4`。历史上主环境被手动改成 `mujoco==3.3.2`，这很可能是 speedup 和成功率开始异常的触发点之一。
+
+但这次不是只修 MuJoCo。修复前实际看到的漂移包括：
+
+```text
+4090 old specvla:
+  mujoco==3.3.2
+  numpy==1.26.2
+  accelerate==1.14.0
+  opencv-python==5.0.0.93
+  libero editable -> /media/asus/.../cgh/LIBERO
+
+3090 old specvla:
+  robosuite==1.4.0
+  mujoco==3.3.2
+  accelerate==1.14.0
+  protobuf==6.32.0
+  wrapt==2.2.2
+  libero editable -> /data/wulin/c/LIBERO
+```
+
+`LIBERO` 源码 commit 在两台机器上都是 `8f1084e3132a39270c3a13ebe37270a43ece2a01`，和 clean checkout 一致；所以这里的 LIBERO 问题主要不是源码版本不同，而是路径/config/环境包混杂让排查变复杂。后续评测时应显式确认 `PYTHONPATH` 和 `~/.libero/config.yaml` 指向当前机器对应的 LIBERO 目录。
+
+### 已对齐的旧 specvla 环境
+
+2026-07-14 已直接修改两台机器的旧 `specvla` conda 环境，没有保留新的 aligned 环境：
+
+```text
+4090:
+  /home/asus/miniconda3/envs/specvla
+  repo: /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH
+  LIBERO: /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/LIBERO
+
+3090:
+  /data/wulin/miniconda3/envs/specvla
+  repo: /data/wulin/c/SpecVLA-DFLASH
+  LIBERO: /data/wulin/c/LIBERO
+```
+
+最终关键版本对齐为：
+
+```text
+mujoco==3.3.4
+robosuite==1.4.1
+numpy==1.26.4
+accelerate==1.9.0
+opencv-python==4.12.0.88
+protobuf==4.21.12
+wrapt==1.14.2
+pynput==1.8.2
+termcolor==3.3.0
+libero==0.1.0
+bddl==3.6.0
+transformers==4.40.1
+torch==2.2.0+cu121
+torchvision==0.17.0+cu121
+torchaudio==2.2.0+cu121
+```
+
+这些版本的来源和优先级：
+
+- SpecVLA README 明确写了 `torch==2.2.0`、CUDA 12.1、`libero==0.1.0`。
+- SpecVLA/OpenVLA 的 `openvla/experiments/robot/libero/libero_requirements.txt` 写了 `robosuite==1.4.1`。
+- 上游 SpecVLA GitHub 中提交的 W&B offline run 环境快照记录过 `mujoco==3.3.4`、`numpy==1.26.4`、`accelerate==1.9.0`、`torch==2.2.0+cu121` 等。
+- `mujoco==3.3.4` 不是 README 官方 pin 的版本，但它比不指定版本更接近上游仓库残留的实验环境证据。
+
+### 修复时使用的安装命令
+
+4090：
+
+```bash
+/home/asus/miniconda3/envs/specvla/bin/python -m pip install \
+  -i https://pypi.tuna.tsinghua.edu.cn/simple \
+  --trusted-host pypi.tuna.tsinghua.edu.cn \
+  --no-cache-dir --force-reinstall --no-deps \
+  mujoco==3.3.4 robosuite==1.4.1 numpy==1.26.4 accelerate==1.9.0
+
+/home/asus/miniconda3/envs/specvla/bin/python -m pip install \
+  -i https://pypi.tuna.tsinghua.edu.cn/simple \
+  --trusted-host pypi.tuna.tsinghua.edu.cn \
+  --no-cache-dir --force-reinstall --no-deps \
+  opencv-python==4.12.0.88 protobuf==4.21.12 wrapt==1.14.2
+```
+
+3090：
+
+```bash
+/data/wulin/miniconda3/envs/specvla/bin/python -m pip install \
+  -i https://pypi.tuna.tsinghua.edu.cn/simple \
+  --trusted-host pypi.tuna.tsinghua.edu.cn \
+  --no-cache-dir --force-reinstall --no-deps \
+  mujoco==3.3.4 robosuite==1.4.1 numpy==1.26.4 accelerate==1.9.0
+
+/data/wulin/miniconda3/envs/specvla/bin/python -m pip install \
+  -i https://pypi.tuna.tsinghua.edu.cn/simple \
+  --trusted-host pypi.tuna.tsinghua.edu.cn \
+  --no-cache-dir pynput termcolor
+
+/data/wulin/miniconda3/envs/specvla/bin/python -m pip install \
+  -i https://pypi.tuna.tsinghua.edu.cn/simple \
+  --trusted-host pypi.tuna.tsinghua.edu.cn \
+  --no-cache-dir --force-reinstall --no-deps \
+  opencv-python==4.12.0.88 protobuf==4.21.12 wrapt==1.14.2
+```
+
+### 验证命令
+
+4090：
+
+```bash
+ROOT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh
+PY=/home/asus/miniconda3/envs/specvla/bin/python
+cd "$ROOT/SpecVLA-DFLASH"
+
+PYTHONPATH="$ROOT/LIBERO:$ROOT/SpecVLA-DFLASH/openvla:$ROOT/SpecVLA-DFLASH" "$PY" - <<'PY'
+import importlib.metadata as md, torch, cv2
+for p in ["mujoco", "robosuite", "numpy", "accelerate", "opencv-python", "protobuf", "wrapt", "pynput", "termcolor", "libero", "bddl", "transformers"]:
+    print(f"{p}=={md.version(p)}")
+import libero, robosuite, mujoco
+print("torch", torch.__version__, torch.version.cuda)
+print("cv2", cv2.__version__)
+print("imports_ok")
+PY
+
+bash -n openvla/specdecoding/decode-scripts/libero_eval_common.sh \
+  openvla/specdecoding/decode-scripts/run_openvla_ar_libero_goal_eval.sh \
+  openvla/specdecoding/decode-scripts/run_specvla_libero_goal_eval.sh \
+  openvla/specdecoding/decode-scripts/run_specvla_relaxed_libero_goal_eval.sh
+```
+
+3090：
+
+```bash
+ROOT=/data/wulin/c
+PY=/data/wulin/miniconda3/envs/specvla/bin/python
+cd "$ROOT/SpecVLA-DFLASH"
+
+PYTHONPATH="$ROOT/LIBERO:$ROOT/SpecVLA-DFLASH/openvla:$ROOT/SpecVLA-DFLASH" "$PY" - <<'PY'
+import importlib.metadata as md, torch, cv2
+for p in ["mujoco", "robosuite", "numpy", "accelerate", "opencv-python", "protobuf", "wrapt", "pynput", "termcolor", "libero", "bddl", "transformers"]:
+    print(f"{p}=={md.version(p)}")
+import libero, robosuite, mujoco
+print("torch", torch.__version__, torch.version.cuda)
+print("cv2", cv2.__version__)
+print("imports_ok")
+PY
+
+bash -n openvla/specdecoding/decode-scripts/libero_eval_common.sh \
+  openvla/specdecoding/decode-scripts/run_openvla_ar_libero_goal_eval.sh \
+  openvla/specdecoding/decode-scripts/run_specvla_libero_goal_eval.sh \
+  openvla/specdecoding/decode-scripts/run_specvla_relaxed_libero_goal_eval.sh
+```
+
+### 后续注意事项
+
+1. 不要再无版本号执行 `pip install mujoco` 或 `pip install -U robosuite mujoco`；否则 MuJoCo 会漂到当前最新版本。
+2. 跑 LIBERO 推理前先确认 `MUJOCO_GL=egl`、`MUJOCO_EGL_DEVICE_ID`、`PYTHONPATH` 和 `LIBERO_PATH`。
+3. 本项目的 speedup 统计脚本看的是 JSON 中每 step 的模型推理时间；仿真栈变化不一定直接改变单步计时代码，但会改变 rollout 轨迹、成功/失败路径和统计样本，因此仍会间接影响最终 speedup。
+4. 如果要比较 DFLASH 与 SpecVLA，上游兼容模式应保持 `SYNC_CUDA_TIMING=False`、`TIMING_SCOPE=last_task`，这对应作者脚本的 paper-style timing。
+5. 若再次出现负加速，先记录 `pip freeze | grep -E 'mujoco|robosuite|numpy|accelerate|opencv|protobuf|wrapt|libero|bddl|torch'`，再比较 JSON 的 steps/mean/median，不要只看最终 speedup。
+
 ## 环境备注
 
 - 原 SpecVLA 环境备注：Python 3.10、PyTorch 2.2.0 + CUDA 12.1、LIBERO 0.1.0。

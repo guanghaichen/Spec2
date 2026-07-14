@@ -78,11 +78,13 @@ anchor token，并产生了该位置 hidden state。DFLASH draft 接收：
 3. 一个长度为 `q` 的输入块 `[token_a, MASK, ..., MASK]`，带 RoPE position 和每个 action 维度的
    learned action-dimension embedding。
 
-在 **一次** DFLASH forward 中，draft 会为未来 `q <= 6` 个位置
-`token_(a+1) ... token_(a+q)` 输出 hidden/logits。它的 block attention 是非因果的
-（`is_causal=False`），所以这是块并行 draft，不是内部自回归循环。随后 target model 并行得到
-proposal 的 posterior token，接受最长合法前缀；如果遇到拒绝位置，就写入 target model 自己的
-posterior token，因此支持 partial acceptance 和 partial correction。
+在 **一次** DFLASH transformer forward 中，draft 会为未来 `q <= 6` 个位置
+`token_(a+1) ... token_(a+q)` 并行输出 hidden。它的 block attention 是非因果的
+（`is_causal=False`）。当前 Action-RNN 版本随后只在 256 个动作 token 上运行一个低秩顺序头：第一个
+位置读 anchor token，后续位置读刚由 draft 生成的前一个 token。也就是说，昂贵的三层 transformer
+仍只跑一次，但最终 token 决策包含最多 6 个很小的顺序状态更新；它不是“六个最终 token 严格 O(1)
+同时吐出”。随后 target model 并行得到 proposal 的 posterior token，接受最长合法前缀；如果遇到拒绝
+位置，就写入 target model 自己的 posterior token，因此支持 partial acceptance 和 partial correction。
 
 当前主评测使用 `accept_threshold=9`，也就是基于 token distance 的 relaxed acceptance，而不是严格相等。
 只有在做 strict-acceptance 消融时才把阈值设成 `0` 或显式 strict 脚本。报告实验时必须同时写清楚阈值、
@@ -166,6 +168,59 @@ confidence_mae
 在线 summary JSON 还会记录 `conditional_prefix`：`p_k` 表示已经连续接受前 k-1 个 token 后，第 k 个仍被
 接受的条件概率。它比独立 `per_position` 命中率更能解释真实 Length。长期控制信号仍是 4090 上的
 `SR / Length / Speedup`；四卡训练保持 `--val_split 0`，每 10 epoch 保存 checkpoint。
+
+### 2026-07-14 环境修复后的从零实验链
+
+本轮固定分工为：**3090 生成数据并用 0-3 四卡训练，4090 单卡做 LIBERO rollout**。数据与 checkpoint
+不要沿用环境修复前的实验目录。MuJoCo 本身不会参与 RLDS 离线 hidden 生成，但 OpenVLA、Transformers、
+PyTorch 和图像预处理版本会影响 teacher token/hidden，因此本轮仍重新生成并记录环境。
+
+3090 数据生成脚本现在会真实设置 `seed`，默认拒绝覆盖已有 HDF5，并默认不保存训练从不读取的
+`pixel_values`。因此新文件会比历史约 419GB 的文件小约 30GB，但 token、完整 prompt hidden、action hidden
+及训练监督完全不变。正式生成前先用一张空闲 GPU 做小样本检查：
+
+```bash
+ssh 3090_wulin
+source /data/wulin/miniconda3/etc/profile.d/conda.sh
+conda activate specvla
+cd /data/wulin/c/SpecVLA-DFLASH
+
+CUDA_VISIBLE_DEVICES=0 python openvla/specdecoding/train-scripts/ge_data_all_openvla_token_only_libero_goal.py \
+  --vla_path /data/wulin/hf_files/openvla-7b-finetuned-libero-goal \
+  --data_root_dir /data/wulin/c/datasets/modified_libero_rlds \
+  --dataset_name libero_goal_no_noops \
+  --outdir /data/wulin/c/specvla-data/dflash_goal_smoke_envfix.h5 \
+  --output_format hdf5 --seed 7 --max_samples 32
+```
+
+smoke 正常后换一个新文件名正式生成；不要加 `--max_samples`：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python openvla/specdecoding/train-scripts/ge_data_all_openvla_token_only_libero_goal.py \
+  --vla_path /data/wulin/hf_files/openvla-7b-finetuned-libero-goal \
+  --data_root_dir /data/wulin/c/datasets/modified_libero_rlds \
+  --dataset_name libero_goal_no_noops \
+  --outdir /data/wulin/c/specvla-data/dflash_goal_dataset_envfix_20260714.h5 \
+  --output_format hdf5 --seed 7
+```
+
+只有 HDF5 的 `complete=True`、`dflash_data_format=full_prefix_plus_action_hidden_v4`，且抽样 shape 为
+`predicted_tokens=[7]`、`action_last=[6,4096]`、`action_selected=[6,20480]` 时才能训练。训练命令：
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1,2,3 \
+DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset_envfix_20260714.h5 \
+OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_action_rnn_prefix_3layer_b8x2_4gpu \
+  bash openvla/specdecoding/train-scripts/run_dflash_action_rnn_prefix_3layer_4gpu.sh
+```
+
+把选定 checkpoint 搬到 4090 后，在 4090 仓库中运行 Goal strict + relaxed：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 EVAL_EPOCH=200 \
+DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_action_rnn_prefix_3layer_b8x2_4gpu \
+  bash openvla/specdecoding/decode-scripts/run_dflash_action_rnn_goal_pair_eval.sh
+```
 
 ## 实验演进与诊断记录
 
@@ -948,67 +1003,31 @@ PY2
 
 评测 launcher 默认会设置 `MUJOCO_GL=egl`。不要手动设置错误的 `MUJOCO_EGL_DEVICE_ID`。
 
-### 8. 数据生成 sanity check
+### 8. 数据生成职责说明
 
-确认模型和 RLDS 都准备好后，在 4090 上先小规模跑通数据生成：
-
-```bash
-ssh 4090
-source ~/.bashrc
-conda activate specvla
-cd /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH
-
-CUDA_VISIBLE_DEVICES=0 python openvla/specdecoding/train-scripts/ge_data_all_openvla_token_only_libero_goal.py \
-  --gpu_index 0 \
-  --vla_path /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-goal \
-  --data_root_dir /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/dataset/modified_libero_rlds \
-  --dataset_name libero_goal_no_noops \
-  --outdir /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset.h5 \
-  --output_format hdf5
-```
-
-正式生成结束后检查：
-
-```bash
-ls -lh /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset.h5
-python - <<'PY'
-import h5py
-path = '/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset.h5'
-with h5py.File(path, 'r') as f:
-    print('complete', bool(f.attrs.get('complete')), 'samples', int(f.attrs.get('num_samples')), 'format', f.attrs.get('format'))
-PY
-```
-
-历史 4090/3090 的有效样本规模约为 `28.5k`，大小约 `419G`。新 4090 重新生成后，
-应在实验记录中写清楚实际样本数；不要默认和旧机器完全一致。
+当前 4090 只负责在线推理，不再准备 RLDS，也不在这里生成 DFlash 离线数据。数据 smoke、正式生成和训练
+都在 3090 完成，统一使用前文“2026-07-14 环境修复后的从零实验链”的命令。新数据的实际样本数必须写入
+实验记录；历史 `28.5k / 419GB` 只能作为量级参考。
 
 ### 9. 从 3090 搬训练好的 checkpoint 到 4090
 
 3090 继续负责四卡训练。训练完成后，在本地终端用 `scp -3` 从 3090 搬到 4090：
 
 ```bash
-TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu
-DEST_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu
+TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_action_rnn_prefix_3layer_b8x2_4gpu
+DEST_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_action_rnn_prefix_3layer_b8x2_4gpu
+CKPT_PATH=$(ssh 3090_wulin "find ${TRAIN_DIR} -maxdepth 1 -type d -name 'epoch_200_step_*' -print -quit")
+test -n "${CKPT_PATH}" || { echo "epoch 200 checkpoint not found"; exit 1; }
 
 ssh 4090 "mkdir -p ${DEST_DIR}"
-
-for CKPT in epoch_100_step_044700 epoch_150_step_067050 epoch_200_step_089400; do
-  ssh 4090 "mkdir -p ${DEST_DIR}/${CKPT}"
-  scp -3 3090_wulin:${TRAIN_DIR}/${CKPT}/pytorch_model.bin 4090:${DEST_DIR}/${CKPT}/pytorch_model.bin
-  scp -3 3090_wulin:${TRAIN_DIR}/${CKPT}/dflash_config.json 4090:${DEST_DIR}/${CKPT}/dflash_config.json
-done
-
-for FILE in dflash_config.json metrics.jsonl training_summary_markov_acd_start0_slotdecay090.csv training_summary_markov_acd_start0_slotdecay090.md; do
-  scp -3 3090_wulin:${TRAIN_DIR}/${FILE} 4090:${DEST_DIR}/${FILE}
-done
+scp -3 -r "3090_wulin:${CKPT_PATH}" "4090:${DEST_DIR}/"
 ```
 
 复制后检查：
 
 ```bash
-ssh 4090 "for CKPT in epoch_100_step_044700 epoch_150_step_067050 epoch_200_step_089400; do \
-  ls -lh ${DEST_DIR}/\${CKPT}/dflash_config.json ${DEST_DIR}/\${CKPT}/pytorch_model.bin; \
-done"
+CKPT_NAME=$(basename "${CKPT_PATH}")
+ssh 4090 "ls -lh ${DEST_DIR}/${CKPT_NAME}/dflash_config.json ${DEST_DIR}/${CKPT_NAME}/pytorch_model.bin"
 ```
 
 ## 服务器分工和训练流程
@@ -1017,8 +1036,8 @@ done"
 
 | 机器 | GPU 情况 | 主要用途 |
 | --- | --- | --- |
-| 4090 | 新 RTX 4090 服务器 | 主开发、代码调试、数据生成、小规模 sanity check、最终 LIBERO 推理评测。 |
-| 3090 | 8 张 RTX 3090，实验中默认只用 0-3 四张 | 完整 DFLASH 四卡训练。 |
+| 4090 | 新 RTX 4090 服务器 | 主开发、代码调试、最终 LIBERO 单卡推理评测。 |
+| 3090 | 8 张 RTX 3090，实验中默认只用 0-3 四张 | RLDS 离线数据生成和完整 DFLASH 四卡训练。 |
 
 因此，**不要在 README 中把 4090 写成四卡训练机器**。当前四卡 launcher 固定使用
 `torchrun --nproc_per_node 4`，实际应该在 3090 上用 `CUDA_VISIBLE_DEVICES=0,1,2,3`
@@ -1027,63 +1046,18 @@ done"
 当前固定实验流如下：
 
 ```text
-4090 维护代码和数据生成 -> GitHub main 固化代码 -> 3090 四卡训练 -> 本地 scp -3 搬 checkpoint 到 4090 -> 4090 跑五套推理评测
+4090 维护代码 -> GitHub main 固化代码 -> 3090 生成数据并四卡训练 -> 本地 scp -3 搬 checkpoint 到 4090 -> 4090 跑推理评测
 ```
 
 3090 的 RTX 3090 对 speculative decoding 的小 kernel、校验和调度开销更敏感，速度结果容易偏低；
 因此正式比较 `SR / Length / Speedup` 时统一使用 4090。3090 只作为训练吞吐机器。
 
-### 1. 4090：主开发、数据生成和单卡调试
+### 1. 3090：离线数据生成
 
-4090 进入服务器和环境：
-
-```bash
-ssh 4090
-source ~/.bashrc
-conda activate specvla
-cd /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH
-export PYTHONPATH="$PWD"
-```
-
-数据生成路径可以通过 `VLA_PATH`、`LIBERO_RLDS_ROOT`、`DFLASH_DATA_OUTDIR` 覆盖；
-数据生成脚本也支持显式 `--vla_path`、`--data_root_dir`、`--outdir` 参数。这样可以避免意外触发 Hugging Face 下载。
-
-生成 DFLASH 原始数据的入口：
-
-```text
-openvla/specdecoding/train-scripts/ge_data_all_openvla_token_only_libero_goal.py
-```
-
-数据生成命令：
-
-```bash
-CUDA_VISIBLE_DEVICES=0 python openvla/specdecoding/train-scripts/ge_data_all_openvla_token_only_libero_goal.py \
-  --gpu_index 0 \
-  --vla_path /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-goal \
-  --data_root_dir /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/dataset/modified_libero_rlds \
-  --dataset_name libero_goal_no_noops \
-  --outdir /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset.h5 \
-  --output_format hdf5
-```
-
-训练前确认数据大小和数量：
-
-```bash
-ls -lh /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset.h5
-python - <<'PY'
-import h5py
-path = '/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset.h5'
-with h5py.File(path, 'r') as f:
-    print('complete', bool(f.attrs.get('complete')), 'samples', int(f.attrs.get('num_samples')), 'format', f.attrs.get('format'))
-PY
-```
-
-旧 4090 历史数据目录状态如下；新 4090 重新生成或迁移后必须重新记录实际数值：
-
-```text
-/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset.h5
-历史样本内容来自 28,576 个有效 .ckpt；单文件 HDF5 中 `complete=true` 才能训练。
-```
+数据生成的唯一正式入口是
+`openvla/specdecoding/train-scripts/ge_data_all_openvla_token_only_libero_goal.py`。路径全部显式传入，
+不要依赖 `.bashrc`；先 smoke、再正式生成，命令见前文“2026-07-14 环境修复后的从零实验链”。
+`CUDA_VISIBLE_DEVICES` 决定实际使用哪张物理卡，旧参数 `--gpu_index` 仅为兼容保留，不应再写入新命令。
 
 ### 2. 3090：完整四卡训练
 

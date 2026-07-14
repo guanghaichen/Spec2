@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 三层 DFlash + 动作子词表顺序头训练入口。
+# DFlash + frozen lm_head 动作残差顺序头训练入口；本文件默认三层，用于容量消融。
 # 核心路径：DFlash 主干一次并行生成 hidden，低秩前缀状态只在 256 个动作 bin 上递推；
-# 训练目标直接覆盖 token 命中、teacher 动作分布、连续前缀存活和置信度校准。
+# 训练目标直接覆盖 token 命中、teacher 动作分布和连续前缀存活；主实验不训练置信度头。
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 cd "${REPO_ROOT}"
 
-OUTPUT_NAME="ckpt_goal_dflash_action_rnn_prefix_3layer_b8x2_4gpu"
+NUM_DRAFT_LAYERS="${NUM_DRAFT_LAYERS:-3}"
+OUTPUT_NAME="${OUTPUT_NAME:-ckpt_goal_dflash_action_rnn_prefix_${NUM_DRAFT_LAYERS}layer_b8x2_4gpu}"
 if [[ -d "/data/wulin" ]]; then
   DEFAULT_VLA_PATH="/data/wulin/hf_files/openvla-7b-finetuned-libero-goal"
   DEFAULT_DATAPATH="/data/wulin/c/specvla-data/dflash_goal_dataset.h5"
@@ -56,11 +57,10 @@ COS_W="${COS_W:-0.02}"
 ACTION_TOKEN_CE_W="${ACTION_TOKEN_CE_W:-0.10}"
 ACTION_DISTILL_L1_W="${ACTION_DISTILL_L1_W:-0.90}"
 PREFIX_SURVIVAL_W="${PREFIX_SURVIVAL_W:-0.50}"
-ACTION_CONFIDENCE_W="${ACTION_CONFIDENCE_W:-0.10}"
 ANCHOR_LOGIT_DISTILL_W="${ANCHOR_LOGIT_DISTILL_W:-0.10}"
 
 cat <<EOF
-========== DFlash Action-RNN Prefix 3-layer ==========
+========== DFlash Action-RNN Prefix ${NUM_DRAFT_LAYERS}-layer ==========
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}
 VLA_PATH=${VLA_PATH}
 DATAPATH=${DATAPATH}
@@ -69,7 +69,7 @@ global_batch=${BATCH_SIZE} * ${GRAD_ACCUM_STEPS} * ${NPROC_PER_NODE}
 epochs=${NUM_EPOCHS} lr=${LR} warmup=${WARMUP_STEPS}
 hidden=${HIDDEN_W} cos=${COS_W}
 action_ce=${ACTION_TOKEN_CE_W} action_l1=${ACTION_DISTILL_L1_W}
-prefix_survival=${PREFIX_SURVIVAL_W} confidence=${ACTION_CONFIDENCE_W}
+prefix_survival=${PREFIX_SURVIVAL_W} confidence=disabled
 anchor_logit_distill=${ANCHOR_LOGIT_DISTILL_W}
 =======================================================
 EOF
@@ -79,20 +79,20 @@ export HDF5_USE_FILE_LOCKING="${HDF5_USE_FILE_LOCKING:-FALSE}"
 
 torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   openvla/specdecoding/train-scripts/train_dflash_libero_goal.py \
-  --run_name dflash-action-rnn-prefix-3layer-b8x2-4gpu \
+  --run_name "dflash-action-rnn-prefix-${NUM_DRAFT_LAYERS}layer-b8x2-4gpu" \
   --vla_path "${VLA_PATH}" \
   --datapath "${DATAPATH}" \
   --dataset_format "${DATASET_FORMAT}" \
   --output_dir "${OUTPUT_DIR}" \
-  --num_draft_layers 3 \
+  --num_draft_layers "${NUM_DRAFT_LAYERS}" \
   --block_size 7 \
-  --target_layer_ids 1 8 15 22 29 \
-  --selected_hidden_variant replace_22_with_final \
+  --num_target_feature_layers 5 \
+  --selected_hidden_variant target_layers \
   --include_anchor_hidden \
   --action_head_type slot_rnn \
   --action_head_rank 256 \
   --action_vocab_size 256 \
-  --action_confidence_enabled \
+  --no-action_confidence_enabled \
   --hidden_w "${HIDDEN_W}" \
   --cos_w "${COS_W}" \
   --soft_w 0 \
@@ -100,7 +100,7 @@ torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   --action_distill_l1_w "${ACTION_DISTILL_L1_W}" \
   --action_distill_temperature 1.0 \
   --prefix_survival_w "${PREFIX_SURVIVAL_W}" \
-  --action_confidence_w "${ACTION_CONFIDENCE_W}" \
+  --action_confidence_w 0 \
   --slot_decay 1.0 \
   --position_balance \
   --hidden_noise 0.03 \

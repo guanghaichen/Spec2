@@ -13,6 +13,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 sys.path.insert(0, str(REPO_ROOT))
 
 from dflash_hdf5_utils import finalize_hdf5_file, init_hdf5_file, write_sample as write_hdf5_sample
+from openvla.specdecoding.model.dflash import build_evenly_spaced_target_layer_ids
 
 
 def resolve_default_path(env_names, candidates, fallback):
@@ -134,7 +135,7 @@ class GenerateConfig:
     seed: int = args.seed                            # Random Seed (for reproducibility)
     use_spec: bool = False# 是否使用 SpecVLA 相关功能（预留开关）
     save_all_hidden_states: bool = False             # 调试用：保存每步所有层 hidden
-    hidden_layer_ids: Optional[list[int]] = [1, 8, 15, 22, 29]     # DFlash 用：只保存指定层（层号按 decoder layer，从0开始）
+    hidden_layer_ids: Optional[list[int]] = None                    # 加载模型后按首层/最终层端点自动均匀取 5 层
 
 gen_model_cfg=GenerateConfig()
 
@@ -211,6 +212,13 @@ quantization_config = None# 不量化
 print('正在加载 vla模型')
 model = get_model(gen_model_cfg)# 根据配置加载 OpenVLAForActionPrediction 到 GPU
 processor = get_processor(gen_model_cfg)# 再次获取 processor（和前面重复，但这里用的是 openvla_utils 里的封装版本，可能带额外配置）
+num_target_layers = int(model.language_model.config.num_hidden_layers)
+gen_model_cfg.hidden_layer_ids = build_evenly_spaced_target_layer_ids(
+    num_target_layers=num_target_layers,
+    num_feature_layers=5,
+    first_layer_id=1,
+)
+print(f'均匀选择 teacher hidden layers: {gen_model_cfg.hidden_layer_ids}')
 print('正在加载 data')
 batch_transform = RLDSBatchTransform(# 把 RLDS 原始数据（图像、动作、指令）转换成模型输入格式
         action_tokenizer,# 用 action_tokenizer 把动作向量变成 token
@@ -378,6 +386,14 @@ for batch_idx, batch in enumerate(pbar):
                     hidden_layer_ids=gen_model_cfg.hidden_layer_ids,# 指定要返回的隐藏状态的层索引
                     do_sample=False# 不采样，而是贪婪解码，走greedy_search，直接取概率最高的动作 token
                 )
+        # 最终层已经作为 selected hidden 的最后一个分块保存；prompt_last 与它逐元素重复，
+        # 当前 target_layers workflow 不再额外落盘该副本。action_last 仍保留为 hidden 回归标签。
+        if (
+            isinstance(hidden, dict)
+            and gen_model_cfg.hidden_layer_ids[-1] == num_target_layers - 1
+        ):
+            hidden = dict(hidden)
+            hidden.pop("prompt_last", None)
         # 把需要保存的数据打包成字典 tensor dictionary
         td={
             "input_ids": batch["input_ids"].cpu()[0],

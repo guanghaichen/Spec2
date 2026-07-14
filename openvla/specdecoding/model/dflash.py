@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -41,6 +43,42 @@ def build_target_layer_ids(num_target_layers: int, num_draft_layers: int) -> lis
         int(round(start + (i * span) / (num_draft_layers - 1)))
         for i in range(num_draft_layers)
     ]
+
+
+def build_evenly_spaced_target_layer_ids(
+    num_target_layers: int,
+    num_feature_layers: int = 5,
+    first_layer_id: int = 1,
+) -> list[int]:
+    """在首个指定层和最终层之间做算法化的近似等间隔取样。
+
+    OpenVLA/Llama-2 有 32 个 decoder layers，0-based 的最终层是 31。
+    从 1 到 31 取 5 点时跨度 30 不能被 4 整除，因此不存在整数层上的绝对等间隔解；
+    使用四舍五入后的 linspace 得到 [1, 9, 16, 24, 31]，相邻间隔只相差 1。
+    layer_id=31 经 hidden_states[layer_id + 1] 正好对应最终归一化 hidden。
+    """
+    if num_target_layers <= 0:
+        raise ValueError("num_target_layers must be > 0")
+    if num_feature_layers < 2:
+        raise ValueError("num_feature_layers must be >= 2 so both first and final layers are present")
+    final_layer_id = num_target_layers - 1
+    if not 0 <= first_layer_id < final_layer_id:
+        raise ValueError(
+            f"first_layer_id must be in [0, {final_layer_id - 1}], got {first_layer_id}"
+        )
+    if num_feature_layers > final_layer_id - first_layer_id + 1:
+        raise ValueError("num_feature_layers exceeds the number of available integer layer ids")
+
+    span = final_layer_id - first_layer_id
+    layer_ids = [
+        int(math.floor(first_layer_id + i * span / (num_feature_layers - 1) + 0.5))
+        for i in range(num_feature_layers)
+    ]
+    if layer_ids[0] != first_layer_id or layer_ids[-1] != final_layer_id:
+        raise AssertionError(f"Even layer selection lost an endpoint: {layer_ids}")
+    if len(set(layer_ids)) != len(layer_ids):
+        raise ValueError(f"Even layer selection produced duplicate ids: {layer_ids}")
+    return layer_ids
 
 
 SELECTED_HIDDEN_VARIANTS = ("target_layers", "replace_22_with_final")
@@ -290,7 +328,10 @@ class DFlashDraftModel(nn.Module):
         if configured_target_layer_ids is None:
             if num_target_layers is None:
                 raise ValueError("Missing DFlash config field `num_target_layers`.")
-            self.target_layer_ids = build_target_layer_ids(num_target_layers, config.num_hidden_layers)
+            self.target_layer_ids = build_evenly_spaced_target_layer_ids(
+                num_target_layers,
+                int(getattr(config, "dflash_num_target_feature_layers", 5)),
+            )
         else:
             self.target_layer_ids = configured_target_layer_ids# 按配置指定的层取索引
         self.selected_hidden_variant = normalize_selected_hidden_variant(
@@ -361,8 +402,8 @@ class DFlashDraftModel(nn.Module):
             self.logit_markov_hidden = None
             self.logit_markov_out = None
 
-        # 新版动作专用顺序修正头：DFlash 主干仍一次并行产生整块 hidden/base logits，
-        # 此处只在 256 个动作 token 上递推一个很小的状态，避免逐 slot 重跑完整 lm_head。
+        # 动作专用顺序残差头：先用 frozen lm_head 的 256 个动作行得到基准 logits，
+        # 再递推一个很小的状态并只输出 residual bias；它不取代 lm_head。
         self.action_head_type = getattr(config, "dflash_action_head_type", "none")
         self.action_head_rank = int(getattr(config, "dflash_action_head_rank", 256))
         self.action_token_start = int(getattr(config, "dflash_action_token_start", 0))
@@ -402,7 +443,8 @@ class DFlashDraftModel(nn.Module):
             nn.init.normal_(self.action_head_slot.weight, mean=0.0, std=0.02)
             nn.init.normal_(self.action_head_state.weight, mean=0.0, std=0.02)
             nn.init.zeros_(self.action_head_state.bias)
-            nn.init.normal_(self.action_head_out.weight, mean=0.0, std=1e-4)
+            # 初始行为严格等于 frozen lm_head；训练只学习必要的前缀条件残差。
+            nn.init.zeros_(self.action_head_out.weight)
             if self.action_confidence_head is not None:
                 nn.init.normal_(self.action_confidence_head.weight, mean=0.0, std=0.02)
                 nn.init.zeros_(self.action_confidence_head.bias)
@@ -497,7 +539,7 @@ class DFlashDraftModel(nn.Module):
         prev_token_ids: torch.LongTensor,
         action_position_ids: torch.LongTensor,
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
-        """训练时用 teacher 前缀递推，输出动作子词表 logits 与逐位置置信度。"""
+        """训练时用 teacher 前缀递推，在 frozen lm_head 动作 logits 上叠加残差。"""
         base_action_logits = self.action_logits_from_full(base_logits)
         if not self.action_sequential_enabled:
             return base_action_logits, None
@@ -537,7 +579,7 @@ class DFlashDraftModel(nn.Module):
         confidence_threshold: float = 0.0,
         confidence_min_tokens: int = 1,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
-        """推理时使用刚采样出的动作前缀递推；低置信度时可提前结束草稿块。"""
+        """推理时使用刚采样出的动作前缀递推，并始终保留 frozen lm_head 基准 logits。"""
         if not self.action_sequential_enabled:
             raise RuntimeError("sample_action_block requires dflash_action_head_type='slot_rnn'.")
         if first_prev_token_ids.ndim == 2:

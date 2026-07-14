@@ -5,7 +5,7 @@ from pathlib import Path
 
 import torch
 
-from specdecoding.model.dflash import DFlashDraftModel
+from specdecoding.model.dflash import DFlashDraftModel, build_evenly_spaced_target_layer_ids
 
 
 def load_training_module():
@@ -45,6 +45,12 @@ def tiny_config():
 
 
 class DFlashActionHeadTest(unittest.TestCase):
+    def test_even_layer_selection_keeps_endpoints(self):
+        self.assertEqual(
+            build_evenly_spaced_target_layer_ids(32, num_feature_layers=5, first_layer_id=1),
+            [1, 9, 16, 24, 31],
+        )
+
     def test_teacher_forcing_and_inference_shapes(self):
         torch.manual_seed(7)
         model = DFlashDraftModel(tiny_config())
@@ -62,6 +68,8 @@ class DFlashActionHeadTest(unittest.TestCase):
         )
         self.assertEqual(action_logits.shape, (batch_size, block_len, 32))
         self.assertEqual(confidence_logits.shape, (batch_size, block_len))
+        # Residual head starts at zero, so initialization exactly preserves frozen lm_head logits.
+        self.assertTrue(torch.equal(action_logits, model.action_logits_from_full(base_logits)))
         (action_logits.mean() + confidence_logits.mean()).backward()
         self.assertIsNotNone(model.action_head_out.weight.grad)
 
@@ -77,6 +85,27 @@ class DFlashActionHeadTest(unittest.TestCase):
         self.assertEqual(confidence.shape, (batch_size, block_len))
         self.assertTrue(torch.all(sampled_tokens >= 96))
         self.assertTrue(torch.all(sampled_tokens < 128))
+
+    def test_new_even_layer_sample_does_not_require_duplicate_prompt_last(self):
+        train_module = load_training_module()
+        parser = train_module.OfflineDFlashSampleMixin()
+        layer_ids = [1, 9, 16, 24, 31]
+        parser._configure_format(5, layer_ids, "target_layers")
+        data = {
+            "dflash_data_format": "full_prefix_plus_action_hidden_v4",
+            "predicted_tokens": torch.arange(7) + 31744,
+            "hidden_state": {
+                "prompt_selected": torch.randn(3, 5 * 8),
+                "prompt_position_ids": torch.arange(3),
+                "prompt_length": 3,
+                "action_selected": torch.randn(6, 5 * 8),
+                "action_last": torch.randn(6, 8),
+                "layer_ids": layer_ids,
+            },
+        }
+        sample = parser._format_sample(data, "memory")
+        self.assertEqual(sample["prompt_selected"].shape, (3, 40))
+        self.assertEqual(sample["target_hidden"].shape, (6, 8))
 
     def test_new_losses_are_finite_and_reach_action_head(self):
         train_module = load_training_module()

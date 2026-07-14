@@ -33,7 +33,7 @@ from openvla.specdecoding.model.dflash import (
     SELECTED_HIDDEN_VARIANTS,
     DFlashDraftModel,
     apply_selected_hidden_variant,
-    build_target_layer_ids,
+    build_evenly_spaced_target_layer_ids,
     normalize_selected_hidden_variant,
 )# 导入DFlash Draft模型与自适应选层函数
 
@@ -113,14 +113,15 @@ def parse_args():
 
     # ---- Draft 结构与输入 hidden 组织方式 ----
     parser.add_argument("--block_size", type=int, default=7, help="一次投机生成的 action token 块大小；OpenVLA action 默认 7 维")
-    parser.add_argument("--num_draft_layers", type=int, default=3, help="DFlash Draft Transformer 层数；新版动作顺序头实验默认使用 3 层")
-    parser.add_argument("--target_layer_ids", type=int, nargs="*", default=[1, 8, 15, 22, 29], help="离线数据保存的 OpenVLA 多层 hidden；当前数据为 [1,8,15,22,29]")
+    parser.add_argument("--num_draft_layers", type=int, default=1, help="DFlash Draft Transformer 层数；速度优先的主实验默认 1 层，3 层仅作容量消融")
+    parser.add_argument("--target_layer_ids", type=int, nargs="*", default=None, help="显式 teacher hidden 层；默认在 layer 1 与 final 之间算法化近似等间隔取样")
+    parser.add_argument("--num_target_feature_layers", type=int, default=5, help="未显式传 target_layer_ids 时自动抽取的 teacher hidden 层数，默认 5")
     parser.add_argument(
         "--selected_hidden_variant",
         type=str,
         choices=SELECTED_HIDDEN_VARIANTS,
         default="target_layers",
-        help="DFlash context hidden 组装方式：target_layers=直接用保存的目标层；replace_22_with_final=把 [1,8,15,22,29] 替换为 [1,8,15,29,final]",
+        help="DFlash context hidden 组装方式：target_layers=直接用保存的均匀层；replace_22_with_final 仅兼容历史数据",
     )
     parser.add_argument("--mask_token_id", type=int, default=None, help="加噪声的 token ID，不指定也会自适应取pad_token_id")
     parser.add_argument(
@@ -821,6 +822,7 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "block_size": args.block_size,
         "num_draft_layers": args.num_draft_layers,
         "target_layer_ids": args.target_layer_ids,
+        "num_target_feature_layers": args.num_target_feature_layers,
         "selected_hidden_variant": args.selected_hidden_variant,
         "mask_token_id": args.mask_token_id,
         "loss_design": (
@@ -2111,14 +2113,17 @@ def main():
         torch.cuda.empty_cache()
     # 如果用户没有通过命令行指定要从目标模型的哪些层提取特征
     if args.target_layer_ids is None or len(args.target_layer_ids) == 0:
-        args.target_layer_ids = build_target_layer_ids(# 那就自动取
+        args.target_layer_ids = build_evenly_spaced_target_layer_ids(
             num_target_layers=num_target_layers,
-            num_draft_layers=args.num_draft_layers,
+            num_feature_layers=args.num_target_feature_layers,
+            first_layer_id=1,
         )
+        rank0_print(is_main, f"自动均匀选择 teacher hidden layers: {args.target_layer_ids}")
     # Draft初始化
     draft_config = copy.deepcopy(target_config)# 从目标模型的配置复制而来，继承大部分结构参数，确保其与目标模型兼容
     draft_config.num_hidden_layers = args.num_draft_layers# 覆盖 草稿模型的层数
-    draft_config.num_target_layers = num_target_layers# 将目标模型的总层数也存入草稿配置，供 build_target_layer_ids 使用
+    draft_config.num_target_layers = num_target_layers# 保存目标模型总层数，供自动均匀选层和 checkpoint 重建使用
+    draft_config.dflash_num_target_feature_layers = args.num_target_feature_layers
     draft_config.dflash_target_layer_ids = args.target_layer_ids# 5
     draft_config.dflash_selected_hidden_variant = args.selected_hidden_variant
     draft_config.dflash_block_size = args.block_size# 7

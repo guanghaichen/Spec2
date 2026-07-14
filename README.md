@@ -81,7 +81,7 @@ anchor token，并产生了该位置 hidden state。DFLASH draft 接收：
 在 **一次** DFLASH transformer forward 中，draft 会为未来 `q <= 6` 个位置
 `token_(a+1) ... token_(a+q)` 并行输出 hidden。它的 block attention 是非因果的
 （`is_causal=False`）。当前 Action-RNN 版本随后只在 256 个动作 token 上运行一个低秩顺序头：第一个
-位置读 anchor token，后续位置读刚由 draft 生成的前一个 token。也就是说，昂贵的三层 transformer
+位置读 anchor token，后续位置读刚由 draft 生成的前一个 token。也就是说，DFlash transformer
 仍只跑一次，但最终 token 决策包含最多 6 个很小的顺序状态更新；它不是“六个最终 token 严格 O(1)
 同时吐出”。随后 target model 并行得到 proposal 的 posterior token，接受最长合法前缀；如果遇到拒绝
 位置，就写入 target model 自己的 posterior token，因此支持 partial acceptance 和 partial correction。
@@ -97,9 +97,9 @@ anchor token，并产生了该位置 hidden state。DFLASH draft 接收：
 - **完整 prefix context：** 不要把 context 压缩成只有最后一个 prefill hidden。离线数据和在线推理都保留完整 prompt sequence。
 - **Anchor context：** 每次 draft block 前，target model 会先解码当前 anchor。这一步提供真实 anchor hidden，
   也让后续 anchor 能看到 target-side action history。
-- **Source layers：** 离线数据保存 OpenVLA 选定层 `[1, 8, 15, 22, 29]`，并额外保存 final layer。
-  当前 `replace_22_with_final` 变体会在加载时构造 `[1, 8, 15, 29, final]`，
-  保持五层特征宽度，不需要重新生成数据。
+- **Source layers：** 不再手工指定 `[1,8,15,29,final]`。代码在 layer 1 与 final layer 之间做五点
+  linspace 近似等间隔抽样；32 层 OpenVLA 得到 `[1,9,16,24,31(final)]`。跨度 30 不能被 4 整除，
+  因此整数层上无法绝对等间隔，相邻间隔为 `8/7/8/7`，且训练和推理从 checkpoint 读取同一组索引。
 - **RoPE positions：** prefix positions 是 `0 ... prefix_len-1`；action context 和 block positions 紧接在 prefix 后面。
   训练和推理必须使用同一规则。
 - **Action identity：** `action_dim_embed` 标识 7 个不同动作维度。这是额外学习到的信息，不替代 RoPE，也不修改 RoPE。
@@ -113,25 +113,26 @@ draft depth、target layers、anchor-hidden mode、mask token 和 selected-hidde
 当前推荐训练入口已经更新为：
 
 ```text
-openvla/specdecoding/train-scripts/run_dflash_action_rnn_prefix_3layer_4gpu.sh
+openvla/specdecoding/train-scripts/run_dflash_action_rnn_prefix_1layer_4gpu.sh
 ```
 
 上一版 **Markov-ACD** 仍完整保留用于历史 checkpoint 和消融，但不再是下一轮主训练。原因是其推理路径会对
 每个 slot 重复执行 hidden residual、完整 `lm_head` 和全词表 logit bias；即使 Length 提高，这些串行大词表
 投影也可能吃掉投机解码节省的时间。新版结构统一称为 **Action-RNN Prefix Survival**：
 
-1. **三层并行 DFlash 主干。** 完整 prompt/action target hidden 仍只经过一次块并行 draft forward，模型深度
-   从 1 层增至 3 层，提高 base hidden 对视觉、指令和动作结构的表达能力。
-2. **动作子词表前缀状态头。** 只取冻结 `lm_head` 中对应 256 个 OpenVLA 动作 token 的权重行，对整块做一次
-   小投影；随后递推一个 256 维前缀状态。第 i 步输入当前并行 hidden、前一个动作 token、动作维度 embedding
-   和上一状态，输出 256 类动作 bias。训练时使用 teacher 真实前缀，推理时使用刚刚生成的 draft 前缀。
+1. **一层并行 DFlash 主干。** 完整 prompt/action target hidden 只经过一次块并行 draft forward。4090 微基准中，
+   一层约 `1.55ms/288M` 参数，三层约 `3.10ms/693M`；上一版一层离线 base accuracy 已接近 0.975，在线瓶颈
+   主要是前缀暴露落差而非容量，因此一层作为速度优先主实验，三层只保留为容量消融。
+2. **Frozen-lm-head 动作前缀残差头。** 它没有替代 `lm_head`：先精确取冻结 `lm_head` 对应 256 个动作 token
+   的权重行得到 base logits，再递推一个 256 维前缀状态并输出 residual bias，最终 logits 是
+   `frozen_lm_head_logits + residual_bias`。残差输出层零初始化，所以训练起点严格等于 frozen `lm_head`。
+   训练时读 teacher 前缀，推理时读刚生成的 draft 前缀。
 3. **跨 Anchor Logit Distillation。** 对同一目标位置，短前缀弱路径的最终动作分布追一步强路径，并对 strong
    path `stop_gradient`。这保留了本项目“不同 anchor 是同一目标的强弱因果视角”的核心设计。
 4. **Expected Prefix Survival。** 不再靠指定 p2/p3 等位置的 boost。先用 teacher/student 动作分布的
    `1 - total_variation` 估计逐位置可接受概率，再对块内概率做累乘，直接优化连续可接受前缀。
    因为前面一处错误会同时破坏后面所有前缀，早期位置会自然得到更重要的梯度。
-5. **Confidence Truncation。** 小置信度头学习逐 slot 可接受概率。推理可在低置信位置前缩短 proposal，减少
-   明知大概率会失败的验证开销。默认阈值为 `0.0`，先测无截断基线，再单独扫阈值，避免未经校准就改变结果。
+5. **不使用额外置信度头。** 当前主实验关闭 confidence head/loss，避免训练一个默认推理又不使用的旁路模块。
 
 新版明确关闭旧 `causal_residual_type hidden` 和 `logit_markov_type bias`，因此旧头不会和新头叠加计算。
 `position_balance=True` 只抵消 multi-anchor 中后部绝对位置被重复监督更多次的统计偏差；`slot_decay=1.0`，
@@ -139,7 +140,7 @@ openvla/specdecoding/train-scripts/run_dflash_action_rnn_prefix_3layer_4gpu.sh
 
 ### 当前 Loss 和指标
 
-三层 Action-RNN 默认总损失为：
+一层 Action-RNN 默认总损失为：
 
 ```text
 total = 0.30 * hidden_smooth_l1
@@ -147,7 +148,6 @@ total = 0.30 * hidden_smooth_l1
       + 0.10 * action_token_ce
       + 0.90 * action_distribution_l1
       + 0.50 * prefix_survival
-      + 0.10 * action_confidence_bce
       + 0.10 * cross_anchor_logit_distillation
 ```
 
@@ -159,10 +159,8 @@ SwanLab 和 `metrics.jsonl` 新增记录：
 action_token_ce_loss / component
 action_distill_l1_loss / component
 prefix_survival_loss / component
-action_confidence_loss / component
 action_accept_probability_proxy
 expected_prefix_length
-confidence_mae
 ```
 
 在线 summary JSON 还会记录 `conditional_prefix`：`p_k` 表示已经连续接受前 k-1 个 token 后，第 k 个仍被
@@ -175,9 +173,10 @@ confidence_mae
 不要沿用环境修复前的实验目录。MuJoCo 本身不会参与 RLDS 离线 hidden 生成，但 OpenVLA、Transformers、
 PyTorch 和图像预处理版本会影响 teacher token/hidden，因此本轮仍重新生成并记录环境。
 
-3090 数据生成脚本现在会真实设置 `seed`，默认拒绝覆盖已有 HDF5，并默认不保存训练从不读取的
-`pixel_values`。因此新文件会比历史约 419GB 的文件小约 30GB，但 token、完整 prompt hidden、action hidden
-及训练监督完全不变。正式生成前先用一张空闲 GPU 做小样本检查：
+3090 数据生成脚本现在会真实设置 `seed`，默认拒绝覆盖已有 HDF5，并不保存训练从不读取的
+`pixel_values`。均匀选层已经包含 final，因此也不再重复保存逐元素相同的 `prompt_last`；预计新文件约
+`315-325GB`，但 token、完整 prompt 的五层 hidden、action hidden 及训练监督不变。正式生成前先用一张
+空闲 GPU 做小样本检查：
 
 ```bash
 ssh 3090_wulin
@@ -210,15 +209,15 @@ CUDA_VISIBLE_DEVICES=0 python openvla/specdecoding/train-scripts/ge_data_all_ope
 ```bash
 CUDA_VISIBLE_DEVICES=0,1,2,3 \
 DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset_envfix_20260714.h5 \
-OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_action_rnn_prefix_3layer_b8x2_4gpu \
-  bash openvla/specdecoding/train-scripts/run_dflash_action_rnn_prefix_3layer_4gpu.sh
+OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu \
+  bash openvla/specdecoding/train-scripts/run_dflash_action_rnn_prefix_1layer_4gpu.sh
 ```
 
 把选定 checkpoint 搬到 4090 后，在 4090 仓库中运行 Goal strict + relaxed：
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 EVAL_EPOCH=200 \
-DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_action_rnn_prefix_3layer_b8x2_4gpu \
+DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu \
   bash openvla/specdecoding/decode-scripts/run_dflash_action_rnn_goal_pair_eval.sh
 ```
 
@@ -237,7 +236,7 @@ DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-d
 | Residual-CAD weak-path | `ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_residual_cad_weakpath_b16_4gpu` | 增加 hidden residual head、Hidden-level CAD、refined hidden supervision，b16 四卡 | 200 epoch 完整训练 | 0.799 / 0.830 | anchor0->p2 从 0.503 抬到 0.671，但 residual 后 `accuracy` 没超过 `base_accuracy`，说明残差头训练信号还不够强。 |
 | Markov-ACD 诊断短跑 | `ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_tokence_soft01_b16_4gpu` | 增加 logits-level Markov bias、Logit-level CAD、residual token CE、`soft_w=0.10` | 跑到 epoch 18 手动/中途停止 | 0.897 / 0.905 | p2-p5 离线准确率明显跃升，证明“跨 anchor 蒸馏 + token/logit 信号”方向有效；但该目录仍是旧短跑诊断版，run_config 里有旧 `weak_path_loss_boost` 且 `start_index=1`。 |
 | Clean Markov-ACD 完整长跑 | `ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu` | 删除所有手工位置加权；`causal_residual_start_index=0`；`slot_decay=0.90`；低权重 `soft_w=0.10`；Markov-aware refinement + Hidden/Logit CAD + residual token CE | 3090 四卡 200 epoch 已完成 | 0.999 / 1.000；`base_accuracy` 末值 0.974 / 最好 0.987 | 离线 teacher-forced 视角几乎饱和：p1-p5 到 1.000，p6 约 0.996。最终是否有效必须看 4090 online Length/Speedup，建议优先测 epoch 100/150/200。 |
-| Action-RNN Prefix Survival 3-layer | `ckpt_goal_dflash_action_rnn_prefix_3layer_b8x2_4gpu` | 三层并行主干、256 类动作前缀状态头、动作分布 L1、期望前缀存活、置信度头、Logit CAD | 代码就绪，待 3090 四卡训练 | - | 针对上一版离线近饱和但在线 p2-p5 和速度未同步提升的问题；同时移除每 slot 的完整词表投影开销。 |
+| Action-RNN Prefix Survival 1-layer | `ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu` | 一层并行主干、冻结 `lm_head` 的 256 个动作行、低秩动作前缀残差、动作分布 L1、期望前缀存活、Logit CAD；不使用置信度头 | 代码就绪，待新环境数据生成后在 3090 四卡训练 | - | 针对上一版离线近饱和但 online p2-p5 和速度未同步提升的问题；保留正确的 `lm_head` 基准，同时移除每 slot 的完整词表投影开销。三层版本仅作容量消融。 |
 
 ### 2026-07-11 最新 Markov-ACD 200 epoch 结果
 
@@ -276,7 +275,7 @@ Speedup 使用同轮 AR mean step time `0.161929s` 作为分子：
 这组结果说明两件事。第一，离线准确率接近 1.0 并没有转化成同等 online hit rate，teacher-forced
 前缀与推理时自生成前缀之间仍有明显 exposure gap。第二，DFlash strict 的 Length 高于 SpecVLA strict，
 却更慢；Length 只描述每个验证块推进多少 token，不包含 draft 自己的成本。旧 Markov-ACD 对每个 slot
-重复完整 `lm_head`/全词表修正，额外串行开销足以抵消较长前缀。这正是三层 Action-RNN 新实验同时优化
+重复完整 `lm_head`/全词表修正，额外串行开销足以抵消较长前缀。这正是 Action-RNN 新实验同时优化
 “模型能力、连续前缀目标、推理头成本”的直接依据，而不是单纯继续堆离线 accuracy。
 
 ### 位置准确率演进
@@ -435,13 +434,13 @@ accuracy
 残差修正是否真的救到了 p2-p5。新版训练尤其要看：
 `anchor_0_to_position_2_acc` 是否比旧版更快上升，以及 `accuracy - base_accuracy` 是否转正。
 
-## 离线数据：历史 artifact 和 4090 目标目录
+## 离线数据：历史 artifact 与当前格式
 
 数据生成脚本使用 `openvla/modified_libero_rlds` 中的 `libero_goal_no_noops` split。对每个 RLDS sample，
 脚本贪心运行 OpenVLA；只有当返回的 action hidden-state sequence 和 7 个 action token 在结构上兼容时，
-才写出一个 `data_*.ckpt` tensor dictionary。
+才写入数据集。当前正式格式是单个 HDF5，不再是一条样本一个 `.ckpt`。
 
-4090 上建议使用的数据目录：
+下面是环境修复前的历史 4090 artifact，仅用于解释旧实验，不应继续训练：
 
 ```text
 /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/dflash_goal_dataset
@@ -451,7 +450,7 @@ accuracy
 有效样本 `28,639`。数据较大是预期现象，因为每个有效样本保存完整 prefix hidden sequence、
 selected/final hidden states，而不只是离散 action token。
 
-关键字段如下：
+旧 artifact 的关键字段如下：
 
 ```text
 input_ids                    tokenized vision-language prompt
@@ -465,7 +464,11 @@ hidden_state.action_last     action hidden states，final layer
 dflash_data_format           full_prefix_plus_action_hidden_v4
 ```
 
-不要把旧数据格式生成的文件混进这个目录。Trainer 会检查字段和 shape，但实验前仍应手动确认数据版本和样本数。
+2026-07-14 起，当前 HDF5 仍使用 `full_prefix_plus_action_hidden_v4` 的语义，但固定均匀层
+`[1,9,16,24,31(final)]`，并有两项无损精简：不保存训练不读取的 `pixel_values`；因为 final 已在
+`prompt_selected` 中，不重复保存逐元素相同的 `prompt_last`。`action_last=[6,4096]` 仍保留为 hidden
+回归标签。不要把旧数据格式生成的文件混进新文件；Trainer 会检查字段、层号和 shape，正式训练前仍应
+手动确认 `complete=True`、样本数与抽样内容。
 
 ## 方法演进摘要
 
@@ -485,8 +488,9 @@ dflash_data_format           full_prefix_plus_action_hidden_v4
 7. **Clean Markov-ACD 当前长跑版。** 删除所有手工位置加权，保留结构性 Markov-aware refinement 和 CAD；
    `causal_residual_start_index=0` 覆盖第一跳，`slot_decay=0.90` 轻度偏向更影响 acceptance length 的前几个 slot。epoch 120 已显示离线 p2-p5 接近饱和，下一步看 4090 online Length/Speedup。
 8. **Action-RNN Prefix Survival。** 在线评测证明旧头的 teacher-forced/online gap 和逐 slot 全词表开销仍是瓶颈。
-   新版改为三层并行主干、256 类低秩前缀状态、动作分布蒸馏、连续前缀存活目标和可选置信截断；跨
-   anchor logit distillation 保留为本项目的因果强弱路径约束。
+   新版主实验使用一层并行主干；先以冻结 `lm_head` 的 256 个动作行产生正确基准 logits，再由低秩动作
+   前缀状态只学习 residual bias。训练加入动作分布蒸馏、连续前缀存活目标和跨 anchor logit distillation，
+   当前配方不训练置信度头；三层主干只作为容量消融。
 
 需要始终记住的限制：
 
@@ -494,6 +498,15 @@ dflash_data_format           full_prefix_plus_action_hidden_v4
   这是并行设计的核心建模风险，不是可以用离线 token metric 掩盖的小问题。
 - 低 hidden loss 不等于有效 speculative speedup。真正决定速度的是在线 acceptance distribution 和 target-call count。
 - Relaxed acceptance 可能保持实际动作效果，但 token 层面不等于 strict equality。必须做消融并诚实报告阈值。
+
+尚未实现、需要先做 correctness test 再决定是否进入主线的推理优化是 **Full-block Verification +
+All-accepted Anchor Reuse**。当前 anchor-hidden 路径每块先做一次 target 单 token anchor decode，再只把
+`q-1` 个 proposal 喂给 target 校验；即使整块全收，最后一个 proposal 仍要在下一轮单独 decode。
+候选优化会在校验时喂满 `q` 个 proposal：前 `q-1` 个 logits 维持原校验语义，额外的最后一个输入顺便
+得到最后 proposal 的 target hidden/KV 和下一 token logits。只有整块全收时才复用这些结果并跳过下一轮
+anchor decode；一旦拒绝，仍把 cache 裁到纠正 token 之前，走原有 target correction。这样不改变接受规则，
+理论上能在高接受率区域减少 target launch；在正式并入前必须逐 token 对齐 AR 输出，并分别测全收/首位拒绝/
+中途拒绝/尾部不足一个 block 四类边界。
 
 
 ## 后续扩展：OpenVLA-OFT Layer-ACD Early Exit
@@ -1014,8 +1027,8 @@ PY2
 3090 继续负责四卡训练。训练完成后，在本地终端用 `scp -3` 从 3090 搬到 4090：
 
 ```bash
-TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_action_rnn_prefix_3layer_b8x2_4gpu
-DEST_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_action_rnn_prefix_3layer_b8x2_4gpu
+TRAIN_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu
+DEST_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu
 CKPT_PATH=$(ssh 3090_wulin "find ${TRAIN_DIR} -maxdepth 1 -type d -name 'epoch_200_step_*' -print -quit")
 test -n "${CKPT_PATH}" || { echo "epoch 200 checkpoint not found"; exit 1; }
 
@@ -1070,19 +1083,23 @@ source /data/wulin/miniconda3/etc/profile.d/conda.sh
 conda activate specvla
 ```
 
-3090 当前有 8 张 RTX 3090，但默认完整训练只使用 0-3 四张卡。当前优先跑三层
+3090 当前有 8 张 RTX 3090，但默认完整训练只使用 0-3 四张卡。当前主实验优先跑一层
 Action-RNN Prefix Survival：
 
 ```bash
 CUDA_VISIBLE_DEVICES=0,1,2,3 \
-  bash openvla/specdecoding/train-scripts/run_dflash_action_rnn_prefix_3layer_4gpu.sh
+  bash openvla/specdecoding/train-scripts/run_dflash_action_rnn_prefix_1layer_4gpu.sh
 ```
 
 当前推荐 launcher：
 
 ```text
-openvla/specdecoding/train-scripts/run_dflash_action_rnn_prefix_3layer_4gpu.sh
+openvla/specdecoding/train-scripts/run_dflash_action_rnn_prefix_1layer_4gpu.sh
 ```
+
+三层容量消融入口是
+`openvla/specdecoding/train-scripts/run_dflash_action_rnn_prefix_3layer_4gpu.sh`；除 Draft 深度和输出目录外，
+它与一层主实验共用同一套数据和损失配置。
 
 当前三档核心消融训练入口如下。它们共用 batch、学习率、层选择、完整 prefix/action hidden、`slot_decay=0.90` 等训练 recipe，只改变结构信号，方便做清楚的主线对比：
 
@@ -1100,24 +1117,25 @@ openvla/specdecoding/train-scripts/run_dflash_ablation_3_markov_acd_4gpu.sh    #
 ```text
 OPENVLA_GOAL_PATH=/data/wulin/hf_files/openvla-7b-finetuned-libero-goal
 DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset.h5  # 若不存在则 launcher 自动回退旧 dflash_goal_dataset
-OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_action_rnn_prefix_3layer_b8x2_4gpu
+OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu
 ```
 
 Action-RNN Prefix Survival 主训练配置：
 
 ```text
 torchrun --nproc_per_node 4
-num_draft_layers = 3
-selected_hidden_variant = replace_22_with_final
+num_draft_layers = 1
+num_target_feature_layers = 5 -> OpenVLA-32L 自动得到 [1,9,16,24,31(final)]
+selected_hidden_variant = target_layers
 action_head_type = slot_rnn
 action_head_rank = 256
 action_vocab_size = 256
-action_confidence_enabled = true
+action_confidence_enabled = false
 hidden_w / cos_w = 0.30 / 0.02
 action_token_ce_w = 0.10
 action_distill_l1_w = 0.90
 prefix_survival_w = 0.50
-action_confidence_w = 0.10
+action_confidence_w = 0
 anchor_logit_distill_w = 0.10
 anchor_logit_distill_temperature = 2.0
 anchor_logit_distill_min/max_position = 2/6
@@ -1141,9 +1159,9 @@ CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=200 NUM_TRIALS_PER_TASK=50 \
   bash openvla/specdecoding/decode-scripts/run_dflash_action_rnn_goal_pair_eval.sh
 ```
 
-该脚本会显式启用新动作前缀头，但默认 `DFLASH_CONFIDENCE_THRESHOLD=0.0`。先用这个设置比较纯模型能力和
-头部开销；随后可用例如 `DFLASH_CONFIDENCE_THRESHOLD=0.3` 做独立阈值 sweep。summary JSON 会同时保存
-`per_position`、`conditional_prefix`、`confidence_truncated_blocks`，不要只看独立位置命中率。
+该脚本只评测 Goal，不会误把 Goal draft 用到 Object/Spatial/Long。checkpoint 中的
+`dflash_config.json` 是 Draft 深度和选层的唯一真值；launcher 里的默认值只用于兼容旧 checkpoint。
+summary JSON 会同时保存 `per_position` 与 `conditional_prefix`，不要只看独立位置命中率。
 
 `run_dflash_anchor_hidden_1layer_residual_cad_4gpu.sh` 支持环境变量覆盖常用超参数，例如：
 脚本内部已经按“路径、训练规模、loss 权重、Markov-ACD 结构参数”分区写了中文注释，启动时也会打印完整配置，训练前优先检查这份打印。
@@ -1400,18 +1418,14 @@ Length 的 CUDA 标量会在计时结束后才 materialize，不把统计开销�
 ### 非 Goal suite 的 AR / SpecVLA baseline
 
 当前已补齐 Object、Spatial、Long 三个 suite 的 baseline launcher。这里的 Long 对应代码里的
-`libero_10`。这些专用脚本覆盖 AR、SpecVLA strict、SpecVLA relaxed；DFLASH 使用保留
-`goal` 名称的通用 launcher，但可通过 `TASK_SUITE_NAME` 评测四个已有权重的 suite。
+`libero_10`。这些专用脚本覆盖 AR、SpecVLA strict、SpecVLA relaxed。**DFlash checkpoint 是 suite-specific
+的；当前只训练 Goal draft，因此 Action-RNN 一键评测脚本强制 `TASK_SUITE_NAME=libero_goal`，不得拿 Goal
+draft 跨子集评测。** 将来只有为 Object/Spatial/Long 分别重生成数据并训练 draft 后，才能复制同一评测模板。
 
 Relaxed acceptance 的默认阈值按论文设置：Goal/Object/Spatial 使用 `r=9`，Long（`libero_10`）
-使用 `r=5`。`run_specvla_relaxed_libero_10_eval.sh` 与所有支持 `TASK_SUITE_NAME=libero_10` 的
-DFLASH relaxed launcher 都会自动选 `r=5`；只有显式传入 `ACCEPT_THRESHOLD` 时才覆盖该规则。
-例如评测 DFLASH CAD-head 的第 200 epoch Long checkpoint：
-
-```bash
-CUDA_VISIBLE_DEVICES=0 TASK_SUITE_NAME=libero_10 EVAL_EPOCH=200 \
-  bash openvla/specdecoding/decode-scripts/run_dflash_residual_libero_goal_eval.sh
-```
+使用 `r=5`。审计确认 `run_specvla_main_table_eval.sh` 会为 Long 路由到
+`run_specvla_relaxed_libero_10_eval.sh`，后者默认 `ACCEPT_THRESHOLD=5`；strict 四个 suite 都固定 `r=0`。
+只有显式传入 `ACCEPT_THRESHOLD` 时才覆盖默认规则。
 
 | LIBERO suite | AR | SpecVLA strict | SpecVLA relaxed |
 | --- | --- | --- | --- |
@@ -1638,7 +1652,7 @@ CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
   bash openvla/specdecoding/decode-scripts/run_specvla_relaxed_libero_10_eval.sh
 ```
 
-### DFlash CAD-head checkpoint sweep 和自动主表
+### 历史 DFlash CAD-head checkpoint sweep 和自动主表
 
 当前主表优先比较五类方法：OpenVLA AR、SpecVLA strict、SpecVLA relaxed、DFlash CAD-head strict、DFlash CAD-head relaxed。
 AR baseline 的四个 suite summary 已放在：
@@ -1647,14 +1661,11 @@ AR baseline 的四个 suite summary 已放在：
 /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs/openvla_ar
 ```
 
-DFlash CAD-head 一键评测链只跑 strict/relaxed 两个 CAD-head 版本，并自动用同 suite 的 AR `timing.mean` 计算 Speedup：
+DFlash CAD-head 一键评测链是旧 Markov-ACD checkpoint 的历史工具，并自动用同 suite 的 AR `timing.mean`
+计算 Speedup。当前只有 Goal draft 有效，因此必须显式限制 `TASK_SUITES="libero_goal"`：
 
 ```bash
-# 默认跑 libero_goal/libero_object/libero_spatial/libero_10，默认扫 120/150/180/200 四个 epoch。
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
-  bash openvla/specdecoding/decode-scripts/run_dflash_cad_head_main_table_eval.sh
-
-# 当前推荐先测 Goal 的 epoch 100/150/200：
+# 历史 Goal Markov-ACD 的 epoch 100/150/200：
 TASK_SUITES="libero_goal" EVAL_EPOCHS="100 150 200" \
 DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_anchor_hidden_1layer_finalhidden_markov_acd_start0_slotdecay090_tokence_soft01_b16_4gpu \
 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \

@@ -167,6 +167,10 @@ final_action_logits = frozen_lm_head_action_logits + action_rnn_bias
 RNN 每一步读取：当前位置 DFlash hidden、前一个 action token、当前位置 embedding、上一步 RNN state。
 输出层零初始化，因此训练起点严格等于 frozen `lm_head`。
 
+当前稳定版把两条反传路径解耦：hidden/cos 只更新并行 Draft 主干；CE、动作分布 L1、Prefix Survival
+和跨 anchor logit KL 只更新 Action-RNN。动作头仍读取当前 Draft hidden，但该输入在动作损失分支执行
+`stop_gradient`。这样 token 目标不能再通过改动共享 hidden 走捷径，必须让残差动作头本身学会修正。
+
 训练使用 teacher forcing。以 anchor0 为例：
 
 ```text
@@ -246,12 +250,12 @@ HDF5 不保存 `pixel_values`；final hidden 已在 selected prompt 中，也不
 默认一层主实验：
 
 ```text
-total = 0.30 * hidden_smooth_l1
-      + 0.02 * hidden_cosine
+total = 1.00 * hidden_smooth_l1
+      + 0.05 * hidden_cosine
       + 0.10 * action_token_ce
-      + 0.90 * action_distribution_l1
-      + 0.50 * prefix_survival
-      + 0.10 * cross_anchor_logit_distillation
+      + 0.40 * action_distribution_l1
+      + 0.20 * prefix_survival
+      + 0.05 * cross_anchor_logit_distillation
 ```
 
 它们对参数的作用不同：
@@ -260,13 +264,14 @@ total = 0.30 * hidden_smooth_l1
 | --- | --- | --- | --- |
 | hidden SmoothL1 | 否 | 是 | 保持目标 hidden 表征 |
 | hidden cosine | 否 | 是 | 对齐 hidden 方向 |
-| action token CE | 是 | 是 | 提高真实 token top-1 命中 |
-| action distribution L1 | 是 | 是 | 对齐 256 类 teacher 动作分布 |
-| prefix survival | 是 | 是 | 直接鼓励连续接受前缀 |
-| cross-anchor logit KL | 是 | 是 | 让远端弱路径追近端强路径 |
+| action token CE | 是 | 否 | 提高真实 token top-1 命中 |
+| action distribution L1 | 是 | 否 | 对齐 256 类 teacher 动作分布 |
+| prefix survival | 是 | 否 | 直接鼓励连续接受前缀 |
+| cross-anchor logit KL | 是 | 否 | 让远端弱路径追近端强路径 |
 
 当前关闭：全词表 soft CE、confidence head、旧 hidden CAD、旧 causal residual、旧 refined hidden、旧 residual CE。
 `slot_decay=1.0`；只保留 `position_balance` 来抵消 multi-anchor 对后部绝对位置的重复监督偏差。
+优化器使用两组学习率：Draft 主干 `2e-5`，Action-RNN `5e-5`，共同 warmup 1000 step 后线性退火。
 
 ### 4.4 SwanLab 指标怎样读
 
@@ -282,13 +287,18 @@ component = raw_loss * 配置权重
 | --- | --- |
 | `base_accuracy` | Action-RNN 残差加入前的 frozen-lm-head 命中率 |
 | `accuracy` | teacher-forced Action-RNN 修正后的总体命中率 |
+| `action_head_accuracy_gain` | `accuracy-base_accuracy`；直接判断残差动作头是否真的带来收益 |
 | `rollout_accuracy` | anchor0 使用自身预测前缀回滚时的 top-1 命中率 |
+| `rollout_exposure_gap` | `accuracy-rollout_accuracy`；衡量 teacher forcing 到自回滚的分布差距 |
 | `rollout_top2_accuracy` | 正确 token 是否进入 self-rollout top-2 |
 | `rollout_expected_prefix_length` | anchor0 实际连续猜对的平均前缀长度，范围 0 到 6 |
 | `position_k_acc` | 所有 anchor 对绝对位置 pk 的 teacher-forced 平均准确率 |
 | `anchor_a_to_position_k_acc` | 指定 anchor 到指定目标位置的准确率矩阵 |
 | `action_accept_probability_proxy` | 由 teacher/student 分布距离得到的单位置接受概率代理 |
 | `expected_prefix_length` | 分布式可微前缀代理，不等于在线论文 Length |
+
+`train/*` 是每 20 optimizer step 的局部窗口，可能受批次难度影响；`train_epoch/*` 是整轮均值，判断长期
+收敛时应优先看后者。
 
 当前主训练每 20 optimizer step 上传普通标量，每 200 step 上传 anchor/position 明细。`NUM_WORKERS=1`、
 单文件 HDF5、不保存 optimizer state 和根目录 checkpoint 副本，用于降低共享服务器 IO 压力。
@@ -369,8 +379,14 @@ Length 高于 SpecVLA strict 却更慢，证明 Length 不包含 draft 自身成
 | rollout p1-p6 | 0.341 / 0.109 / 0.428 / 0.344 / 0.479 / 0.902 |
 
 总 loss、CE、L1、hidden 都在下降，没有 NaN/OOM。需要警惕的是 RNN 修正后的 accuracy 尚未超过 base，
-以及 teacher-forced 与 rollout 约有 9 个百分点差距。RNN 输出层零初始化，step 500 尚不能判死；warmup
-结束后的 step 1000-2000 才是第一次关键检查点。
+以及 teacher-forced 与 rollout 约有 9 个百分点差距。
+
+到 epoch 6-12，旧耦合配方出现稳定的轮内锯齿：action CE/L1/Prefix/KL 在每轮内上升，准确率下降，下一轮
+开头又恢复；学习率始终平滑，因此不是 scheduler 重启。去除 epoch 均值后，hidden 与 CE/L1/Prefix 的
+相关系数约为 `-0.61/-0.53/-0.47`。epoch 12 时 teacher-forced head accuracy 约 `0.922`，base accuracy
+约 `0.921`，动作头净增益仅约 `0.0005`，而 rollout 约 `0.889`。这说明高权重动作损失主要在改动共享
+Draft hidden，Action-RNN 本身几乎没有学到有效残差。当前默认配方因此改为“主干/动作头梯度隔离 + 双学习率
++ hidden 主导权重”；旧输出目录不得续训到新配方。
 
 ## 7. 当前标准工作流
 
@@ -434,7 +450,8 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 \
   bash openvla/specdecoding/train-scripts/run_dflash_train.sh main
 ```
 
-脚本默认：一层 draft、global batch 64、200 epoch、`lr=5e-5`、warmup 1000 step、每 10 epoch 保存一次。
+脚本默认：一层 draft、global batch 64、200 epoch、Draft/Action-RNN 学习率分别为 `2e-5/5e-5`、
+warmup 1000 step、每 10 epoch 保存一次。动作损失输入默认 detach，不要用旧 checkpoint 续训。
 
 常用消融：
 
@@ -469,14 +486,14 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 \
 
 ```bash
 CKPT_3090=$(ssh 3090_wulin \
-  "find /data/wulin/c/specvla-data/ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu \
+  "find /data/wulin/c/specvla-data/ckpt_goal_dflash_action_rnn_decoupled_1layer_b8x2_4gpu \
    -maxdepth 1 -type d -name 'epoch_200_step_*' | sort -V | tail -1")
 
 ssh 4090 \
-  'mkdir -p /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu'
+  'mkdir -p /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_action_rnn_decoupled_1layer_b8x2_4gpu'
 
 scp -3 -r "3090_wulin:${CKPT_3090}" \
-  '4090:/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu/'
+  '4090:/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_action_rnn_decoupled_1layer_b8x2_4gpu/'
 ```
 
 ### 7.4 4090 复现 SpecVLA Goal baseline
@@ -524,7 +541,7 @@ bash openvla/specdecoding/decode-scripts/run_specvla_main_table_eval.sh
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 EVAL_EPOCH=200 \
-DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu \
+DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_action_rnn_decoupled_1layer_b8x2_4gpu \
   bash openvla/specdecoding/decode-scripts/run_dflash_action_rnn_goal_pair_eval.sh
 ```
 

@@ -100,7 +100,13 @@ def parse_args():
     parser.add_argument("--pin_memory", action=argparse.BooleanOptionalAction, default=False, help="是否启用 DataLoader pinned memory；默认关闭以降低主机内存/IO 压力")
     parser.add_argument("--persistent_workers", action=argparse.BooleanOptionalAction, default=False, help="是否保持 DataLoader worker 常驻；默认关闭，避免训练结束后 worker/文件句柄残留")
     parser.add_argument("--num_epochs", type=int, default=200, help="最大训练 epochs")
-    parser.add_argument("--lr", type=float, default=5e-5, help="AdamW 学习率；当前 4 卡 batch=64 时推荐 5e-5 起步")
+    parser.add_argument("--lr", type=float, default=2e-5, help="Draft Transformer 主干 AdamW 学习率；hidden 蒸馏默认使用较稳的 2e-5")
+    parser.add_argument(
+        "--action_head_lr",
+        type=float,
+        default=5e-5,
+        help="Action-RNN 独立学习率；动作头参数量较小，可高于 Draft 主干",
+    )
     parser.add_argument("--weight_decay", type=float, default=5e-2, help="AdamW weight decay；用于抑制 draft 过度记忆训练集")
     parser.add_argument("--adam_beta1", type=float, default=0.9, help="AdamW beta1")
     parser.add_argument("--adam_beta2", type=float, default=0.98, help="AdamW beta2")
@@ -147,6 +153,12 @@ def parse_args():
         help="动作专用顺序头；slot_rnn 只在 256 个动作 token 上递推前缀状态，避免每个 slot 重跑完整 lm_head",
     )
     parser.add_argument("--action_head_rank", type=int, default=256, help="动作顺序头的低秩状态维度")
+    parser.add_argument(
+        "--detach_action_head_inputs",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="动作损失是否只更新 Action-RNN；默认隔离 Draft hidden，避免 token 监督破坏 hidden 蒸馏",
+    )
     parser.add_argument("--action_vocab_size", type=int, default=256, help="OpenVLA 动作子词表大小，默认 256 个离散动作 bin")
     parser.add_argument(
         "--action_token_start",
@@ -854,6 +866,7 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "cos_w": args.cos_w,
         "action_head_type": args.action_head_type,
         "action_head_rank": args.action_head_rank,
+        "detach_action_head_inputs": args.detach_action_head_inputs,
         "action_vocab_size": args.action_vocab_size,
         "action_token_start": args.action_token_start,
         "action_confidence_enabled": args.action_confidence_enabled,
@@ -900,6 +913,7 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "gradient_accumulation_steps": args.gradient_accumulation_steps,
         "num_epochs": args.num_epochs,
         "lr": args.lr,
+        "action_head_lr": args.action_head_lr,
         "weight_decay": args.weight_decay,
         "adam_beta1": args.adam_beta1,
         "adam_beta2": args.adam_beta2,
@@ -1411,13 +1425,21 @@ def compute_loss_and_accuracy(
         # 新版只取 lm_head 的 256 个动作行做块投影，随后在动作子词表上递推前缀状态。
         action_confidence_logits = None
         if draft_model.action_sequential_enabled:
+            # hidden/cos 负责训练并行 Draft 主干；token、分布、Prefix 与跨-anchor
+            # logits 只训练轻量 Action-RNN。若不隔离，动作损失会优先改动共享
+            # hidden，而不是迫使 residual head 学会真正有用的修正。
+            action_base_hidden = student_hidden
+            action_head_hidden = pred_hidden[:, :max_block_len, :]
+            if args.detach_action_head_inputs:
+                action_base_hidden = action_base_hidden.detach()
+                action_head_hidden = action_head_hidden.detach()
             base_student_logits = draft_model.project_action_logits(
-                student_hidden.to(torch.bfloat16),
+                action_base_hidden.to(torch.bfloat16),
                 lm_head,
             ).float()
             student_logits, action_confidence_logits = draft_model.apply_action_sequential_head(
                 base_student_logits,
-                pred_hidden[:, :max_block_len, :],
+                action_head_hidden,
                 prev_token_ids=prev_token_ids,
                 action_position_ids=action_position_ids,
             )
@@ -2053,7 +2075,9 @@ def evaluate(
         "val/anchor_logit_distill_pairs_per_sample": total_anchor_logit_distill_pairs / denom,
         "val/accuracy": total_acc / denom,
         "val/base_accuracy": total_base_acc / denom,
+        "val/action_head_accuracy_gain": (total_acc - total_base_acc) / denom,
         "val/rollout_accuracy": total_rollout_acc / denom,
+        "val/rollout_exposure_gap": (total_acc - total_rollout_acc) / denom,
         "val/rollout_top2_accuracy": total_rollout_top2_acc / denom,
         "val/rollout_runner_up_rescue_rate": total_rollout_runner_up_rescue_rate / denom,
         "val/rollout_expected_prefix_length": total_rollout_expected_prefix_length / denom,
@@ -2101,6 +2125,8 @@ def main():
         raise ValueError("--anchor_logit_distill_temperature must be > 0.")
     if args.action_head_rank <= 0:
         raise ValueError("--action_head_rank must be > 0.")
+    if args.lr <= 0 or args.action_head_lr <= 0:
+        raise ValueError("--lr and --action_head_lr must both be > 0.")
     if args.action_vocab_size <= 0:
         raise ValueError("--action_vocab_size must be > 0.")
     if args.action_distill_temperature <= 0:
@@ -2399,8 +2425,33 @@ def main():
             val_loader_kwargs["prefetch_factor"] = max(1, int(args.dataloader_prefetch_factor))
         val_loader = DataLoader(val_dataset, **val_loader_kwargs)
 
+    raw_model = unwrap_model(model)
+    action_head_params = []
+    draft_backbone_params = []
+    for parameter_name, parameter in raw_model.named_parameters():
+        if not parameter.requires_grad:
+            continue
+        if parameter_name.startswith("action_head_") or parameter_name.startswith("action_confidence_head"):
+            action_head_params.append(parameter)
+        else:
+            draft_backbone_params.append(parameter)
+    optimizer_groups = [
+        {
+            "params": draft_backbone_params,
+            "lr": args.lr,
+            "group_name": "draft_backbone",
+        }
+    ]
+    if action_head_params:
+        optimizer_groups.append(
+            {
+                "params": action_head_params,
+                "lr": args.action_head_lr,
+                "group_name": "action_head",
+            }
+        )
     optimizer = AdamW(
-        model.parameters(),
+        optimizer_groups,
         lr=args.lr,
         weight_decay=args.weight_decay,
         betas=(args.adam_beta1, args.adam_beta2),
@@ -2558,6 +2609,21 @@ def main():
             train_confidence_mae_sum = 0.0
             train_detail_accumulator = None
             train_log_steps = 0
+            epoch_metric_names = (
+                "loss",
+                "hidden_loss",
+                "cos_loss",
+                "action_token_ce_loss",
+                "action_distill_l1_loss",
+                "prefix_survival_loss",
+                "anchor_logit_distill_loss",
+                "accuracy",
+                "base_accuracy",
+                "rollout_accuracy",
+                "rollout_expected_prefix_length",
+            )
+            epoch_metric_sums = {name: 0.0 for name in epoch_metric_names}
+            epoch_metric_steps = 0
             pbar = tqdm(train_loader, desc=f"train {epoch}/{args.num_epochs}", dynamic_ncols=True) if is_main else train_loader
             for batch_idx, batch in enumerate(pbar, start=1):
                 if args.anchor_consistency_w > 0 and args.anchor_consistency_warmup_steps > 0:
@@ -2586,6 +2652,9 @@ def main():
                 )
                 (metrics["loss"] / args.gradient_accumulation_steps).backward()
                 log_metrics = distributed_log_metrics(metrics, distributed)
+                for metric_name in epoch_metric_names:
+                    epoch_metric_sums[metric_name] += log_metrics[metric_name].item()
+                epoch_metric_steps += 1
 
                 train_loss_sum += log_metrics["loss"].item()
                 train_soft_sum += log_metrics["soft_loss"].item()
@@ -2683,7 +2752,13 @@ def main():
                             "train/anchor_logit_distill_pairs_per_batch": train_anchor_logit_distill_pairs_sum / denom_log_steps,
                             "train/accuracy": train_acc_sum / denom_log_steps,
                             "train/base_accuracy": train_base_acc_sum / denom_log_steps,
+                            "train/action_head_accuracy_gain": (
+                                train_acc_sum - train_base_acc_sum
+                            ) / denom_log_steps,
                             "train/rollout_accuracy": train_rollout_acc_sum / denom_log_steps,
+                            "train/rollout_exposure_gap": (
+                                train_acc_sum - train_rollout_acc_sum
+                            ) / denom_log_steps,
                             "train/rollout_top2_accuracy": train_rollout_top2_acc_sum / denom_log_steps,
                             "train/rollout_runner_up_rescue_rate": train_rollout_runner_up_rescue_rate_sum / denom_log_steps,
                             "train/rollout_expected_prefix_length": train_rollout_expected_prefix_length_sum / denom_log_steps,
@@ -2692,6 +2767,11 @@ def main():
                             "train/expected_prefix_length": train_expected_prefix_length_sum / denom_log_steps,
                             "train/confidence_mae": train_confidence_mae_sum / denom_log_steps,
                             "train/lr": scheduler.get_last_lr()[0],
+                            "train/action_head_lr": (
+                                scheduler.get_last_lr()[1]
+                                if len(scheduler.get_last_lr()) > 1
+                                else scheduler.get_last_lr()[0]
+                            ),
                         }
                         train_payload.update(detail_metrics_to_log("train", train_detail_accumulator))
                         append_jsonl(metrics_log_path, train_payload)
@@ -2735,10 +2815,13 @@ def main():
                             f"conf_mae={train_payload['train/confidence_mae']:.3f} "
                             f"acc={train_payload['train/accuracy']:.3f} "
                             f"base_acc={train_payload['train/base_accuracy']:.3f} "
+                            f"head_gain={train_payload['train/action_head_accuracy_gain']:+.4f} "
                             f"roll={train_payload['train/rollout_accuracy']:.3f} "
+                            f"exposure_gap={train_payload['train/rollout_exposure_gap']:.3f} "
                             f"roll2={train_payload['train/rollout_top2_accuracy']:.3f} "
                             f"rollL={train_payload['train/rollout_expected_prefix_length']:.2f} "
-                            f"lr={train_payload['train/lr']:.2e}",
+                            f"lr={train_payload['train/lr']:.2e}/"
+                            f"{train_payload['train/action_head_lr']:.2e}",
                             flush=True,
                         )
                         train_loss_sum = 0.0
@@ -2801,6 +2884,38 @@ def main():
                         racc=f"{log_metrics['rollout_accuracy'].item():.3f}",
                         r2=f"{log_metrics['rollout_top2_accuracy'].item():.3f}",
                         lr=f"{scheduler.get_last_lr()[0]:.2e}",
+                        step=global_step,
+                    )
+
+            if is_main:
+                epoch_denom = max(1, epoch_metric_steps)
+                epoch_payload = {
+                    "event": "train_epoch",
+                    "timestamp": datetime.now().isoformat(),
+                    "epoch": epoch,
+                    "global_step": global_step,
+                    **{
+                        f"train_epoch/{name}": value / epoch_denom
+                        for name, value in epoch_metric_sums.items()
+                    },
+                    "train_epoch/action_head_accuracy_gain": (
+                        epoch_metric_sums["accuracy"] - epoch_metric_sums["base_accuracy"]
+                    ) / epoch_denom,
+                    "train_epoch/rollout_exposure_gap": (
+                        epoch_metric_sums["accuracy"] - epoch_metric_sums["rollout_accuracy"]
+                    ) / epoch_denom,
+                    "train_epoch/lr": scheduler.get_last_lr()[0],
+                    "train_epoch/action_head_lr": (
+                        scheduler.get_last_lr()[1]
+                        if len(scheduler.get_last_lr()) > 1
+                        else scheduler.get_last_lr()[0]
+                    ),
+                }
+                append_jsonl(metrics_log_path, epoch_payload)
+                if swanlab_run is not None:
+                    swanlab_run = safe_swanlab_log(
+                        swanlab_run,
+                        numeric_payload_for_swanlab(epoch_payload, default_prefix="train_epoch"),
                         step=global_step,
                     )
 

@@ -180,6 +180,7 @@ class DFlashActionHeadTest(unittest.TestCase):
             action_distill_temperature=1.0,
             prefix_survival_w=0.5,
             action_confidence_w=0.1,
+            detach_action_head_inputs=True,
             hidden_loss_type="smooth_l1",
             hidden_w=0.3,
             cos_w=0.02,
@@ -220,6 +221,26 @@ class DFlashActionHeadTest(unittest.TestCase):
         self.assertGreaterEqual(metrics["rollout_expected_prefix_length"].item(), 0.0)
         metrics["loss"].backward()
         self.assertIsNotNone(model.action_head_out.weight.grad)
+
+        # With hidden/cos disabled, detached action objectives must update only
+        # the Action-RNN instead of using the shared Draft hidden as a shortcut.
+        model.zero_grad(set_to_none=True)
+        args.hidden_w = 0.0
+        args.cos_w = 0.0
+        isolated_metrics = train_module.compute_loss_and_accuracy(
+            model,
+            embed_tokens,
+            lm_head,
+            batch,
+            args,
+            device,
+        )
+        isolated_metrics["loss"].backward()
+        self.assertGreater(model.action_head_out.weight.grad.abs().sum().item(), 0.0)
+        backbone_grad = model.layers[0].self_attn.q_proj.weight.grad
+        self.assertTrue(
+            backbone_grad is None or torch.count_nonzero(backbone_grad).item() == 0
+        )
 
 
 if __name__ == "__main__":

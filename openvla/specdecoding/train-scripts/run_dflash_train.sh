@@ -18,27 +18,27 @@ cd "${REPO_ROOT}"
 case "${PROFILE}" in
   main)
     PROFILE_LAYERS=1
-    PROFILE_PREFIX_W=0.50
-    PROFILE_ANCHOR_W=0.10
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu
+    PROFILE_PREFIX_W=0.20
+    PROFILE_ANCHOR_W=0.05
+    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_action_rnn_decoupled_1layer_b8x2_4gpu
     ;;
   three_layer)
     PROFILE_LAYERS=3
-    PROFILE_PREFIX_W=0.50
-    PROFILE_ANCHOR_W=0.10
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_action_rnn_prefix_3layer_b8x2_4gpu
+    PROFILE_PREFIX_W=0.20
+    PROFILE_ANCHOR_W=0.05
+    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_action_rnn_decoupled_3layer_b8x2_4gpu
     ;;
   no_prefix)
     PROFILE_LAYERS=1
     PROFILE_PREFIX_W=0
-    PROFILE_ANCHOR_W=0.10
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_action_rnn_no_prefix_1layer_b8x2_4gpu
+    PROFILE_ANCHOR_W=0.05
+    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_action_rnn_decoupled_no_prefix_1layer_b8x2_4gpu
     ;;
   no_anchor)
     PROFILE_LAYERS=1
-    PROFILE_PREFIX_W=0.50
+    PROFILE_PREFIX_W=0.20
     PROFILE_ANCHOR_W=0
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_action_rnn_no_anchor_1layer_b8x2_4gpu
+    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_action_rnn_decoupled_no_anchor_1layer_b8x2_4gpu
     ;;
   *)
     echo "用法: bash $0 [main|three_layer|no_prefix|no_anchor]" >&2
@@ -79,16 +79,17 @@ NPROC_PER_NODE="${NPROC_PER_NODE:-4}"
 BATCH_SIZE="${BATCH_SIZE:-8}"
 GRAD_ACCUM_STEPS="${GRAD_ACCUM_STEPS:-2}"
 NUM_EPOCHS="${NUM_EPOCHS:-200}"
-LR="${LR:-5e-5}"
+LR="${LR:-2e-5}"
+ACTION_HEAD_LR="${ACTION_HEAD_LR:-5e-5}"
 WARMUP_STEPS="${WARMUP_STEPS:-1000}"
 SAVE_EVERY="${SAVE_EVERY:-10}"
 SEED="${SEED:-7}"
 
-# 当前损失。hidden 保持表征，四个 action loss 直接训练 Action-RNN。
-HIDDEN_W="${HIDDEN_W:-0.30}"
-COS_W="${COS_W:-0.02}"
+# 稳定版反传：hidden/cos 只训练 Draft 主干；动作损失只训练 Action-RNN。
+HIDDEN_W="${HIDDEN_W:-1.00}"
+COS_W="${COS_W:-0.05}"
 ACTION_TOKEN_CE_W="${ACTION_TOKEN_CE_W:-0.10}"
-ACTION_DISTILL_L1_W="${ACTION_DISTILL_L1_W:-0.90}"
+ACTION_DISTILL_L1_W="${ACTION_DISTILL_L1_W:-0.40}"
 
 # 共享服务器 IO 与 SwanLab 设置。
 NUM_WORKERS="${NUM_WORKERS:-1}"
@@ -120,6 +121,7 @@ TARGET_FEATURE_LAYERS=5_evenly_spaced
 GLOBAL_BATCH=${BATCH_SIZE} * ${GRAD_ACCUM_STEPS} * ${NPROC_PER_NODE}
 NUM_EPOCHS=${NUM_EPOCHS}
 LR=${LR}
+ACTION_HEAD_LR=${ACTION_HEAD_LR}
 WARMUP_STEPS=${WARMUP_STEPS}
 SAVE_EVERY=${SAVE_EVERY}
 SEED=${SEED}
@@ -161,6 +163,7 @@ torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   --include_anchor_hidden \
   --action_head_type slot_rnn \
   --action_head_rank 256 \
+  --detach_action_head_inputs \
   --action_vocab_size 256 \
   --no-action_confidence_enabled \
   --hidden_w "${HIDDEN_W}" \
@@ -187,6 +190,7 @@ torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   --anchor_logit_distill_correct_teacher_only \
   --weight_decay 0.05 \
   --lr "${LR}" \
+  --action_head_lr "${ACTION_HEAD_LR}" \
   --batch_size "${BATCH_SIZE}" \
   --gradient_accumulation_steps "${GRAD_ACCUM_STEPS}" \
   --num_epochs "${NUM_EPOCHS}" \

@@ -196,6 +196,11 @@ rollout_expected_prefix_length
 rollout_position_1..6_acc / rollout_position_1..6_top2_acc
 ```
 
+当前主训练每 `20` 个 optimizer step 向 SwanLab 上传普通 loss、component、总体 accuracy 和 rollout
+指标；每 `200` step 再上传 anchor/position 明细。这样第一条 `metrics.jsonl` 训练记录出现时云端也会有
+曲线，同时避免恢复成每次上传全部明细所产生的百万级 records。可在启动时用
+`SWANLAB_LOG_EVERY_STEPS` 和 `SWANLAB_DETAIL_EVERY_STEPS` 覆盖。
+
 原有 `position_*_acc` 使用 teacher 前 token，是 teacher-forced 训练指标。新增 `rollout_*` 只在
 `anchor=0` 上让 Action-RNN 使用自己刚生成的 token 回滚，并且复用同一次 DFlash hidden，不增加 Draft
 Transformer forward；其中 top-2 覆盖率是单分叉树能否救回主路径错误的直接先验。论文诊断时必须优先

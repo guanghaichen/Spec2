@@ -53,6 +53,8 @@ SAVE_EVERY="${SAVE_EVERY:-10}"
 SEED="${SEED:-7}"
 NUM_WORKERS="${NUM_WORKERS:-1}"
 DATASET_FORMAT="${DATASET_FORMAT:-auto}"
+SWANLAB_LOG_EVERY_STEPS="${SWANLAB_LOG_EVERY_STEPS:-20}"
+SWANLAB_DETAIL_EVERY_STEPS="${SWANLAB_DETAIL_EVERY_STEPS:-200}"
 
 # 新版损失：前缀存活本身已对早期错误施加连锁惩罚，因此不再叠加 slot_decay 人工偏置。
 HIDDEN_W="${HIDDEN_W:-0.30}"
@@ -74,6 +76,7 @@ hidden=${HIDDEN_W} cos=${COS_W}
 action_ce=${ACTION_TOKEN_CE_W} action_l1=${ACTION_DISTILL_L1_W}
 prefix_survival=${PREFIX_SURVIVAL_W} confidence=disabled
 anchor_logit_distill=${ANCHOR_LOGIT_DISTILL_W}
+swanlab_scalar_every=${SWANLAB_LOG_EVERY_STEPS} swanlab_detail_every=${SWANLAB_DETAIL_EVERY_STEPS}
 =======================================================
 EOF
 
@@ -132,6 +135,6 @@ torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   --dataloader_prefetch_factor 1 \
   --no-pin_memory \
   --no-persistent_workers \
-  --swanlab_log_every_steps 200 \
-  --swanlab_detail_every_steps 1000 \
+  --swanlab_log_every_steps "${SWANLAB_LOG_EVERY_STEPS}" \
+  --swanlab_detail_every_steps "${SWANLAB_DETAIL_EVERY_STEPS}" \
   --val_split 0

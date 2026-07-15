@@ -102,6 +102,12 @@ class GenerateConfig:
 @draccus.wrap()
 def eval_libero(cfg: GenerateConfig) -> None:
     assert cfg.pretrained_checkpoint is not None, "cfg.pretrained_checkpoint must not be None!"
+    if not cfg.use_spec:
+        raise ValueError(
+            "run_libero_goal_AR.py is reserved for the SpecVLA paper's wrapped AR baseline "
+            "and requires --use_spec True. Pure OpenVLA AR is not a valid denominator for "
+            "reproducing the paper speedup."
+        )
     if "image_aug" in cfg.pretrained_checkpoint:
         assert cfg.center_crop, "Expecting `center_crop==True` because model was trained with image augmentations!"
     assert not (cfg.load_in_8bit and cfg.load_in_4bit), "Cannot use both 8-bit and 4-bit quantization!"

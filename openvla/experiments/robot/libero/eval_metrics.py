@@ -298,6 +298,13 @@ def write_eval_summary(
         "task_suite_name": cfg.task_suite_name,
         "model_family": cfg.model_family,
         "draft_backend": getattr(cfg, "draft_backend", None),
+        "use_spec": getattr(cfg, "use_spec", None),
+        "parallel_draft": getattr(cfg, "parallel_draft", None),
+        "ar_baseline": (
+            "specvla_paper_wrapped_ar"
+            if eval_family == "openvla_ar" and getattr(cfg, "use_spec", False)
+            else None
+        ),
         "accept_threshold": getattr(cfg, "accept_threshold", None),
         "dflash_block_size": getattr(cfg, "dflash_block_size", None),
         "dflash_num_draft_layers": getattr(cfg, "dflash_num_draft_layers", None),

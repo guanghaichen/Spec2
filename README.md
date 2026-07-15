@@ -42,9 +42,12 @@
 然后用 OpenVLA 校验 draft token，并提出基于 action-token distance 的 relaxed acceptance。
 
 下面是 **SpecVLA 论文 Table 1 的数值**，不是本仓库复现结果。`Length` 表示每次 forward
-平均生成 token 数，speedup 是相对 OpenVLA 自回归推理的速度。
+平均生成 token 数。复现作者公开代码的 speedup 时，本仓库固定使用作者 AR launcher 的实现：
+`run_libero_goal_AR.py`、`use_spec=True`、`parallel_draft=False`。这个路径会加载
+`SpecVLAforActionPrediction`/draft wrapper 并通过 `ea_forward` 逐 token 推进；它是本文后续所说的
+“SpecVLA paper AR”，也是唯一允许作为论文复现分母的 AR。
 
-| LIBERO suite | OpenVLA AR 成功率 | SpecVLA 成功率 / Length / speedup | SpecVLA relaxed 成功率 / Length / speedup |
+| LIBERO suite | 论文表中 AR 成功率 | SpecVLA 成功率 / Length / speedup | SpecVLA relaxed 成功率 / Length / speedup |
 | --- | ---: | --- | --- |
 | Goal | 78.0% | 74.2% / 2.04 / 1.09x | 74.4% / 2.94 / 1.42x |
 | Object | 89.0% | 89.0% / 1.75 / 1.15x | 85.0% / 2.38 / 1.38x |
@@ -204,9 +207,10 @@ Transformer forward；其中 top-2 覆盖率是单分叉树能否救回主路径
 
 ### 2026-07-14 环境修复后的从零实验链
 
-本轮固定分工为：**3090 生成数据并用 0-3 四卡训练，4090 单卡做 LIBERO rollout**。数据与 checkpoint
-不要沿用环境修复前的实验目录。MuJoCo 本身不会参与 RLDS 离线 hidden 生成，但 OpenVLA、Transformers、
-PyTorch 和图像预处理版本会影响 teacher token/hidden，因此本轮仍重新生成并记录环境。
+本轮固定分工为：**3090 生成数据并用 0-3 四卡训练，4090 单卡做 LIBERO rollout**。MuJoCo 本身不会参与
+RLDS 离线 hidden 生成。2026-07-15 的最终排查进一步确认：本次 SpecVLA speedup 异常来自 AR 分母路径选错，
+不是离线数据；已有数据无需因此重生成。下面保留的新文件名流程用于数据格式/环境实验隔离，不是修复
+SpecVLA speedup 的必要条件。
 
 3090 数据生成脚本现在会真实设置 `seed`，默认拒绝覆盖已有 HDF5，并不保存训练从不读取的
 `pixel_values`。均匀选层已经包含 final，因此也不再重复保存逐元素相同的 `prompt_last`；预计新文件约
@@ -336,14 +340,15 @@ DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-d
 
 诊断结论：训练集上的 Markov-ACD/CAD-head 信号很强，弱路径 p2-p5 已被明显拉起；但这是 offline teacher-forced 统计，不能直接等价为接收长度。下一步优先把 epoch 100/150/200 搬到 4090，跑 CAD-head strict/relaxed 的 online rollout。
 
-### 2026-07-12 Goal 在线结果与新方案靶点
+### 2026-07-12 Goal 在线结果与新方案靶点（历史非论文 AR 分母）
 
 在 4090、`SYNC_CUDA_TIMING=False`、`TIMING_SCOPE=last_task` 下，epoch 200 的完整 Goal 结果如下。
-Speedup 使用同轮 AR mean step time `0.161929s` 作为分子：
+这组历史 Speedup 使用了 `0.161929s` 的旧 AR 分母。它不是作者 `use_spec=True` 的 paper AR，不能与论文
+或本仓库 2026-07-15 之后的复现结果直接比较；表格只保留用于 DFlash 工程演进回溯。
 
 | 方法 | SR | mean step time | Speedup vs AR | Length | avg accept | online per-position hit |
 | --- | ---: | ---: | ---: | ---: | ---: | --- |
-| OpenVLA AR | 0.774 | 0.161929s | 1.000x | - | - | - |
+| 历史旧 AR（非 paper AR） | 0.774 | 0.161929s | 1.000x | - | - | - |
 | SpecVLA strict | 0.768 | 0.178630s | 0.907x | 1.631 | 0.631 | - |
 | SpecVLA relaxed | 0.734 | 0.141256s | 1.146x | 2.361 | 1.361 | - |
 | DFlash Markov-ACD strict | 0.788 | 0.182786s | 0.886x | 2.109 | 1.008 | 0.687/0.326/0.411/0.393/0.468/0.577 |
@@ -390,14 +395,14 @@ Markov-ACD。
 但 4090 在线结果没有得到同等提升；因此下一轮不再继续追求 teacher-forced 饱和，而是改攻 online exposure
 gap、连续前缀目标和草稿头开销。
 
-### 3090 在线 sanity check
+### 3090 在线 sanity check（历史非论文 AR 分母）
 
 2026-07-05 这组 Goal 评测是在 3090 上多实验并行跑的，适合判断成功率和大致趋势，但不适合作论文最终速度。
 正式速度统一在 4090 单实验串行跑，并保持 `SYNC_CUDA_TIMING=False`、`TIMING_SCOPE=last_task`。
 
 | 方法 | SR | mean step time | Speedup vs AR | Length | avg accept | 备注 |
 | --- | ---: | ---: | ---: | ---: | ---: | --- |
-| OpenVLA AR | 0.768 | 0.2826s | 1.00x | - | - | baseline |
+| 历史旧 AR（非 paper AR） | 0.768 | 0.2826s | 1.00x | - | - | 仅历史 sanity baseline |
 | SpecVLA strict | 0.762 | 0.3211s | 0.88x | 1.396 | 0.396 | 3090 上负加速 |
 | SpecVLA relaxed | 0.736 | 0.2709s | 1.04x | 2.372 | 1.372 | relaxed 后才略快 |
 | DFLASH strict | 0.760 | 0.2905s | 0.97x | 2.113 | 1.043 | Length 高于 Spec strict，但速度仍不够 |
@@ -713,7 +718,7 @@ feature 并训练 layer-16 adapter。
 这句话需要四类证据同时成立：
 
 1. **效果证据。** 在 LIBERO 多个 suite 上，DFLASH/Markov-ACD 的 `SR / Length / Speedup`
-   同时优于或不弱于 OpenVLA AR 和 SpecVLA baseline。
+   同时优于或不弱于 SpecVLA paper AR 和 SpecVLA baseline。
 2. **机制证据。** p2-p5 弱路径的离线准确率、在线 hit rate、accept length histogram 都能解释为什么速度提高。
 3. **消融证据。** 去掉 Markov-aware residual、Hidden-level CAD、Logit-level CAD、soft distribution、
    `start_index=0`、`slot_decay=0.90` 等组件后，指标按预期下降。
@@ -723,7 +728,7 @@ feature 并训练 layer-16 adapter。
 
 | 层级 | 实验 | 目的 | 关键指标 |
 | --- | --- | --- | --- |
-| Main table | OpenVLA AR / SpecVLA strict / SpecVLA relaxed / DFLASH strict / DFLASH relaxed / DFLASH CADhead strict-relaxed | 证明主结果不是单一脚本偶然现象 | `SR`、`Length`、`Speedup`、`avg_accept_length`、`overall_hit_rate` |
+| Main table | SpecVLA paper AR / SpecVLA strict / SpecVLA relaxed / DFLASH strict / DFLASH relaxed / DFLASH CADhead strict-relaxed | 证明主结果不是单一脚本偶然现象 | `SR`、`Length`、`Speedup`、`avg_accept_length`、`overall_hit_rate` |
 | Multi-suite | LIBERO Goal / Object / Spatial / Long | 证明不是只对 Goal 有效 | 每个 suite 的主表指标和 task-level breakdown |
 | Threshold sweep | relaxed threshold `0/3/6/9/12` | 分离 strict acceptance 和 relaxed acceptance 的贡献 | `SR` vs `Length` vs `Speedup` 曲线 |
 | Checkpoint sweep | epoch 30/60/90/120/150/180/200 | 找到最佳训练点，避免只报 latest | offline acc、online Length、SR |
@@ -829,9 +834,9 @@ safety stop / collision / out-of-bound flag
 
 | Task | Method | Success | Completion time | Policy latency | Control freq | Avg accepted length | Notes |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
-| Pick-place | OpenVLA AR | - | - | - | - | - | target baseline |
+| Pick-place | SpecVLA paper AR | - | - | - | - | - | target baseline |
 | Pick-place | DFLASH relaxed | - | - | - | - | - | same target |
-| Disturbed pick | OpenVLA AR | - | - | - | - | - | latency-sensitive |
+| Disturbed pick | SpecVLA paper AR | - | - | - | - | - | latency-sensitive |
 | Disturbed pick | DFLASH relaxed | - | - | - | - | - | latency-sensitive |
 
 如果资源有限，真机部分可以先做 2-3 个任务、每任务每方法 20 trials，作为“real-robot validation”小节；
@@ -1263,7 +1268,8 @@ CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=200 NUM_TRIALS_PER_TASK=50 \
 4. HDF5 文件属性 `complete=true` 时才允许训练；合并/生成中途的半成品不会被误读。
 5. 训练 launcher 和底层 `train_dflash_libero_goal.py` 默认都使用 `NUM_WORKERS=1`、`DATALOADER_PREFETCH_FACTOR=1`、关闭 pin/persistent workers，并默认不保存 optimizer state / latest 根目录副本，减少共享硬盘压力。只有明确需要断点续训时，才手动打开 `SAVE_TRAINING_STATE=True`。
 
-下面只用于抢救历史 `.ckpt` artifact，**不能替代 2026-07-14 环境修复后的重新生成**：
+下面用于把历史 `.ckpt` artifact 无损打包为 HDF5。2026-07-15 已确认 AR Speedup 根因与离线数据无关，
+因此它可以继续用于训练，无需为了本次问题重新生成：
 
 ```bash
 ssh 3090_wulin
@@ -1429,27 +1435,31 @@ Logs: /data/wulin/c/specvla-data/eval_logs
 
 ```text
 OpenVLA goal model: /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-goal
-SpecVLA checkpoint: /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_libero_goal_debug_ckpt
+SpecVLA checkpoint: /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/specvla_checkpoint/goal
 DFLASH copied checkpoint example: /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/epoch_190_step_169670
 Logs: /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs
 ```
 
 如果权重被复制或重命名，可以用下面变量覆盖。DFlash 评测用 `SPEC_CKPT` 指向从 3090 搬到 4090 的
-checkpoint；SpecVLA baseline 才需要 `SPECVLA_GOAL_CKPT`。OpenVLA 模型路径不要再用全局 `VLA_PATH`
+checkpoint；SpecVLA baseline 只使用 `SPECVLA_GOAL_CKPT` / `SPECVLA_CKPT_ROOT`。两类变量故意分离，
+baseline launcher 会忽略 shell 中残留的 DFlash `SPEC_CKPT`。OpenVLA 模型路径不要再用全局 `VLA_PATH`
 覆盖 eval launcher，因为 `.bashrc` 里常固定的是 Goal 模型，容易污染 Object/Spatial/Long；如确实要覆盖，
 使用 `VLA_PATH_OVERRIDE`：
 
 ```bash
 VLA_PATH_OVERRIDE=/path/to/openvla-suite-model
-SPEC_CKPT=/path/to/goal_ckpt
 SPECVLA_GOAL_CKPT=/path/to/goal_ckpt
+SPECVLA_CKPT_ROOT=/path/to/specvla_checkpoint
+
+# 仅 DFlash launcher 使用：
+SPEC_CKPT=/path/to/dflash_ckpt
 ```
 
 ### Goal 七套核心评测
 
 | 实验 | Launcher | Python 入口 | Draft backend | Acceptance | 日志子目录 |
 | --- | --- | --- | --- | --- | --- |
-| OpenVLA AR baseline | `run_openvla_ar_libero_goal_eval.sh` | `run_libero_goal_AR.py` | 无 | 自回归 | `openvla_ar` |
+| SpecVLA paper AR baseline | `run_openvla_ar_libero_goal_eval.sh` | `run_libero_goal_AR.py` | `eagle` wrapper | `use_spec=True`，`ea_forward` 自回归 | `openvla_ar`（历史目录名） |
 | SpecVLA strict baseline | `run_specvla_libero_goal_eval.sh` | `run_libero_goal_Spec.py` | `eagle` | strict，`accept_threshold=0` | `specvla_strict` |
 | SpecVLA relaxed baseline | `run_specvla_relaxed_libero_goal_eval.sh` | `run_libero_goal_Spec_Relaxed.py` | `eagle` | relaxed，默认 `accept_threshold=9` | `specvla_relaxed` |
 | DFLASH strict ablation | `run_dflash_strict_libero_goal_eval.sh` | `run_libero_goal_Spec.py` | `dflash` | strict，`accept_threshold=0` | `dflash_strict` |
@@ -1485,11 +1495,11 @@ TIMING_SCOPE=full_suite SYNC_CUDA_TIMING=True \
 ### Goal：一键复现 SpecVLA baseline
 
 为了严格复现上游 SpecVLA 的 Goal 评测语义，使用下面的一键 launcher。它串行运行
-OpenVLA AR、SpecVLA strict（`r=0`）和 SpecVLA relaxed（`r=9`），统一使用 `seed=7`、
+SpecVLA paper AR（`use_spec=True`）、SpecVLA strict（`r=0`）和 SpecVLA relaxed（`r=9`），统一使用 `seed=7`、
 `50 trials/task`、`SYNC_CUDA_TIMING=False`、`TIMING_SCOPE=last_task`：
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 \
+CUDA_VISIBLE_DEVICES=0 SEED=7 NUM_TRIALS_PER_TASK=50 \
   bash openvla/specdecoding/decode-scripts/run_specvla_goal_upstream_compatible_eval.sh
 ```
 
@@ -1533,9 +1543,41 @@ SpecVLA Long    : /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-d
 `libero_90` 暂未写一键脚本，因为当前 4090 没有准备对应的 OpenVLA fine-tuned model 和 SpecVLA
 checkpoint。若后续补齐权重，可用 `init_libero_eval_env libero_90` 按同一模板扩展。
 
-AR baseline 使用标准 OpenVLA 模型，故意不向模型传 `generate_mode`、`return_dflash_stats`
-这类 SpecVLA/DFlash 专用 generation 参数。2026-06-28 曾因误传这些参数导致 AR 每个 episode
-一开始就异常退出，表现为“推得很快但成功率全 0”；该问题已在 `a5817d5` 修复。
+这些文件名中的 `openvla_ar` 只是历史兼容命名，不表示纯 OpenVLA 路径。四个 AR launcher 都会解析同
+suite 的 SpecVLA draft checkpoint，显式传 `--use_spec True --parallel_draft False`。Python 入口也会拒绝
+错误的 false 值，因此不会再静默生成不兼容的论文 Speedup 分母。
+
+### Goal：分别运行 paper AR / strict / relaxed
+
+三条命令必须串行执行，不要让多个 rollout 共享 GPU/CPU。它们使用相同的模型、draft、seed 和计时口径：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 SEED=7 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_openvla_ar_libero_goal_eval.sh
+
+CUDA_VISIBLE_DEVICES=0 SEED=7 NUM_TRIALS_PER_TASK=50 ACCEPT_THRESHOLD=0 \
+  bash openvla/specdecoding/decode-scripts/run_specvla_libero_goal_eval.sh
+
+CUDA_VISIBLE_DEVICES=0 SEED=7 NUM_TRIALS_PER_TASK=50 ACCEPT_THRESHOLD=9 \
+  bash openvla/specdecoding/decode-scripts/run_specvla_relaxed_libero_goal_eval.sh
+```
+
+第一条虽然保留了历史文件名 `run_openvla_ar_libero_goal_eval.sh`，实际只运行 SpecVLA paper AR；仓库不再
+提供从这个入口切换到纯 OpenVLA AR 的可用方式。
+
+### 随机种子与是否需要重生成数据
+
+- 推理：三个 launcher 都显式传 `--seed 7`。`set_seed_everywhere` 固定 Python、NumPy、PyTorch/CUDA，
+  关闭 cuDNN benchmark 并开启 deterministic；LIBERO 使用固定 init-state 列表，环境内部仍按上游代码
+  `env.seed(0)`。同硬件/驱动/依赖下应高度可复现，但 GPU wall-clock 耗时本身仍会有小幅抖动。
+- DFlash 训练：训练入口默认 `seed=7`，文件顺序、DistributedSampler 和 shard 内顺序都由该 seed 控制。
+  CUDA 算子以及断点续训未保存完整 RNG state，所以不能承诺与不中断训练逐位相同。
+- 数据生成：正式入口默认并显式使用 `--seed 7`，OpenVLA 是 greedy、DataLoader worker 为 0；但 RLDS 的
+  TensorFlow shuffle/并行 image augmentation 没有逐样本 stateless seed，因而是“已设全局种子”，不是
+  “输出文件逐位一致”。需要严格对照时应保留同一份 HDF5，而不是重复生成后假定哈希一致。
+
+本次不需要去 3090 重生成数据。根因只影响评测时 AR 的计时分母；离线数据生成本来就应运行普通
+OpenVLA teacher（数据脚本里的 `use_spec=False` 是正确语义），与 paper AR launcher 的选择无关。
 
 ### 评测机器约定
 
@@ -1631,24 +1673,24 @@ screen -S eval_dflash_strict
 3090 复制来的权重。建议串行跑，不要同时启动多个评测，否则速度数字会被 CPU、MuJoCo、图像预处理和
 Python 调度共享开销污染。
 
-1. OpenVLA AR baseline：
+1. SpecVLA paper AR baseline（`use_spec=True`）：
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+CUDA_VISIBLE_DEVICES=0 SEED=7 NUM_TRIALS_PER_TASK=50 \
   bash openvla/specdecoding/decode-scripts/run_openvla_ar_libero_goal_eval.sh
 ```
 
 2. SpecVLA strict baseline：
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+CUDA_VISIBLE_DEVICES=0 SEED=7 NUM_TRIALS_PER_TASK=50 ACCEPT_THRESHOLD=0 \
   bash openvla/specdecoding/decode-scripts/run_specvla_libero_goal_eval.sh
 ```
 
 3. SpecVLA relaxed baseline：
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+CUDA_VISIBLE_DEVICES=0 SEED=7 NUM_TRIALS_PER_TASK=50 ACCEPT_THRESHOLD=9 \
   bash openvla/specdecoding/decode-scripts/run_specvla_relaxed_libero_goal_eval.sh
 ```
 
@@ -1714,33 +1756,33 @@ CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
 
 ```bash
 # Object
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+CUDA_VISIBLE_DEVICES=0 SEED=7 NUM_TRIALS_PER_TASK=50 \
   bash openvla/specdecoding/decode-scripts/run_openvla_ar_libero_object_eval.sh
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+CUDA_VISIBLE_DEVICES=0 SEED=7 NUM_TRIALS_PER_TASK=50 ACCEPT_THRESHOLD=0 \
   bash openvla/specdecoding/decode-scripts/run_specvla_libero_object_eval.sh
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+CUDA_VISIBLE_DEVICES=0 SEED=7 NUM_TRIALS_PER_TASK=50 ACCEPT_THRESHOLD=9 \
   bash openvla/specdecoding/decode-scripts/run_specvla_relaxed_libero_object_eval.sh
 
 # Spatial
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+CUDA_VISIBLE_DEVICES=0 SEED=7 NUM_TRIALS_PER_TASK=50 \
   bash openvla/specdecoding/decode-scripts/run_openvla_ar_libero_spatial_eval.sh
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+CUDA_VISIBLE_DEVICES=0 SEED=7 NUM_TRIALS_PER_TASK=50 ACCEPT_THRESHOLD=0 \
   bash openvla/specdecoding/decode-scripts/run_specvla_libero_spatial_eval.sh
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+CUDA_VISIBLE_DEVICES=0 SEED=7 NUM_TRIALS_PER_TASK=50 ACCEPT_THRESHOLD=9 \
   bash openvla/specdecoding/decode-scripts/run_specvla_relaxed_libero_spatial_eval.sh
 
 # Long / libero_10
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+CUDA_VISIBLE_DEVICES=0 SEED=7 NUM_TRIALS_PER_TASK=50 \
   bash openvla/specdecoding/decode-scripts/run_openvla_ar_libero_10_eval.sh
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+CUDA_VISIBLE_DEVICES=0 SEED=7 NUM_TRIALS_PER_TASK=50 ACCEPT_THRESHOLD=0 \
   bash openvla/specdecoding/decode-scripts/run_specvla_libero_10_eval.sh
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+CUDA_VISIBLE_DEVICES=0 SEED=7 NUM_TRIALS_PER_TASK=50 ACCEPT_THRESHOLD=5 \
   bash openvla/specdecoding/decode-scripts/run_specvla_relaxed_libero_10_eval.sh
 ```
 
 ### 历史 DFlash CAD-head checkpoint sweep 和自动主表
 
-当前主表优先比较五类方法：OpenVLA AR、SpecVLA strict、SpecVLA relaxed、DFlash CAD-head strict、DFlash CAD-head relaxed。
+当前主表优先比较五类方法：SpecVLA paper AR、SpecVLA strict、SpecVLA relaxed、DFlash CAD-head strict、DFlash CAD-head relaxed。
 AR baseline 的四个 suite summary 已放在：
 
 ```text
@@ -1777,7 +1819,7 @@ python openvla/specdecoding/test-speed/summarize_main_table_eval.py \
 ```
 
 这个汇总脚本会自动过滤普通 DFlash，只收 `dflash_use_causal_residual_sampling=true` 的 DFlash CAD-head 结果；
-Speedup 一律相对同 suite 的 OpenVLA AR baseline。
+Speedup 一律相对同 suite 的 SpecVLA paper AR baseline。`openvla_ar` 只是兼容旧工具的目录名。
 
 评测结束后，旧的手动汇总方式仍可用。由于普通 DFLASH 和 CADhead 都写入 `dflash_strict` / `dflash_relaxed`
 目录，不能只靠 `ls -t | head -1` 自动判断是哪一组；刚跑完一整套时可以先这样取最新文件，
@@ -1969,25 +2011,48 @@ evaluation seed
 
 这些信息是让结果可比较而不是只停留在经验描述的最低要求。
 
-## 2026-07-14 推理 speedup 修复记录
+## 2026-07-15 推理 speedup 最终根因与永久修复
 
-这次问题的背景是：clean upstream 复现环境在 LIBERO goal 上重新跑通后，`test_speed_for_json.py` 得到的 speedup 为 Spec 约 `1.00x`、Spec Relaxed 约 `1.31x`，已经接近原 SpecVLA 论文复现结果；而主项目 `SpecVLA-DFLASH` 之前一度出现 SpecVLA 负加速或 speedup 异常。排查结论是：不能把原因简单归结为 MuJoCo 一个包，实际漂移点至少包括 MuJoCo、robosuite、LIBERO 指向、numpy、accelerate，以及部分基础依赖。
-
-### 主要原因判断
-
-最可疑、也最直接影响 LIBERO 推理复现的差异是仿真栈：
+clean upstream 在 LIBERO Goal 上得到 strict 约 `1.00x`、relaxed 约 `1.31x`，而 DFLASH 仓库同环境得到
+`0.885x` / `1.157x`。最终确认根因不是 MuJoCo 或 LIBERO，而是 **AR 分母执行了不同的代码路径**：
 
 ```text
-SpecVLA eval script
--> LIBERO task/env wrapper
--> robosuite
--> mujoco Python package
--> MuJoCo physics/render backend
+作者上游 test_AR_goal.sh
+  -> run_libero_goal_AR.py 默认 use_spec=True
+  -> SpecVLAforActionPrediction + LlamaSpecForCausalLM
+  -> ea_forward 的逐 token paper AR
+
+DFLASH 旧 launcher
+  -> 显式传入 use_spec=False
+  -> 纯 OpenVLA generate/predict_action
+  -> AR 更快，Speedup 分母变小
 ```
 
-其中 `robosuite==1.4.1` 只声明 `mujoco>=2.3.0`，没有上限；如果不额外 pin，现在 fresh install 会解析到更新的 MuJoCo，而不是作者 W&B 快照里记录过的 `mujoco==3.3.4`。历史上主环境被手动改成 `mujoco==3.3.2`，这很可能是 speedup 和成功率开始异常的触发点之一。
+固定同一组输入做脱离 MuJoCo rollout 的模型计时后，upstream 纯 AR 为 `0.158163s`，DFLASH 纯 AR 为
+`0.158400s`，两者基本相同；upstream paper wrapped AR 为 `0.179271s`，比纯路径慢 `1.1335x`。
+完整 JSON 也吻合：旧 paper AR 分母 `0.182051s` 配当前 strict/relaxed 耗时会得到约
+`0.995x` / `1.300x`，正好复现 clean 结果。换言之，`0.885x` / `1.157x` 不是 SpecVLA 算法突然变慢，
+而是拿了更快、但不属于作者复现协议的 AR 作分母。
 
-但这次不是只修 MuJoCo。修复前实际看到的漂移包括：
+永久规则如下：
+
+1. 论文 Speedup 的 AR 只能运行 `run_libero_goal_AR.py` 且保持 `use_spec=True`、
+   `parallel_draft=False`，并加载与 suite 对应的 SpecVLA draft checkpoint。
+2. 所有 `run_openvla_ar_libero_*_eval.sh` 已改为该 paper AR；文件名和输出目录 `openvla_ar` 仅为兼容
+   现有汇总工具，不代表纯 OpenVLA。
+3. `run_libero_goal_AR.py` 会拒绝 false 值，防止以后再次静默产生错误分母。
+4. AR、strict、relaxed 必须同机、同 GPU、串行运行，并保持 `SEED=7`、
+   `SYNC_CUDA_TIMING=False`、`TIMING_SCOPE=last_task`。
+5. 2026-07-15 之前以约 `0.158-0.162s` 纯 AR 为分母的历史 speedup 不能拿来与论文数字比较。
+
+### 环境差异的实际地位
+
+MuJoCo、robosuite、LIBERO、NumPy、Accelerate 等依赖仍应固定，它们会影响仿真轨迹、成功率、可运行性和
+计时噪声，但不是这次 `1.31x -> 1.157x` 的根因。两边核对到的 LIBERO commit 均为
+`8f1084e3132a39270c3a13ebe37270a43ece2a01`，draft checkpoint SHA 也一致；固定输入模型计时已经排除了
+仿真栈。下面保留环境对齐记录，作用是维持成功率与整体复现条件，不应再把它表述成已证明的 Speedup 根因。
+
+环境修复前实际看到的漂移包括：
 
 ```text
 4090 old specvla:

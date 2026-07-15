@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Summarize LIBERO main-table eval summaries with speedup vs OpenVLA AR.
+"""Summarize LIBERO main-table eval summaries with speedup vs SpecVLA paper AR.
 
 The script scans *_summary.json files produced by the LIBERO evaluators and
 builds a compact table for:
-  - OpenVLA AR
+  - SpecVLA paper AR (wrapped, use_spec=True)
   - SpecVLA strict / relaxed
   - DFlash CAD-head strict / relaxed
 
@@ -22,7 +22,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 SUITE_ORDER = ["libero_goal", "libero_object", "libero_spatial", "libero_10", "libero_90"]
 METHOD_ORDER = {
-    "OpenVLA AR": 0,
+    "SpecVLA paper AR": 0,
     "SpecVLA": 1,
     "SpecVLA-Relaxed": 2,
     "DFlash CAD Head Strict": 3,
@@ -47,7 +47,9 @@ def iter_summaries(root: Path) -> Iterable[Dict[str, Any]]:
 def classify_method(summary: Dict[str, Any], include_plain_dflash: bool = False) -> Optional[str]:
     family = summary.get("eval_family")
     if family == "openvla_ar":
-        return "OpenVLA AR"
+        if summary.get("ar_baseline") != "specvla_paper_wrapped_ar" or summary.get("use_spec") is not True:
+            return None
+        return "SpecVLA paper AR"
     if family == "specvla_strict":
         return "SpecVLA"
     if family == "specvla_relaxed":
@@ -102,6 +104,8 @@ def collect_latest_ar(ar_dir: Path) -> Dict[str, Dict[str, Any]]:
     for summary in iter_summaries(ar_dir):
         if summary.get("eval_family") != "openvla_ar":
             continue
+        if summary.get("ar_baseline") != "specvla_paper_wrapped_ar" or summary.get("use_spec") is not True:
+            continue
         suite = summary.get("task_suite_name")
         if not suite:
             continue
@@ -120,11 +124,20 @@ def build_rows(args: argparse.Namespace) -> List[Dict[str, Any]]:
             continue
         suite = summary.get("task_suite_name") or "unknown"
         epoch = extract_epoch(summary)
-        if method in {"OpenVLA AR", "SpecVLA", "SpecVLA-Relaxed"}:
+        if method in {"SpecVLA paper AR", "SpecVLA", "SpecVLA-Relaxed"}:
             epoch = ""
         key = (suite, method, epoch)
         if key not in grouped or summary["_mtime"] > grouped[key]["_mtime"]:
             grouped[key] = summary
+
+    required_suites = {suite for suite, method, _ in grouped if method != "SpecVLA paper AR"}
+    missing_ar = sorted(required_suites - set(ar_by_suite), key=suite_rank)
+    if missing_ar:
+        raise ValueError(
+            "Missing SpecVLA paper AR (use_spec=True) summary for: "
+            + ", ".join(missing_ar)
+            + ". Run the corresponding run_openvla_ar_libero_*_eval.sh launcher first."
+        )
 
     rows: List[Dict[str, Any]] = []
     for (suite, method, epoch), summary in grouped.items():
@@ -209,7 +222,7 @@ def write_markdown(rows: List[Dict[str, Any]], path: Path) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--log-dir", required=True, help="Root eval_logs directory.")
-    parser.add_argument("--ar-dir", required=True, help="Directory containing OpenVLA AR *_summary.json files.")
+    parser.add_argument("--ar-dir", required=True, help="Directory containing SpecVLA paper wrapped-AR summaries.")
     parser.add_argument("--output-csv", default=None, help="Optional CSV output path.")
     parser.add_argument("--output-md", default=None, help="Optional Markdown output path.")
     parser.add_argument("--include-plain-dflash", action="store_true", help="Also include non-CAD DFlash rows.")

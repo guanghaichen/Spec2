@@ -50,6 +50,7 @@ NUM_EPOCHS="${NUM_EPOCHS:-200}"
 LR="${LR:-5e-5}"
 WARMUP_STEPS="${WARMUP_STEPS:-1000}"
 SAVE_EVERY="${SAVE_EVERY:-10}"
+SEED="${SEED:-7}"
 NUM_WORKERS="${NUM_WORKERS:-1}"
 DATASET_FORMAT="${DATASET_FORMAT:-auto}"
 
@@ -68,7 +69,7 @@ VLA_PATH=${VLA_PATH}
 DATAPATH=${DATAPATH}
 OUTPUT_DIR=${OUTPUT_DIR}
 global_batch=${BATCH_SIZE} * ${GRAD_ACCUM_STEPS} * ${NPROC_PER_NODE}
-epochs=${NUM_EPOCHS} lr=${LR} warmup=${WARMUP_STEPS}
+epochs=${NUM_EPOCHS} lr=${LR} warmup=${WARMUP_STEPS} seed=${SEED}
 hidden=${HIDDEN_W} cos=${COS_W}
 action_ce=${ACTION_TOKEN_CE_W} action_l1=${ACTION_DISTILL_L1_W}
 prefix_survival=${PREFIX_SURVIVAL_W} confidence=disabled
@@ -124,6 +125,7 @@ torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   --num_epochs "${NUM_EPOCHS}" \
   --warmup_steps "${WARMUP_STEPS}" \
   --save_every "${SAVE_EVERY}" \
+  --seed "${SEED}" \
   --no-save_training_state \
   --no-save_latest_root_copy \
   --num_workers "${NUM_WORKERS}" \

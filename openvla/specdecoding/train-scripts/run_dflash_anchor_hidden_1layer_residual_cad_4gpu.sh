@@ -53,6 +53,7 @@ LR="${LR:-5e-5}"
 WARMUP_STEPS="${WARMUP_STEPS:-1000}"
 NUM_EPOCHS="${NUM_EPOCHS:-200}"
 SAVE_EVERY="${SAVE_EVERY:-10}"
+SEED="${SEED:-7}"
 HIDDEN_NOISE="${HIDDEN_NOISE:-0.03}"
 SLOT_DECAY="${SLOT_DECAY:-0.90}"              # 块内位置整体递减；0.90 轻度偏向前几个 slot。
 
@@ -107,6 +108,7 @@ LR=${LR}
 WARMUP_STEPS=${WARMUP_STEPS}
 NUM_EPOCHS=${NUM_EPOCHS}
 SAVE_EVERY=${SAVE_EVERY}
+SEED=${SEED}
 HIDDEN_NOISE=${HIDDEN_NOISE}
 SLOT_DECAY=${SLOT_DECAY}
 NUM_WORKERS=${NUM_WORKERS}
@@ -212,6 +214,7 @@ torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   --num_epochs "${NUM_EPOCHS}" \
   --warmup_steps "${WARMUP_STEPS}" \
   --save_every "${SAVE_EVERY}" \
+  --seed "${SEED}" \
   "${SAVE_TRAINING_STATE_ARG}" \
   "${SAVE_LATEST_ROOT_COPY_ARG}" \
   --num_workers "${NUM_WORKERS}" \

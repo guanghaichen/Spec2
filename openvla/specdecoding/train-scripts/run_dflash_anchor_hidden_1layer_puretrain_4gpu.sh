@@ -24,10 +24,12 @@ fi
 VLA_PATH="${VLA_PATH:-${DEFAULT_VLA_PATH}}"
 DATAPATH="${DATAPATH:-${DEFAULT_DATAPATH}}"
 OUTPUT_DIR="${OUTPUT_DIR:-${DEFAULT_OUTPUT_DIR}}"
+SEED="${SEED:-7}"
 
 echo "VLA_PATH=${VLA_PATH}"
 echo "DATAPATH=${DATAPATH}"
 echo "OUTPUT_DIR=${OUTPUT_DIR}"
+echo "SEED=${SEED}"
 
 torchrun --standalone --nnodes 1 --nproc_per_node 4 \
   openvla/specdecoding/train-scripts/train_dflash_libero_goal.py \
@@ -35,6 +37,7 @@ torchrun --standalone --nnodes 1 --nproc_per_node 4 \
   --vla_path "${VLA_PATH}" \
   --datapath "${DATAPATH}" \
   --output_dir "${OUTPUT_DIR}" \
+  --seed "${SEED}" \
   --num_draft_layers 1 \
   --target_layer_ids 1 8 15 22 29 \
   --selected_hidden_variant replace_22_with_final \

@@ -95,12 +95,17 @@ log_dir = Path(sys.argv[1])
 run_id_prefix = sys.argv[2]
 summary_prefix = Path(sys.argv[3])
 
-ar_candidates = sorted(
-    (log_dir / "openvla_ar").glob("*libero_goal*openvla_ar_summary.json"),
-    key=lambda path: path.stat().st_mtime,
-)
+ar_candidates = []
+for path in (log_dir / "openvla_ar").glob("*libero_goal*openvla_ar_summary.json"):
+    payload = json.loads(path.read_text())
+    if payload.get("ar_baseline") == "specvla_paper_wrapped_ar" and payload.get("use_spec") is True:
+        ar_candidates.append(path)
+ar_candidates.sort(key=lambda path: path.stat().st_mtime)
 if not ar_candidates:
-    raise SystemExit(f"No Goal AR summary found under {log_dir / 'openvla_ar'}")
+    raise SystemExit(
+        f"No SpecVLA paper AR summary found under {log_dir / 'openvla_ar'}; "
+        "run run_openvla_ar_libero_goal_eval.sh first"
+    )
 ar_summary = json.loads(ar_candidates[-1].read_text())
 ar_mean = ar_summary.get("timing", {}).get("mean")
 
@@ -165,7 +170,7 @@ def fmt(value, digits=3):
 lines = [
     f"# DFlash Goal repeated eval: {run_id_prefix}",
     "",
-    f"AR baseline summary: `{ar_candidates[-1]}`",
+    f"SpecVLA paper AR baseline summary: `{ar_candidates[-1]}`",
     f"AR mean step time: {fmt(ar_mean, 6)} s",
     "",
     "| Mode | Seed | SR | Length | Avg Accept | Hit Rate | Mean Step | Speedup | p1 | p2 | p3 | p4 | p5 | p6 |",

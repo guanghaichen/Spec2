@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Reproduce the upstream SpecVLA Goal baseline protocol in one serial run:
-# OpenVLA AR -> SpecVLA strict (r=0) -> SpecVLA relaxed (r=9).
+# Reproduce the upstream SpecVLA Goal paper protocol in one serial run:
+# paper wrapped AR (use_spec=True) -> strict (r=0) -> relaxed (r=9).
 # The individual launchers write their normal JSON/TXT artifacts; this wrapper
 # additionally writes one compact comparison TXT with SR, Length and Speedup.
 
@@ -15,10 +15,10 @@ init_libero_goal_eval_env
 NUM_TRIALS_PER_TASK="${NUM_TRIALS_PER_TASK:-50}"
 SYNC_CUDA_TIMING="${SYNC_CUDA_TIMING:-False}"
 TIMING_SCOPE="${TIMING_SCOPE:-last_task}"
-RUN_TAG="${RUN_TAG:-specvla-goal-upstream-compatible-$(date +%Y%m%d-%H%M%S)}"
-export NUM_TRIALS_PER_TASK SYNC_CUDA_TIMING TIMING_SCOPE
+RUN_TAG="${RUN_TAG:-specvla-goal-paper-protocol-$(date +%Y%m%d-%H%M%S)}"
+export NUM_TRIALS_PER_TASK SYNC_CUDA_TIMING TIMING_SCOPE SEED
 
-AR_NOTE="${RUN_TAG}-ar"
+AR_NOTE="${RUN_TAG}-paper-wrapped-ar"
 STRICT_NOTE="${RUN_TAG}-strict-r0"
 RELAXED_NOTE="${RUN_TAG}-relaxed-r9"
 
@@ -38,7 +38,8 @@ find_summary() {
 }
 
 echo "============================================================"
-echo "SpecVLA Goal upstream-compatible baseline"
+echo "SpecVLA Goal paper-compatible protocol"
+echo "AR_BASELINE=specvla_paper_wrapped_ar (use_spec=True)"
 echo "RUN_TAG=${RUN_TAG}"
 echo "NUM_TRIALS_PER_TASK=${NUM_TRIALS_PER_TASK}"
 echo "SYNC_CUDA_TIMING=${SYNC_CUDA_TIMING}"

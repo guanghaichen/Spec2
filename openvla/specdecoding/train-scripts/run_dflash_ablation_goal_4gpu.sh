@@ -19,6 +19,7 @@ LR="${LR:-5e-5}"
 WARMUP_STEPS="${WARMUP_STEPS:-1000}"
 NUM_EPOCHS="${NUM_EPOCHS:-200}"
 SAVE_EVERY="${SAVE_EVERY:-10}"
+SEED="${SEED:-7}"
 HIDDEN_NOISE="${HIDDEN_NOISE:-0.03}"
 SLOT_DECAY="${SLOT_DECAY:-0.90}"              # 三档共用，保持位置训练权重一致，消融只比较结构信号。
 HIDDEN_W="${HIDDEN_W:-1.0}"
@@ -130,6 +131,7 @@ LR=${LR}
 WARMUP_STEPS=${WARMUP_STEPS}
 NUM_EPOCHS=${NUM_EPOCHS}
 SAVE_EVERY=${SAVE_EVERY}
+SEED=${SEED}
 HIDDEN_NOISE=${HIDDEN_NOISE}
 SLOT_DECAY=${SLOT_DECAY}
 HIDDEN_W=${HIDDEN_W}
@@ -213,6 +215,7 @@ torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   --num_epochs "${NUM_EPOCHS}" \
   --warmup_steps "${WARMUP_STEPS}" \
   --save_every "${SAVE_EVERY}" \
+  --seed "${SEED}" \
   "${SAVE_TRAINING_STATE_ARG}" \
   "${SAVE_LATEST_ROOT_COPY_ARG}" \
   --num_workers "${NUM_WORKERS}" \

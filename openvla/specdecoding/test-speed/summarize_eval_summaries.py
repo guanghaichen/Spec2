@@ -22,13 +22,24 @@ def format_float(value, digits=3, suffix=""):
     return f"{float(value):.{digits}f}{suffix}"
 
 
+def require_paper_ar(summary, path):
+    if summary.get("eval_family") != "openvla_ar":
+        raise ValueError(f"AR summary has wrong eval_family: {path}")
+    if summary.get("ar_baseline") != "specvla_paper_wrapped_ar" or summary.get("use_spec") is not True:
+        raise ValueError(
+            f"Refusing non-paper AR denominator: {path}. Re-run "
+            "run_openvla_ar_libero_goal_eval.sh; paper reproduction requires use_spec=True."
+        )
+
+
 def main():
     parser = argparse.ArgumentParser(description="Summarize LIBERO eval summary JSON files.")
-    parser.add_argument("--ar-summary", required=True, help="OpenVLA AR *_summary.json file.")
+    parser.add_argument("--ar-summary", required=True, help="SpecVLA paper wrapped-AR *_summary.json file.")
     parser.add_argument("summaries", nargs="+", help="SpecVLA/DFlash *_summary.json files.")
     args = parser.parse_args()
 
     ar = load_summary(Path(args.ar_summary))
+    require_paper_ar(ar, args.ar_summary)
     ar_mean = ar.get("timing", {}).get("mean")
     if ar_mean is None:
         raise ValueError(f"AR summary has no timing.mean: {args.ar_summary}")

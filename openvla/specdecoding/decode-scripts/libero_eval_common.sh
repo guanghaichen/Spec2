@@ -111,16 +111,17 @@ init_libero_goal_eval_env() {
 }
 
 resolve_specvla_checkpoint() {
-  if [[ -z "${SPEC_CKPT:-}" ]]; then
-    if [[ -n "${SPECVLA_CKPT}" ]]; then
-      SPEC_CKPT="${SPECVLA_CKPT}"
-    elif [[ -n "${SPECVLA_GOAL_CKPT}" && "${TASK_SUITE_NAME:-libero_goal}" == "libero_goal" ]]; then
-      SPEC_CKPT="${SPECVLA_GOAL_CKPT}"
-    elif [[ -n "${SPECVLA_CKPT_ROOT}" ]]; then
-      SPEC_CKPT="${SPECVLA_CKPT_ROOT}/${TASK_SUITE_SLUG}"
-    else
-      SPEC_CKPT="${DEFAULT_SPECVLA_CKPT}"
-    fi
+  # SpecVLA paper baselines deliberately ignore the generic SPEC_CKPT variable:
+  # that variable belongs to DFlash launchers and may still point at a trained
+  # DFlash checkpoint from the previous command in the same shell.
+  if [[ -n "${SPECVLA_CKPT}" ]]; then
+    SPEC_CKPT="${SPECVLA_CKPT}"
+  elif [[ -n "${SPECVLA_GOAL_CKPT}" && "${TASK_SUITE_NAME:-libero_goal}" == "libero_goal" ]]; then
+    SPEC_CKPT="${SPECVLA_GOAL_CKPT}"
+  elif [[ -n "${SPECVLA_CKPT_ROOT}" ]]; then
+    SPEC_CKPT="${SPECVLA_CKPT_ROOT}/${TASK_SUITE_SLUG}"
+  else
+    SPEC_CKPT="${DEFAULT_SPECVLA_CKPT}"
   fi
 
   if [[ ! -d "${SPEC_CKPT}" ]]; then
@@ -131,14 +132,15 @@ resolve_specvla_checkpoint() {
 }
 
 resolve_specvla_goal_checkpoint() {
-  if [[ -z "${SPEC_CKPT:-}" ]]; then
-    if [[ -n "${SPECVLA_GOAL_CKPT}" ]]; then
-      SPEC_CKPT="${SPECVLA_GOAL_CKPT}"
-    elif [[ -n "${SPECVLA_CKPT_ROOT}" ]]; then
-      SPEC_CKPT="${SPECVLA_CKPT_ROOT}/goal"
-    else
-      SPEC_CKPT="${DEFAULT_SPECVLA_GOAL_CKPT:-${DEFAULT_SPECVLA_CKPT}}"
-    fi
+  # See resolve_specvla_checkpoint: never inherit a DFlash SPEC_CKPT here.
+  if [[ -n "${SPECVLA_GOAL_CKPT}" ]]; then
+    SPEC_CKPT="${SPECVLA_GOAL_CKPT}"
+  elif [[ -n "${SPECVLA_CKPT}" ]]; then
+    SPEC_CKPT="${SPECVLA_CKPT}"
+  elif [[ -n "${SPECVLA_CKPT_ROOT}" ]]; then
+    SPEC_CKPT="${SPECVLA_CKPT_ROOT}/goal"
+  else
+    SPEC_CKPT="${DEFAULT_SPECVLA_GOAL_CKPT:-${DEFAULT_SPECVLA_CKPT}}"
   fi
 
   if [[ ! -d "${SPEC_CKPT}" ]]; then

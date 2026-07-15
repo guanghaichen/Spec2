@@ -1507,6 +1507,18 @@ CUDA_VISIBLE_DEVICES=0 SEED=7 NUM_TRIALS_PER_TASK=50 \
 `<LOG_DIR>/reproduction/<RUN_TAG>_comparison.txt` 汇总 `SR / Length / Avg Accept / Mean Step / Speedup`。
 若要先 smoke test，可写 `NUM_TRIALS_PER_TASK=1`；论文复现必须回到默认的 `50`。
 
+`test_speed_for_json.py` 也已移除硬编码路径。若仍使用原始 timing JSON 手工测速，必须同时传入同一次
+paper AR 的 summary；脚本会核对文件前缀、`ar_baseline=specvla_paper_wrapped_ar` 和 `use_spec=true`，
+旧的纯 AR JSON 会被拒绝：
+
+```bash
+python openvla/specdecoding/test-speed/test_speed_for_json.py \
+  --ar /path/to/paper_ar_timing.json \
+  --ar-summary /path/to/paper_ar_summary.json \
+  --spec /path/to/specvla_strict_timing.json \
+  --relaxed /path/to/specvla_relaxed_timing.json
+```
+
 本仓库在这一模式下还对齐了两个容易被忽略的源码细节：成功终止 action 不写入 timing JSON，且
 Length 的 CUDA 标量会在计时结束后才 materialize，不把统计开销混入 SpecVLA 的 wall-clock 时间。
 这仍不能消除 RTX 4090 与论文 A100 80G 的硬件差异，但排除了可控的评测代码差异。

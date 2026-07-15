@@ -200,6 +200,7 @@ class DFlashActionHeadTest(unittest.TestCase):
             causal_residual_max_position=6,
             causal_residual_cad_type="cosine",
             anchor_logit_distill_w=0.0,
+            backbone_anchor_logit_distill_w=0.0,
             anchor_logit_distill_temperature=2.0,
             anchor_logit_distill_min_position=2,
             anchor_logit_distill_max_position=6,
@@ -240,6 +241,55 @@ class DFlashActionHeadTest(unittest.TestCase):
         backbone_grad = model.layers[0].self_attn.q_proj.weight.grad
         self.assertTrue(
             backbone_grad is None or torch.count_nonzero(backbone_grad).item() == 0
+        )
+
+        # Draft soft distribution distillation bypasses the detached Action-RNN
+        # branch and must therefore restore a gradient to the backbone only.
+        model.zero_grad(set_to_none=True)
+        args.action_token_ce_w = 0.0
+        args.action_distill_l1_w = 0.0
+        args.prefix_survival_w = 0.0
+        args.action_confidence_w = 0.0
+        args.soft_w = 0.05
+        backbone_soft_metrics = train_module.compute_loss_and_accuracy(
+            model,
+            embed_tokens,
+            lm_head,
+            batch,
+            args,
+            device,
+        )
+        backbone_soft_metrics["loss"].backward()
+        backbone_grad = model.layers[0].self_attn.q_proj.weight.grad
+        self.assertIsNotNone(backbone_grad)
+        self.assertGreater(backbone_grad.abs().sum().item(), 0.0)
+        action_head_grad = model.action_head_out.weight.grad
+        self.assertTrue(
+            action_head_grad is None or torch.count_nonzero(action_head_grad).item() == 0
+        )
+
+        # The separate backbone cross-anchor KL must also train the Draft while
+        # keeping the Action-RNN outside its gradient graph.
+        model.zero_grad(set_to_none=True)
+        args.soft_w = 0.0
+        args.backbone_anchor_logit_distill_w = 0.05
+        args.anchor_logit_distill_correct_teacher_only = False
+        backbone_kl_metrics = train_module.compute_loss_and_accuracy(
+            model,
+            embed_tokens,
+            lm_head,
+            batch,
+            args,
+            device,
+        )
+        self.assertGreater(backbone_kl_metrics["backbone_anchor_logit_distill_pairs"].item(), 0.0)
+        backbone_kl_metrics["loss"].backward()
+        backbone_grad = model.layers[0].self_attn.q_proj.weight.grad
+        self.assertIsNotNone(backbone_grad)
+        self.assertGreater(backbone_grad.abs().sum().item(), 0.0)
+        action_head_grad = model.action_head_out.weight.grad
+        self.assertTrue(
+            action_head_grad is None or torch.count_nonzero(action_head_grad).item() == 0
         )
 
 

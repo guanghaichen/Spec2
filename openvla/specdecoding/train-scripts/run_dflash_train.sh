@@ -20,25 +20,25 @@ case "${PROFILE}" in
     PROFILE_LAYERS=1
     PROFILE_PREFIX_W=0.20
     PROFILE_ANCHOR_W=0.05
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_action_rnn_decoupled_1layer_b8x2_4gpu
+    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_action_rnn_decoupled_distill_1layer_b8x2_4gpu
     ;;
   three_layer)
     PROFILE_LAYERS=3
     PROFILE_PREFIX_W=0.20
     PROFILE_ANCHOR_W=0.05
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_action_rnn_decoupled_3layer_b8x2_4gpu
+    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_action_rnn_decoupled_distill_3layer_b8x2_4gpu
     ;;
   no_prefix)
     PROFILE_LAYERS=1
     PROFILE_PREFIX_W=0
     PROFILE_ANCHOR_W=0.05
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_action_rnn_decoupled_no_prefix_1layer_b8x2_4gpu
+    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_action_rnn_decoupled_distill_no_prefix_1layer_b8x2_4gpu
     ;;
   no_anchor)
     PROFILE_LAYERS=1
     PROFILE_PREFIX_W=0.20
     PROFILE_ANCHOR_W=0
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_action_rnn_decoupled_no_anchor_1layer_b8x2_4gpu
+    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_action_rnn_decoupled_distill_no_anchor_1layer_b8x2_4gpu
     ;;
   *)
     echo "用法: bash $0 [main|three_layer|no_prefix|no_anchor]" >&2
@@ -85,9 +85,11 @@ WARMUP_STEPS="${WARMUP_STEPS:-1000}"
 SAVE_EVERY="${SAVE_EVERY:-10}"
 SEED="${SEED:-7}"
 
-# 稳定版反传：hidden/cos 只训练 Draft 主干；动作损失只训练 Action-RNN。
+# 稳定版反传：低权重分布蒸馏只训练 Draft 主干；重动作损失只训练 Action-RNN。
 HIDDEN_W="${HIDDEN_W:-1.00}"
 COS_W="${COS_W:-0.05}"
+SOFT_W="${SOFT_W:-0.05}"
+BACKBONE_ANCHOR_LOGIT_DISTILL_W="${BACKBONE_ANCHOR_LOGIT_DISTILL_W:-${PROFILE_ANCHOR_W}}"
 ACTION_TOKEN_CE_W="${ACTION_TOKEN_CE_W:-0.10}"
 ACTION_DISTILL_L1_W="${ACTION_DISTILL_L1_W:-0.40}"
 
@@ -129,6 +131,8 @@ SEED=${SEED}
 [损失权重]
 HIDDEN_W=${HIDDEN_W}
 COS_W=${COS_W}
+SOFT_W=${SOFT_W}
+BACKBONE_ANCHOR_LOGIT_DISTILL_W=${BACKBONE_ANCHOR_LOGIT_DISTILL_W}
 ACTION_TOKEN_CE_W=${ACTION_TOKEN_CE_W}
 ACTION_DISTILL_L1_W=${ACTION_DISTILL_L1_W}
 PREFIX_SURVIVAL_W=${PREFIX_SURVIVAL_W}
@@ -151,7 +155,7 @@ fi
 
 torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   openvla/specdecoding/train-scripts/train_dflash_libero_goal.py \
-  --run_name "dflash-action-rnn-${PROFILE}-${NUM_DRAFT_LAYERS}layer-b8x2-4gpu" \
+  --run_name "dflash-action-rnn-decoupled-distill-${PROFILE}-${NUM_DRAFT_LAYERS}layer-b8x2-4gpu" \
   --vla_path "${VLA_PATH}" \
   --datapath "${DATAPATH}" \
   --dataset_format auto \
@@ -168,7 +172,8 @@ torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   --no-action_confidence_enabled \
   --hidden_w "${HIDDEN_W}" \
   --cos_w "${COS_W}" \
-  --soft_w 0 \
+  --soft_w "${SOFT_W}" \
+  --soft_temperature 2.0 \
   --action_token_ce_w "${ACTION_TOKEN_CE_W}" \
   --action_distill_l1_w "${ACTION_DISTILL_L1_W}" \
   --action_distill_temperature 1.0 \
@@ -184,6 +189,7 @@ torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   --residual_token_ce_w 0 \
   --logit_markov_type none \
   --anchor_logit_distill_w "${ANCHOR_LOGIT_DISTILL_W}" \
+  --backbone_anchor_logit_distill_w "${BACKBONE_ANCHOR_LOGIT_DISTILL_W}" \
   --anchor_logit_distill_temperature 2.0 \
   --anchor_logit_distill_min_position 2 \
   --anchor_logit_distill_max_position 6 \

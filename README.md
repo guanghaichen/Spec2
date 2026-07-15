@@ -167,9 +167,11 @@ final_action_logits = frozen_lm_head_action_logits + action_rnn_bias
 RNN 每一步读取：当前位置 DFlash hidden、前一个 action token、当前位置 embedding、上一步 RNN state。
 输出层零初始化，因此训练起点严格等于 frozen `lm_head`。
 
-当前稳定版把两条反传路径解耦：hidden/cos 只更新并行 Draft 主干；CE、动作分布 L1、Prefix Survival
-和跨 anchor logit KL 只更新 Action-RNN。动作头仍读取当前 Draft hidden，但该输入在动作损失分支执行
-`stop_gradient`。这样 token 目标不能再通过改动共享 hidden 走捷径，必须让残差动作头本身学会修正。
+当前稳定版把两条反传职责解耦，但前向并非互不相干：Action-RNN 仍读取 Draft hidden 和冻结 `lm_head`
+产生的基础 logits。hidden/cos、低权重 teacher soft distribution 和主干跨 anchor KL 更新并行 Draft；CE、
+动作分布 L1、Prefix Survival 和动作头跨 anchor KL 更新 Action-RNN。动作头读取的 Draft hidden/base logits
+在动作损失分支执行 `stop_gradient`。这样重动作目标不能再通过改动共享 hidden 走捷径，同时 Draft 仍能得到
+直接的 token 分布监督。
 
 训练使用 teacher forcing。以 anchor0 为例：
 
@@ -189,11 +191,12 @@ RNN 每一步读取：当前位置 DFlash hidden、前一个 action token、当�
 所以因果信息没有消失，而是从旧 hidden 修正迁移到了动作 logits 决策层。代价是 teacher forcing 与
 self-rollout 仍有分布差异，必须看 `rollout_*` 和在线命中率。
 
-#### 跨 Anchor Logit Distillation
+#### 双分支跨 Anchor Logit Distillation
 
-对同一目标位置，较远 slot 的最终动作分布追近端强路径分布。强路径必须预测正确，且 teacher 分支
-`stop_gradient`。这保留了本项目区别于单纯 DSpark 式前 token 注入的核心：不同 anchor 是同一目标位置的
-多种因果视角。
+对同一目标位置，较远 slot 的动作分布追近端强路径分布。强路径必须预测正确，且 teacher 分支
+`stop_gradient`。当前同一原则作用两次：修正前 base logits 的 KL 只训练 Draft 主干；修正后 final logits 的
+KL 只训练 Action-RNN。这保留了本项目区别于单纯 DSpark 式前 token 注入的核心：不同 anchor 是同一目标
+位置的多种因果视角，并且主干与动作头都必须各自吸收这种信息，不能由另一侧代偿。
 
 #### Prefix Survival
 
@@ -252,10 +255,12 @@ HDF5 不保存 `pixel_values`；final hidden 已在 selected prompt 中，也不
 ```text
 total = 1.00 * hidden_smooth_l1
       + 0.05 * hidden_cosine
+      + 0.05 * backbone_teacher_soft_ce
+      + 0.05 * backbone_cross_anchor_logit_kl
       + 0.10 * action_token_ce
       + 0.40 * action_distribution_l1
       + 0.20 * prefix_survival
-      + 0.05 * cross_anchor_logit_distillation
+      + 0.05 * action_head_cross_anchor_logit_kl
 ```
 
 它们对参数的作用不同：
@@ -264,12 +269,15 @@ total = 1.00 * hidden_smooth_l1
 | --- | --- | --- | --- |
 | hidden SmoothL1 | 否 | 是 | 保持目标 hidden 表征 |
 | hidden cosine | 否 | 是 | 对齐 hidden 方向 |
+| backbone teacher soft CE | 否 | 是 | 让修正前 base logits 对齐 teacher 的 256 类动作分布 |
+| backbone cross-anchor logit KL | 否 | 是 | 让主干远端弱路径追近端强路径 |
 | action token CE | 是 | 否 | 提高真实 token top-1 命中 |
 | action distribution L1 | 是 | 否 | 对齐 256 类 teacher 动作分布 |
 | prefix survival | 是 | 否 | 直接鼓励连续接受前缀 |
-| cross-anchor logit KL | 是 | 否 | 让远端弱路径追近端强路径 |
+| action-head cross-anchor logit KL | 是 | 否 | 让动作头修正后的弱路径追近端强路径 |
 
-当前关闭：全词表 soft CE、confidence head、旧 hidden CAD、旧 causal residual、旧 refined hidden、旧 residual CE。
+当前 soft CE 只在 256 个动作 token 子词表上计算，不做昂贵且无关的全词表 soft CE。当前关闭：confidence
+head、旧 hidden CAD、旧 causal residual、旧 refined hidden、旧 residual CE。
 `slot_decay=1.0`；只保留 `position_balance` 来抵消 multi-anchor 对后部绝对位置的重复监督偏差。
 优化器使用两组学习率：Draft 主干 `2e-5`，Action-RNN `5e-5`，共同 warmup 1000 step 后线性退火。
 
@@ -288,6 +296,9 @@ component = raw_loss * 配置权重
 | `base_accuracy` | Action-RNN 残差加入前的 frozen-lm-head 命中率 |
 | `accuracy` | teacher-forced Action-RNN 修正后的总体命中率 |
 | `action_head_accuracy_gain` | `accuracy-base_accuracy`；直接判断残差动作头是否真的带来收益 |
+| `soft_loss` / `soft_component` | Draft base logits 的 teacher soft CE 原值 / 乘 `0.05` 后贡献 |
+| `backbone_anchor_logit_distill_loss` | Draft base logits 的跨 anchor KL；只更新主干 |
+| `anchor_logit_distill_loss` | Action-RNN final logits 的跨 anchor KL；只更新动作头 |
 | `rollout_accuracy` | anchor0 使用自身预测前缀回滚时的 top-1 命中率 |
 | `rollout_exposure_gap` | `accuracy-rollout_accuracy`；衡量 teacher forcing 到自回滚的分布差距 |
 | `rollout_top2_accuracy` | 正确 token 是否进入 self-rollout top-2 |
@@ -386,7 +397,8 @@ Length 高于 SpecVLA strict 却更慢，证明 Length 不包含 draft 自身成
 相关系数约为 `-0.61/-0.53/-0.47`。epoch 12 时 teacher-forced head accuracy 约 `0.922`，base accuracy
 约 `0.921`，动作头净增益仅约 `0.0005`，而 rollout 约 `0.889`。这说明高权重动作损失主要在改动共享
 Draft hidden，Action-RNN 本身几乎没有学到有效残差。当前默认配方因此改为“主干/动作头梯度隔离 + 双学习率
-+ hidden 主导权重”；旧输出目录不得续训到新配方。
++ hidden 主导权重”。在此基础上，当前配方再给 Draft 增加 `0.05` teacher soft CE 和 `0.05` 主干跨 anchor
+KL，使其不只依靠 hidden 回归；旧输出目录不得续训到新配方。
 
 ## 7. 当前标准工作流
 
@@ -451,7 +463,8 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 \
 ```
 
 脚本默认：一层 draft、global batch 64、200 epoch、Draft/Action-RNN 学习率分别为 `2e-5/5e-5`、
-warmup 1000 step、每 10 epoch 保存一次。动作损失输入默认 detach，不要用旧 checkpoint 续训。
+warmup 1000 step、每 10 epoch 保存一次。Draft 侧 soft/KL 权重均为 `0.05`；动作重损失输入默认 detach，
+不要用旧 checkpoint 续训。
 
 常用消融：
 
@@ -486,14 +499,14 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 \
 
 ```bash
 CKPT_3090=$(ssh 3090_wulin \
-  "find /data/wulin/c/specvla-data/ckpt_goal_dflash_action_rnn_decoupled_1layer_b8x2_4gpu \
+  "find /data/wulin/c/specvla-data/ckpt_goal_dflash_action_rnn_decoupled_distill_1layer_b8x2_4gpu \
    -maxdepth 1 -type d -name 'epoch_200_step_*' | sort -V | tail -1")
 
 ssh 4090 \
-  'mkdir -p /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_action_rnn_decoupled_1layer_b8x2_4gpu'
+  'mkdir -p /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_action_rnn_decoupled_distill_1layer_b8x2_4gpu'
 
 scp -3 -r "3090_wulin:${CKPT_3090}" \
-  '4090:/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_action_rnn_decoupled_1layer_b8x2_4gpu/'
+  '4090:/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_action_rnn_decoupled_distill_1layer_b8x2_4gpu/'
 ```
 
 ### 7.4 4090 复现 SpecVLA Goal baseline
@@ -541,7 +554,7 @@ bash openvla/specdecoding/decode-scripts/run_specvla_main_table_eval.sh
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 EVAL_EPOCH=200 \
-DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_action_rnn_decoupled_1layer_b8x2_4gpu \
+DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_action_rnn_decoupled_distill_1layer_b8x2_4gpu \
   bash openvla/specdecoding/decode-scripts/run_dflash_action_rnn_goal_pair_eval.sh
 ```
 

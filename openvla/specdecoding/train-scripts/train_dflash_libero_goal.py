@@ -297,6 +297,12 @@ def parse_args():
     parser.add_argument("--logit_markov_rank", type=int, default=256, help="logits Markov bias 头中间维度；只影响 bias 头表达力")
     parser.add_argument("--logit_markov_scale", type=float, default=1.0, help="logits Markov bias 幅度系数；调小可减弱 token 层修正")
     parser.add_argument("--anchor_logit_distill_w", type=float, default=0.0, help="跨 anchor 强弱路径 logits 蒸馏权重；让弱前缀预测追更强前缀预测")
+    parser.add_argument(
+        "--backbone_anchor_logit_distill_w",
+        type=float,
+        default=0.0,
+        help="Draft base logits 的跨 anchor KL 权重；与动作头 KL 独立，直接训练并行主干",
+    )
     parser.add_argument("--anchor_logit_distill_temperature", type=float, default=2.0, help="跨 anchor logits KL 温度；越大越强调暗知识而非单个 hard token")
     parser.add_argument("--anchor_logit_distill_min_position", type=int, default=2, help="anchor logits 蒸馏作用的最小目标 token 位置；默认 p2")
     parser.add_argument("--anchor_logit_distill_max_position", type=int, default=5, help="anchor logits 蒸馏作用的最大目标 token 位置；默认 p5")
@@ -402,6 +408,8 @@ def distributed_log_metrics(metrics: Dict[str, torch.Tensor], distributed: bool)
         "rollout_position_total",
         "anchor_consistency_pairs",
         "causal_residual_cad_pairs",
+        "anchor_logit_distill_pairs",
+        "backbone_anchor_logit_distill_pairs",
     }
     reduced: Dict[str, torch.Tensor] = {}
     world_size = dist.get_world_size()
@@ -846,7 +854,13 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "selected_hidden_variant": args.selected_hidden_variant,
         "mask_token_id": args.mask_token_id,
         "loss_design": (
-            "specvla_anchor_hidden_main+teacher_soft_ce"
+            "specvla_anchor_hidden_main"
+            + ("+backbone_teacher_soft_ce" if args.soft_w > 0 else "")
+            + (
+                "+backbone_anchor_logit_distill"
+                if args.backbone_anchor_logit_distill_w > 0
+                else ""
+            )
             + ("+causal_residual_cad" if args.causal_residual_cad_w > 0 else "")
             + ("+logit_markov_bias" if args.logit_markov_type != "none" else "")
             + ("+anchor_logit_distill" if args.anchor_logit_distill_w > 0 else "")
@@ -900,6 +914,7 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "logit_markov_rank": args.logit_markov_rank,
         "logit_markov_scale": args.logit_markov_scale,
         "anchor_logit_distill_w": args.anchor_logit_distill_w,
+        "backbone_anchor_logit_distill_w": args.backbone_anchor_logit_distill_w,
         "anchor_logit_distill_temperature": args.anchor_logit_distill_temperature,
         "anchor_logit_distill_min_position": args.anchor_logit_distill_min_position,
         "anchor_logit_distill_max_position": args.anchor_logit_distill_max_position,
@@ -1294,6 +1309,9 @@ def compute_loss_and_accuracy(
     anchor_logit_distill_sum = torch.zeros((), device=device, dtype=torch.float32)
     anchor_logit_distill_weight_sum = torch.zeros((), device=device, dtype=torch.float32)
     anchor_logit_distill_pairs = torch.zeros((), device=device, dtype=torch.float32)
+    backbone_anchor_logit_distill_sum = torch.zeros((), device=device, dtype=torch.float32)
+    backbone_anchor_logit_distill_weight_sum = torch.zeros((), device=device, dtype=torch.float32)
+    backbone_anchor_logit_distill_pairs = torch.zeros((), device=device, dtype=torch.float32)
     action_token_ce_sum = torch.zeros((), device=device, dtype=torch.float32)
     action_distill_l1_sum = torch.zeros((), device=device, dtype=torch.float32)
     prefix_survival_sum = torch.zeros((), device=device, dtype=torch.float32)
@@ -1331,6 +1349,9 @@ def compute_loss_and_accuracy(
     anchor_logit_teacher_logits: Dict[int, torch.Tensor] = {}
     anchor_logit_teacher_mask: Dict[int, torch.Tensor] = {}
     anchor_logit_student_entries = []
+    backbone_anchor_logit_teacher_logits: Dict[int, torch.Tensor] = {}
+    backbone_anchor_logit_teacher_mask: Dict[int, torch.Tensor] = {}
+    backbone_anchor_logit_student_entries = []
     # 主循环：
     # - 原始 DFLASH: context=P+A[:anchor]，block=[t_anchor, MASK...]，预测 t_{anchor+1}...
     # - SpecVLA式注入: context=P+A[:anchor+1]，block=[t_anchor, MASK...]，预测 t_{anchor+1}...
@@ -1425,27 +1446,28 @@ def compute_loss_and_accuracy(
         # 新版只取 lm_head 的 256 个动作行做块投影，随后在动作子词表上递推前缀状态。
         action_confidence_logits = None
         if draft_model.action_sequential_enabled:
-            # hidden/cos 负责训练并行 Draft 主干；token、分布、Prefix 与跨-anchor
-            # logits 只训练轻量 Action-RNN。若不隔离，动作损失会优先改动共享
-            # hidden，而不是迫使 residual head 学会真正有用的修正。
-            action_base_hidden = student_hidden
-            action_head_hidden = pred_hidden[:, :max_block_len, :]
-            if args.detach_action_head_inputs:
-                action_base_hidden = action_base_hidden.detach()
-                action_head_hidden = action_head_hidden.detach()
-            base_student_logits = draft_model.project_action_logits(
-                action_base_hidden.to(torch.bfloat16),
+            # backbone_student_logits 保留到 Draft hidden 的梯度，只承接低权重
+            # soft / backbone cross-anchor KL。Action-RNN 的重动作损失使用 detach
+            # 分支，避免 CE/L1/Prefix 重新通过共享 hidden 走捷径。
+            backbone_student_logits = draft_model.project_action_logits(
+                student_hidden.to(torch.bfloat16),
                 lm_head,
             ).float()
+            action_base_logits = backbone_student_logits
+            action_head_hidden = pred_hidden[:, :max_block_len, :]
+            if args.detach_action_head_inputs:
+                action_base_logits = action_base_logits.detach()
+                action_head_hidden = action_head_hidden.detach()
             student_logits, action_confidence_logits = draft_model.apply_action_sequential_head(
-                base_student_logits,
+                action_base_logits,
                 action_head_hidden,
                 prev_token_ids=prev_token_ids,
                 action_position_ids=action_position_ids,
             )
-            base_metric_logits = draft_model.action_logits_from_full(base_student_logits)
+            base_metric_logits = backbone_student_logits
         else:
             base_student_logits = lm_head(student_hidden.to(torch.bfloat16)).float()
+            backbone_student_logits = base_student_logits
             student_logits = lm_head(refined_student_hidden.to(torch.bfloat16)).float()
             base_metric_logits = base_student_logits
         if args.logit_markov_type != "none" and not draft_model.action_sequential_enabled:
@@ -1512,7 +1534,12 @@ def compute_loss_and_accuracy(
         if args.soft_w > 0:
             with torch.no_grad():
                 teacher_probs = F.softmax(teacher_logits / args.soft_temperature, dim=-1)
-            student_log_probs = F.log_softmax(student_logits / args.soft_temperature, dim=-1)
+            # soft loss 只监督 Draft 主干经冻结 lm_head 得到的基础分布。
+            # Action-RNN 的重动作损失走上方 detach 分支，不会借此反传回主干。
+            student_log_probs = F.log_softmax(
+                backbone_student_logits / args.soft_temperature,
+                dim=-1,
+            )
             soft_ce = -(teacher_probs * student_log_probs).sum(dim=-1) * (args.soft_temperature ** 2)
             soft_sum += (soft_ce * loss_weight).sum()
 
@@ -1594,7 +1621,7 @@ def compute_loss_and_accuracy(
         if draft_model.action_sequential_enabled and anchor == 0:
             with torch.no_grad():
                 rollout_tokens, rollout_logits, _ = draft_model.sample_action_block(
-                    base_logits=base_student_logits.detach(),
+                    base_logits=backbone_student_logits.detach(),
                     hidden_states=pred_hidden[:, :max_block_len, :].detach(),
                     first_prev_token_ids=tokens[:, known_token_index : known_token_index + 1],
                     action_position_ids=action_position_ids,
@@ -1741,6 +1768,34 @@ def compute_loss_and_accuracy(
                         )
                     )
 
+        if args.backbone_anchor_logit_distill_w > 0:
+            for local_pos in range(max_block_len):
+                target_pos = teacher_start + local_pos
+                target_token_position = target_pos + 1
+                pos_mask = valid_mask[:, local_pos].bool()
+                if local_pos == 0:
+                    teacher_mask = pos_mask
+                    if args.anchor_logit_distill_correct_teacher_only:
+                        teacher_mask = teacher_mask & base_correct_mask[:, local_pos]
+                    backbone_anchor_logit_teacher_logits[target_pos] = backbone_student_logits[
+                        :, local_pos, :
+                    ]
+                    backbone_anchor_logit_teacher_mask[target_pos] = teacher_mask
+                elif (
+                    local_pos >= args.causal_residual_start_index
+                    and args.anchor_logit_distill_min_position
+                    <= target_token_position
+                    <= args.anchor_logit_distill_max_position
+                ):
+                    backbone_anchor_logit_student_entries.append(
+                        (
+                            target_pos,
+                            backbone_student_logits[:, local_pos, :],
+                            pos_mask,
+                            loss_weight[:, local_pos].detach(),
+                        )
+                    )
+
         base_total_correct += base_correct_mask.sum().float()
         total_correct += correct_mask.sum().float()
         total_positions += valid_count
@@ -1827,6 +1882,31 @@ def compute_loss_and_accuracy(
             anchor_logit_distill_weight_sum += current_weight
             anchor_logit_distill_pairs += pair_mask.sum().float()
 
+    if args.backbone_anchor_logit_distill_w > 0:
+        temperature = float(args.anchor_logit_distill_temperature)
+        for target_pos, weak_logits, weak_mask, weak_weight in backbone_anchor_logit_student_entries:
+            strong_logits = backbone_anchor_logit_teacher_logits.get(target_pos)
+            strong_mask = backbone_anchor_logit_teacher_mask.get(target_pos)
+            if strong_logits is None or strong_mask is None:
+                continue
+            pair_mask = weak_mask & strong_mask
+            if int(pair_mask.sum().item()) == 0:
+                continue
+            pair_weight = weak_weight * pair_mask.float()
+            current_weight = pair_weight.sum()
+            if current_weight.item() == 0:
+                continue
+            strong_probs = F.softmax(strong_logits.detach() / temperature, dim=-1)
+            weak_log_probs = F.log_softmax(weak_logits / temperature, dim=-1)
+            logit_kl = F.kl_div(
+                weak_log_probs,
+                strong_probs,
+                reduction="none",
+            ).sum(dim=-1) * (temperature ** 2)
+            backbone_anchor_logit_distill_sum += (logit_kl * pair_weight).sum()
+            backbone_anchor_logit_distill_weight_sum += current_weight
+            backbone_anchor_logit_distill_pairs += pair_mask.sum().float()
+
     loss_denom = weight_sum.clamp_min(1.0)
     metric_denom = total_positions.clamp_min(1.0)
     consistency_denom = anchor_consistency_weight_sum.clamp_min(1.0)
@@ -1834,6 +1914,7 @@ def compute_loss_and_accuracy(
     refined_hidden_denom = refined_hidden_weight_sum.clamp_min(1.0)
     residual_token_ce_denom = residual_token_ce_weight_sum.clamp_min(1.0)
     anchor_logit_distill_denom = anchor_logit_distill_weight_sum.clamp_min(1.0)
+    backbone_anchor_logit_distill_denom = backbone_anchor_logit_distill_weight_sum.clamp_min(1.0)
     soft_loss = soft_sum / loss_denom
     hidden_loss = hidden_sum / loss_denom
     cos_loss = cos_sum / loss_denom
@@ -1842,6 +1923,9 @@ def compute_loss_and_accuracy(
     refined_hidden_loss = refined_hidden_sum / refined_hidden_denom
     residual_token_ce_loss = residual_token_ce_sum / residual_token_ce_denom
     anchor_logit_distill_loss = anchor_logit_distill_sum / anchor_logit_distill_denom
+    backbone_anchor_logit_distill_loss = (
+        backbone_anchor_logit_distill_sum / backbone_anchor_logit_distill_denom
+    )
     action_token_ce_loss = action_token_ce_sum / loss_denom
     action_distill_l1_loss = action_distill_l1_sum / loss_denom
     prefix_survival_loss = prefix_survival_sum / loss_denom
@@ -1867,6 +1951,9 @@ def compute_loss_and_accuracy(
     refined_hidden_component = args.refined_hidden_w * refined_hidden_loss
     residual_token_ce_component = args.residual_token_ce_w * residual_token_ce_loss
     anchor_logit_distill_component = args.anchor_logit_distill_w * anchor_logit_distill_loss
+    backbone_anchor_logit_distill_component = (
+        args.backbone_anchor_logit_distill_w * backbone_anchor_logit_distill_loss
+    )
     action_token_ce_component = args.action_token_ce_w * action_token_ce_loss
     action_distill_l1_component = args.action_distill_l1_w * action_distill_l1_loss
     prefix_survival_component = args.prefix_survival_w * prefix_survival_loss
@@ -1880,6 +1967,7 @@ def compute_loss_and_accuracy(
         + refined_hidden_component
         + residual_token_ce_component
         + anchor_logit_distill_component
+        + backbone_anchor_logit_distill_component
         + action_token_ce_component
         + action_distill_l1_component
         + prefix_survival_component
@@ -1904,6 +1992,7 @@ def compute_loss_and_accuracy(
         "refined_hidden_loss": refined_hidden_loss,
         "residual_token_ce_loss": residual_token_ce_loss,
         "anchor_logit_distill_loss": anchor_logit_distill_loss,
+        "backbone_anchor_logit_distill_loss": backbone_anchor_logit_distill_loss,
         "action_token_ce_loss": action_token_ce_loss,
         "action_distill_l1_loss": action_distill_l1_loss,
         "prefix_survival_loss": prefix_survival_loss,
@@ -1916,6 +2005,7 @@ def compute_loss_and_accuracy(
         "refined_hidden_component": refined_hidden_component,
         "residual_token_ce_component": residual_token_ce_component,
         "anchor_logit_distill_component": anchor_logit_distill_component,
+        "backbone_anchor_logit_distill_component": backbone_anchor_logit_distill_component,
         "action_token_ce_component": action_token_ce_component,
         "action_distill_l1_component": action_distill_l1_component,
         "prefix_survival_component": prefix_survival_component,
@@ -1925,6 +2015,7 @@ def compute_loss_and_accuracy(
         "anchor_consistency_pairs": anchor_consistency_pairs.detach(),
         "causal_residual_cad_pairs": causal_residual_cad_pairs.detach(),
         "anchor_logit_distill_pairs": anchor_logit_distill_pairs.detach(),
+        "backbone_anchor_logit_distill_pairs": backbone_anchor_logit_distill_pairs.detach(),
         "refined_hidden_weight_sum": refined_hidden_weight_sum.detach(),
         "accuracy": accuracy,
         "base_accuracy": base_accuracy,
@@ -1967,6 +2058,7 @@ def evaluate(
     total_causal_residual_cad = 0.0
     total_refined_hidden = 0.0
     total_anchor_logit_distill = 0.0
+    total_backbone_anchor_logit_distill = 0.0
     total_action_token_ce = 0.0
     total_action_distill_l1 = 0.0
     total_prefix_survival = 0.0
@@ -1978,6 +2070,7 @@ def evaluate(
     total_causal_residual_cad_component = 0.0
     total_refined_hidden_component = 0.0
     total_anchor_logit_distill_component = 0.0
+    total_backbone_anchor_logit_distill_component = 0.0
     total_action_token_ce_component = 0.0
     total_action_distill_l1_component = 0.0
     total_prefix_survival_component = 0.0
@@ -1987,6 +2080,7 @@ def evaluate(
     total_anchor_consistency_pairs = 0.0
     total_causal_residual_cad_pairs = 0.0
     total_anchor_logit_distill_pairs = 0.0
+    total_backbone_anchor_logit_distill_pairs = 0.0
     total_acc = 0.0
     total_base_acc = 0.0
     total_rollout_acc = 0.0
@@ -2010,6 +2104,9 @@ def evaluate(
         total_causal_residual_cad += metrics["causal_residual_cad_loss"].item() * bs
         total_refined_hidden += metrics["refined_hidden_loss"].item() * bs
         total_anchor_logit_distill += metrics["anchor_logit_distill_loss"].item() * bs
+        total_backbone_anchor_logit_distill += metrics[
+            "backbone_anchor_logit_distill_loss"
+        ].item() * bs
         total_action_token_ce += metrics["action_token_ce_loss"].item() * bs
         total_action_distill_l1 += metrics["action_distill_l1_loss"].item() * bs
         total_prefix_survival += metrics["prefix_survival_loss"].item() * bs
@@ -2021,6 +2118,9 @@ def evaluate(
         total_causal_residual_cad_component += metrics["causal_residual_cad_component"].item() * bs
         total_refined_hidden_component += metrics["refined_hidden_component"].item() * bs
         total_anchor_logit_distill_component += metrics["anchor_logit_distill_component"].item() * bs
+        total_backbone_anchor_logit_distill_component += metrics[
+            "backbone_anchor_logit_distill_component"
+        ].item() * bs
         total_action_token_ce_component += metrics["action_token_ce_component"].item() * bs
         total_action_distill_l1_component += metrics["action_distill_l1_component"].item() * bs
         total_prefix_survival_component += metrics["prefix_survival_component"].item() * bs
@@ -2030,6 +2130,9 @@ def evaluate(
         total_anchor_consistency_pairs += metrics["anchor_consistency_pairs"].item()
         total_causal_residual_cad_pairs += metrics["causal_residual_cad_pairs"].item()
         total_anchor_logit_distill_pairs += metrics["anchor_logit_distill_pairs"].item()
+        total_backbone_anchor_logit_distill_pairs += metrics[
+            "backbone_anchor_logit_distill_pairs"
+        ].item()
         total_acc += metrics["accuracy"].item() * bs
         total_base_acc += metrics["base_accuracy"].item() * bs
         total_rollout_acc += metrics["rollout_accuracy"].item() * bs
@@ -2053,6 +2156,7 @@ def evaluate(
         "val/causal_residual_cad_loss": total_causal_residual_cad / denom,
         "val/refined_hidden_loss": total_refined_hidden / denom,
         "val/anchor_logit_distill_loss": total_anchor_logit_distill / denom,
+        "val/backbone_anchor_logit_distill_loss": total_backbone_anchor_logit_distill / denom,
         "val/action_token_ce_loss": total_action_token_ce / denom,
         "val/action_distill_l1_loss": total_action_distill_l1 / denom,
         "val/prefix_survival_loss": total_prefix_survival / denom,
@@ -2064,6 +2168,9 @@ def evaluate(
         "val/causal_residual_cad_component": total_causal_residual_cad_component / denom,
         "val/refined_hidden_component": total_refined_hidden_component / denom,
         "val/anchor_logit_distill_component": total_anchor_logit_distill_component / denom,
+        "val/backbone_anchor_logit_distill_component": (
+            total_backbone_anchor_logit_distill_component / denom
+        ),
         "val/action_token_ce_component": total_action_token_ce_component / denom,
         "val/action_distill_l1_component": total_action_distill_l1_component / denom,
         "val/prefix_survival_component": total_prefix_survival_component / denom,
@@ -2073,6 +2180,9 @@ def evaluate(
         "val/anchor_consistency_pairs_per_sample": total_anchor_consistency_pairs / denom,
         "val/causal_residual_cad_pairs_per_sample": total_causal_residual_cad_pairs / denom,
         "val/anchor_logit_distill_pairs_per_sample": total_anchor_logit_distill_pairs / denom,
+        "val/backbone_anchor_logit_distill_pairs_per_sample": (
+            total_backbone_anchor_logit_distill_pairs / denom
+        ),
         "val/accuracy": total_acc / denom,
         "val/base_accuracy": total_base_acc / denom,
         "val/action_head_accuracy_gain": (total_acc - total_base_acc) / denom,
@@ -2110,6 +2220,7 @@ def main():
         "refined_hidden_w",
         "residual_token_ce_w",
         "anchor_logit_distill_w",
+        "backbone_anchor_logit_distill_w",
         "action_token_ce_w",
         "action_distill_l1_w",
         "prefix_survival_w",
@@ -2576,6 +2687,7 @@ def main():
             train_refined_hidden_sum = 0.0
             train_residual_token_ce_sum = 0.0
             train_anchor_logit_distill_sum = 0.0
+            train_backbone_anchor_logit_distill_sum = 0.0
             train_action_token_ce_sum = 0.0
             train_action_distill_l1_sum = 0.0
             train_prefix_survival_sum = 0.0
@@ -2588,6 +2700,7 @@ def main():
             train_refined_hidden_component_sum = 0.0
             train_residual_token_ce_component_sum = 0.0
             train_anchor_logit_distill_component_sum = 0.0
+            train_backbone_anchor_logit_distill_component_sum = 0.0
             train_action_token_ce_component_sum = 0.0
             train_action_distill_l1_component_sum = 0.0
             train_prefix_survival_component_sum = 0.0
@@ -2597,6 +2710,7 @@ def main():
             train_anchor_consistency_pairs_sum = 0.0
             train_causal_residual_cad_pairs_sum = 0.0
             train_anchor_logit_distill_pairs_sum = 0.0
+            train_backbone_anchor_logit_distill_pairs_sum = 0.0
             train_acc_sum = 0.0
             train_base_acc_sum = 0.0
             train_rollout_acc_sum = 0.0
@@ -2611,12 +2725,14 @@ def main():
             train_log_steps = 0
             epoch_metric_names = (
                 "loss",
+                "soft_loss",
                 "hidden_loss",
                 "cos_loss",
                 "action_token_ce_loss",
                 "action_distill_l1_loss",
                 "prefix_survival_loss",
                 "anchor_logit_distill_loss",
+                "backbone_anchor_logit_distill_loss",
                 "accuracy",
                 "base_accuracy",
                 "rollout_accuracy",
@@ -2665,6 +2781,9 @@ def main():
                 train_refined_hidden_sum += log_metrics["refined_hidden_loss"].item()
                 train_residual_token_ce_sum += log_metrics["residual_token_ce_loss"].item()
                 train_anchor_logit_distill_sum += log_metrics["anchor_logit_distill_loss"].item()
+                train_backbone_anchor_logit_distill_sum += log_metrics[
+                    "backbone_anchor_logit_distill_loss"
+                ].item()
                 train_action_token_ce_sum += log_metrics["action_token_ce_loss"].item()
                 train_action_distill_l1_sum += log_metrics["action_distill_l1_loss"].item()
                 train_prefix_survival_sum += log_metrics["prefix_survival_loss"].item()
@@ -2677,6 +2796,9 @@ def main():
                 train_refined_hidden_component_sum += log_metrics["refined_hidden_component"].item()
                 train_residual_token_ce_component_sum += log_metrics["residual_token_ce_component"].item()
                 train_anchor_logit_distill_component_sum += log_metrics["anchor_logit_distill_component"].item()
+                train_backbone_anchor_logit_distill_component_sum += log_metrics[
+                    "backbone_anchor_logit_distill_component"
+                ].item()
                 train_action_token_ce_component_sum += log_metrics["action_token_ce_component"].item()
                 train_action_distill_l1_component_sum += log_metrics["action_distill_l1_component"].item()
                 train_prefix_survival_component_sum += log_metrics["prefix_survival_component"].item()
@@ -2686,6 +2808,9 @@ def main():
                 train_anchor_consistency_pairs_sum += log_metrics["anchor_consistency_pairs"].item()
                 train_causal_residual_cad_pairs_sum += log_metrics["causal_residual_cad_pairs"].item()
                 train_anchor_logit_distill_pairs_sum += log_metrics["anchor_logit_distill_pairs"].item()
+                train_backbone_anchor_logit_distill_pairs_sum += log_metrics[
+                    "backbone_anchor_logit_distill_pairs"
+                ].item()
                 train_acc_sum += log_metrics["accuracy"].item()
                 train_base_acc_sum += log_metrics["base_accuracy"].item()
                 train_rollout_acc_sum += log_metrics["rollout_accuracy"].item()
@@ -2729,6 +2854,9 @@ def main():
                             "train/refined_hidden_loss": train_refined_hidden_sum / denom_log_steps,
                             "train/residual_token_ce_loss": train_residual_token_ce_sum / denom_log_steps,
                             "train/anchor_logit_distill_loss": train_anchor_logit_distill_sum / denom_log_steps,
+                            "train/backbone_anchor_logit_distill_loss": (
+                                train_backbone_anchor_logit_distill_sum / denom_log_steps
+                            ),
                             "train/action_token_ce_loss": train_action_token_ce_sum / denom_log_steps,
                             "train/action_distill_l1_loss": train_action_distill_l1_sum / denom_log_steps,
                             "train/prefix_survival_loss": train_prefix_survival_sum / denom_log_steps,
@@ -2741,6 +2869,9 @@ def main():
                             "train/refined_hidden_component": train_refined_hidden_component_sum / denom_log_steps,
                             "train/residual_token_ce_component": train_residual_token_ce_component_sum / denom_log_steps,
                             "train/anchor_logit_distill_component": train_anchor_logit_distill_component_sum / denom_log_steps,
+                            "train/backbone_anchor_logit_distill_component": (
+                                train_backbone_anchor_logit_distill_component_sum / denom_log_steps
+                            ),
                             "train/action_token_ce_component": train_action_token_ce_component_sum / denom_log_steps,
                             "train/action_distill_l1_component": train_action_distill_l1_component_sum / denom_log_steps,
                             "train/prefix_survival_component": train_prefix_survival_component_sum / denom_log_steps,
@@ -2750,6 +2881,9 @@ def main():
                             "train/anchor_consistency_pairs_per_batch": train_anchor_consistency_pairs_sum / denom_log_steps,
                             "train/causal_residual_cad_pairs_per_batch": train_causal_residual_cad_pairs_sum / denom_log_steps,
                             "train/anchor_logit_distill_pairs_per_batch": train_anchor_logit_distill_pairs_sum / denom_log_steps,
+                            "train/backbone_anchor_logit_distill_pairs_per_batch": (
+                                train_backbone_anchor_logit_distill_pairs_sum / denom_log_steps
+                            ),
                             "train/accuracy": train_acc_sum / denom_log_steps,
                             "train/base_accuracy": train_base_acc_sum / denom_log_steps,
                             "train/action_head_accuracy_gain": (
@@ -2807,6 +2941,8 @@ def main():
                             f"rescad*={train_payload['train/causal_residual_cad_component']:.4f} "
                             f"alogit={train_payload['train/anchor_logit_distill_loss']:.4f} "
                             f"alogit*={train_payload['train/anchor_logit_distill_component']:.4f} "
+                            f"balogit={train_payload['train/backbone_anchor_logit_distill_loss']:.4f} "
+                            f"balogit*={train_payload['train/backbone_anchor_logit_distill_component']:.4f} "
                             f"refh={train_payload['train/refined_hidden_loss']:.4f} "
                             f"refh*={train_payload['train/refined_hidden_component']:.4f} "
                             f"ace={train_payload['train/action_token_ce_loss']:.4f} "
@@ -2833,6 +2969,7 @@ def main():
                         train_refined_hidden_sum = 0.0
                         train_residual_token_ce_sum = 0.0
                         train_anchor_logit_distill_sum = 0.0
+                        train_backbone_anchor_logit_distill_sum = 0.0
                         train_action_token_ce_sum = 0.0
                         train_action_distill_l1_sum = 0.0
                         train_prefix_survival_sum = 0.0
@@ -2845,6 +2982,7 @@ def main():
                         train_refined_hidden_component_sum = 0.0
                         train_residual_token_ce_component_sum = 0.0
                         train_anchor_logit_distill_component_sum = 0.0
+                        train_backbone_anchor_logit_distill_component_sum = 0.0
                         train_action_token_ce_component_sum = 0.0
                         train_action_distill_l1_component_sum = 0.0
                         train_prefix_survival_component_sum = 0.0
@@ -2854,6 +2992,7 @@ def main():
                         train_anchor_consistency_pairs_sum = 0.0
                         train_causal_residual_cad_pairs_sum = 0.0
                         train_anchor_logit_distill_pairs_sum = 0.0
+                        train_backbone_anchor_logit_distill_pairs_sum = 0.0
                         train_acc_sum = 0.0
                         train_base_acc_sum = 0.0
                         train_rollout_acc_sum = 0.0
@@ -2875,6 +3014,7 @@ def main():
                         anc=f"{log_metrics['anchor_consistency_loss'].item():.3f}",
                         rescad=f"{log_metrics['causal_residual_cad_loss'].item():.3f}",
                         alogit=f"{log_metrics['anchor_logit_distill_loss'].item():.3f}",
+                        balogit=f"{log_metrics['backbone_anchor_logit_distill_loss'].item():.3f}",
                         refh=f"{log_metrics['refined_hidden_loss'].item():.3f}",
                         ace=f"{log_metrics['action_token_ce_loss'].item():.3f}",
                         pref=f"{log_metrics['expected_prefix_length'].item():.2f}",
@@ -2986,6 +3126,8 @@ def main():
                     f"rescad*={val_metrics['val/causal_residual_cad_component']:.4f} "
                     f"alogit={val_metrics['val/anchor_logit_distill_loss']:.4f} "
                     f"alogit*={val_metrics['val/anchor_logit_distill_component']:.4f} "
+                    f"balogit={val_metrics['val/backbone_anchor_logit_distill_loss']:.4f} "
+                    f"balogit*={val_metrics['val/backbone_anchor_logit_distill_component']:.4f} "
                     f"refh={val_metrics['val/refined_hidden_loss']:.4f} "
                     f"refh*={val_metrics['val/refined_hidden_component']:.4f} "
                     f"ace={val_metrics['val/action_token_ce_loss']:.4f} "

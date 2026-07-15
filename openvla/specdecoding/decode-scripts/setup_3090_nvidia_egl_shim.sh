@@ -72,4 +72,4 @@ echo
 echo "Example:"
 echo "  NVIDIA_EGL_SHIM_DIR=${SLIM_DIR} \\"
 echo "  NVIDIA_EGL_VENDOR_JSON=${VENDOR_JSON} \\"
-echo "    bash openvla/specdecoding/decode-scripts/run_dflash_libero_goal_eval.sh"
+echo "    bash openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh relaxed"

@@ -136,7 +136,7 @@ def build_rows(args: argparse.Namespace) -> List[Dict[str, Any]]:
         raise ValueError(
             "Missing SpecVLA paper AR (use_spec=True) summary for: "
             + ", ".join(missing_ar)
-            + ". Run the corresponding run_openvla_ar_libero_*_eval.sh launcher first."
+            + ". Run run_specvla_paper_ar_eval.sh for the corresponding suite first."
         )
 
     rows: List[Dict[str, Any]] = []

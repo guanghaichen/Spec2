@@ -68,7 +68,7 @@ for seed in ${REPEAT_SEEDS}; do
     DFLASH_USE_CAUSAL_RESIDUAL_SAMPLING="${DFLASH_USE_CAUSAL_RESIDUAL_SAMPLING}" \
     DFLASH_NUM_DRAFT_LAYERS="${DFLASH_NUM_DRAFT_LAYERS}" \
     RUN_ID_NOTE="${RUN_ID_PREFIX}-strict-seed${seed}-r${STRICT_ACCEPT_THRESHOLD}" \
-      bash "${SCRIPT_DIR}/run_dflash_residual_strict_libero_goal_eval.sh"
+      bash "${SCRIPT_DIR}/run_dflash_goal_eval.sh" strict
   fi
 
   if [[ "${RUN_RELAXED}" == "True" ]]; then
@@ -80,7 +80,7 @@ for seed in ${REPEAT_SEEDS}; do
     DFLASH_USE_CAUSAL_RESIDUAL_SAMPLING="${DFLASH_USE_CAUSAL_RESIDUAL_SAMPLING}" \
     DFLASH_NUM_DRAFT_LAYERS="${DFLASH_NUM_DRAFT_LAYERS}" \
     RUN_ID_NOTE="${RUN_ID_PREFIX}-relaxed-seed${seed}-r${RELAXED_ACCEPT_THRESHOLD}" \
-      bash "${SCRIPT_DIR}/run_dflash_residual_libero_goal_eval.sh"
+      bash "${SCRIPT_DIR}/run_dflash_goal_eval.sh" relaxed
   fi
 done
 
@@ -104,7 +104,7 @@ ar_candidates.sort(key=lambda path: path.stat().st_mtime)
 if not ar_candidates:
     raise SystemExit(
         f"No SpecVLA paper AR summary found under {log_dir / 'openvla_ar'}; "
-        "run run_openvla_ar_libero_goal_eval.sh first"
+        "run run_specvla_paper_ar_eval.sh goal first"
     )
 ar_summary = json.loads(ar_candidates[-1].read_text())
 ar_mean = ar_summary.get("timing", {}).get("mean")

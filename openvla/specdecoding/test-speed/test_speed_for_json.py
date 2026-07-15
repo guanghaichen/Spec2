@@ -45,7 +45,7 @@ def require_matching_paper_ar(ar_timing_path, ar_summary_path, ar_stats):
     if summary.get("ar_baseline") != "specvla_paper_wrapped_ar" or summary.get("use_spec") is not True:
         raise ValueError(
             "Refusing non-paper AR denominator. Re-run "
-            "run_openvla_ar_libero_goal_eval.sh; paper reproduction requires use_spec=True."
+            "run_specvla_paper_ar_eval.sh goal; paper reproduction requires use_spec=True."
         )
 
     expected_timing_path = Path(str(ar_summary_path).replace("_summary.json", "_timing.json"))

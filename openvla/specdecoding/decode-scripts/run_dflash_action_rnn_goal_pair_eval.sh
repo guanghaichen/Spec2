@@ -40,7 +40,7 @@ echo "[Action-RNN strict] suite=libero_goal epoch=${EVAL_EPOCH} r=0"
 SPEC_CKPT="" ACCEPT_THRESHOLD=0 DFLASH_ACCEPTANCE_MODE=token \
 DFLASH_TREE_BRANCH_POSITION=0 DFLASH_TREE_AUTO_CALIBRATE="${DFLASH_TREE_AUTO_CALIBRATE}" \
 RUN_ID_NOTE="${STRICT_RUN_NOTE}" \
-  bash "${SCRIPT_DIR}/run_dflash_strict_libero_goal_eval.sh"
+  bash "${SCRIPT_DIR}/run_dflash_goal_eval.sh" strict
 
 STRICT_SUMMARY="$(find "${LOG_DIR}/dflash_strict" -maxdepth 1 -type f \
   -name "*--${STRICT_RUN_NOTE}-dflash_strict_summary.json" -print | sort | tail -n 1)"
@@ -63,4 +63,4 @@ echo "[Action-RNN relaxed] suite=libero_goal epoch=${EVAL_EPOCH} r=${RELAXED_ACC
 SPEC_CKPT="" ACCEPT_THRESHOLD="${RELAXED_ACCEPT_THRESHOLD:-9}" \
 DFLASH_ACCEPTANCE_MODE=action_group DFLASH_TREE_BRANCH_POSITION="${SELECTED_TREE_POSITION}" \
 RUN_ID_NOTE="${RELAXED_RUN_NOTE}" \
-  bash "${SCRIPT_DIR}/run_dflash_libero_goal_eval.sh"
+  bash "${SCRIPT_DIR}/run_dflash_goal_eval.sh" relaxed

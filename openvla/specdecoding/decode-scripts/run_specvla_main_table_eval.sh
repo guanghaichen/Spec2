@@ -29,18 +29,10 @@ SUMMARY_PREFIX="${SUMMARY_PREFIX:-${LOG_DIR}/main_table_specvla_baselines}"
 
 script_for() {
   local method="$1"
-  local suite="$2"
-  case "${method}:${suite}" in
-    strict:libero_goal) echo "${SCRIPT_DIR}/run_specvla_libero_goal_eval.sh" ;;
-    strict:libero_object) echo "${SCRIPT_DIR}/run_specvla_libero_object_eval.sh" ;;
-    strict:libero_spatial) echo "${SCRIPT_DIR}/run_specvla_libero_spatial_eval.sh" ;;
-    strict:libero_10) echo "${SCRIPT_DIR}/run_specvla_libero_10_eval.sh" ;;
-    relaxed:libero_goal) echo "${SCRIPT_DIR}/run_specvla_relaxed_libero_goal_eval.sh" ;;
-    relaxed:libero_object) echo "${SCRIPT_DIR}/run_specvla_relaxed_libero_object_eval.sh" ;;
-    relaxed:libero_spatial) echo "${SCRIPT_DIR}/run_specvla_relaxed_libero_spatial_eval.sh" ;;
-    relaxed:libero_10) echo "${SCRIPT_DIR}/run_specvla_relaxed_libero_10_eval.sh" ;;
+  case "${method}" in
+    strict|relaxed) echo "${SCRIPT_DIR}/run_specvla_eval.sh" ;;
     *)
-      echo "Unsupported method/suite: ${method}/${suite}" >&2
+      echo "Unsupported method: ${method}" >&2
       return 1
       ;;
   esac
@@ -99,12 +91,12 @@ maybe_run() {
   fi
 
   if [[ "${DRY_RUN}" == "True" ]]; then
-    echo "[dry-run] SpecVLA ${method} ${suite}: ${launcher}"
+    echo "[dry-run] SpecVLA ${method} ${suite}: ${launcher} ${suite} ${method}"
     return 0
   fi
 
-  echo "[run] SpecVLA ${method} ${suite}: ${launcher}"
-  bash "${launcher}"
+  echo "[run] SpecVLA ${method} ${suite}: ${launcher} ${suite} ${method}"
+  bash "${launcher}" "${suite}" "${method}"
 }
 
 cat <<EOF

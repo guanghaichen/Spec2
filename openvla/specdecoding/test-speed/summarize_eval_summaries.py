@@ -28,7 +28,7 @@ def require_paper_ar(summary, path):
     if summary.get("ar_baseline") != "specvla_paper_wrapped_ar" or summary.get("use_spec") is not True:
         raise ValueError(
             f"Refusing non-paper AR denominator: {path}. Re-run "
-            "run_openvla_ar_libero_goal_eval.sh; paper reproduction requires use_spec=True."
+            "run_specvla_paper_ar_eval.sh goal; paper reproduction requires use_spec=True."
         )
 
 

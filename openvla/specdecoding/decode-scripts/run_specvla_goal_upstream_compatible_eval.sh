@@ -46,9 +46,9 @@ echo "SYNC_CUDA_TIMING=${SYNC_CUDA_TIMING}"
 echo "TIMING_SCOPE=${TIMING_SCOPE}"
 echo "============================================================"
 
-RUN_ID_NOTE="${AR_NOTE}" bash "${SCRIPT_DIR}/run_openvla_ar_libero_goal_eval.sh"
-RUN_ID_NOTE="${STRICT_NOTE}" bash "${SCRIPT_DIR}/run_specvla_libero_goal_eval.sh"
-RUN_ID_NOTE="${RELAXED_NOTE}" bash "${SCRIPT_DIR}/run_specvla_relaxed_libero_goal_eval.sh"
+RUN_ID_NOTE="${AR_NOTE}" bash "${SCRIPT_DIR}/run_specvla_paper_ar_eval.sh" goal
+RUN_ID_NOTE="${STRICT_NOTE}" bash "${SCRIPT_DIR}/run_specvla_eval.sh" goal strict
+RUN_ID_NOTE="${RELAXED_NOTE}" bash "${SCRIPT_DIR}/run_specvla_eval.sh" goal relaxed
 
 AR_SUMMARY="$(find_summary "${LOG_DIR}/openvla_ar" "${AR_NOTE}" "openvla_ar")"
 STRICT_SUMMARY="$(find_summary "${LOG_DIR}/specvla_strict" "${STRICT_NOTE}" "specvla_strict")"

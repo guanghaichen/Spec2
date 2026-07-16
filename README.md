@@ -345,8 +345,8 @@ SwanLab 默认只上传当前启用且有解释价值的精选指标，不再上
 checkpoint 副本，用于降低共享服务器 IO 压力。
 
 SwanLab 的 loss 曲线是最近 20 optimizer step 的窗口均值，可能随 batch 难度在单个 epoch 内上扬；跨 epoch
-收敛应读取 `metrics.jsonl` 中的 `train_epoch/*`。三阶段中的 raw loss 即使权重尚为 0 也会保留作诊断，是否
-真正反传应看 SwanLab 的“训练阶段/当前权重”，并可在 `metrics.jsonl` 中核对 `*_component`。
+收敛应读取 `metrics.jsonl` 中的 `train_epoch/*`。三阶段中尚未入场的 loss 不参与计算，raw loss 和
+`*_component` 都严格记录为 0；是否已经入场可同时查看 SwanLab 的“训练阶段/当前权重”。
 
 ## 5. 推理和验证
 

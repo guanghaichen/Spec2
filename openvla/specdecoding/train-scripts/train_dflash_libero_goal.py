@@ -1549,6 +1549,7 @@ def compute_loss_and_accuracy(
     confidence_weight_sum = torch.zeros((), device=device, dtype=torch.float32)
     expected_prefix_sum = torch.zeros((), device=device, dtype=torch.float32)
     expected_prefix_blocks = torch.zeros((), device=device, dtype=torch.float32)
+    action_head_graph_anchor = torch.zeros((), device=device, dtype=torch.float32)
     weight_sum = torch.zeros((), device=device, dtype=torch.float32)
     total_positions = torch.zeros((), device=device, dtype=torch.float32)
     total_correct = torch.zeros((), device=device, dtype=torch.float32)
@@ -1694,6 +1695,13 @@ def compute_loss_and_accuracy(
                 prev_token_ids=prev_token_ids,
                 action_position_ids=action_position_ids,
             )
+            # 阶段三前动作损失不计算，但 DDP 仍需看到动作头位于 loss 图中。
+            # 零值图锚不会产生有效梯度，随后还会把动作头 grad 设回 None。
+            action_head_graph_anchor = action_head_graph_anchor + student_logits.sum() * 0.0
+            if action_confidence_logits is not None:
+                action_head_graph_anchor = (
+                    action_head_graph_anchor + action_confidence_logits.sum() * 0.0
+                )
             base_metric_logits = backbone_student_logits
         else:
             base_student_logits = lm_head(student_hidden.to(torch.bfloat16)).float()
@@ -1743,10 +1751,10 @@ def compute_loss_and_accuracy(
         weight_sum += current_weight_sum
 
         need_teacher_logits = (
-            args.soft_w > 0
-            or args.action_distill_l1_w > 0
-            or args.prefix_survival_w > 0
-            or args.action_confidence_w > 0
+            active_loss_weights["soft_w"] > 0
+            or active_loss_weights["action_distill_l1_w"] > 0
+            or active_loss_weights["prefix_survival_w"] > 0
+            or active_loss_weights["action_confidence_w"] > 0
         )
         teacher_logits = None
         teacher_probs = None
@@ -1761,7 +1769,7 @@ def compute_loss_and_accuracy(
                     teacher_logits = lm_head(teacher_hidden.to(torch.bfloat16)).float()
 
         # SpecVLA 风格的 soft distribution 交叉熵：学习 teacher 的相对偏好，而不是 hard token id。
-        if args.soft_w > 0:
+        if active_loss_weights["soft_w"] > 0:
             with torch.no_grad():
                 teacher_probs = F.softmax(teacher_logits / args.soft_temperature, dim=-1)
             # soft loss 只监督 Draft 主干经冻结 lm_head 得到的基础分布。
@@ -1775,7 +1783,7 @@ def compute_loss_and_accuracy(
 
         if draft_model.action_sequential_enabled:
             local_target_tokens = draft_model.action_token_ids_to_local(target_tokens)
-            if args.action_token_ce_w > 0:
+            if active_loss_weights["action_token_ce_w"] > 0:
                 action_ce = F.cross_entropy(
                     student_logits.reshape(-1, student_logits.shape[-1]),
                     local_target_tokens.reshape(-1),
@@ -1783,7 +1791,11 @@ def compute_loss_and_accuracy(
                 ).view_as(target_tokens)
                 action_token_ce_sum += (action_ce * loss_weight).sum()
 
-            if args.action_distill_l1_w > 0 or args.prefix_survival_w > 0 or args.action_confidence_w > 0:
+            if (
+                active_loss_weights["action_distill_l1_w"] > 0
+                or active_loss_weights["prefix_survival_w"] > 0
+                or active_loss_weights["action_confidence_w"] > 0
+            ):
                 temperature = float(args.action_distill_temperature)
                 if teacher_probs is None or temperature != float(args.soft_temperature):
                     with torch.no_grad():
@@ -1792,7 +1804,8 @@ def compute_loss_and_accuracy(
                 probability_l1 = (student_probs - teacher_probs).abs().sum(dim=-1)
                 # 1-TV 是两分布在一次 maximal coupling 下取到相同 token 的概率。
                 accept_probability_proxy = (1.0 - 0.5 * probability_l1).clamp(min=0.0, max=1.0)
-                action_distill_l1_sum += (probability_l1 * loss_weight).sum()
+                if active_loss_weights["action_distill_l1_w"] > 0:
+                    action_distill_l1_sum += (probability_l1 * loss_weight).sum()
                 action_accept_prob_proxy_sum += (accept_probability_proxy * loss_weight).sum()
 
                 survival_input = torch.where(
@@ -1801,11 +1814,15 @@ def compute_loss_and_accuracy(
                     torch.ones_like(accept_probability_proxy),
                 )
                 cumulative_survival = torch.cumprod(survival_input, dim=1)
-                prefix_survival_sum += ((1.0 - cumulative_survival) * loss_weight).sum()
+                if active_loss_weights["prefix_survival_w"] > 0:
+                    prefix_survival_sum += ((1.0 - cumulative_survival) * loss_weight).sum()
                 expected_prefix_sum += (cumulative_survival * valid_mask).sum()
                 expected_prefix_blocks += valid_mask[:, 0].sum()
 
-                if action_confidence_logits is not None:
+                if (
+                    action_confidence_logits is not None
+                    and active_loss_weights["action_confidence_w"] > 0
+                ):
                     confidence_target = accept_probability_proxy.detach()
                     confidence_reg = F.binary_cross_entropy_with_logits(
                         action_confidence_logits,
@@ -1977,7 +1994,7 @@ def compute_loss_and_accuracy(
                         )
                     )
 
-        if args.anchor_logit_distill_w > 0:
+        if active_loss_weights["anchor_logit_distill_w"] > 0:
             for local_pos in range(max_block_len):
                 target_pos = teacher_start + local_pos
                 target_token_position = target_pos + 1
@@ -2001,7 +2018,7 @@ def compute_loss_and_accuracy(
                         )
                     )
 
-        if args.backbone_anchor_logit_distill_w > 0:
+        if active_loss_weights["backbone_anchor_logit_distill_w"] > 0:
             for local_pos in range(max_block_len):
                 target_pos = teacher_start + local_pos
                 target_token_position = target_pos + 1
@@ -2090,7 +2107,7 @@ def compute_loss_and_accuracy(
             causal_residual_cad_weight_sum += current_weight
             causal_residual_cad_pairs += pair_mask.sum().float()
 
-    if args.anchor_logit_distill_w > 0:
+    if active_loss_weights["anchor_logit_distill_w"] > 0:
         temperature = float(args.anchor_logit_distill_temperature)
         for target_pos, weak_logits, weak_mask, weak_weight in anchor_logit_student_entries:
             strong_logits = anchor_logit_teacher_logits.get(target_pos)
@@ -2115,7 +2132,7 @@ def compute_loss_and_accuracy(
             anchor_logit_distill_weight_sum += current_weight
             anchor_logit_distill_pairs += pair_mask.sum().float()
 
-    if args.backbone_anchor_logit_distill_w > 0:
+    if active_loss_weights["backbone_anchor_logit_distill_w"] > 0:
         temperature = float(args.anchor_logit_distill_temperature)
         for target_pos, weak_logits, weak_mask, weak_weight in backbone_anchor_logit_student_entries:
             strong_logits = backbone_anchor_logit_teacher_logits.get(target_pos)
@@ -2212,6 +2229,7 @@ def compute_loss_and_accuracy(
         + action_distill_l1_component
         + prefix_survival_component
         + action_confidence_component
+        + action_head_graph_anchor
     )
     accuracy = total_correct / metric_denom
     base_accuracy = base_total_correct / metric_denom

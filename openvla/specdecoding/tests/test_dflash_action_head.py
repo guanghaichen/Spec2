@@ -152,6 +152,30 @@ class DFlashActionHeadTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             train_module.clip_optimizer_parameter_groups(optimizer, max_norm=0.5)
 
+    def test_inactive_action_group_has_no_update_or_adam_state(self):
+        train_module = load_training_module()
+        draft_parameter = torch.nn.Parameter(torch.ones(()))
+        action_parameter = torch.nn.Parameter(torch.ones(()))
+        optimizer = torch.optim.AdamW(
+            [
+                {"params": [draft_parameter], "lr": 2e-5, "group_name": "draft_backbone"},
+                {"params": [action_parameter], "lr": 5e-5, "group_name": "action_head"},
+            ],
+            weight_decay=0.1,
+        )
+        draft_before = draft_parameter.detach().clone()
+        action_before = action_parameter.detach().clone()
+        draft_parameter.grad = torch.ones_like(draft_parameter)
+        action_parameter.grad = None
+
+        train_module.clip_optimizer_parameter_groups(optimizer, max_norm=0.5)
+        optimizer.step()
+
+        self.assertNotEqual(draft_parameter.item(), draft_before.item())
+        self.assertEqual(action_parameter.item(), action_before.item())
+        self.assertIn(draft_parameter, optimizer.state)
+        self.assertNotIn(action_parameter, optimizer.state)
+
     def test_even_layer_selection_keeps_endpoints(self):
         self.assertEqual(
             build_evenly_spaced_target_layer_ids(32, num_feature_layers=5, first_layer_id=1),
@@ -313,6 +337,46 @@ class DFlashActionHeadTest(unittest.TestCase):
             anchor_logit_distill_max_position=6,
             anchor_logit_distill_correct_teacher_only=True,
         )
+
+        # 阶段一只计算 Draft hidden/cos；尚未入场的 raw loss 必须严格为 0。
+        args.soft_w = 0.05
+        args.backbone_anchor_logit_distill_w = 0.05
+        stage1_metrics = train_module.compute_loss_and_accuracy(
+            model,
+            embed_tokens,
+            lm_head,
+            batch,
+            args,
+            device,
+            loss_weights={
+                "soft_w": 0.0,
+                "backbone_anchor_logit_distill_w": 0.0,
+                "action_token_ce_w": 0.0,
+                "action_distill_l1_w": 0.0,
+                "prefix_survival_w": 0.0,
+                "action_confidence_w": 0.0,
+                "anchor_logit_distill_w": 0.0,
+            },
+        )
+        for metric_name in (
+            "soft_loss",
+            "backbone_anchor_logit_distill_loss",
+            "action_token_ce_loss",
+            "action_distill_l1_loss",
+            "prefix_survival_loss",
+        ):
+            self.assertEqual(stage1_metrics[metric_name].item(), 0.0)
+        stage1_metrics["loss"].backward()
+        draft_grad = model.layers[0].self_attn.q_proj.weight.grad
+        self.assertIsNotNone(draft_grad)
+        self.assertGreater(draft_grad.abs().sum().item(), 0.0)
+        action_grad = model.action_head_out.weight.grad
+        self.assertIsNotNone(action_grad)
+        self.assertEqual(torch.count_nonzero(action_grad).item(), 0)
+        model.zero_grad(set_to_none=True)
+        args.soft_w = 0.0
+        args.backbone_anchor_logit_distill_w = 0.0
+
         metrics = train_module.compute_loss_and_accuracy(
             model,
             embed_tokens,

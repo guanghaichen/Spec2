@@ -288,7 +288,8 @@ head、旧 hidden CAD、旧 causal residual、旧 refined hidden、旧 residual 
 `slot_decay=1.0`；只保留 `position_balance` 来抵消 multi-anchor 对后部绝对位置的重复监督偏差。
 优化器使用两组学习率：Draft 主干 `2e-5`，从 epoch 1 warmup 1000 step 后按 200 epoch 线性退火；
 Action-RNN 为 `5e-5`，epoch 101 前学习率严格为 0 且不积累 Adam 状态，从 epoch 101 独立 warmup 500 step，
-再按剩余 100 epoch 线性退火。动作损失对 Draft 继续保持 `stop_gradient`。
+再按剩余 100 epoch 线性退火。动作损失对 Draft 继续保持 `stop_gradient`。两组参数各自以 `0.5` 为上限
+独立裁剪梯度；Action-RNN 的梯度峰值不会再缩小 Draft 的更新，非有限梯度会立即报错而不是污染权重。
 
 ### 4.4 SwanLab 指标怎样读
 
@@ -305,12 +306,13 @@ component = raw_loss * 配置权重
 | `base_accuracy` | Action-RNN 残差加入前的 frozen-lm-head 命中率 |
 | `accuracy` | teacher-forced Action-RNN 修正后的总体命中率 |
 | `action_head_accuracy_gain` | `accuracy-base_accuracy`；直接判断残差动作头是否真的带来收益 |
-| `soft_loss` / `soft_component` | Draft base logits 的 teacher soft CE 原值 / 乘 `0.05` 后贡献 |
+| `soft_loss` / `soft_component` | Draft base logits 的 teacher soft CE 原值 / 乘当前阶段权重后的贡献；原值包含 teacher entropy，不以 0 为理论下限 |
 | `backbone_anchor_logit_distill_loss` | Draft base logits 的跨 anchor KL；只更新主干 |
 | `anchor_logit_distill_loss` | 旧 Action-RNN 跨 anchor KL；当前主实验关闭，仅保留兼容代码 |
 | `rollout_accuracy` | anchor0 使用自身预测前缀回滚时的 top-1 命中率 |
 | `rollout_exposure_gap` | `accuracy-rollout_accuracy`；衡量 teacher forcing 到自回滚的分布差距 |
 | `rollout_top2_accuracy` | 正确 token 是否进入 self-rollout top-2 |
+| `rollout_runner_up_rescue_rate` | `rollout_top2_accuracy-rollout_accuracy`；正确 token 恰好是第二候选的位置占全部位置的比例，是单分叉的潜力而非真实接受率 |
 | `rollout_expected_prefix_length` | anchor0 实际连续猜对的平均前缀长度，范围 0 到 6 |
 | `rollout_prefix_k_success_rate` | anchor0 从 p1 开始至少连续猜对 k 步的概率；随 k 单调不增 |
 | `position_k_acc` | 所有 anchor 对绝对位置 pk 的 teacher-forced 平均准确率 |
@@ -341,6 +343,10 @@ SwanLab 默认只上传当前启用且有解释价值的精选指标，不再上
 当前主训练每 20 optimizer step 上传核心标量和连续前缀成功率，每 200 step 上传 rollout 逐位置明细。
 完整英文科研记录仍写入 `metrics.jsonl`。`NUM_WORKERS=1`、单文件 HDF5、不保存 optimizer state 和根目录
 checkpoint 副本，用于降低共享服务器 IO 压力。
+
+SwanLab 的 loss 曲线是最近 20 optimizer step 的窗口均值，可能随 batch 难度在单个 epoch 内上扬；跨 epoch
+收敛应读取 `metrics.jsonl` 中的 `train_epoch/*`。三阶段中的 raw loss 即使权重尚为 0 也会保留作诊断，是否
+真正反传应看 SwanLab 的“训练阶段/当前权重”，并可在 `metrics.jsonl` 中核对 `*_component`。
 
 ## 5. 推理和验证
 

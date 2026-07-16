@@ -334,7 +334,7 @@ def parse_args():
     )
     parser.add_argument("--action_dim", type=int, default=7, help="OpenVLA action token 维度数，用于 action-dimension embedding")
     parser.add_argument("--hidden_noise", type=float, default=0.03, help="训练时 context hidden 加噪标准差（0=不加，推荐 0.03）")
-    parser.add_argument("--grad_clip", type=float, default=0.5)
+    parser.add_argument("--grad_clip", type=float, default=0.5, help="Draft 与 Action-RNN 各自独立的梯度范数上限")
     parser.add_argument("--log_every_steps", type=int, default=20, help="每多少个 optimizer step 记录一次训练日志")
     parser.add_argument("--resume_from_checkpoint", type=str, default=None, help="恢复训练；可传具体 checkpoint 目录，或 latest")
     parser.add_argument("--run_name", type=str, default=None, help="实验名；默认自动生成")
@@ -1162,8 +1162,8 @@ SWANLAB_CORE_METRIC_LABELS = {
     "loss": ("损失", "总损失"),
     "hidden_loss": ("损失", "主干Hidden损失"),
     "cos_loss": ("损失", "主干余弦损失"),
-    "soft_loss": ("损失", "主干Soft分布损失"),
-    "backbone_anchor_logit_distill_loss": ("损失", "主干跨Anchor分布蒸馏"),
+    "soft_loss": ("损失", "主干Soft分布损失（原值）"),
+    "backbone_anchor_logit_distill_loss": ("损失", "主干跨Anchor分布蒸馏（原值）"),
     "anchor_logit_distill_loss": ("损失", "动作头跨Anchor分布蒸馏"),
     "action_token_ce_loss": ("损失", "动作Token交叉熵"),
     "action_distill_l1_loss": ("损失", "动作分布L1损失"),
@@ -1174,7 +1174,7 @@ SWANLAB_CORE_METRIC_LABELS = {
     "rollout_accuracy": ("自回滚", "总体准确率"),
     "rollout_exposure_gap": ("自回滚", "Teacher-Forcing暴露差距"),
     "rollout_top2_accuracy": ("自回滚", "Top2覆盖率"),
-    "rollout_runner_up_rescue_rate": ("自回滚", "第二候选可挽救率"),
+    "rollout_runner_up_rescue_rate": ("自回滚", "第二候选覆盖增益"),
     "rollout_expected_prefix_length": ("自回滚", "平均连续命中长度"),
     "stage_id": ("阶段", "当前阶段"),
     "stage2_scale": ("阶段", "Draft分布阶段渐入比例"),
@@ -1186,6 +1186,8 @@ SWANLAB_CORE_METRIC_LABELS = {
     "active_prefix_w": ("阶段", "当前连续前缀权重"),
     "lr": ("优化器", "Draft学习率"),
     "action_head_lr": ("优化器", "Action-RNN学习率"),
+    "draft_grad_norm": ("优化器", "Draft裁剪前梯度范数"),
+    "action_head_grad_norm": ("优化器", "Action-RNN裁剪前梯度范数"),
 }
 
 
@@ -1372,6 +1374,26 @@ def build_training_stage(args, epoch: int) -> Dict[str, Any]:
         "stage3_scale": stage3_scale,
         "weights": weights,
     }
+
+
+def clip_optimizer_parameter_groups(
+    optimizer: AdamW,
+    max_norm: float,
+) -> Dict[str, torch.Tensor]:
+    """独立裁剪每个参数组，避免一组梯度峰值压缩另一组的有效更新。"""
+    group_norms: Dict[str, torch.Tensor] = {}
+    for group_index, group in enumerate(optimizer.param_groups):
+        group_name = str(group.get("group_name", f"group_{group_index}"))
+        parameters = [parameter for parameter in group["params"] if parameter.grad is not None]
+        if not parameters:
+            group_norms[group_name] = torch.zeros((), dtype=torch.float32)
+            continue
+        group_norms[group_name] = torch.nn.utils.clip_grad_norm_(
+            parameters,
+            max_norm,
+            error_if_nonfinite=True,
+        ).detach().float()
+    return group_norms
 
 
 def new_detail_accumulator(num_positions: int) -> Dict[str, torch.Tensor]:
@@ -2467,6 +2489,8 @@ def main():
         raise ValueError("--action_head_rank must be > 0.")
     if args.lr <= 0 or args.action_head_lr <= 0:
         raise ValueError("--lr and --action_head_lr must both be > 0.")
+    if args.grad_clip <= 0:
+        raise ValueError("--grad_clip must be > 0.")
     if args.staged_training:
         if args.stage2_start_epoch <= 1:
             raise ValueError("--stage2_start_epoch must be > 1 for staged training.")
@@ -2786,6 +2810,15 @@ def main():
             action_head_params.append(parameter)
         else:
             draft_backbone_params.append(parameter)
+    draft_parameter_ids = {id(parameter) for parameter in draft_backbone_params}
+    action_parameter_ids = {id(parameter) for parameter in action_head_params}
+    trainable_parameter_ids = {
+        id(parameter) for parameter in raw_model.parameters() if parameter.requires_grad
+    }
+    if draft_parameter_ids & action_parameter_ids:
+        raise RuntimeError("Draft and Action-RNN optimizer groups overlap.")
+    if draft_parameter_ids | action_parameter_ids != trainable_parameter_ids:
+        raise RuntimeError("Optimizer parameter groups do not cover every trainable parameter exactly once.")
     optimizer_groups = [
         {
             "params": draft_backbone_params,
@@ -3114,11 +3147,11 @@ def main():
                     batch_idx % args.gradient_accumulation_steps == 0 or batch_idx == len(train_loader)
                 )
                 if should_step:
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
                     # Action-RNN 在阶段三前不应积累 Adam 状态，也不应被 AdamW weight decay 改动。
                     if not action_head_active:
                         for parameter in action_head_params:
                             parameter.grad = None
+                    gradient_norms = clip_optimizer_parameter_groups(optimizer, args.grad_clip)
                     optimizer.step()
                     scheduler.step()
                     optimizer.zero_grad(set_to_none=True)
@@ -3202,6 +3235,14 @@ def main():
                                 if len(scheduler.get_last_lr()) > 1
                                 else scheduler.get_last_lr()[0]
                             ),
+                            "train/draft_grad_norm": gradient_norms.get(
+                                "draft_backbone",
+                                torch.zeros(()),
+                            ).item(),
+                            "train/action_head_grad_norm": gradient_norms.get(
+                                "action_head",
+                                torch.zeros(()),
+                            ).item(),
                         }
                         train_payload.update(detail_metrics_to_log("train", train_detail_accumulator))
                         append_jsonl(metrics_log_path, train_payload)
@@ -3216,7 +3257,7 @@ def main():
                                 default_prefix="train",
                                 step=global_step,
                             )
-                            swan_payload["train/log_steps"] = float(train_log_steps)
+                            swan_payload["训练日志/窗口批次数"] = float(train_log_steps)
                             swanlab_run = safe_swanlab_log(
                                 swanlab_run,
                                 swan_payload,

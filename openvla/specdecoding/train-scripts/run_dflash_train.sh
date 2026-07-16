@@ -160,7 +160,7 @@ fi
 
 torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   openvla/specdecoding/train-scripts/train_dflash_libero_goal.py \
-  --run_name "dflash-cosine-curriculum-action-rnn-${PROFILE}-${NUM_DRAFT_LAYERS}layer-b8x2-4gpu" \
+  --run_name "dflash-cosine-curriculum-action-rnn-${PROFILE}-${NUM_DRAFT_LAYERS}layer-b${BATCH_SIZE}x${GRAD_ACCUM_STEPS}-${NPROC_PER_NODE}gpu" \
   --vla_path "${VLA_PATH}" \
   --datapath "${DATAPATH}" \
   --dataset_format auto \

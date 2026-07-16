@@ -3,6 +3,10 @@
 本仓库研究一个具体问题：能否把 DFlash 式块并行草稿模型迁移到 OpenVLA，在保持目标模型校验可靠性的
 前提下，提高 LIBERO 动作解码速度。
 
+当前完整方案由三层组成：块并行 Draft 负责低成本提案；跨 Anchor 蒸馏、Domino 式 Base/Final 课程和
+DSpark 风格 Action-RNN 负责提高弱路径命中；动作组级宽松校验与校准式稀疏多候选树负责在推理阶段扩大
+可接受候选覆盖。它们最终都必须接受成功率、Length 和端到端 Speedup 的共同检验。
+
 代码基于 [SpecVLA](https://github.com/PineTreeWss/SpecVLA)，而 SpecVLA 又基于
 [OpenVLA](https://github.com/openvla/openvla)。当前仓库仍是研究代码，不是已经定稿的公开复现包。
 所有结论必须同时报告成功率、接受长度和速度；训练准确率不能替代在线 LIBERO 结果。
@@ -14,7 +18,7 @@
 1. 先理解 OpenVLA 为什么把一个动作表示为 7 个离散 token。
 2. 再理解 SpecVLA 如何用小草稿模型逐 token 提案，并让 OpenVLA 校验。
 3. 然后理解本项目为什么改用 DFlash 式块并行 hidden 生成。
-4. 最后沿着实验历程看清楚：完整上下文、multi-anchor、跨 anchor 蒸馏、Markov 修正，为什么一步步演化到当前 Action-RNN Prefix Survival。
+4. 最后沿着实验历程看清楚：完整上下文、multi-anchor、跨 anchor 蒸馏、Action-RNN，以及动作组级宽松校验和稀疏多候选树为什么逐步形成。
 
 当前核心文件：
 
@@ -80,6 +84,45 @@ parallel_draft=False
 
 本仓库迁移的是“目标模型 hidden 条件下的轻量块并行 draft”这一核心思想，不声称复现 DFlash 原论文的
 完整模型、训练配方或 LLM 加速数字。
+
+### 2.4 当前完整方法与创新边界
+
+当前方法不是单一训练技巧，而是一条从“产生更好的草稿”到“用更低代价校验草稿”的完整链：
+
+```text
+完整 prompt + 已验证 action hidden
+              ↓
+     一次 DFlash 块并行 forward
+              ↓
+   frozen lm_head 得到 Base logits
+              ↓
+ Action-RNN 注入块内短程因果关系
+              ↓
+ 主路径 + 可选单分叉 runner-up 路径
+              ↓
+ 目标模型一次线性/树形并行校验
+              ↓
+ strict 精确接受 或 action-group 宽松接受
+              ↓
+ 提交最长合法前缀；拒绝点由目标模型纠正
+```
+
+各部分的来源和本项目的增量必须区分清楚：
+
+| 组成 | 思想来源 | 本项目中的落地 | 定位 |
+| --- | --- | --- | --- |
+| hidden 条件下的块并行主干 | DFlash | 适配 OpenVLA 七维动作、完整多层 prompt hidden 和已验证 action hidden | 基础骨架 |
+| 轻量顺序因果修正 | [DSpark](https://arxiv.org/abs/2607.05147)/同类半自回归 draft 的启发 | frozen `lm_head` 后增加低秩 Action-RNN，训练读真实前 token，推理读自身前 token | 吸收短程因果建模精髓，不声称复现 DSpark 全系统 |
+| Base/Final 课程 | [Domino](https://arxiv.org/abs/2605.29707) 的 base-anchored curriculum | `BaseCE` 到 `FinalCE` 的全程余弦交接，Final CE 联合更新 Draft 与 RNN | 吸收防止修正头走捷径的核心经验 |
+| 跨 Anchor 长程因果迁移 | 本项目 | 同一目标位置上，让完整前缀强路径的 base 分布蒸馏短前缀弱路径 | 训练端主要自有设计 |
+| 单时钟联合课程 | 本项目在 Domino 思路上的扩展 | 同一余弦系数同步控制 Base/Final、跨 Anchor、L1 和 Prefix Survival | 减少硬阶段和人工 epoch 边界 |
+| 动作组级宽松校验 | 本项目在 SpecVLA relaxed 上的结构化扩展 | 平移组、旋转组使用组内平方误差预算，夹爪保持精确 | 推理端自有设计之一 |
+| 校准式稀疏多候选树 | 本项目 | 一个 runner-up 单分叉形成双路径稀疏树，一次目标 forward 校验，实测无收益则关闭 | 推理端自有设计之二 |
+
+因此，论文主线应表述为：**块并行主干负责低成本长程预测，Action-RNN 补充显式短程因果，跨 Anchor 蒸馏
+补充训练时可获得的长前缀知识；动作组校验与稀疏候选树再把更高的候选覆盖率转化为在线接受长度和速度。**
+其中 Domino 与 DSpark 是清晰标注的机制启发，跨 Anchor、统一课程的组合方式及两项推理机制是当前拟通过
+消融证明的自有增量。最终的新颖性表述仍应以完整文献检索和实验结果为准。
 
 ## 3. 方法是怎样一步步形成的
 
@@ -167,11 +210,17 @@ final_action_logits = frozen_lm_head_action_logits + action_rnn_bias
 RNN 每一步读取：当前位置 DFlash hidden、前一个 action token、当前位置 embedding、上一步 RNN state。
 输出层零初始化，因此训练起点严格等于 frozen `lm_head`。
 
-当前稳定版把两条反传职责解耦，但前向并非互不相干：Action-RNN 仍读取 Draft hidden 和冻结 `lm_head`
-产生的基础 logits。hidden/cos、低权重 teacher soft distribution 和 Draft 跨 anchor KL 更新并行 Draft；
-CE、动作分布 L1 和 Prefix Survival 更新 Action-RNN。动作头读取的 Draft hidden/base logits 在动作损失分支
-执行 `stop_gradient`。这样重动作目标不能再通过改动共享 hidden 走捷径，同时 Draft 仍能得到直接的 token
-分布监督。
+当前版本不再把 Draft 与 Action-RNN 完全割裂。它同时计算修正前 `BaseCE` 和修正后 `FinalCE`，并用覆盖完整
+训练预算的余弦系数 `s` 平滑交接：
+
+```text
+L_token = (1-s) * BaseCE + s * FinalCE
+```
+
+`BaseCE` 直接锚定并行 Draft；`FinalCE` 不执行 `stop_gradient`，同时改善 Draft 和 Action-RNN。hidden/cos/soft
+继续全程监督 Draft，跨 Anchor KL 随 `s` 渐入。动作分布 L1 和 Prefix Survival 仍使用 detached Draft 输入，
+只训练 Action-RNN，防止辅助目标借共享 hidden 走捷径。这样既保留 Domino 式基础分布锚点，又不会把 RNN
+降成与 Draft 无关的纯后处理器。
 
 训练使用 teacher forcing。以 anchor0 为例：
 
@@ -362,18 +411,71 @@ SwanLab 的 loss 曲线是最近 20 optimizer step 的窗口均值，可能随 b
 目标校验只输入 `q-1` 个 proposal 是标准 next-token shift：anchor logits 校验第一个 proposal，输入前
 `q-1` 个 proposal 后得到的 logits 分别校验余下 token。最后一个 proposal 不需要再次作为本块输入。
 
-### 5.2 Relaxed action-group acceptance
+### 5.2 动作组级宽松校验
 
-当前 relaxed 评测把平移 `(x,y,z)` 和旋转 `(roll,pitch,yaw)` 分组检查总平方 bin 误差；gripper 始终要求
-精确相等。它只改变 relaxed 接受规则，不改变 strict 输出语义。论文中必须同时报告阈值、成功率和 Length。
+SpecVLA 原始 relaxed 规则逐 token 判断 `|draft_i-target_i| <= r`，等价于在每个动作维度上分别设置 bin
+误差上限。本项目进一步利用七维动作的物理结构，把连续运动维度分成：
 
-### 5.3 Calibrated single-fork tree
+```text
+平移组 G_t = (x, y, z)
+旋转组 G_r = (roll, pitch, yaw)
+离散组       = gripper
+```
 
-Action-RNN 主路径生成后，可在一个固定位置取 runner-up token，并从该状态滚出一条备选后缀。两条路径由
-目标模型一次 tree-attention forward 校验，最长合法前缀胜出。
+对于当前块中可见的某个运动组 `G`，令 `delta_i` 为 draft 与 target 的 bin 距离，动作组通过条件为：
 
-strict 评测先在真实 observation 上比较 `off/p2/p3/p4/p5` 的完整动作延迟。只有某个分叉位置统计显著地
-快于 off，才进入正式评测，否则回退 off。树只作用于 anchor0 首块，避免后续短块支付无效成本。
+```text
+sum(delta_i^2, i in G) <= |G_visible| * r^2
+```
+
+通过时，该组当前可见的维度整体视为可接受。因此，一个维度即使略微超过逐 token 阈值，只要其它维度误差
+较小、组内总误差仍在同等最坏角点预算内，也可以被挽救。组条件未通过时保留原逐 token 判断，不额外惩罚
+本来已通过的维度。`gripper` 是类别决策，相邻 token id 不代表“接近的开合程度”，所以始终要求与目标模型
+完全相等。最终仍取从当前位置开始的最长连续可接受前缀，首个拒绝位置由目标模型纠正。
+
+这项机制与 Draft 结构正交，不增加模型 forward；它试图把 token 空间的离散误差转换为更符合动作几何的
+接受规则。代价是它不再属于 strict lossless 校验，必须同时报告阈值 `r`、任务成功率、Length 和 Speedup。
+代码额外记录：
+
+| 指标 | 含义 |
+| --- | --- |
+| `action_group_rescued_blocks` | 组级规则比逐 token 规则接受更长前缀的块数 |
+| `action_group_extra_accepted` | 组级规则额外接受的 token 总数 |
+
+### 5.3 校准式稀疏多候选树校验
+
+当前实现是稀疏多候选树的最小固定预算版本：**单分叉、双路径**，并不是任意宽度的 beam search。流程如下：
+
+1. DFlash transformer 只执行一次，Action-RNN 从 Base logits 生成贪心主路径。
+2. 在一个固定分叉位置取主路径 logits 的第二候选 token。
+3. 复用该位置之前的前缀和 RNN state，只用轻量 Action-RNN 滚出第二候选的后缀，不再执行 DFlash forward。
+4. 主路径和备选路径共享分叉前节点；tree mask 保证两条后缀只能看见各自的因果祖先。
+5. 目标模型用一次 tree-attention forward 同时校验两条路径，选择可接受前缀更长的一条。
+6. 只把胜出路径中真正提交的 hidden 和 KV 节点写回缓存；拒绝点仍由目标模型 posterior 纠正。
+
+若块长为 `q`，线性校验输入 `q-1` 个节点；在索引 `b` 单分叉后，稀疏树只额外加入
+`q-1-b` 个备选后缀节点。它避免完整 top-k 树的指数膨胀，目标是用少量额外验证宽度覆盖主路径中高价值的
+runner-up，而不是盲目增加候选数。默认只在 anchor0 的首个最长块启用，后续短块不再支付树开销。
+
+树是否提速不能由 top-2 命中率直接决定，因此 strict 评测先在真实 observation 上对
+`off/p2/p3/p4/p5` 做配对的完整动作延迟校准。候选位置必须同时满足：确实触发过分叉、相对 off 的中位延迟
+更低、经过多重比较修正的单侧符号检验显著；否则自动选择 `off`。这使树成为“有实测净收益才打开”的系统
+机制，而不是固定增加开销的启发式补丁。代码记录：
+
+| 指标 | 含义 |
+| --- | --- |
+| `tree_triggered_blocks` | 实际构造双路径树的块数 |
+| `tree_selected_alternate_blocks` | 最终选择备选路径的块数 |
+| `tree_extra_verified_nodes` | 相比线性校验额外送入目标模型的树节点数 |
+| `tree_extra_accepted` | 备选路径比主路径额外接受的 token 数 |
+| `tree_mean_branch_score` | runner-up 相对主候选的平均概率比代理 |
+
+### 5.4 训练创新与推理创新怎样闭环
+
+跨 Anchor、Base/Final 课程和 Action-RNN 解决“候选能否覆盖目标 token”；动作组校验和稀疏候选树解决
+“已有候选怎样以有限验证成本转化为更长接受前缀”。两类推理机制彼此正交：树增加离散候选覆盖，动作组规则
+放宽连续运动误差；二者可以组合，但必须分别做 `off/on` 消融并计入完整动作延迟。strict + tree 仍保持目标
+token 精确校验；action-group relaxed 则以成功率约束换取更大的接受空间。
 
 ## 6. 实验历程与目前证据
 
@@ -608,11 +710,30 @@ DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-d
   bash openvla/specdecoding/decode-scripts/run_dflash_action_rnn_goal_pair_eval.sh
 ```
 
+成对脚本先在 strict 中校准 `off/p2/p3/p4/p5`，再把选出的分叉位置用于 relaxed 动作组校验；若没有候选位置
+在完整动作延迟上显著优于 `off`，两次评测都自动退回线性验证。
+
 单独执行：
 
 ```bash
 EVAL_EPOCH=200 bash openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh strict
 EVAL_EPOCH=200 bash openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh relaxed
+```
+
+推理机制消融必须固定同一 checkpoint、seed 和计时口径：
+
+```bash
+# 线性 strict：关闭候选树
+DFLASH_TREE_MODE=off DFLASH_TREE_AUTO_CALIBRATE=False \
+  EVAL_EPOCH=200 bash openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh strict
+
+# 原逐 token relaxed：关闭动作组规则与候选树
+DFLASH_ACCEPTANCE_MODE=token DFLASH_TREE_MODE=off \
+  EVAL_EPOCH=200 bash openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh relaxed
+
+# 动作组 relaxed，但关闭候选树
+DFLASH_ACCEPTANCE_MODE=action_group DFLASH_TREE_MODE=off \
+  EVAL_EPOCH=200 bash openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh relaxed
 ```
 
 五个 seed 重复性评测：
@@ -790,6 +911,20 @@ OpenVLA-OFT 已经并行输出动作，不适合直接套用 action-token specul
   title={DFlash: Block Diffusion for Flash Speculative Decoding},
   author={Chen, Jian and Liang, Yesheng and Liu, Zhijian},
   booktitle={ICML},
+  year={2026}
+}
+
+@article{huang2026domino,
+  title={Domino: Decoupling Causal Modeling from Autoregressive Drafting in Speculative Decoding},
+  author={Huang, Jianuo and others},
+  journal={arXiv preprint arXiv:2605.29707},
+  year={2026}
+}
+
+@article{cheng2026dspark,
+  title={DSpark: Confidence-Scheduled Speculative Decoding with Semi-Autoregressive Generation},
+  author={Cheng, Xin and others},
+  journal={arXiv preprint arXiv:2607.05147},
   year={2026}
 }
 ```

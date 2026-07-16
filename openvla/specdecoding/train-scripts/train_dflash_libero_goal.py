@@ -3091,7 +3091,7 @@ def main():
             step=global_step,
         )
 
-    previous_stage_id = None
+    previous_training_control = None
     try:
         for epoch in range(start_epoch, args.num_epochs + 1):
             stage = build_training_control(
@@ -3106,31 +3106,62 @@ def main():
                 if args.unified_cosine_curriculum
                 else (not args.staged_training or epoch >= args.stage3_start_epoch)
             )
-            if stage["id"] != previous_stage_id:
-                stage_payload = {
-                    "event": "training_stage_start",
-                    "timestamp": datetime.now().isoformat(),
-                    "epoch": epoch,
-                    "global_step": global_step,
-                    "stage/id": stage["id"],
-                    "stage/name": stage["name"],
-                    "stage/stage2_scale": stage["stage2_scale"],
-                    "stage/stage3_scale": stage["stage3_scale"],
-                    **{
-                        f"stage/{name}": value
-                        for name, value in active_loss_weights.items()
-                    },
-                }
+            training_control = (
+                "unified_cosine_curriculum"
+                if args.unified_cosine_curriculum
+                else f"stage_{stage['id']}"
+            )
+            if training_control != previous_training_control:
+                if args.unified_cosine_curriculum:
+                    stage_payload = {
+                        "event": "training_curriculum_start",
+                        "timestamp": datetime.now().isoformat(),
+                        "epoch": epoch,
+                        "global_step": global_step,
+                        "curriculum/name": stage["name"],
+                        "curriculum/progress": stage["progress"],
+                        "curriculum/base_scale": stage["base_scale"],
+                        "curriculum/final_scale": stage["final_scale"],
+                        **{
+                            f"curriculum/{name}": value
+                            for name, value in active_loss_weights.items()
+                        },
+                    }
+                else:
+                    stage_payload = {
+                        "event": "training_stage_start",
+                        "timestamp": datetime.now().isoformat(),
+                        "epoch": epoch,
+                        "global_step": global_step,
+                        "stage/id": stage["id"],
+                        "stage/name": stage["name"],
+                        "stage/stage2_scale": stage["stage2_scale"],
+                        "stage/stage3_scale": stage["stage3_scale"],
+                        **{
+                            f"stage/{name}": value
+                            for name, value in active_loss_weights.items()
+                        },
+                    }
                 if is_main:
                     append_jsonl(metrics_log_path, stage_payload)
-                    print(
-                        f"\n进入训练阶段 {stage['id']}: {stage['name']} | epoch={epoch} | "
-                        f"soft_w={active_loss_weights['soft_w']:.4f} "
-                        f"draft_anchor_kl_w={active_loss_weights['backbone_anchor_logit_distill_w']:.4f} "
-                        f"action_ce_w={active_loss_weights['action_token_ce_w']:.4f} "
-                        f"prefix_w={active_loss_weights['prefix_survival_w']:.4f}"
-                    )
-                previous_stage_id = stage["id"]
+                    if args.unified_cosine_curriculum:
+                        print(
+                            f"\n启用统一余弦训练课程 | epoch={epoch} | "
+                            f"base={stage['base_scale']:.6f} final={stage['final_scale']:.6f} "
+                            f"soft_w={active_loss_weights['soft_w']:.4f} "
+                            f"draft_anchor_kl_w={active_loss_weights['backbone_anchor_logit_distill_w']:.6f} "
+                            f"action_ce_w={active_loss_weights['action_token_ce_w']:.4f} "
+                            f"prefix_w={active_loss_weights['prefix_survival_w']:.6f}"
+                        )
+                    else:
+                        print(
+                            f"\n进入训练阶段 {stage['id']}: {stage['name']} | epoch={epoch} | "
+                            f"soft_w={active_loss_weights['soft_w']:.4f} "
+                            f"draft_anchor_kl_w={active_loss_weights['backbone_anchor_logit_distill_w']:.4f} "
+                            f"action_ce_w={active_loss_weights['action_token_ce_w']:.4f} "
+                            f"prefix_w={active_loss_weights['prefix_survival_w']:.4f}"
+                        )
+                previous_training_control = training_control
             model.train()
             if hasattr(train_dataset, "set_epoch"):
                 train_dataset.set_epoch(epoch)
@@ -3203,9 +3234,14 @@ def main():
             )
             epoch_metric_sums = {name: 0.0 for name in epoch_metric_names}
             epoch_metric_steps = 0
+            progress_mode = (
+                "curriculum=cosine"
+                if args.unified_cosine_curriculum
+                else f"stage={stage['id']}"
+            )
             pbar = tqdm(
                 train_loader,
-                desc=f"train {epoch}/{args.num_epochs} stage={stage['id']}",
+                desc=f"train {epoch}/{args.num_epochs} {progress_mode}",
                 dynamic_ncols=True,
             ) if is_main else train_loader
             for batch_idx, batch in enumerate(pbar, start=1):
@@ -3334,9 +3370,6 @@ def main():
                             "timestamp": datetime.now().isoformat(),
                             "epoch": epoch,
                             "global_step": global_step,
-                            "train/stage_id": stage["id"],
-                            "train/stage2_scale": stage["stage2_scale"],
-                            "train/stage3_scale": stage["stage3_scale"],
                             "train/curriculum_progress": stage["progress"],
                             "train/curriculum_base_scale": stage["base_scale"],
                             "train/curriculum_final_scale": stage["final_scale"],
@@ -3424,6 +3457,14 @@ def main():
                             ).item(),
                             "train/global_grad_norm": gradient_norms["global"].item(),
                         }
+                        if not args.unified_cosine_curriculum:
+                            train_payload.update(
+                                {
+                                    "train/stage_id": stage["id"],
+                                    "train/stage2_scale": stage["stage2_scale"],
+                                    "train/stage3_scale": stage["stage3_scale"],
+                                }
+                            )
                         train_payload.update(detail_metrics_to_log("train", train_detail_accumulator))
                         append_jsonl(metrics_log_path, train_payload)
                         if (
@@ -3554,9 +3595,6 @@ def main():
                     "timestamp": datetime.now().isoformat(),
                     "epoch": epoch,
                     "global_step": global_step,
-                    "train_epoch/stage_id": stage["id"],
-                    "train_epoch/stage2_scale": stage["stage2_scale"],
-                    "train_epoch/stage3_scale": stage["stage3_scale"],
                     "train_epoch/active_soft_w": active_loss_weights["soft_w"],
                     "train_epoch/active_backbone_anchor_kl_w": active_loss_weights[
                         "backbone_anchor_logit_distill_w"
@@ -3581,6 +3619,14 @@ def main():
                         else scheduler.get_last_lr()[0]
                     ),
                 }
+                if not args.unified_cosine_curriculum:
+                    epoch_payload.update(
+                        {
+                            "train_epoch/stage_id": stage["id"],
+                            "train_epoch/stage2_scale": stage["stage2_scale"],
+                            "train_epoch/stage3_scale": stage["stage3_scale"],
+                        }
+                    )
                 append_jsonl(metrics_log_path, epoch_payload)
 
             # ── 验证 + 早停 + 最优权重 ──

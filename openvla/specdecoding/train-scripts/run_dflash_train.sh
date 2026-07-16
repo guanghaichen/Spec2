@@ -3,7 +3,7 @@ set -euo pipefail
 
 # 当前 DFlash 训练统一入口。
 #
-#   bash .../run_dflash_train.sh main        # 推荐：一层 Action-RNN Prefix Survival
+#   bash .../run_dflash_train.sh main        # 推荐：一层、三阶段、Draft 跨 anchor + Action-RNN
 #   bash .../run_dflash_train.sh three_layer # 容量消融：三层主干
 #   bash .../run_dflash_train.sh no_prefix   # 去掉 Prefix Survival
 #   bash .../run_dflash_train.sh no_anchor   # 去掉跨 anchor logits 蒸馏
@@ -20,25 +20,25 @@ case "${PROFILE}" in
     PROFILE_LAYERS=1
     PROFILE_PREFIX_W=0.20
     PROFILE_ANCHOR_W=0.05
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_action_rnn_decoupled_distill_1layer_b8x2_4gpu
+    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_staged_draft_anchor_action_rnn_1layer_b8x2_4gpu
     ;;
   three_layer)
     PROFILE_LAYERS=3
     PROFILE_PREFIX_W=0.20
     PROFILE_ANCHOR_W=0.05
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_action_rnn_decoupled_distill_3layer_b8x2_4gpu
+    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_staged_draft_anchor_action_rnn_3layer_b8x2_4gpu
     ;;
   no_prefix)
     PROFILE_LAYERS=1
     PROFILE_PREFIX_W=0
     PROFILE_ANCHOR_W=0.05
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_action_rnn_decoupled_distill_no_prefix_1layer_b8x2_4gpu
+    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_staged_draft_anchor_no_prefix_1layer_b8x2_4gpu
     ;;
   no_anchor)
     PROFILE_LAYERS=1
     PROFILE_PREFIX_W=0.20
     PROFILE_ANCHOR_W=0
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_action_rnn_decoupled_distill_no_anchor_1layer_b8x2_4gpu
+    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_staged_no_anchor_action_rnn_1layer_b8x2_4gpu
     ;;
   *)
     echo "用法: bash $0 [main|three_layer|no_prefix|no_anchor]" >&2
@@ -48,7 +48,6 @@ esac
 
 NUM_DRAFT_LAYERS="${NUM_DRAFT_LAYERS:-${PROFILE_LAYERS}}"
 PREFIX_SURVIVAL_W="${PREFIX_SURVIVAL_W:-${PROFILE_PREFIX_W}}"
-ANCHOR_LOGIT_DISTILL_W="${ANCHOR_LOGIT_DISTILL_W:-${PROFILE_ANCHOR_W}}"
 OUTPUT_NAME="${OUTPUT_NAME:-${PROFILE_OUTPUT_NAME}}"
 
 if [[ -d "/data/wulin" ]]; then
@@ -82,6 +81,12 @@ NUM_EPOCHS="${NUM_EPOCHS:-200}"
 LR="${LR:-2e-5}"
 ACTION_HEAD_LR="${ACTION_HEAD_LR:-5e-5}"
 WARMUP_STEPS="${WARMUP_STEPS:-1000}"
+ACTION_HEAD_WARMUP_STEPS="${ACTION_HEAD_WARMUP_STEPS:-500}"
+STAGE2_START_EPOCH="${STAGE2_START_EPOCH:-21}"
+STAGE3_START_EPOCH="${STAGE3_START_EPOCH:-101}"
+STAGE_WEIGHT_RAMP_EPOCHS="${STAGE_WEIGHT_RAMP_EPOCHS:-5}"
+STAGE1_END_EPOCH=$((STAGE2_START_EPOCH - 1))
+STAGE2_END_EPOCH=$((STAGE3_START_EPOCH - 1))
 SAVE_EVERY="${SAVE_EVERY:-10}"
 SEED="${SEED:-7}"
 
@@ -90,6 +95,8 @@ HIDDEN_W="${HIDDEN_W:-1.00}"
 COS_W="${COS_W:-0.05}"
 SOFT_W="${SOFT_W:-0.05}"
 BACKBONE_ANCHOR_LOGIT_DISTILL_W="${BACKBONE_ANCHOR_LOGIT_DISTILL_W:-${PROFILE_ANCHOR_W}}"
+# 主实验把跨 anchor 蒸馏限定在 Draft 主干；Action-RNN 只接受 CE/L1/Prefix 直接监督。
+ANCHOR_LOGIT_DISTILL_W="${ANCHOR_LOGIT_DISTILL_W:-0}"
 ACTION_TOKEN_CE_W="${ACTION_TOKEN_CE_W:-0.10}"
 ACTION_DISTILL_L1_W="${ACTION_DISTILL_L1_W:-0.40}"
 
@@ -125,6 +132,9 @@ NUM_EPOCHS=${NUM_EPOCHS}
 LR=${LR}
 ACTION_HEAD_LR=${ACTION_HEAD_LR}
 WARMUP_STEPS=${WARMUP_STEPS}
+ACTION_HEAD_WARMUP_STEPS=${ACTION_HEAD_WARMUP_STEPS}
+STAGES=1-${STAGE1_END_EPOCH} / ${STAGE2_START_EPOCH}-${STAGE2_END_EPOCH} / ${STAGE3_START_EPOCH}-${NUM_EPOCHS}
+STAGE_WEIGHT_RAMP_EPOCHS=${STAGE_WEIGHT_RAMP_EPOCHS}
 SAVE_EVERY=${SAVE_EVERY}
 SEED=${SEED}
 
@@ -155,7 +165,7 @@ fi
 
 torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   openvla/specdecoding/train-scripts/train_dflash_libero_goal.py \
-  --run_name "dflash-action-rnn-decoupled-distill-${PROFILE}-${NUM_DRAFT_LAYERS}layer-b8x2-4gpu" \
+  --run_name "dflash-staged-draft-anchor-action-rnn-${PROFILE}-${NUM_DRAFT_LAYERS}layer-b8x2-4gpu" \
   --vla_path "${VLA_PATH}" \
   --datapath "${DATAPATH}" \
   --dataset_format auto \
@@ -197,6 +207,11 @@ torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   --weight_decay 0.05 \
   --lr "${LR}" \
   --action_head_lr "${ACTION_HEAD_LR}" \
+  --staged_training \
+  --stage2_start_epoch "${STAGE2_START_EPOCH}" \
+  --stage3_start_epoch "${STAGE3_START_EPOCH}" \
+  --stage_weight_ramp_epochs "${STAGE_WEIGHT_RAMP_EPOCHS}" \
+  --action_head_warmup_steps "${ACTION_HEAD_WARMUP_STEPS}" \
   --batch_size "${BATCH_SIZE}" \
   --gradient_accumulation_steps "${GRAD_ACCUM_STEPS}" \
   --num_epochs "${NUM_EPOCHS}" \

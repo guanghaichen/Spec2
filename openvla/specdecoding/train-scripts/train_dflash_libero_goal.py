@@ -108,6 +108,16 @@ def parse_args():
         default=5e-5,
         help="Action-RNN 独立学习率；动作头参数量较小，可高于 Draft 主干",
     )
+    parser.add_argument(
+        "--staged_training",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="是否按 epoch 自动执行三阶段训练；关闭时所有配置为正的 loss 从 epoch 1 生效",
+    )
+    parser.add_argument("--stage2_start_epoch", type=int, default=21, help="阶段二起始 epoch：启用 Draft soft 与跨 anchor 蒸馏")
+    parser.add_argument("--stage3_start_epoch", type=int, default=101, help="阶段三起始 epoch：启用 Action-RNN 的 CE/L1/Prefix 监督")
+    parser.add_argument("--stage_weight_ramp_epochs", type=int, default=5, help="新阶段 loss 从 0 线性升到目标权重所用 epoch 数")
+    parser.add_argument("--action_head_warmup_steps", type=int, default=500, help="Action-RNN 从阶段三开始独立 warmup 的 optimizer step 数")
     parser.add_argument("--weight_decay", type=float, default=5e-2, help="AdamW weight decay；用于抑制 draft 过度记忆训练集")
     parser.add_argument("--adam_beta1", type=float, default=0.9, help="AdamW beta1")
     parser.add_argument("--adam_beta2", type=float, default=0.98, help="AdamW beta2")
@@ -932,6 +942,11 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "num_epochs": args.num_epochs,
         "lr": args.lr,
         "action_head_lr": args.action_head_lr,
+        "staged_training": args.staged_training,
+        "stage2_start_epoch": args.stage2_start_epoch,
+        "stage3_start_epoch": args.stage3_start_epoch,
+        "stage_weight_ramp_epochs": args.stage_weight_ramp_epochs,
+        "action_head_warmup_steps": args.action_head_warmup_steps,
         "weight_decay": args.weight_decay,
         "adam_beta1": args.adam_beta1,
         "adam_beta2": args.adam_beta2,
@@ -1161,6 +1176,14 @@ SWANLAB_CORE_METRIC_LABELS = {
     "rollout_top2_accuracy": ("自回滚", "Top2覆盖率"),
     "rollout_runner_up_rescue_rate": ("自回滚", "第二候选可挽救率"),
     "rollout_expected_prefix_length": ("自回滚", "平均连续命中长度"),
+    "stage_id": ("阶段", "当前阶段"),
+    "stage2_scale": ("阶段", "Draft分布阶段渐入比例"),
+    "stage3_scale": ("阶段", "Action-RNN阶段渐入比例"),
+    "active_soft_w": ("阶段", "当前Soft权重"),
+    "active_backbone_anchor_kl_w": ("阶段", "当前Draft跨Anchor权重"),
+    "active_action_ce_w": ("阶段", "当前动作CE权重"),
+    "active_action_l1_w": ("阶段", "当前动作L1权重"),
+    "active_prefix_w": ("阶段", "当前连续前缀权重"),
     "lr": ("优化器", "Draft学习率"),
     "action_head_lr": ("优化器", "Action-RNN学习率"),
 }
@@ -1223,20 +1246,132 @@ def build_swanlab_metrics_payload(
             translated[translated_key] = value
     return translated
 
-# 学习率调度策略，先warmup，再linear decay
-def build_scheduler(optimizer: AdamW, total_steps: int, warmup_steps: int, warmup_ratio: float):
+# 学习率调度策略：Draft 从训练开始计时；Action-RNN 可延迟到阶段三独立计时。
+def linear_warmup_decay_scale(
+    current_step: int,
+    total_steps: int,
+    warmup_steps: int,
+    warmup_ratio: float,
+) -> float:
     if warmup_steps <= 0:
         warmup_steps = max(1, int(total_steps * warmup_ratio))
     else:
         warmup_steps = min(total_steps, warmup_steps)
+    if current_step < 0:
+        return 0.0
+    if current_step < warmup_steps:
+        return float(current_step) / float(max(1, warmup_steps))
+    progress = float(current_step - warmup_steps) / float(max(1, total_steps - warmup_steps))
+    return max(0.0, 1.0 - progress)
 
-    def lr_lambda(current_step: int) -> float:
-        if current_step < warmup_steps:
-            return float(current_step) / float(max(1, warmup_steps))
-        progress = float(current_step - warmup_steps) / float(max(1, total_steps - warmup_steps))
-        return max(0.0, 1.0 - progress)
 
-    return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+def build_scheduler(
+    optimizer: AdamW,
+    total_steps: int,
+    warmup_steps: int,
+    warmup_ratio: float,
+    action_start_step: Optional[int] = None,
+    action_warmup_steps: int = 0,
+):
+    def draft_lr_lambda(current_step: int) -> float:
+        return linear_warmup_decay_scale(
+            current_step,
+            total_steps,
+            warmup_steps,
+            warmup_ratio,
+        )
+
+    lr_lambdas = []
+    for group in optimizer.param_groups:
+        if group.get("group_name") == "action_head" and action_start_step is not None:
+            action_total_steps = max(1, total_steps - action_start_step)
+
+            def action_lr_lambda(
+                current_step: int,
+                *,
+                start_step=action_start_step,
+                local_total_steps=action_total_steps,
+            ) -> float:
+                return linear_warmup_decay_scale(
+                    current_step - start_step,
+                    local_total_steps,
+                    action_warmup_steps,
+                    warmup_ratio,
+                )
+
+            lr_lambdas.append(action_lr_lambda)
+        else:
+            lr_lambdas.append(draft_lr_lambda)
+    return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambdas)
+
+
+STAGED_LOSS_WEIGHT_NAMES = (
+    "hidden_w",
+    "cos_w",
+    "soft_w",
+    "backbone_anchor_logit_distill_w",
+    "action_token_ce_w",
+    "action_distill_l1_w",
+    "prefix_survival_w",
+    "action_confidence_w",
+    "anchor_logit_distill_w",
+)
+
+
+def stage_ramp_scale(epoch: int, start_epoch: int, ramp_epochs: int) -> float:
+    if epoch < start_epoch:
+        return 0.0
+    if ramp_epochs <= 1:
+        return 1.0
+    return min(1.0, float(epoch - start_epoch + 1) / float(ramp_epochs))
+
+
+def build_training_stage(args, epoch: int) -> Dict[str, Any]:
+    """返回当前阶段及实际生效权重；目标权重始终保留在 args 中。"""
+    weights = {name: float(getattr(args, name)) for name in STAGED_LOSS_WEIGHT_NAMES}
+    if not args.staged_training:
+        return {
+            "id": 0,
+            "name": "joint",
+            "stage2_scale": 1.0,
+            "stage3_scale": 1.0,
+            "weights": weights,
+        }
+
+    stage2_scale = stage_ramp_scale(
+        epoch,
+        args.stage2_start_epoch,
+        args.stage_weight_ramp_epochs,
+    )
+    stage3_scale = stage_ramp_scale(
+        epoch,
+        args.stage3_start_epoch,
+        args.stage_weight_ramp_epochs,
+    )
+    weights["soft_w"] *= stage2_scale
+    weights["backbone_anchor_logit_distill_w"] *= stage2_scale
+    for name in (
+        "action_token_ce_w",
+        "action_distill_l1_w",
+        "prefix_survival_w",
+        "action_confidence_w",
+        "anchor_logit_distill_w",
+    ):
+        weights[name] *= stage3_scale
+
+    if epoch < args.stage2_start_epoch:
+        stage_id, stage_name = 1, "draft_representation"
+    elif epoch < args.stage3_start_epoch:
+        stage_id, stage_name = 2, "draft_distribution_and_anchor"
+    else:
+        stage_id, stage_name = 3, "draft_plus_action_rnn"
+    return {
+        "id": stage_id,
+        "name": stage_name,
+        "stage2_scale": stage2_scale,
+        "stage3_scale": stage3_scale,
+        "weights": weights,
+    }
 
 
 def new_detail_accumulator(num_positions: int) -> Dict[str, torch.Tensor]:
@@ -1345,8 +1480,13 @@ def compute_loss_and_accuracy(
     device: torch.device,
     consistency_scale: float = 1.0,
     causal_residual_scale: float = 1.0,
+    loss_weights: Optional[Dict[str, float]] = None,
 ) -> Dict[str, torch.Tensor]:
     draft_model = model.module if hasattr(model, "module") else model
+    active_loss_weights = {
+        name: float((loss_weights or {}).get(name, getattr(args, name)))
+        for name in STAGED_LOSS_WEIGHT_NAMES
+    }
     prompt_selected = batch["prompt_selected"].to(device=device, dtype=torch.bfloat16)# 完整 prefill/prefix 上下文 [B, P, L*hidden]
     prompt_position_ids = batch["prompt_position_ids"].to(device=device)# 完整 prefill/prefix 的绝对 position [B, P]
     prompt_attention_mask = batch["prompt_attention_mask"].to(device=device)# prefix padding mask [B, P]
@@ -2004,9 +2144,9 @@ def compute_loss_and_accuracy(
     action_accept_probability_proxy = action_accept_prob_proxy_sum / loss_denom
     confidence_mae = confidence_abs_error_sum / confidence_weight_sum.clamp_min(1.0)
     expected_prefix_length = expected_prefix_sum / expected_prefix_blocks.clamp_min(1.0)
-    hidden_component = args.hidden_w * hidden_loss
-    soft_component = args.soft_w * soft_loss
-    cos_component = args.cos_w * cos_loss
+    hidden_component = active_loss_weights["hidden_w"] * hidden_loss
+    soft_component = active_loss_weights["soft_w"] * soft_loss
+    cos_component = active_loss_weights["cos_w"] * cos_loss
     anchor_consistency_scale = torch.tensor(float(consistency_scale), device=device, dtype=torch.float32)
     anchor_consistency_component = (
         args.anchor_consistency_w * anchor_consistency_scale * anchor_consistency_loss
@@ -2021,14 +2161,21 @@ def compute_loss_and_accuracy(
     )
     refined_hidden_component = args.refined_hidden_w * refined_hidden_loss
     residual_token_ce_component = args.residual_token_ce_w * residual_token_ce_loss
-    anchor_logit_distill_component = args.anchor_logit_distill_w * anchor_logit_distill_loss
-    backbone_anchor_logit_distill_component = (
-        args.backbone_anchor_logit_distill_w * backbone_anchor_logit_distill_loss
+    anchor_logit_distill_component = (
+        active_loss_weights["anchor_logit_distill_w"] * anchor_logit_distill_loss
     )
-    action_token_ce_component = args.action_token_ce_w * action_token_ce_loss
-    action_distill_l1_component = args.action_distill_l1_w * action_distill_l1_loss
-    prefix_survival_component = args.prefix_survival_w * prefix_survival_loss
-    action_confidence_component = args.action_confidence_w * action_confidence_loss
+    backbone_anchor_logit_distill_component = (
+        active_loss_weights["backbone_anchor_logit_distill_w"]
+        * backbone_anchor_logit_distill_loss
+    )
+    action_token_ce_component = active_loss_weights["action_token_ce_w"] * action_token_ce_loss
+    action_distill_l1_component = (
+        active_loss_weights["action_distill_l1_w"] * action_distill_l1_loss
+    )
+    prefix_survival_component = active_loss_weights["prefix_survival_w"] * prefix_survival_loss
+    action_confidence_component = (
+        active_loss_weights["action_confidence_w"] * action_confidence_loss
+    )
     total_loss = (
         hidden_component
         + soft_component
@@ -2120,6 +2267,7 @@ def evaluate(
     val_loader: DataLoader,
     args,
     device: torch.device,
+    loss_weights: Optional[Dict[str, float]] = None,
 ) -> Dict[str, float]:
     """在验证集上评估 Draft 模型，返回平均指标。"""
     model.eval()
@@ -2167,7 +2315,15 @@ def evaluate(
     detail_accumulator = None
 
     for batch in val_loader:
-        metrics = compute_loss_and_accuracy(model, embed_tokens, lm_head, batch, args, device)
+        metrics = compute_loss_and_accuracy(
+            model,
+            embed_tokens,
+            lm_head,
+            batch,
+            args,
+            device,
+            loss_weights=loss_weights,
+        )
         bs = batch["lengths"].shape[0]
         total_loss += metrics["loss"].item() * bs
         total_soft += metrics["soft_loss"].item() * bs
@@ -2311,6 +2467,17 @@ def main():
         raise ValueError("--action_head_rank must be > 0.")
     if args.lr <= 0 or args.action_head_lr <= 0:
         raise ValueError("--lr and --action_head_lr must both be > 0.")
+    if args.staged_training:
+        if args.stage2_start_epoch <= 1:
+            raise ValueError("--stage2_start_epoch must be > 1 for staged training.")
+        if args.stage3_start_epoch <= args.stage2_start_epoch:
+            raise ValueError("--stage3_start_epoch must be greater than --stage2_start_epoch.")
+        if args.stage3_start_epoch > args.num_epochs:
+            raise ValueError("--stage3_start_epoch must not exceed --num_epochs.")
+        if args.stage_weight_ramp_epochs <= 0:
+            raise ValueError("--stage_weight_ramp_epochs must be > 0.")
+        if args.action_head_warmup_steps < 0:
+            raise ValueError("--action_head_warmup_steps must be >= 0.")
     if args.action_vocab_size <= 0:
         raise ValueError("--action_vocab_size must be > 0.")
     if args.action_distill_temperature <= 0:
@@ -2643,7 +2810,17 @@ def main():
     )
     steps_per_epoch = max(1, (len(train_loader) + args.gradient_accumulation_steps - 1) // args.gradient_accumulation_steps)
     total_optimizer_steps = max(1, args.num_epochs * steps_per_epoch)# 计算总的优化器步数，用于学习率调度器
-    scheduler = build_scheduler(optimizer, total_optimizer_steps, args.warmup_steps, args.warmup_ratio)
+    action_start_step = None
+    if args.staged_training and action_head_params:
+        action_start_step = (args.stage3_start_epoch - 1) * steps_per_epoch
+    scheduler = build_scheduler(
+        optimizer,
+        total_optimizer_steps,
+        args.warmup_steps,
+        args.warmup_ratio,
+        action_start_step=action_start_step,
+        action_warmup_steps=args.action_head_warmup_steps,
+    )
 
     global_step = 0
     resume_checkpoint_dir = resolve_resume_checkpoint(args.output_dir, args.resume_from_checkpoint)
@@ -2680,6 +2857,7 @@ def main():
             "trainable_params_m": round(trainable_params / 1e6, 2),
             "steps_per_epoch": steps_per_epoch,
             "total_optimizer_steps": total_optimizer_steps,
+            "action_head_start_step": action_start_step,
             "distributed": distributed,
             "world_size": world_size,
             "per_device_batch": args.batch_size,
@@ -2740,8 +2918,37 @@ def main():
             step=global_step,
         )
 
+    previous_stage_id = None
     try:
         for epoch in range(start_epoch, args.num_epochs + 1):
+            stage = build_training_stage(args, epoch)
+            active_loss_weights = stage["weights"]
+            action_head_active = not args.staged_training or epoch >= args.stage3_start_epoch
+            if stage["id"] != previous_stage_id:
+                stage_payload = {
+                    "event": "training_stage_start",
+                    "timestamp": datetime.now().isoformat(),
+                    "epoch": epoch,
+                    "global_step": global_step,
+                    "stage/id": stage["id"],
+                    "stage/name": stage["name"],
+                    "stage/stage2_scale": stage["stage2_scale"],
+                    "stage/stage3_scale": stage["stage3_scale"],
+                    **{
+                        f"stage/{name}": value
+                        for name, value in active_loss_weights.items()
+                    },
+                }
+                if is_main:
+                    append_jsonl(metrics_log_path, stage_payload)
+                    print(
+                        f"\n进入训练阶段 {stage['id']}: {stage['name']} | epoch={epoch} | "
+                        f"soft_w={active_loss_weights['soft_w']:.4f} "
+                        f"draft_anchor_kl_w={active_loss_weights['backbone_anchor_logit_distill_w']:.4f} "
+                        f"action_ce_w={active_loss_weights['action_token_ce_w']:.4f} "
+                        f"prefix_w={active_loss_weights['prefix_survival_w']:.4f}"
+                    )
+                previous_stage_id = stage["id"]
             model.train()
             if hasattr(train_dataset, "set_epoch"):
                 train_dataset.set_epoch(epoch)
@@ -2810,7 +3017,11 @@ def main():
             )
             epoch_metric_sums = {name: 0.0 for name in epoch_metric_names}
             epoch_metric_steps = 0
-            pbar = tqdm(train_loader, desc=f"train {epoch}/{args.num_epochs}", dynamic_ncols=True) if is_main else train_loader
+            pbar = tqdm(
+                train_loader,
+                desc=f"train {epoch}/{args.num_epochs} stage={stage['id']}",
+                dynamic_ncols=True,
+            ) if is_main else train_loader
             for batch_idx, batch in enumerate(pbar, start=1):
                 if args.anchor_consistency_w > 0 and args.anchor_consistency_warmup_steps > 0:
                     consistency_scale = min(
@@ -2835,6 +3046,7 @@ def main():
                     device,
                     consistency_scale=consistency_scale,
                     causal_residual_scale=causal_residual_scale,
+                    loss_weights=active_loss_weights,
                 )
                 (metrics["loss"] / args.gradient_accumulation_steps).backward()
                 log_metrics = distributed_log_metrics(metrics, distributed)
@@ -2903,6 +3115,10 @@ def main():
                 )
                 if should_step:
                     torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
+                    # Action-RNN 在阶段三前不应积累 Adam 状态，也不应被 AdamW weight decay 改动。
+                    if not action_head_active:
+                        for parameter in action_head_params:
+                            parameter.grad = None
                     optimizer.step()
                     scheduler.step()
                     optimizer.zero_grad(set_to_none=True)
@@ -2915,6 +3131,16 @@ def main():
                             "timestamp": datetime.now().isoformat(),
                             "epoch": epoch,
                             "global_step": global_step,
+                            "train/stage_id": stage["id"],
+                            "train/stage2_scale": stage["stage2_scale"],
+                            "train/stage3_scale": stage["stage3_scale"],
+                            "train/active_soft_w": active_loss_weights["soft_w"],
+                            "train/active_backbone_anchor_kl_w": active_loss_weights[
+                                "backbone_anchor_logit_distill_w"
+                            ],
+                            "train/active_action_ce_w": active_loss_weights["action_token_ce_w"],
+                            "train/active_action_l1_w": active_loss_weights["action_distill_l1_w"],
+                            "train/active_prefix_w": active_loss_weights["prefix_survival_w"],
                             "train/loss": train_loss_sum / denom_log_steps,
                             "train/soft_loss": train_soft_sum / denom_log_steps,
                             "train/hidden_loss": train_hidden_sum / denom_log_steps,
@@ -3104,6 +3330,16 @@ def main():
                     "timestamp": datetime.now().isoformat(),
                     "epoch": epoch,
                     "global_step": global_step,
+                    "train_epoch/stage_id": stage["id"],
+                    "train_epoch/stage2_scale": stage["stage2_scale"],
+                    "train_epoch/stage3_scale": stage["stage3_scale"],
+                    "train_epoch/active_soft_w": active_loss_weights["soft_w"],
+                    "train_epoch/active_backbone_anchor_kl_w": active_loss_weights[
+                        "backbone_anchor_logit_distill_w"
+                    ],
+                    "train_epoch/active_action_ce_w": active_loss_weights["action_token_ce_w"],
+                    "train_epoch/active_action_l1_w": active_loss_weights["action_distill_l1_w"],
+                    "train_epoch/active_prefix_w": active_loss_weights["prefix_survival_w"],
                     **{
                         f"train_epoch/{name}": value / epoch_denom
                         for name, value in epoch_metric_sums.items()
@@ -3131,7 +3367,15 @@ def main():
             if do_eval:
                 if distributed:
                     raise RuntimeError("Validation is disabled in DDP mode; use --val_split 0.")
-                val_metrics = evaluate(model, embed_tokens, lm_head, val_loader, args, device)
+                val_metrics = evaluate(
+                    model,
+                    embed_tokens,
+                    lm_head,
+                    val_loader,
+                    args,
+                    device,
+                    loss_weights=active_loss_weights,
+                )
 
                 current_val_loss = val_metrics["val/loss"]
                 current_val_acc = val_metrics["val/accuracy"]

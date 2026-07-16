@@ -45,6 +45,88 @@ def tiny_config():
 
 
 class DFlashActionHeadTest(unittest.TestCase):
+    def test_three_stage_loss_schedule(self):
+        train_module = load_training_module()
+        args = SimpleNamespace(
+            staged_training=True,
+            stage2_start_epoch=21,
+            stage3_start_epoch=101,
+            stage_weight_ramp_epochs=5,
+            hidden_w=1.0,
+            cos_w=0.05,
+            soft_w=0.05,
+            backbone_anchor_logit_distill_w=0.05,
+            action_token_ce_w=0.10,
+            action_distill_l1_w=0.40,
+            prefix_survival_w=0.20,
+            action_confidence_w=0.0,
+            anchor_logit_distill_w=0.0,
+        )
+
+        stage1 = train_module.build_training_stage(args, 20)
+        self.assertEqual(stage1["id"], 1)
+        self.assertEqual(stage1["weights"]["soft_w"], 0.0)
+        self.assertEqual(stage1["weights"]["action_token_ce_w"], 0.0)
+
+        stage2_start = train_module.build_training_stage(args, 21)
+        self.assertEqual(stage2_start["id"], 2)
+        self.assertAlmostEqual(stage2_start["weights"]["soft_w"], 0.01)
+        self.assertAlmostEqual(
+            stage2_start["weights"]["backbone_anchor_logit_distill_w"],
+            0.01,
+        )
+        self.assertEqual(stage2_start["weights"]["action_token_ce_w"], 0.0)
+
+        stage2_full = train_module.build_training_stage(args, 25)
+        self.assertAlmostEqual(stage2_full["weights"]["soft_w"], 0.05)
+        self.assertAlmostEqual(
+            stage2_full["weights"]["backbone_anchor_logit_distill_w"],
+            0.05,
+        )
+
+        stage3_start = train_module.build_training_stage(args, 101)
+        self.assertEqual(stage3_start["id"], 3)
+        self.assertAlmostEqual(stage3_start["weights"]["action_token_ce_w"], 0.02)
+        self.assertAlmostEqual(stage3_start["weights"]["action_distill_l1_w"], 0.08)
+        self.assertAlmostEqual(stage3_start["weights"]["prefix_survival_w"], 0.04)
+        self.assertEqual(stage3_start["weights"]["anchor_logit_distill_w"], 0.0)
+
+        stage3_full = train_module.build_training_stage(args, 105)
+        self.assertAlmostEqual(stage3_full["weights"]["action_token_ce_w"], 0.10)
+        self.assertAlmostEqual(stage3_full["weights"]["action_distill_l1_w"], 0.40)
+        self.assertAlmostEqual(stage3_full["weights"]["prefix_survival_w"], 0.20)
+
+    def test_action_head_lr_starts_only_in_stage_three(self):
+        train_module = load_training_module()
+        draft_parameter = torch.nn.Parameter(torch.ones(()))
+        action_parameter = torch.nn.Parameter(torch.ones(()))
+        optimizer = torch.optim.AdamW(
+            [
+                {"params": [draft_parameter], "lr": 2e-5, "group_name": "draft_backbone"},
+                {"params": [action_parameter], "lr": 5e-5, "group_name": "action_head"},
+            ]
+        )
+        scheduler = train_module.build_scheduler(
+            optimizer,
+            total_steps=200,
+            warmup_steps=10,
+            warmup_ratio=0.03,
+            action_start_step=100,
+            action_warmup_steps=10,
+        )
+        self.assertEqual(scheduler.get_last_lr()[1], 0.0)
+
+        for _ in range(50):
+            optimizer.step()
+            scheduler.step()
+        self.assertGreater(scheduler.get_last_lr()[0], 0.0)
+        self.assertEqual(scheduler.get_last_lr()[1], 0.0)
+
+        for _ in range(51):
+            optimizer.step()
+            scheduler.step()
+        self.assertGreater(scheduler.get_last_lr()[1], 0.0)
+
     def test_even_layer_selection_keeps_endpoints(self):
         self.assertEqual(
             build_evenly_spaced_target_layer_ids(32, num_feature_layers=5, first_layer_id=1),

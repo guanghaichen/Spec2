@@ -4,6 +4,7 @@ import json
 import math
 import os
 import random
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -406,6 +407,8 @@ def distributed_log_metrics(metrics: Dict[str, torch.Tensor], distributed: bool)
         "rollout_position_correct",
         "rollout_position_top2_correct",
         "rollout_position_total",
+        "rollout_prefix_correct",
+        "rollout_prefix_total",
         "anchor_consistency_pairs",
         "causal_residual_cad_pairs",
         "anchor_logit_distill_pairs",
@@ -1140,6 +1143,56 @@ def is_swanlab_detail_metric(metric_key: str) -> bool:
     return False
 
 
+SWANLAB_CORE_METRIC_LABELS = {
+    "loss": ("损失", "总损失"),
+    "hidden_loss": ("损失", "主干Hidden损失"),
+    "cos_loss": ("损失", "主干余弦损失"),
+    "soft_loss": ("损失", "主干Soft分布损失"),
+    "backbone_anchor_logit_distill_loss": ("损失", "主干跨Anchor分布蒸馏"),
+    "anchor_logit_distill_loss": ("损失", "动作头跨Anchor分布蒸馏"),
+    "action_token_ce_loss": ("损失", "动作Token交叉熵"),
+    "action_distill_l1_loss": ("损失", "动作分布L1损失"),
+    "prefix_survival_loss": ("损失", "连续前缀生存损失"),
+    "accuracy": ("准确率", "Teacher-Forcing总体准确率"),
+    "base_accuracy": ("准确率", "Draft基础准确率"),
+    "action_head_accuracy_gain": ("准确率", "Action-RNN准确率增益"),
+    "rollout_accuracy": ("自回滚", "总体准确率"),
+    "rollout_exposure_gap": ("自回滚", "Teacher-Forcing暴露差距"),
+    "rollout_top2_accuracy": ("自回滚", "Top2覆盖率"),
+    "rollout_runner_up_rescue_rate": ("自回滚", "第二候选可挽救率"),
+    "rollout_expected_prefix_length": ("自回滚", "平均连续命中长度"),
+    "lr": ("优化器", "Draft学习率"),
+    "action_head_lr": ("优化器", "Action-RNN学习率"),
+}
+
+
+def translate_swanlab_metric_key(metric_key: str) -> Optional[str]:
+    """把精选指标映射成中文 SwanLab 表名；返回 None 表示不上传。"""
+    if "/" not in metric_key:
+        return None
+    scope, leaf = metric_key.split("/", 1)
+    scope_label = {"train": "训练", "val": "验证"}.get(scope)
+    if scope_label is None:
+        return None
+
+    label = SWANLAB_CORE_METRIC_LABELS.get(leaf)
+    if label is not None:
+        category, metric_name = label
+        return f"{scope_label}{category}/{metric_name}"
+
+    match = re.fullmatch(r"rollout_position_(\d+)_(acc|top2_acc)", leaf)
+    if match:
+        position, metric_type = match.groups()
+        suffix = "命中率" if metric_type == "acc" else "Top2覆盖率"
+        return f"{scope_label}逐位置自回滚/P{position}{suffix}"
+
+    match = re.fullmatch(r"rollout_prefix_(\d+)_success_rate", leaf)
+    if match:
+        prefix_length = match.group(1)
+        return f"{scope_label}连续前缀成功率/连续命中至少{prefix_length}步"
+    return None
+
+
 def build_swanlab_metrics_payload(
     payload: Dict[str, Any],
     args,
@@ -1152,20 +1205,23 @@ def build_swanlab_metrics_payload(
     所有 anchor-position 明细，避免百万级 record 上传和本地 swanlog 膨胀。
     """
     numeric = numeric_payload_for_swanlab(payload, default_prefix=default_prefix)
-    if args.swanlab_log_all_metrics:
-        return numeric
-
     detail_every = max(1, int(args.swanlab_detail_every_steps))
     include_detail = (
         args.swanlab_log_detail_metrics
         and step is not None
         and step % detail_every == 0
     )
-    return {
-        key: value
-        for key, value in numeric.items()
-        if include_detail or not is_swanlab_detail_metric(key)
-    }
+    if args.swanlab_log_all_metrics:
+        return numeric
+
+    translated: Dict[str, float] = {}
+    for key, value in numeric.items():
+        if is_swanlab_detail_metric(key) and not include_detail:
+            continue
+        translated_key = translate_swanlab_metric_key(key)
+        if translated_key is not None:
+            translated[translated_key] = value
+    return translated
 
 # 学习率调度策略，先warmup，再linear decay
 def build_scheduler(optimizer: AdamW, total_steps: int, warmup_steps: int, warmup_ratio: float):
@@ -1194,6 +1250,8 @@ def new_detail_accumulator(num_positions: int) -> Dict[str, torch.Tensor]:
         "rollout_position_correct": torch.zeros(num_positions, dtype=torch.float32),
         "rollout_position_top2_correct": torch.zeros(num_positions, dtype=torch.float32),
         "rollout_position_total": torch.zeros(num_positions, dtype=torch.float32),
+        "rollout_prefix_correct": torch.zeros(num_positions, dtype=torch.float32),
+        "rollout_prefix_total": torch.zeros(num_positions, dtype=torch.float32),
     }
 
 
@@ -1208,6 +1266,8 @@ def accumulate_detail_metrics(accumulator: Optional[Dict[str, torch.Tensor]], me
         "rollout_position_correct",
         "rollout_position_top2_correct",
         "rollout_position_total",
+        "rollout_prefix_correct",
+        "rollout_prefix_total",
     ]
     if accumulator is None:
         accumulator = new_detail_accumulator(metrics["anchor_correct"].numel())
@@ -1229,6 +1289,8 @@ def detail_metrics_to_log(prefix: str, accumulator: Optional[Dict[str, torch.Ten
     rollout_position_correct = accumulator["rollout_position_correct"]
     rollout_position_top2_correct = accumulator["rollout_position_top2_correct"]
     rollout_position_total = accumulator["rollout_position_total"]
+    rollout_prefix_correct = accumulator["rollout_prefix_correct"]
+    rollout_prefix_total = accumulator["rollout_prefix_total"]
 
     for idx in range(anchor_total.numel()):
         if anchor_total[idx] > 0:
@@ -1241,6 +1303,10 @@ def detail_metrics_to_log(prefix: str, accumulator: Optional[Dict[str, torch.Ten
             ).item()
             payload[f"{prefix}/rollout_position_{idx + 1}_top2_acc"] = (
                 rollout_position_top2_correct[idx] / rollout_position_total[idx]
+            ).item()
+        if rollout_prefix_total[idx] > 0:
+            payload[f"{prefix}/rollout_prefix_{idx + 1}_success_rate"] = (
+                rollout_prefix_correct[idx] / rollout_prefix_total[idx]
             ).item()
 
     for anchor in range(anchor_position_total.shape[0]):
@@ -1340,6 +1406,8 @@ def compute_loss_and_accuracy(
     rollout_position_correct = torch.zeros(seq_len, device=device, dtype=torch.float32)
     rollout_position_top2_correct = torch.zeros(seq_len, device=device, dtype=torch.float32)
     rollout_position_total = torch.zeros(seq_len, device=device, dtype=torch.float32)
+    rollout_prefix_correct = torch.zeros(seq_len, device=device, dtype=torch.float32)
+    rollout_prefix_total = torch.zeros(seq_len, device=device, dtype=torch.float32)
     causal_slot0_hidden: Dict[int, torch.Tensor] = {}
     causal_slot0_mask: Dict[int, torch.Tensor] = {}
     far_slot_entries = []
@@ -1651,7 +1719,10 @@ def compute_loss_and_accuracy(
                     dim=1,
                 ) * rollout_valid.float()
                 rollout_prefix_sum += prefix_survives.sum()
-                rollout_prefix_blocks += rollout_valid[:, 0].sum().float()
+                rollout_block_count = rollout_valid[:, 0].sum().float()
+                rollout_prefix_blocks += rollout_block_count
+                rollout_prefix_total[:max_block_len] += rollout_block_count
+                rollout_prefix_correct[:max_block_len] += prefix_survives.sum(dim=0)
                 for local_pos in range(max_block_len):
                     pos_mask = rollout_valid[:, local_pos]
                     pos_count = pos_mask.sum().float()
@@ -2036,6 +2107,8 @@ def compute_loss_and_accuracy(
         "rollout_position_correct": rollout_position_correct.detach(),
         "rollout_position_top2_correct": rollout_position_top2_correct.detach(),
         "rollout_position_total": rollout_position_total.detach(),
+        "rollout_prefix_correct": rollout_prefix_correct.detach(),
+        "rollout_prefix_total": rollout_prefix_total.detach(),
     }
 
 
@@ -2655,18 +2728,15 @@ def main():
             print(f"SwanLab 已启动: mode={args.swanlab_mode}")
         swanlab_run = safe_swanlab_log(
             swanlab_run,
-            numeric_payload_for_swanlab(
-                {
-                    "train_files": len(train_files),
-                    "val_files": len(val_files),
-                    "trainable_params": trainable_params,
-                    "trainable_params_m": round(trainable_params / 1e6, 2),
-                    "steps_per_epoch": steps_per_epoch,
-                    "total_optimizer_steps": total_optimizer_steps,
-                    "effective_batch": args.batch_size * args.gradient_accumulation_steps,
-                },
-                default_prefix="run",
-            ),
+            {
+                "运行信息/训练样本数": float(train_sample_count),
+                "运行信息/可训练参数量_百万": round(trainable_params / 1e6, 2),
+                "运行信息/每轮优化步数": float(steps_per_epoch),
+                "运行信息/总优化步数": float(total_optimizer_steps),
+                "运行信息/全局有效批量": float(
+                    args.batch_size * args.gradient_accumulation_steps * world_size
+                ),
+            },
             step=global_step,
         )
 
@@ -3052,12 +3122,6 @@ def main():
                     ),
                 }
                 append_jsonl(metrics_log_path, epoch_payload)
-                if swanlab_run is not None:
-                    swanlab_run = safe_swanlab_log(
-                        swanlab_run,
-                        numeric_payload_for_swanlab(epoch_payload, default_prefix="train_epoch"),
-                        step=global_step,
-                    )
 
             # ── 验证 + 早停 + 最优权重 ──
             do_eval = (

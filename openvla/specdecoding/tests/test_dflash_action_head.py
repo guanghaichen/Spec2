@@ -220,6 +220,15 @@ class DFlashActionHeadTest(unittest.TestCase):
         self.assertGreaterEqual(metrics["rollout_accuracy"].item(), 0.0)
         self.assertGreaterEqual(metrics["rollout_top2_accuracy"].item(), metrics["rollout_accuracy"].item())
         self.assertGreaterEqual(metrics["rollout_expected_prefix_length"].item(), 0.0)
+        prefix_rates = metrics["rollout_prefix_correct"] / metrics[
+            "rollout_prefix_total"
+        ].clamp_min(1.0)
+        self.assertTrue(torch.all(prefix_rates[:-1] >= prefix_rates[1:]))
+        self.assertAlmostEqual(
+            prefix_rates.sum().item(),
+            metrics["rollout_expected_prefix_length"].item(),
+            places=5,
+        )
         metrics["loss"].backward()
         self.assertIsNotNone(model.action_head_out.weight.grad)
 
@@ -291,6 +300,36 @@ class DFlashActionHeadTest(unittest.TestCase):
         self.assertTrue(
             action_head_grad is None or torch.count_nonzero(action_head_grad).item() == 0
         )
+
+    def test_swanlab_payload_is_chinese_and_filtered(self):
+        train_module = load_training_module()
+        args = SimpleNamespace(
+            swanlab_log_all_metrics=False,
+            swanlab_log_detail_metrics=True,
+            swanlab_detail_every_steps=200,
+        )
+        payload = {
+            "train/loss": 1.2,
+            "train/hidden_loss": 0.8,
+            "train/hidden_component": 0.8,
+            "train/anchor_0_acc": 0.9,
+            "train/rollout_position_2_acc": 0.7,
+            "train/rollout_prefix_2_success_rate": 0.6,
+            "train/lr": 1e-5,
+        }
+        swan_payload = train_module.build_swanlab_metrics_payload(
+            payload,
+            args,
+            default_prefix="train",
+            step=200,
+        )
+        self.assertEqual(swan_payload["训练损失/总损失"], 1.2)
+        self.assertEqual(swan_payload["训练损失/主干Hidden损失"], 0.8)
+        self.assertEqual(swan_payload["训练逐位置自回滚/P2命中率"], 0.7)
+        self.assertEqual(swan_payload["训练连续前缀成功率/连续命中至少2步"], 0.6)
+        self.assertEqual(swan_payload["训练优化器/Draft学习率"], 1e-5)
+        self.assertNotIn("train/hidden_component", swan_payload)
+        self.assertFalse(any("anchor_0" in key for key in swan_payload))
 
 
 if __name__ == "__main__":

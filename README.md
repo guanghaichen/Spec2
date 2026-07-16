@@ -283,7 +283,7 @@ head、旧 hidden CAD、旧 causal residual、旧 refined hidden、旧 residual 
 
 ### 4.4 SwanLab 指标怎样读
 
-原始 loss 与 `*_component` 要分开看：
+`metrics.jsonl` 保留全量原始指标。原始 loss 与 `*_component` 的关系为：
 
 ```text
 component = raw_loss * 配置权重
@@ -303,16 +303,35 @@ component = raw_loss * 配置权重
 | `rollout_exposure_gap` | `accuracy-rollout_accuracy`；衡量 teacher forcing 到自回滚的分布差距 |
 | `rollout_top2_accuracy` | 正确 token 是否进入 self-rollout top-2 |
 | `rollout_expected_prefix_length` | anchor0 实际连续猜对的平均前缀长度，范围 0 到 6 |
+| `rollout_prefix_k_success_rate` | anchor0 从 p1 开始至少连续猜对 k 步的概率；随 k 单调不增 |
 | `position_k_acc` | 所有 anchor 对绝对位置 pk 的 teacher-forced 平均准确率 |
 | `anchor_a_to_position_k_acc` | 指定 anchor 到指定目标位置的准确率矩阵 |
 | `action_accept_probability_proxy` | 由 teacher/student 分布距离得到的单位置接受概率代理 |
 | `expected_prefix_length` | 分布式可微前缀代理，不等于在线论文 Length |
 
-`train/*` 是每 20 optimizer step 的局部窗口，可能受批次难度影响；`train_epoch/*` 是整轮均值，判断长期
-收敛时应优先看后者。
+并且有严格关系：
 
-当前主训练每 20 optimizer step 上传普通标量，每 200 step 上传 anchor/position 明细。`NUM_WORKERS=1`、
-单文件 HDF5、不保存 optimizer state 和根目录 checkpoint 副本，用于降低共享服务器 IO 压力。
+```text
+rollout_expected_prefix_length = sum(k=1..6, rollout_prefix_k_success_rate)
+```
+
+`rollout_accuracy` 是六个位置的平均自回滚命中率；后部位置在前部已错时重新命中也会计入。连续前缀成功率
+要求 p1 到 pk 全部正确，因此更贴近 strict 投机验证。
+
+`train/*` 是每 20 optimizer step 的局部窗口，可能受批次难度影响；`train_epoch/*` 是整轮均值并完整保存在
+`metrics.jsonl`，判断长期收敛时应优先看后者。
+
+SwanLab 默认只上传当前启用且有解释价值的精选指标，不再上传恒为 0 的旧模块、`raw/component` 重复曲线、
+全量 anchor 矩阵和重复的 epoch 曲线。在线表名使用中文并按以下类别组织：
+
+```text
+训练损失 / 训练准确率 / 训练自回滚
+训练连续前缀成功率 / 训练逐位置自回滚 / 训练优化器
+```
+
+当前主训练每 20 optimizer step 上传核心标量和连续前缀成功率，每 200 step 上传 rollout 逐位置明细。
+完整英文科研记录仍写入 `metrics.jsonl`。`NUM_WORKERS=1`、单文件 HDF5、不保存 optimizer state 和根目录
+checkpoint 副本，用于降低共享服务器 IO 压力。
 
 ## 5. 推理和验证
 

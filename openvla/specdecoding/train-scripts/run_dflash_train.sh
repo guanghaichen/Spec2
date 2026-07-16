@@ -3,7 +3,7 @@ set -euo pipefail
 
 # 当前 DFlash 训练统一入口。
 #
-#   bash .../run_dflash_train.sh main        # 推荐：一层、三阶段、Draft 跨 anchor + Action-RNN
+#   bash .../run_dflash_train.sh main        # 推荐：一层、统一余弦课程、Draft 跨 anchor + Action-RNN
 #   bash .../run_dflash_train.sh three_layer # 容量消融：三层主干
 #   bash .../run_dflash_train.sh no_prefix   # 去掉 Prefix Survival
 #   bash .../run_dflash_train.sh no_anchor   # 去掉跨 anchor logits 蒸馏
@@ -20,25 +20,25 @@ case "${PROFILE}" in
     PROFILE_LAYERS=1
     PROFILE_PREFIX_W=0.20
     PROFILE_ANCHOR_W=0.05
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_staged_draft_anchor_action_rnn_1layer_b8x2_4gpu
+    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_cosine_curriculum_action_rnn_1layer_b8x2_4gpu
     ;;
   three_layer)
     PROFILE_LAYERS=3
     PROFILE_PREFIX_W=0.20
     PROFILE_ANCHOR_W=0.05
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_staged_draft_anchor_action_rnn_3layer_b8x2_4gpu
+    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_cosine_curriculum_action_rnn_3layer_b8x2_4gpu
     ;;
   no_prefix)
     PROFILE_LAYERS=1
     PROFILE_PREFIX_W=0
     PROFILE_ANCHOR_W=0.05
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_staged_draft_anchor_no_prefix_1layer_b8x2_4gpu
+    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_cosine_curriculum_no_prefix_1layer_b8x2_4gpu
     ;;
   no_anchor)
     PROFILE_LAYERS=1
     PROFILE_PREFIX_W=0.20
     PROFILE_ANCHOR_W=0
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_staged_no_anchor_action_rnn_1layer_b8x2_4gpu
+    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_cosine_curriculum_no_anchor_1layer_b8x2_4gpu
     ;;
   *)
     echo "用法: bash $0 [main|three_layer|no_prefix|no_anchor]" >&2
@@ -82,15 +82,10 @@ LR="${LR:-2e-5}"
 ACTION_HEAD_LR="${ACTION_HEAD_LR:-5e-5}"
 WARMUP_STEPS="${WARMUP_STEPS:-1000}"
 ACTION_HEAD_WARMUP_STEPS="${ACTION_HEAD_WARMUP_STEPS:-500}"
-STAGE2_START_EPOCH="${STAGE2_START_EPOCH:-21}"
-STAGE3_START_EPOCH="${STAGE3_START_EPOCH:-101}"
-STAGE_WEIGHT_RAMP_EPOCHS="${STAGE_WEIGHT_RAMP_EPOCHS:-5}"
-STAGE1_END_EPOCH=$((STAGE2_START_EPOCH - 1))
-STAGE2_END_EPOCH=$((STAGE3_START_EPOCH - 1))
 SAVE_EVERY="${SAVE_EVERY:-10}"
 SEED="${SEED:-7}"
 
-# 稳定版反传：低权重分布蒸馏只训练 Draft 主干；重动作损失只训练 Action-RNN。
+# 单时钟课程：表征损失始终训练 Draft，Base/Final CE 余弦交接；L1/Prefix 只训练 Action-RNN。
 HIDDEN_W="${HIDDEN_W:-1.00}"
 COS_W="${COS_W:-0.05}"
 SOFT_W="${SOFT_W:-0.05}"
@@ -133,8 +128,8 @@ LR=${LR}
 ACTION_HEAD_LR=${ACTION_HEAD_LR}
 WARMUP_STEPS=${WARMUP_STEPS}
 ACTION_HEAD_WARMUP_STEPS=${ACTION_HEAD_WARMUP_STEPS}
-STAGES=1-${STAGE1_END_EPOCH} / ${STAGE2_START_EPOCH}-${STAGE2_END_EPOCH} / ${STAGE3_START_EPOCH}-${NUM_EPOCHS}
-STAGE_WEIGHT_RAMP_EPOCHS=${STAGE_WEIGHT_RAMP_EPOCHS}
+CURRICULUM=single_cosine_over_${NUM_EPOCHS}_epochs
+TOKEN_CE=(1-s)*BaseCE+s*FinalCE
 SAVE_EVERY=${SAVE_EVERY}
 SEED=${SEED}
 
@@ -165,7 +160,7 @@ fi
 
 torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   openvla/specdecoding/train-scripts/train_dflash_libero_goal.py \
-  --run_name "dflash-staged-draft-anchor-action-rnn-${PROFILE}-${NUM_DRAFT_LAYERS}layer-b8x2-4gpu" \
+  --run_name "dflash-cosine-curriculum-action-rnn-${PROFILE}-${NUM_DRAFT_LAYERS}layer-b8x2-4gpu" \
   --vla_path "${VLA_PATH}" \
   --datapath "${DATAPATH}" \
   --dataset_format auto \
@@ -177,7 +172,7 @@ torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   --include_anchor_hidden \
   --action_head_type slot_rnn \
   --action_head_rank 256 \
-  --detach_action_head_inputs \
+  --no-detach_action_head_inputs \
   --action_vocab_size 256 \
   --no-action_confidence_enabled \
   --hidden_w "${HIDDEN_W}" \
@@ -207,10 +202,8 @@ torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   --weight_decay 0.05 \
   --lr "${LR}" \
   --action_head_lr "${ACTION_HEAD_LR}" \
-  --staged_training \
-  --stage2_start_epoch "${STAGE2_START_EPOCH}" \
-  --stage3_start_epoch "${STAGE3_START_EPOCH}" \
-  --stage_weight_ramp_epochs "${STAGE_WEIGHT_RAMP_EPOCHS}" \
+  --no-staged_training \
+  --unified_cosine_curriculum \
   --action_head_warmup_steps "${ACTION_HEAD_WARMUP_STEPS}" \
   --batch_size "${BATCH_SIZE}" \
   --gradient_accumulation_steps "${GRAD_ACCUM_STEPS}" \

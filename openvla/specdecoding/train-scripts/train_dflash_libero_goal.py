@@ -118,6 +118,15 @@ def parse_args():
     parser.add_argument("--stage3_start_epoch", type=int, default=101, help="阶段三起始 epoch：启用 Action-RNN 的 CE/L1/Prefix 监督")
     parser.add_argument("--stage_weight_ramp_epochs", type=int, default=5, help="新阶段 loss 从 0 线性升到目标权重所用 epoch 数")
     parser.add_argument("--action_head_warmup_steps", type=int, default=500, help="Action-RNN 从阶段三开始独立 warmup 的 optimizer step 数")
+    parser.add_argument(
+        "--unified_cosine_curriculum",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            "使用单一余弦课程平滑完成 Base CE 到 Final CE 的交接，并同步渐入跨 Anchor 与 "
+            "Action-RNN 辅助损失；主实验推荐开启，且与 staged_training 互斥"
+        ),
+    )
     parser.add_argument("--weight_decay", type=float, default=5e-2, help="AdamW weight decay；用于抑制 draft 过度记忆训练集")
     parser.add_argument("--adam_beta1", type=float, default=0.9, help="AdamW beta1")
     parser.add_argument("--adam_beta2", type=float, default=0.98, help="AdamW beta2")
@@ -168,7 +177,7 @@ def parse_args():
         "--detach_action_head_inputs",
         action=argparse.BooleanOptionalAction,
         default=True,
-        help="动作损失是否只更新 Action-RNN；默认隔离 Draft hidden，避免 token 监督破坏 hidden 蒸馏",
+        help="旧版兼容开关：动作损失是否只更新 Action-RNN；统一余弦课程会忽略它并采用联合 Final CE",
     )
     parser.add_argument("--action_vocab_size", type=int, default=256, help="OpenVLA 动作子词表大小，默认 256 个离散动作 bin")
     parser.add_argument(
@@ -943,6 +952,7 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "lr": args.lr,
         "action_head_lr": args.action_head_lr,
         "staged_training": args.staged_training,
+        "unified_cosine_curriculum": args.unified_cosine_curriculum,
         "stage2_start_epoch": args.stage2_start_epoch,
         "stage3_start_epoch": args.stage3_start_epoch,
         "stage_weight_ramp_epochs": args.stage_weight_ramp_epochs,
@@ -1165,7 +1175,9 @@ SWANLAB_CORE_METRIC_LABELS = {
     "soft_loss": ("损失", "主干Soft分布损失（原值）"),
     "backbone_anchor_logit_distill_loss": ("损失", "主干跨Anchor分布蒸馏（原值）"),
     "anchor_logit_distill_loss": ("损失", "动作头跨Anchor分布蒸馏"),
-    "action_token_ce_loss": ("损失", "动作Token交叉熵"),
+    "base_action_token_ce_loss": ("损失", "Base动作Token交叉熵"),
+    "action_token_ce_loss": ("损失", "Final动作Token交叉熵"),
+    "token_curriculum_component": ("损失", "BaseFinal课程Token损失"),
     "action_distill_l1_loss": ("损失", "动作分布L1损失"),
     "prefix_survival_loss": ("损失", "连续前缀生存损失"),
     "accuracy": ("准确率", "Teacher-Forcing总体准确率"),
@@ -1179,6 +1191,9 @@ SWANLAB_CORE_METRIC_LABELS = {
     "stage_id": ("阶段", "当前阶段"),
     "stage2_scale": ("阶段", "Draft分布阶段渐入比例"),
     "stage3_scale": ("阶段", "Action-RNN阶段渐入比例"),
+    "curriculum_progress": ("课程", "训练总进度"),
+    "curriculum_base_scale": ("课程", "Base监督比例"),
+    "curriculum_final_scale": ("课程", "Final监督比例"),
     "active_soft_w": ("阶段", "当前Soft权重"),
     "active_backbone_anchor_kl_w": ("阶段", "当前Draft跨Anchor权重"),
     "active_action_ce_w": ("阶段", "当前动作CE权重"),
@@ -1188,6 +1203,7 @@ SWANLAB_CORE_METRIC_LABELS = {
     "action_head_lr": ("优化器", "Action-RNN学习率"),
     "draft_grad_norm": ("优化器", "Draft裁剪前梯度范数"),
     "action_head_grad_norm": ("优化器", "Action-RNN裁剪前梯度范数"),
+    "global_grad_norm": ("优化器", "全局裁剪前梯度范数"),
 }
 
 
@@ -1376,23 +1392,79 @@ def build_training_stage(args, epoch: int) -> Dict[str, Any]:
     }
 
 
-def clip_optimizer_parameter_groups(
+def cosine_curriculum_scale(progress: float) -> float:
+    """把完整训练进度映射到 [0, 1]，首尾导数均为 0。"""
+    progress = min(1.0, max(0.0, float(progress)))
+    return 0.5 * (1.0 - math.cos(math.pi * progress))
+
+
+def build_training_control(
+    args,
+    epoch: int,
+    global_step: int,
+    total_optimizer_steps: int,
+) -> Dict[str, Any]:
+    """返回当前 step 的损失权重与 Base/Final 交接比例。"""
+    if not args.unified_cosine_curriculum:
+        stage = build_training_stage(args, epoch)
+        return {
+            **stage,
+            "progress": min(1.0, float(global_step) / float(max(1, total_optimizer_steps))),
+            "base_scale": 0.0,
+            "final_scale": 1.0,
+        }
+
+    progress = min(1.0, float(global_step) / float(max(1, total_optimizer_steps)))
+    final_scale = cosine_curriculum_scale(progress)
+    weights = {name: float(getattr(args, name)) for name in STAGED_LOSS_WEIGHT_NAMES}
+    # 表征监督始终存在；结构监督与修正头辅助监督共用一个连续时钟。
+    for name in (
+        "backbone_anchor_logit_distill_w",
+        "action_distill_l1_w",
+        "prefix_survival_w",
+        "action_confidence_w",
+        "anchor_logit_distill_w",
+    ):
+        weights[name] *= final_scale
+    return {
+        "id": 4,
+        "name": "unified_cosine_curriculum",
+        "stage2_scale": final_scale,
+        "stage3_scale": final_scale,
+        "progress": progress,
+        "base_scale": 1.0 - final_scale,
+        "final_scale": final_scale,
+        "weights": weights,
+    }
+
+
+def clip_optimizer_gradients_global(
     optimizer: AdamW,
     max_norm: float,
 ) -> Dict[str, torch.Tensor]:
-    """独立裁剪每个参数组，避免一组梯度峰值压缩另一组的有效更新。"""
+    """记录各组裁剪前范数，再对全部可训练参数执行一次全局 L2 裁剪。"""
     group_norms: Dict[str, torch.Tensor] = {}
+    all_parameters = []
     for group_index, group in enumerate(optimizer.param_groups):
         group_name = str(group.get("group_name", f"group_{group_index}"))
         parameters = [parameter for parameter in group["params"] if parameter.grad is not None]
+        all_parameters.extend(parameters)
         if not parameters:
             group_norms[group_name] = torch.zeros((), dtype=torch.float32)
             continue
-        group_norms[group_name] = torch.nn.utils.clip_grad_norm_(
-            parameters,
+        squared_norm = torch.stack(
+            [parameter.grad.detach().float().norm(2).square() for parameter in parameters]
+        ).sum()
+        group_norms[group_name] = squared_norm.sqrt().detach()
+    if all_parameters:
+        global_norm = torch.nn.utils.clip_grad_norm_(
+            all_parameters,
             max_norm,
             error_if_nonfinite=True,
         ).detach().float()
+    else:
+        global_norm = torch.zeros((), dtype=torch.float32)
+    group_norms["global"] = global_norm
     return group_norms
 
 
@@ -1503,12 +1575,15 @@ def compute_loss_and_accuracy(
     consistency_scale: float = 1.0,
     causal_residual_scale: float = 1.0,
     loss_weights: Optional[Dict[str, float]] = None,
+    curriculum_state: Optional[Dict[str, float]] = None,
 ) -> Dict[str, torch.Tensor]:
     draft_model = model.module if hasattr(model, "module") else model
     active_loss_weights = {
         name: float((loss_weights or {}).get(name, getattr(args, name)))
         for name in STAGED_LOSS_WEIGHT_NAMES
     }
+    base_curriculum_scale = float((curriculum_state or {}).get("base_scale", 0.0))
+    final_curriculum_scale = float((curriculum_state or {}).get("final_scale", 1.0))
     prompt_selected = batch["prompt_selected"].to(device=device, dtype=torch.bfloat16)# 完整 prefill/prefix 上下文 [B, P, L*hidden]
     prompt_position_ids = batch["prompt_position_ids"].to(device=device)# 完整 prefill/prefix 的绝对 position [B, P]
     prompt_attention_mask = batch["prompt_attention_mask"].to(device=device)# prefix padding mask [B, P]
@@ -1540,6 +1615,7 @@ def compute_loss_and_accuracy(
     backbone_anchor_logit_distill_sum = torch.zeros((), device=device, dtype=torch.float32)
     backbone_anchor_logit_distill_weight_sum = torch.zeros((), device=device, dtype=torch.float32)
     backbone_anchor_logit_distill_pairs = torch.zeros((), device=device, dtype=torch.float32)
+    base_action_token_ce_sum = torch.zeros((), device=device, dtype=torch.float32)
     action_token_ce_sum = torch.zeros((), device=device, dtype=torch.float32)
     action_distill_l1_sum = torch.zeros((), device=device, dtype=torch.float32)
     prefix_survival_sum = torch.zeros((), device=device, dtype=torch.float32)
@@ -1676,17 +1752,16 @@ def compute_loss_and_accuracy(
         teacher_hidden = target_hidden[:, teacher_start : teacher_start + max_block_len, :].float()# H(已知token..)
         # 新版只取 lm_head 的 256 个动作行做块投影，随后在动作子词表上递推前缀状态。
         action_confidence_logits = None
+        auxiliary_student_logits = None
         if draft_model.action_sequential_enabled:
-            # backbone_student_logits 保留到 Draft hidden 的梯度，只承接低权重
-            # soft / backbone cross-anchor KL。Action-RNN 的重动作损失使用 detach
-            # 分支，避免 CE/L1/Prefix 重新通过共享 hidden 走捷径。
             backbone_student_logits = draft_model.project_action_logits(
                 student_hidden.to(torch.bfloat16),
                 lm_head,
             ).float()
             action_base_logits = backbone_student_logits
             action_head_hidden = pred_hidden[:, :max_block_len, :]
-            if args.detach_action_head_inputs:
+            use_joint_final_ce = bool(getattr(args, "unified_cosine_curriculum", False))
+            if args.detach_action_head_inputs and not use_joint_final_ce:
                 action_base_logits = action_base_logits.detach()
                 action_head_hidden = action_head_hidden.detach()
             student_logits, action_confidence_logits = draft_model.apply_action_sequential_head(
@@ -1695,6 +1770,25 @@ def compute_loss_and_accuracy(
                 prev_token_ids=prev_token_ids,
                 action_position_ids=action_position_ids,
             )
+            # L1/Prefix 是 Action-RNN 专属辅助目标：使用同一个动作头，但切断其
+            # Draft 输入。Final CE 则保留联合图，让修正结果也能反向改善主干。
+            need_detached_action_aux = (
+                active_loss_weights["action_distill_l1_w"] > 0
+                or active_loss_weights["prefix_survival_w"] > 0
+                or active_loss_weights["action_confidence_w"] > 0
+            )
+            if use_joint_final_ce and need_detached_action_aux:
+                auxiliary_student_logits, auxiliary_confidence_logits = (
+                    draft_model.apply_action_sequential_head(
+                        backbone_student_logits.detach(),
+                        pred_hidden[:, :max_block_len, :].detach(),
+                        prev_token_ids=prev_token_ids,
+                        action_position_ids=action_position_ids,
+                    )
+                )
+                action_confidence_logits = auxiliary_confidence_logits
+            else:
+                auxiliary_student_logits = student_logits
             # 阶段三前动作损失不计算，但 DDP 仍需看到动作头位于 loss 图中。
             # 零值图锚不会产生有效梯度，随后还会把动作头 grad 设回 None。
             action_head_graph_anchor = action_head_graph_anchor + student_logits.sum() * 0.0
@@ -1773,7 +1867,6 @@ def compute_loss_and_accuracy(
             with torch.no_grad():
                 teacher_probs = F.softmax(teacher_logits / args.soft_temperature, dim=-1)
             # soft loss 只监督 Draft 主干经冻结 lm_head 得到的基础分布。
-            # Action-RNN 的重动作损失走上方 detach 分支，不会借此反传回主干。
             student_log_probs = F.log_softmax(
                 backbone_student_logits / args.soft_temperature,
                 dim=-1,
@@ -1784,11 +1877,17 @@ def compute_loss_and_accuracy(
         if draft_model.action_sequential_enabled:
             local_target_tokens = draft_model.action_token_ids_to_local(target_tokens)
             if active_loss_weights["action_token_ce_w"] > 0:
+                base_action_ce = F.cross_entropy(
+                    backbone_student_logits.reshape(-1, backbone_student_logits.shape[-1]),
+                    local_target_tokens.reshape(-1),
+                    reduction="none",
+                ).view_as(target_tokens)
                 action_ce = F.cross_entropy(
                     student_logits.reshape(-1, student_logits.shape[-1]),
                     local_target_tokens.reshape(-1),
                     reduction="none",
                 ).view_as(target_tokens)
+                base_action_token_ce_sum += (base_action_ce * loss_weight).sum()
                 action_token_ce_sum += (action_ce * loss_weight).sum()
 
             if (
@@ -1800,7 +1899,7 @@ def compute_loss_and_accuracy(
                 if teacher_probs is None or temperature != float(args.soft_temperature):
                     with torch.no_grad():
                         teacher_probs = F.softmax(teacher_logits / temperature, dim=-1)
-                student_probs = F.softmax(student_logits / temperature, dim=-1)
+                student_probs = F.softmax(auxiliary_student_logits / temperature, dim=-1)
                 probability_l1 = (student_probs - teacher_probs).abs().sum(dim=-1)
                 # 1-TV 是两分布在一次 maximal coupling 下取到相同 token 的概率。
                 accept_probability_proxy = (1.0 - 0.5 * probability_l1).clamp(min=0.0, max=1.0)
@@ -2176,6 +2275,7 @@ def compute_loss_and_accuracy(
     backbone_anchor_logit_distill_loss = (
         backbone_anchor_logit_distill_sum / backbone_anchor_logit_distill_denom
     )
+    base_action_token_ce_loss = base_action_token_ce_sum / loss_denom
     action_token_ce_loss = action_token_ce_sum / loss_denom
     action_distill_l1_loss = action_distill_l1_sum / loss_denom
     prefix_survival_loss = prefix_survival_sum / loss_denom
@@ -2207,7 +2307,13 @@ def compute_loss_and_accuracy(
         active_loss_weights["backbone_anchor_logit_distill_w"]
         * backbone_anchor_logit_distill_loss
     )
+    base_scale_tensor = torch.tensor(base_curriculum_scale, device=device, dtype=torch.float32)
+    final_scale_tensor = torch.tensor(final_curriculum_scale, device=device, dtype=torch.float32)
     action_token_ce_component = active_loss_weights["action_token_ce_w"] * action_token_ce_loss
+    token_curriculum_component = active_loss_weights["action_token_ce_w"] * (
+        base_scale_tensor * base_action_token_ce_loss
+        + final_scale_tensor * action_token_ce_loss
+    )
     action_distill_l1_component = (
         active_loss_weights["action_distill_l1_w"] * action_distill_l1_loss
     )
@@ -2225,7 +2331,7 @@ def compute_loss_and_accuracy(
         + residual_token_ce_component
         + anchor_logit_distill_component
         + backbone_anchor_logit_distill_component
-        + action_token_ce_component
+        + token_curriculum_component
         + action_distill_l1_component
         + prefix_survival_component
         + action_confidence_component
@@ -2251,6 +2357,7 @@ def compute_loss_and_accuracy(
         "residual_token_ce_loss": residual_token_ce_loss,
         "anchor_logit_distill_loss": anchor_logit_distill_loss,
         "backbone_anchor_logit_distill_loss": backbone_anchor_logit_distill_loss,
+        "base_action_token_ce_loss": base_action_token_ce_loss,
         "action_token_ce_loss": action_token_ce_loss,
         "action_distill_l1_loss": action_distill_l1_loss,
         "prefix_survival_loss": prefix_survival_loss,
@@ -2265,6 +2372,9 @@ def compute_loss_and_accuracy(
         "anchor_logit_distill_component": anchor_logit_distill_component,
         "backbone_anchor_logit_distill_component": backbone_anchor_logit_distill_component,
         "action_token_ce_component": action_token_ce_component,
+        "token_curriculum_component": token_curriculum_component,
+        "curriculum_base_scale": base_scale_tensor.detach(),
+        "curriculum_final_scale": final_scale_tensor.detach(),
         "action_distill_l1_component": action_distill_l1_component,
         "prefix_survival_component": prefix_survival_component,
         "action_confidence_component": action_confidence_component,
@@ -2308,6 +2418,7 @@ def evaluate(
     args,
     device: torch.device,
     loss_weights: Optional[Dict[str, float]] = None,
+    curriculum_state: Optional[Dict[str, float]] = None,
 ) -> Dict[str, float]:
     """在验证集上评估 Draft 模型，返回平均指标。"""
     model.eval()
@@ -2320,6 +2431,7 @@ def evaluate(
     total_refined_hidden = 0.0
     total_anchor_logit_distill = 0.0
     total_backbone_anchor_logit_distill = 0.0
+    total_base_action_token_ce = 0.0
     total_action_token_ce = 0.0
     total_action_distill_l1 = 0.0
     total_prefix_survival = 0.0
@@ -2333,6 +2445,7 @@ def evaluate(
     total_anchor_logit_distill_component = 0.0
     total_backbone_anchor_logit_distill_component = 0.0
     total_action_token_ce_component = 0.0
+    total_token_curriculum_component = 0.0
     total_action_distill_l1_component = 0.0
     total_prefix_survival_component = 0.0
     total_action_confidence_component = 0.0
@@ -2363,6 +2476,7 @@ def evaluate(
             args,
             device,
             loss_weights=loss_weights,
+            curriculum_state=curriculum_state,
         )
         bs = batch["lengths"].shape[0]
         total_loss += metrics["loss"].item() * bs
@@ -2376,6 +2490,7 @@ def evaluate(
         total_backbone_anchor_logit_distill += metrics[
             "backbone_anchor_logit_distill_loss"
         ].item() * bs
+        total_base_action_token_ce += metrics["base_action_token_ce_loss"].item() * bs
         total_action_token_ce += metrics["action_token_ce_loss"].item() * bs
         total_action_distill_l1 += metrics["action_distill_l1_loss"].item() * bs
         total_prefix_survival += metrics["prefix_survival_loss"].item() * bs
@@ -2391,6 +2506,7 @@ def evaluate(
             "backbone_anchor_logit_distill_component"
         ].item() * bs
         total_action_token_ce_component += metrics["action_token_ce_component"].item() * bs
+        total_token_curriculum_component += metrics["token_curriculum_component"].item() * bs
         total_action_distill_l1_component += metrics["action_distill_l1_component"].item() * bs
         total_prefix_survival_component += metrics["prefix_survival_component"].item() * bs
         total_action_confidence_component += metrics["action_confidence_component"].item() * bs
@@ -2426,6 +2542,7 @@ def evaluate(
         "val/refined_hidden_loss": total_refined_hidden / denom,
         "val/anchor_logit_distill_loss": total_anchor_logit_distill / denom,
         "val/backbone_anchor_logit_distill_loss": total_backbone_anchor_logit_distill / denom,
+        "val/base_action_token_ce_loss": total_base_action_token_ce / denom,
         "val/action_token_ce_loss": total_action_token_ce / denom,
         "val/action_distill_l1_loss": total_action_distill_l1 / denom,
         "val/prefix_survival_loss": total_prefix_survival / denom,
@@ -2441,6 +2558,7 @@ def evaluate(
             total_backbone_anchor_logit_distill_component / denom
         ),
         "val/action_token_ce_component": total_action_token_ce_component / denom,
+        "val/token_curriculum_component": total_token_curriculum_component / denom,
         "val/action_distill_l1_component": total_action_distill_l1_component / denom,
         "val/prefix_survival_component": total_prefix_survival_component / denom,
         "val/action_confidence_component": total_action_confidence_component / denom,
@@ -2509,6 +2627,8 @@ def main():
         raise ValueError("--lr and --action_head_lr must both be > 0.")
     if args.grad_clip <= 0:
         raise ValueError("--grad_clip must be > 0.")
+    if args.staged_training and args.unified_cosine_curriculum:
+        raise ValueError("--staged_training and --unified_cosine_curriculum are mutually exclusive.")
     if args.staged_training:
         if args.stage2_start_epoch <= 1:
             raise ValueError("--stage2_start_epoch must be > 1 for staged training.")
@@ -2862,7 +2982,9 @@ def main():
     steps_per_epoch = max(1, (len(train_loader) + args.gradient_accumulation_steps - 1) // args.gradient_accumulation_steps)
     total_optimizer_steps = max(1, args.num_epochs * steps_per_epoch)# 计算总的优化器步数，用于学习率调度器
     action_start_step = None
-    if args.staged_training and action_head_params:
+    if args.unified_cosine_curriculum and action_head_params:
+        action_start_step = 0
+    elif args.staged_training and action_head_params:
         action_start_step = (args.stage3_start_epoch - 1) * steps_per_epoch
     scheduler = build_scheduler(
         optimizer,
@@ -2972,9 +3094,18 @@ def main():
     previous_stage_id = None
     try:
         for epoch in range(start_epoch, args.num_epochs + 1):
-            stage = build_training_stage(args, epoch)
+            stage = build_training_control(
+                args,
+                epoch,
+                global_step,
+                total_optimizer_steps,
+            )
             active_loss_weights = stage["weights"]
-            action_head_active = not args.staged_training or epoch >= args.stage3_start_epoch
+            action_head_active = (
+                stage["final_scale"] > 0
+                if args.unified_cosine_curriculum
+                else (not args.staged_training or epoch >= args.stage3_start_epoch)
+            )
             if stage["id"] != previous_stage_id:
                 stage_payload = {
                     "event": "training_stage_start",
@@ -3016,6 +3147,7 @@ def main():
             train_residual_token_ce_sum = 0.0
             train_anchor_logit_distill_sum = 0.0
             train_backbone_anchor_logit_distill_sum = 0.0
+            train_base_action_token_ce_sum = 0.0
             train_action_token_ce_sum = 0.0
             train_action_distill_l1_sum = 0.0
             train_prefix_survival_sum = 0.0
@@ -3030,6 +3162,7 @@ def main():
             train_anchor_logit_distill_component_sum = 0.0
             train_backbone_anchor_logit_distill_component_sum = 0.0
             train_action_token_ce_component_sum = 0.0
+            train_token_curriculum_component_sum = 0.0
             train_action_distill_l1_component_sum = 0.0
             train_prefix_survival_component_sum = 0.0
             train_action_confidence_component_sum = 0.0
@@ -3056,7 +3189,9 @@ def main():
                 "soft_loss",
                 "hidden_loss",
                 "cos_loss",
+                "base_action_token_ce_loss",
                 "action_token_ce_loss",
+                "token_curriculum_component",
                 "action_distill_l1_loss",
                 "prefix_survival_loss",
                 "anchor_logit_distill_loss",
@@ -3074,6 +3209,18 @@ def main():
                 dynamic_ncols=True,
             ) if is_main else train_loader
             for batch_idx, batch in enumerate(pbar, start=1):
+                stage = build_training_control(
+                    args,
+                    epoch,
+                    global_step,
+                    total_optimizer_steps,
+                )
+                active_loss_weights = stage["weights"]
+                action_head_active = (
+                    stage["final_scale"] > 0
+                    if args.unified_cosine_curriculum
+                    else (not args.staged_training or epoch >= args.stage3_start_epoch)
+                )
                 if args.anchor_consistency_w > 0 and args.anchor_consistency_warmup_steps > 0:
                     consistency_scale = min(
                         1.0,
@@ -3098,6 +3245,7 @@ def main():
                     consistency_scale=consistency_scale,
                     causal_residual_scale=causal_residual_scale,
                     loss_weights=active_loss_weights,
+                    curriculum_state=stage,
                 )
                 (metrics["loss"] / args.gradient_accumulation_steps).backward()
                 log_metrics = distributed_log_metrics(metrics, distributed)
@@ -3117,6 +3265,7 @@ def main():
                 train_backbone_anchor_logit_distill_sum += log_metrics[
                     "backbone_anchor_logit_distill_loss"
                 ].item()
+                train_base_action_token_ce_sum += log_metrics["base_action_token_ce_loss"].item()
                 train_action_token_ce_sum += log_metrics["action_token_ce_loss"].item()
                 train_action_distill_l1_sum += log_metrics["action_distill_l1_loss"].item()
                 train_prefix_survival_sum += log_metrics["prefix_survival_loss"].item()
@@ -3133,6 +3282,9 @@ def main():
                     "backbone_anchor_logit_distill_component"
                 ].item()
                 train_action_token_ce_component_sum += log_metrics["action_token_ce_component"].item()
+                train_token_curriculum_component_sum += log_metrics[
+                    "token_curriculum_component"
+                ].item()
                 train_action_distill_l1_component_sum += log_metrics["action_distill_l1_component"].item()
                 train_prefix_survival_component_sum += log_metrics["prefix_survival_component"].item()
                 train_action_confidence_component_sum += log_metrics["action_confidence_component"].item()
@@ -3169,7 +3321,7 @@ def main():
                     if not action_head_active:
                         for parameter in action_head_params:
                             parameter.grad = None
-                    gradient_norms = clip_optimizer_parameter_groups(optimizer, args.grad_clip)
+                    gradient_norms = clip_optimizer_gradients_global(optimizer, args.grad_clip)
                     optimizer.step()
                     scheduler.step()
                     optimizer.zero_grad(set_to_none=True)
@@ -3185,6 +3337,9 @@ def main():
                             "train/stage_id": stage["id"],
                             "train/stage2_scale": stage["stage2_scale"],
                             "train/stage3_scale": stage["stage3_scale"],
+                            "train/curriculum_progress": stage["progress"],
+                            "train/curriculum_base_scale": stage["base_scale"],
+                            "train/curriculum_final_scale": stage["final_scale"],
                             "train/active_soft_w": active_loss_weights["soft_w"],
                             "train/active_backbone_anchor_kl_w": active_loss_weights[
                                 "backbone_anchor_logit_distill_w"
@@ -3204,6 +3359,9 @@ def main():
                             "train/backbone_anchor_logit_distill_loss": (
                                 train_backbone_anchor_logit_distill_sum / denom_log_steps
                             ),
+                            "train/base_action_token_ce_loss": (
+                                train_base_action_token_ce_sum / denom_log_steps
+                            ),
                             "train/action_token_ce_loss": train_action_token_ce_sum / denom_log_steps,
                             "train/action_distill_l1_loss": train_action_distill_l1_sum / denom_log_steps,
                             "train/prefix_survival_loss": train_prefix_survival_sum / denom_log_steps,
@@ -3220,6 +3378,9 @@ def main():
                                 train_backbone_anchor_logit_distill_component_sum / denom_log_steps
                             ),
                             "train/action_token_ce_component": train_action_token_ce_component_sum / denom_log_steps,
+                            "train/token_curriculum_component": (
+                                train_token_curriculum_component_sum / denom_log_steps
+                            ),
                             "train/action_distill_l1_component": train_action_distill_l1_component_sum / denom_log_steps,
                             "train/prefix_survival_component": train_prefix_survival_component_sum / denom_log_steps,
                             "train/action_confidence_component": train_action_confidence_component_sum / denom_log_steps,
@@ -3261,6 +3422,7 @@ def main():
                                 "action_head",
                                 torch.zeros(()),
                             ).item(),
+                            "train/global_grad_norm": gradient_norms["global"].item(),
                         }
                         train_payload.update(detail_metrics_to_log("train", train_detail_accumulator))
                         append_jsonl(metrics_log_path, train_payload)
@@ -3300,6 +3462,7 @@ def main():
                             f"balogit*={train_payload['train/backbone_anchor_logit_distill_component']:.4f} "
                             f"refh={train_payload['train/refined_hidden_loss']:.4f} "
                             f"refh*={train_payload['train/refined_hidden_component']:.4f} "
+                            f"base_ce={train_payload['train/base_action_token_ce_loss']:.4f} "
                             f"ace={train_payload['train/action_token_ce_loss']:.4f} "
                             f"l1={train_payload['train/action_distill_l1_loss']:.4f} "
                             f"prefix={train_payload['train/expected_prefix_length']:.3f} "
@@ -3325,6 +3488,7 @@ def main():
                         train_residual_token_ce_sum = 0.0
                         train_anchor_logit_distill_sum = 0.0
                         train_backbone_anchor_logit_distill_sum = 0.0
+                        train_base_action_token_ce_sum = 0.0
                         train_action_token_ce_sum = 0.0
                         train_action_distill_l1_sum = 0.0
                         train_prefix_survival_sum = 0.0
@@ -3339,6 +3503,7 @@ def main():
                         train_anchor_logit_distill_component_sum = 0.0
                         train_backbone_anchor_logit_distill_component_sum = 0.0
                         train_action_token_ce_component_sum = 0.0
+                        train_token_curriculum_component_sum = 0.0
                         train_action_distill_l1_component_sum = 0.0
                         train_prefix_survival_component_sum = 0.0
                         train_action_confidence_component_sum = 0.0
@@ -3434,6 +3599,7 @@ def main():
                     args,
                     device,
                     loss_weights=active_loss_weights,
+                    curriculum_state=stage,
                 )
 
                 current_val_loss = val_metrics["val/loss"]

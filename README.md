@@ -248,28 +248,27 @@ HDF5 不保存 `pixel_values`；final hidden 已在 selected prompt 中，也不
 - prefix position 从 0 连续增长，action context 和 block position 紧随 prefix。
 - `action_dim_embed` 标识动作维度；它补充 RoPE，不替代 RoPE。
 
-### 4.3 当前三阶段损失
+### 4.3 当前统一余弦课程损失
 
-一次启动会按固定 epoch 自动切换，Draft 在 200 epoch 内始终继续训练，Action-RNN 从 epoch 101 才入场：
+当前主实验不再按 epoch 硬切三阶段。全程只使用训练进度 `p=global_step/total_steps` 和一条余弦曲线：
 
 ```text
-epoch 1-20:
-  1.00 * hidden_smooth_l1 + 0.05 * hidden_cosine
+s(p) = (1 - cos(pi * p)) / 2
+L_token = 0.10 * ((1-s) * BaseCE + s * FinalCE)
 
-epoch 21-100:
-  保留上述 hidden 监督
-  + 0.05 * backbone_teacher_soft_ce
-  + 0.05 * backbone_cross_anchor_logit_kl
-
-epoch 101-200:
-  Draft 继续使用阶段二全部损失
-  + 0.10 * action_token_ce
-  + 0.40 * action_distribution_l1
-  + 0.20 * prefix_survival
+L_total = 1.00 * hidden_smooth_l1
+        + 0.05 * hidden_cosine
+        + 0.05 * backbone_teacher_soft_ce
+        + s * 0.05 * backbone_cross_anchor_logit_kl
+        + L_token
+        + s * 0.40 * action_distribution_l1
+        + s * 0.20 * prefix_survival
 ```
 
-阶段二和阶段三的新损失均在入场后的 5 epoch 内从 0 线性升到目标权重。Action-RNN 跨 anchor KL 在主实验
-固定为 0；旧实现只为历史 checkpoint 和消融兼容保留。
+`BaseCE` 监督 Action-RNN 修正前的 Draft 动作 logits；`FinalCE` 监督加上 RNN 残差后的 logits。训练开始时
+`s=0`，token 监督全部锚定 Base；中点两者各占一半；结束时 `s=1`，token 监督平滑交给 Final。hidden、cosine
+和低权重 soft 始终训练 Draft，因此 BaseCE 在后期退到 0 也不会让主干失去监督。跨 anchor、L1 和 Prefix
+Survival 使用同一个 `s` 平滑渐入，不再设置 epoch 21/101 等人为边界。
 
 它们对参数的作用不同：
 
@@ -279,17 +278,18 @@ epoch 101-200:
 | hidden cosine | 否 | 是 | 对齐 hidden 方向 |
 | backbone teacher soft CE | 否 | 是 | 让修正前 base logits 对齐 teacher 的 256 类动作分布 |
 | backbone cross-anchor logit KL | 否 | 是 | 让主干远端弱路径追近端强路径 |
-| action token CE | 是 | 否 | 提高真实 token top-1 命中 |
+| Base token CE | 否 | 是 | 防止 RNN 走捷径并保持基础草稿可用 |
+| Final token CE | 是 | 是 | 联合改善 Draft 与修正后的最终 top-1 |
 | action distribution L1 | 是 | 否 | 对齐 256 类 teacher 动作分布 |
 | prefix survival | 是 | 否 | 直接鼓励连续接受前缀 |
 
 当前 soft CE 只在 256 个动作 token 子词表上计算，不做昂贵且无关的全词表 soft CE。当前关闭：confidence
 head、旧 hidden CAD、旧 causal residual、旧 refined hidden、旧 residual CE。
 `slot_decay=1.0`；只保留 `position_balance` 来抵消 multi-anchor 对后部绝对位置的重复监督偏差。
-优化器使用两组学习率：Draft 主干 `2e-5`，从 epoch 1 warmup 1000 step 后按 200 epoch 线性退火；
-Action-RNN 为 `5e-5`，epoch 101 前学习率严格为 0 且不积累 Adam 状态，从 epoch 101 独立 warmup 500 step，
-再按剩余 100 epoch 线性退火。动作损失对 Draft 继续保持 `stop_gradient`。两组参数各自以 `0.5` 为上限
-独立裁剪梯度；Action-RNN 的梯度峰值不会再缩小 Draft 的更新，非有限梯度会立即报错而不是污染权重。
+优化器仍使用两组学习率：Draft `2e-5`、Action-RNN `5e-5`，分别 warmup 1000/500 step 后线性退火。
+L1/Prefix 通过 detached Draft 输入只更新 RNN；Final CE 不 detach，联合更新两者。所有可训练参数按同一个
+全局 L2 范数裁剪到 `0.5`，同时分别记录 Draft、Action-RNN 和全局裁剪前范数。这样联合 Final CE 的梯度方向
+不会被两套独立缩放系数扭曲；非有限梯度会立即报错。
 
 ### 4.4 SwanLab 指标怎样读
 
@@ -306,6 +306,10 @@ component = raw_loss * 配置权重
 | `base_accuracy` | Action-RNN 残差加入前的 frozen-lm-head 命中率 |
 | `accuracy` | teacher-forced Action-RNN 修正后的总体命中率 |
 | `action_head_accuracy_gain` | `accuracy-base_accuracy`；直接判断残差动作头是否真的带来收益 |
+| `base_action_token_ce_loss` | 修正前 Base logits 的真实动作 token CE |
+| `action_token_ce_loss` | 修正后 Final logits 的真实动作 token CE |
+| `token_curriculum_component` | `0.10*((1-s)*BaseCE+s*FinalCE)`，这是实际计入总 loss 的 token 项 |
+| `curriculum_base_scale/final_scale` | 同一余弦时钟的 Base/Final 比例，两者之和恒为 1 |
 | `soft_loss` / `soft_component` | Draft base logits 的 teacher soft CE 原值 / 乘当前阶段权重后的贡献；原值包含 teacher entropy，不以 0 为理论下限 |
 | `backbone_anchor_logit_distill_loss` | Draft base logits 的跨 anchor KL；只更新主干 |
 | `anchor_logit_distill_loss` | 旧 Action-RNN 跨 anchor KL；当前主实验关闭，仅保留兼容代码 |
@@ -345,8 +349,8 @@ SwanLab 默认只上传当前启用且有解释价值的精选指标，不再上
 checkpoint 副本，用于降低共享服务器 IO 压力。
 
 SwanLab 的 loss 曲线是最近 20 optimizer step 的窗口均值，可能随 batch 难度在单个 epoch 内上扬；跨 epoch
-收敛应读取 `metrics.jsonl` 中的 `train_epoch/*`。三阶段中尚未入场的 loss 不参与计算，raw loss 和
-`*_component` 都严格记录为 0；是否已经入场可同时查看 SwanLab 的“训练阶段/当前权重”。
+收敛应读取 `metrics.jsonl` 中的 `train_epoch/*`。课程权重可查看“训练课程/Base监督比例”和“Final监督比例”；
+跨 anchor、L1、Prefix 的实际权重均随 Final 比例连续增长。
 
 ## 5. 推理和验证
 
@@ -381,7 +385,8 @@ strict 评测先在真实 observation 上比较 `off/p2/p3/p4/p5` 的完整动�
 | Residual-CAD | 前 token hidden residual + Hidden 跨 anchor 蒸馏 | anchor0->p2 约 0.503 -> 0.671 | 强 anchor 信息可以帮助弱路径，但 hidden 修正不够直接 |
 | Markov-ACD 短跑 | 加 logits bias、token CE、logit 跨 anchor 蒸馏 | anchor0 p2-p5 约 0.86/0.91/0.88/0.88 | token/logit 因果监督有效 |
 | Clean Markov-ACD 200 epoch | 删除手工 boost，覆盖 slot0，低权重 soft | teacher-forced acc 约 0.999 | 离线饱和不代表在线饱和 |
-| 三阶段 Action-RNN Prefix Survival | 先训 Draft 表征，再训 Draft 跨 anchor，最后加入动作头 | 待重新训练 | 避免不成熟模块过早相互干扰，并把跨 anchor 限定到 Draft |
+| 三阶段 Action-RNN Prefix Survival | epoch 21/101 硬切模块，动作目标与主干完全 detach | 未完成，改为课程版 | 硬边界与完全隔离不利于 Draft/RNN 共同优化 |
+| 统一余弦课程 Action-RNN | Base/Final CE 连续交接，跨 anchor 与 RNN 辅助目标同钟渐入 | 当前待训练 | 保留基础 Draft 锚点，同时让 Final CE 联合改善主干与修正头 |
 
 Pure hidden、Residual-CAD、Markov-ACD 的代表性 anchor0 结果：
 
@@ -431,9 +436,10 @@ Length 高于 SpecVLA strict 却更慢，证明 Length 不包含 draft 自身成
 开头又恢复；学习率始终平滑，因此不是 scheduler 重启。去除 epoch 均值后，hidden 与 CE/L1/Prefix 的
 相关系数约为 `-0.61/-0.53/-0.47`。epoch 12 时 teacher-forced head accuracy 约 `0.922`，base accuracy
 约 `0.921`，动作头净增益仅约 `0.0005`，而 rollout 约 `0.889`。这说明高权重动作损失主要在改动共享
-Draft hidden，Action-RNN 本身几乎没有学到有效残差。当前默认配方因此进一步改成三阶段：先让 Draft 建立
-hidden 表征，epoch 21 再加入 `0.05` teacher soft CE 和 `0.05` Draft 跨 anchor KL，epoch 101 才启动
-Action-RNN。动作头不再使用跨 anchor KL；旧输出目录不得续训到新配方。
+Draft hidden，Action-RNN 本身几乎没有学到有效残差。中间的三阶段版本虽然隔离了梯度冲突，却又把 RNN
+降成纯后处理器，无法通过最终预测反向改善 Draft。当前版本改用一个覆盖完整训练预算的余弦课程：早期以
+Base CE 锚定主干，随后连续增加 Final CE、Draft 跨 anchor KL 和 RNN 辅助监督。动作头不再使用自己的跨
+anchor KL；旧输出目录不得续训到新配方。
 
 ## 7. 当前标准工作流
 
@@ -500,13 +506,14 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 \
 只需启动这一次。脚本默认：一层 draft、global batch 64、200 epoch、每 10 epoch 保存一次，并自动执行：
 
 ```text
-epoch 1-20   Draft hidden/cos 表征预热
-epoch 21-100 加入 Draft soft 与 Draft 跨 anchor KL，前 5 epoch 渐入
-epoch 101-200 Draft 继续训练，同时启动 Action-RNN，前 5 epoch 渐入
+完整 200 epoch 使用同一条余弦课程 s(p)
+Base/Final token CE 权重从 100%/0% 连续变到 0%/100%
+Draft 跨 anchor KL、Action-RNN L1/Prefix 从 0 连续变到目标权重
+hidden/cos/soft 全程保持配置权重
 ```
 
-Draft/Action-RNN 目标学习率分别为 `2e-5/5e-5`。Draft warmup 1000 step；Action-RNN 在 epoch 101 前
-学习率为 0，从入场时独立 warmup 500 step。动作重损失输入默认 detach，Action-RNN 跨 anchor KL 固定关闭。
+Draft/Action-RNN 目标学习率分别为 `2e-5/5e-5`，从训练开始分别 warmup 1000/500 step。Final CE 联合
+更新两者，L1/Prefix 只更新 Action-RNN，Action-RNN 自身的跨 anchor KL 固定关闭。全局梯度裁剪阈值为 `0.5`。
 不要用旧 checkpoint 续训，也不要复用旧输出目录。
 
 常用消融：
@@ -542,14 +549,14 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 \
 
 ```bash
 CKPT_3090=$(ssh 3090_wulin \
-  "find /data/wulin/c/specvla-data/ckpt_goal_dflash_staged_draft_anchor_action_rnn_1layer_b8x2_4gpu \
+  "find /data/wulin/c/specvla-data/ckpt_goal_dflash_cosine_curriculum_action_rnn_1layer_b8x2_4gpu \
    -maxdepth 1 -type d -name 'epoch_200_step_*' | sort -V | tail -1")
 
 ssh 4090 \
-  'mkdir -p /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_staged_draft_anchor_action_rnn_1layer_b8x2_4gpu'
+  'mkdir -p /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_cosine_curriculum_action_rnn_1layer_b8x2_4gpu'
 
 scp -3 -r "3090_wulin:${CKPT_3090}" \
-  '4090:/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_staged_draft_anchor_action_rnn_1layer_b8x2_4gpu/'
+  '4090:/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_cosine_curriculum_action_rnn_1layer_b8x2_4gpu/'
 ```
 
 ### 7.4 4090 复现 SpecVLA Goal baseline
@@ -597,7 +604,7 @@ bash openvla/specdecoding/decode-scripts/run_specvla_main_table_eval.sh
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 EVAL_EPOCH=200 \
-DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_staged_draft_anchor_action_rnn_1layer_b8x2_4gpu \
+DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_cosine_curriculum_action_rnn_1layer_b8x2_4gpu \
   bash openvla/specdecoding/decode-scripts/run_dflash_action_rnn_goal_pair_eval.sh
 ```
 

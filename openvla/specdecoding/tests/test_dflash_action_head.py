@@ -45,6 +45,37 @@ def tiny_config():
 
 
 class DFlashActionHeadTest(unittest.TestCase):
+    def test_unified_cosine_curriculum_is_smooth_and_uses_one_clock(self):
+        train_module = load_training_module()
+        args = SimpleNamespace(
+            unified_cosine_curriculum=True,
+            staged_training=False,
+            hidden_w=1.0,
+            cos_w=0.05,
+            soft_w=0.05,
+            backbone_anchor_logit_distill_w=0.05,
+            action_token_ce_w=0.10,
+            action_distill_l1_w=0.40,
+            prefix_survival_w=0.20,
+            action_confidence_w=0.0,
+            anchor_logit_distill_w=0.0,
+        )
+
+        start = train_module.build_training_control(args, 1, 0, 100)
+        middle = train_module.build_training_control(args, 100, 50, 100)
+        end = train_module.build_training_control(args, 200, 100, 100)
+        self.assertEqual(start["base_scale"], 1.0)
+        self.assertEqual(start["final_scale"], 0.0)
+        self.assertAlmostEqual(middle["base_scale"], 0.5)
+        self.assertAlmostEqual(middle["final_scale"], 0.5)
+        self.assertEqual(end["base_scale"], 0.0)
+        self.assertEqual(end["final_scale"], 1.0)
+        self.assertEqual(start["weights"]["soft_w"], 0.05)
+        self.assertEqual(start["weights"]["backbone_anchor_logit_distill_w"], 0.0)
+        self.assertAlmostEqual(middle["weights"]["backbone_anchor_logit_distill_w"], 0.025)
+        self.assertAlmostEqual(middle["weights"]["action_distill_l1_w"], 0.20)
+        self.assertEqual(end["weights"]["prefix_survival_w"], 0.20)
+
     def test_three_stage_loss_schedule(self):
         train_module = load_training_module()
         args = SimpleNamespace(
@@ -127,7 +158,7 @@ class DFlashActionHeadTest(unittest.TestCase):
             scheduler.step()
         self.assertGreater(scheduler.get_last_lr()[1], 0.0)
 
-    def test_gradient_clipping_is_independent_between_parameter_groups(self):
+    def test_gradient_clipping_uses_one_global_norm(self):
         train_module = load_training_module()
         draft_parameter = torch.nn.Parameter(torch.ones(()))
         action_parameter = torch.nn.Parameter(torch.ones(()))
@@ -140,17 +171,18 @@ class DFlashActionHeadTest(unittest.TestCase):
         draft_parameter.grad = torch.tensor(0.25)
         action_parameter.grad = torch.tensor(100.0)
 
-        norms = train_module.clip_optimizer_parameter_groups(optimizer, max_norm=0.5)
+        norms = train_module.clip_optimizer_gradients_global(optimizer, max_norm=0.5)
 
         self.assertAlmostEqual(norms["draft_backbone"].item(), 0.25, places=5)
         self.assertAlmostEqual(norms["action_head"].item(), 100.0, places=3)
-        self.assertAlmostEqual(draft_parameter.grad.item(), 0.25, places=5)
+        self.assertAlmostEqual(norms["global"].item(), 100.0003, places=3)
+        self.assertLess(draft_parameter.grad.item(), 0.002)
         self.assertAlmostEqual(action_parameter.grad.item(), 0.5, places=5)
 
         draft_parameter.grad = torch.tensor(float("nan"))
         action_parameter.grad = None
         with self.assertRaises(RuntimeError):
-            train_module.clip_optimizer_parameter_groups(optimizer, max_norm=0.5)
+            train_module.clip_optimizer_gradients_global(optimizer, max_norm=0.5)
 
     def test_inactive_action_group_has_no_update_or_adam_state(self):
         train_module = load_training_module()
@@ -168,7 +200,7 @@ class DFlashActionHeadTest(unittest.TestCase):
         draft_parameter.grad = torch.ones_like(draft_parameter)
         action_parameter.grad = None
 
-        train_module.clip_optimizer_parameter_groups(optimizer, max_norm=0.5)
+        train_module.clip_optimizer_gradients_global(optimizer, max_norm=0.5)
         optimizer.step()
 
         self.assertNotEqual(draft_parameter.item(), draft_before.item())
@@ -422,6 +454,30 @@ class DFlashActionHeadTest(unittest.TestCase):
         self.assertTrue(
             backbone_grad is None or torch.count_nonzero(backbone_grad).item() == 0
         )
+
+        # 统一课程的 Final CE 是联合目标：修正头和 Draft 主干必须同时收到梯度。
+        model.zero_grad(set_to_none=True)
+        args.unified_cosine_curriculum = True
+        args.detach_action_head_inputs = False
+        args.action_distill_l1_w = 0.0
+        args.prefix_survival_w = 0.0
+        args.action_confidence_w = 0.0
+        joint_metrics = train_module.compute_loss_and_accuracy(
+            model,
+            embed_tokens,
+            lm_head,
+            batch,
+            args,
+            device,
+            curriculum_state={"base_scale": 0.5, "final_scale": 0.5},
+        )
+        joint_metrics["loss"].backward()
+        self.assertGreater(model.action_head_out.weight.grad.abs().sum().item(), 0.0)
+        backbone_grad = model.layers[0].self_attn.q_proj.weight.grad
+        self.assertIsNotNone(backbone_grad)
+        self.assertGreater(backbone_grad.abs().sum().item(), 0.0)
+        self.assertGreater(joint_metrics["base_action_token_ce_loss"].item(), 0.0)
+        self.assertGreater(joint_metrics["action_token_ce_loss"].item(), 0.0)
 
         # Draft soft distribution distillation bypasses the detached Action-RNN
         # branch and must therefore restore a gradient to the backbone only.

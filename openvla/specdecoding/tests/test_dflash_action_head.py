@@ -59,6 +59,7 @@ class DFlashActionHeadTest(unittest.TestCase):
             prefix_survival_w=0.20,
             action_confidence_w=0.0,
             anchor_logit_distill_w=0.0,
+            token_curriculum_power=4.0,
         )
 
         start = train_module.build_training_control(args, 1, 0, 100)
@@ -70,11 +71,49 @@ class DFlashActionHeadTest(unittest.TestCase):
         self.assertAlmostEqual(middle["final_scale"], 0.5)
         self.assertEqual(end["base_scale"], 0.0)
         self.assertEqual(end["final_scale"], 1.0)
-        self.assertEqual(start["weights"]["soft_w"], 0.05)
+        self.assertEqual(start["token_envelope"], 0.0)
+        self.assertAlmostEqual(middle["token_envelope"], 0.0625)
+        self.assertEqual(end["token_envelope"], 1.0)
+        self.assertEqual(start["weights"]["soft_w"], 0.0)
         self.assertEqual(start["weights"]["backbone_anchor_logit_distill_w"], 0.0)
-        self.assertAlmostEqual(middle["weights"]["backbone_anchor_logit_distill_w"], 0.025)
-        self.assertAlmostEqual(middle["weights"]["action_distill_l1_w"], 0.20)
+        self.assertEqual(start["weights"]["action_token_ce_w"], 0.0)
+        self.assertAlmostEqual(middle["weights"]["soft_w"], 0.003125)
+        self.assertAlmostEqual(
+            middle["weights"]["backbone_anchor_logit_distill_w"],
+            0.003125,
+        )
+        self.assertAlmostEqual(middle["weights"]["action_token_ce_w"], 0.00625)
+        self.assertAlmostEqual(middle["weights"]["action_distill_l1_w"], 0.0125)
         self.assertEqual(end["weights"]["prefix_survival_w"], 0.20)
+
+    def test_action_head_lr_uses_delayed_curriculum_clock(self):
+        train_module = load_training_module()
+        draft_parameter = torch.nn.Parameter(torch.ones(()))
+        action_parameter = torch.nn.Parameter(torch.ones(()))
+        optimizer = torch.optim.AdamW(
+            [
+                {"params": [draft_parameter], "lr": 2e-5, "group_name": "draft_backbone"},
+                {"params": [action_parameter], "lr": 5e-5, "group_name": "action_head"},
+            ]
+        )
+        scheduler = train_module.build_scheduler(
+            optimizer,
+            total_steps=200,
+            warmup_steps=10,
+            warmup_ratio=0.03,
+            action_warmup_steps=10,
+            action_curriculum_power=4.0,
+        )
+        self.assertEqual(scheduler.get_last_lr()[1], 0.0)
+        for _ in range(50):
+            optimizer.step()
+            scheduler.step()
+        self.assertGreater(scheduler.get_last_lr()[0], 0.0)
+        self.assertLess(scheduler.get_last_lr()[1], 5e-5)
+        for _ in range(50):
+            optimizer.step()
+            scheduler.step()
+        self.assertGreater(scheduler.get_last_lr()[1], 0.0)
 
     def test_three_stage_loss_schedule(self):
         train_module = load_training_module()
@@ -422,7 +461,14 @@ class DFlashActionHeadTest(unittest.TestCase):
         self.assertGreaterEqual(metrics["expected_prefix_length"].item(), 0.0)
         self.assertGreaterEqual(metrics["rollout_accuracy"].item(), 0.0)
         self.assertGreaterEqual(metrics["rollout_top2_accuracy"].item(), metrics["rollout_accuracy"].item())
+        self.assertGreaterEqual(metrics["base_rollout_expected_prefix_length"].item(), 0.0)
         self.assertGreaterEqual(metrics["rollout_expected_prefix_length"].item(), 0.0)
+        self.assertGreaterEqual(metrics["base_distribution_overlap"].item(), 0.0)
+        self.assertLessEqual(metrics["base_distribution_overlap"].item(), 1.0)
+        self.assertGreaterEqual(metrics["rollout_distribution_overlap"].item(), 0.0)
+        self.assertLessEqual(metrics["rollout_distribution_overlap"].item(), 1.0)
+        self.assertGreaterEqual(metrics["base_expected_accept_length_proxy"].item(), 0.0)
+        self.assertGreaterEqual(metrics["rollout_expected_accept_length_proxy"].item(), 0.0)
         prefix_rates = metrics["rollout_prefix_correct"] / metrics[
             "rollout_prefix_total"
         ].clamp_min(1.0)
@@ -479,8 +525,7 @@ class DFlashActionHeadTest(unittest.TestCase):
         self.assertGreater(joint_metrics["base_action_token_ce_loss"].item(), 0.0)
         self.assertGreater(joint_metrics["action_token_ce_loss"].item(), 0.0)
 
-        # Draft soft distribution distillation bypasses the detached Action-RNN
-        # branch and must therefore restore a gradient to the backbone only.
+        # Base Soft 只训练 Draft；Final Soft 则沿 Domino 式联合图同时训练两者。
         model.zero_grad(set_to_none=True)
         args.action_token_ce_w = 0.0
         args.action_distill_l1_w = 0.0
@@ -494,6 +539,7 @@ class DFlashActionHeadTest(unittest.TestCase):
             batch,
             args,
             device,
+            curriculum_state={"base_scale": 1.0, "final_scale": 0.0},
         )
         backbone_soft_metrics["loss"].backward()
         backbone_grad = model.layers[0].self_attn.q_proj.weight.grad
@@ -503,6 +549,24 @@ class DFlashActionHeadTest(unittest.TestCase):
         self.assertTrue(
             action_head_grad is None or torch.count_nonzero(action_head_grad).item() == 0
         )
+        self.assertGreater(backbone_soft_metrics["base_soft_loss"].item(), 0.0)
+
+        model.zero_grad(set_to_none=True)
+        final_soft_metrics = train_module.compute_loss_and_accuracy(
+            model,
+            embed_tokens,
+            lm_head,
+            batch,
+            args,
+            device,
+            curriculum_state={"base_scale": 0.0, "final_scale": 1.0},
+        )
+        final_soft_metrics["loss"].backward()
+        self.assertGreater(model.action_head_out.weight.grad.abs().sum().item(), 0.0)
+        backbone_grad = model.layers[0].self_attn.q_proj.weight.grad
+        self.assertIsNotNone(backbone_grad)
+        self.assertGreater(backbone_grad.abs().sum().item(), 0.0)
+        self.assertGreater(final_soft_metrics["final_soft_loss"].item(), 0.0)
 
         # The separate backbone cross-anchor KL must also train the Draft while
         # keeping the Action-RNN outside its gradient graph.
@@ -542,6 +606,8 @@ class DFlashActionHeadTest(unittest.TestCase):
             "train/anchor_0_acc": 0.9,
             "train/rollout_position_2_acc": 0.7,
             "train/rollout_prefix_2_success_rate": 0.6,
+            "train/rollout_expected_accept_length_proxy": 2.4,
+            "train/curriculum_token_envelope": 0.0625,
             "train/lr": 1e-5,
         }
         swan_payload = train_module.build_swanlab_metrics_payload(
@@ -554,6 +620,8 @@ class DFlashActionHeadTest(unittest.TestCase):
         self.assertEqual(swan_payload["训练损失/主干Hidden损失"], 0.8)
         self.assertEqual(swan_payload["训练逐位置自回滚/P2命中率"], 0.7)
         self.assertEqual(swan_payload["训练连续前缀成功率/连续命中至少2步"], 0.6)
+        self.assertEqual(swan_payload["训练推理代理/Action-RNN理论期望接受长度"], 2.4)
+        self.assertEqual(swan_payload["训练课程/Token监督渐入比例"], 0.0625)
         self.assertEqual(swan_payload["训练优化器/Draft学习率"], 1e-5)
         self.assertNotIn("train/hidden_component", swan_payload)
         self.assertFalse(any("anchor_0" in key for key in swan_payload))

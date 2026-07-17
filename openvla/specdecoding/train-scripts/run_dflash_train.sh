@@ -3,7 +3,7 @@ set -euo pipefail
 
 # 当前 DFlash 训练统一入口。
 #
-#   bash .../run_dflash_train.sh main        # 推荐：一层、统一余弦课程、Draft 跨 anchor + Action-RNN
+#   bash .../run_dflash_train.sh main        # 推荐：一层、延迟余弦课程、Draft 跨 anchor + Action-RNN
 #   bash .../run_dflash_train.sh three_layer # 容量消融：三层主干
 #   bash .../run_dflash_train.sh no_prefix   # 去掉 Prefix Survival
 #   bash .../run_dflash_train.sh no_anchor   # 去掉跨 anchor logits 蒸馏
@@ -20,25 +20,25 @@ case "${PROFILE}" in
     PROFILE_LAYERS=1
     PROFILE_PREFIX_W=0.20
     PROFILE_ANCHOR_W=0.05
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_cosine_curriculum_action_rnn_1layer_b8x2_4gpu
+    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_delayed_curriculum_action_rnn_1layer_b16x1_4gpu
     ;;
   three_layer)
     PROFILE_LAYERS=3
     PROFILE_PREFIX_W=0.20
     PROFILE_ANCHOR_W=0.05
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_cosine_curriculum_action_rnn_3layer_b8x2_4gpu
+    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_delayed_curriculum_action_rnn_3layer_b16x1_4gpu
     ;;
   no_prefix)
     PROFILE_LAYERS=1
     PROFILE_PREFIX_W=0
     PROFILE_ANCHOR_W=0.05
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_cosine_curriculum_no_prefix_1layer_b8x2_4gpu
+    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_delayed_curriculum_no_prefix_1layer_b16x1_4gpu
     ;;
   no_anchor)
     PROFILE_LAYERS=1
     PROFILE_PREFIX_W=0.20
     PROFILE_ANCHOR_W=0
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_cosine_curriculum_no_anchor_1layer_b8x2_4gpu
+    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_delayed_curriculum_no_anchor_1layer_b16x1_4gpu
     ;;
   *)
     echo "用法: bash $0 [main|three_layer|no_prefix|no_anchor]" >&2
@@ -74,9 +74,9 @@ OUTPUT_DIR="${OUTPUT_DIR:-${DEFAULT_OUTPUT_DIR}}"
 CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3}"
 NPROC_PER_NODE="${NPROC_PER_NODE:-4}"
 
-# 训练规模：默认 global batch = 8 micro-batch * 2 累积 * 4 GPU = 64。
-BATCH_SIZE="${BATCH_SIZE:-8}"
-GRAD_ACCUM_STEPS="${GRAD_ACCUM_STEPS:-2}"
+# 训练规模：默认 global batch = 16 micro-batch * 1 累积 * 4 GPU = 64。
+BATCH_SIZE="${BATCH_SIZE:-16}"
+GRAD_ACCUM_STEPS="${GRAD_ACCUM_STEPS:-1}"
 NUM_EPOCHS="${NUM_EPOCHS:-200}"
 LR="${LR:-2e-5}"
 ACTION_HEAD_LR="${ACTION_HEAD_LR:-5e-5}"
@@ -85,10 +85,11 @@ ACTION_HEAD_WARMUP_STEPS="${ACTION_HEAD_WARMUP_STEPS:-500}"
 SAVE_EVERY="${SAVE_EVERY:-10}"
 SEED="${SEED:-7}"
 
-# 单时钟课程：表征损失始终训练 Draft，Base/Final CE 余弦交接；L1/Prefix 只训练 Action-RNN。
+# 延迟课程：hidden/cos 全程训练；其余目标约从训练中点后平滑进入。
 HIDDEN_W="${HIDDEN_W:-1.00}"
 COS_W="${COS_W:-0.05}"
 SOFT_W="${SOFT_W:-0.05}"
+TOKEN_CURRICULUM_POWER="${TOKEN_CURRICULUM_POWER:-4.0}"
 BACKBONE_ANCHOR_LOGIT_DISTILL_W="${BACKBONE_ANCHOR_LOGIT_DISTILL_W:-${PROFILE_ANCHOR_W}}"
 # 主实验把跨 anchor 蒸馏限定在 Draft 主干；Action-RNN 只接受 CE/L1/Prefix 直接监督。
 ANCHOR_LOGIT_DISTILL_W="${ANCHOR_LOGIT_DISTILL_W:-0}"
@@ -128,8 +129,9 @@ LR=${LR}
 ACTION_HEAD_LR=${ACTION_HEAD_LR}
 WARMUP_STEPS=${WARMUP_STEPS}
 ACTION_HEAD_WARMUP_STEPS=${ACTION_HEAD_WARMUP_STEPS}
-CURRICULUM=single_cosine_over_${NUM_EPOCHS}_epochs
-TOKEN_CE=(1-s)*BaseCE+s*FinalCE
+CURRICULUM=delayed_cosine_power_${TOKEN_CURRICULUM_POWER}_over_${NUM_EPOCHS}_epochs
+TOKEN_GATE=cosine(progress)^${TOKEN_CURRICULUM_POWER}
+TOKEN_CE=TOKEN_GATE*((1-s)*BaseCE+s*FinalCE)
 SAVE_EVERY=${SAVE_EVERY}
 SEED=${SEED}
 
@@ -137,6 +139,7 @@ SEED=${SEED}
 HIDDEN_W=${HIDDEN_W}
 COS_W=${COS_W}
 SOFT_W=${SOFT_W}
+TOKEN_CURRICULUM_POWER=${TOKEN_CURRICULUM_POWER}
 BACKBONE_ANCHOR_LOGIT_DISTILL_W=${BACKBONE_ANCHOR_LOGIT_DISTILL_W}
 ACTION_TOKEN_CE_W=${ACTION_TOKEN_CE_W}
 ACTION_DISTILL_L1_W=${ACTION_DISTILL_L1_W}
@@ -160,7 +163,7 @@ fi
 
 torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   openvla/specdecoding/train-scripts/train_dflash_libero_goal.py \
-  --run_name "dflash-cosine-curriculum-action-rnn-${PROFILE}-${NUM_DRAFT_LAYERS}layer-b${BATCH_SIZE}x${GRAD_ACCUM_STEPS}-${NPROC_PER_NODE}gpu" \
+  --run_name "dflash-delayed-curriculum-action-rnn-${PROFILE}-${NUM_DRAFT_LAYERS}layer-b${BATCH_SIZE}x${GRAD_ACCUM_STEPS}-${NPROC_PER_NODE}gpu" \
   --vla_path "${VLA_PATH}" \
   --datapath "${DATAPATH}" \
   --dataset_format auto \
@@ -204,6 +207,7 @@ torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   --action_head_lr "${ACTION_HEAD_LR}" \
   --no-staged_training \
   --unified_cosine_curriculum \
+  --token_curriculum_power "${TOKEN_CURRICULUM_POWER}" \
   --action_head_warmup_steps "${ACTION_HEAD_WARMUP_STEPS}" \
   --batch_size "${BATCH_SIZE}" \
   --gradient_accumulation_steps "${GRAD_ACCUM_STEPS}" \

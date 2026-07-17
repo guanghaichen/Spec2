@@ -123,8 +123,17 @@ def parse_args():
         action=argparse.BooleanOptionalAction,
         default=False,
         help=(
-            "使用单一余弦课程平滑完成 Base CE 到 Final CE 的交接，并同步渐入跨 Anchor 与 "
-            "Action-RNN 辅助损失；主实验推荐开启，且与 staged_training 互斥"
+            "使用统一的延迟余弦课程：hidden/cos 全程训练，token/跨 Anchor/Action-RNN "
+            "在训练后半程平滑渐入；主实验推荐开启，且与 staged_training 互斥"
+        ),
+    )
+    parser.add_argument(
+        "--token_curriculum_power",
+        type=float,
+        default=4.0,
+        help=(
+            "token 级监督的延迟指数：g(p)=cosine(p)^power。默认 4 使前半程以 hidden 表征为主，"
+            "约从训练中点后再逐渐增强 Soft/CE/跨 Anchor/Action-RNN"
         ),
     )
     parser.add_argument("--weight_decay", type=float, default=5e-2, help="AdamW weight decay；用于抑制 draft 过度记忆训练集")
@@ -953,6 +962,7 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "action_head_lr": args.action_head_lr,
         "staged_training": args.staged_training,
         "unified_cosine_curriculum": args.unified_cosine_curriculum,
+        "token_curriculum_power": args.token_curriculum_power,
         "stage2_start_epoch": args.stage2_start_epoch,
         "stage3_start_epoch": args.stage3_start_epoch,
         "stage_weight_ramp_epochs": args.stage_weight_ramp_epochs,
@@ -1172,7 +1182,9 @@ SWANLAB_CORE_METRIC_LABELS = {
     "loss": ("损失", "总损失"),
     "hidden_loss": ("损失", "主干Hidden损失"),
     "cos_loss": ("损失", "主干余弦损失"),
-    "soft_loss": ("损失", "主干Soft分布损失（原值）"),
+    "soft_loss": ("损失", "BaseFinal课程Soft分布损失（原值）"),
+    "base_soft_loss": ("损失", "Base Soft分布损失"),
+    "final_soft_loss": ("损失", "Final Soft分布损失"),
     "backbone_anchor_logit_distill_loss": ("损失", "主干跨Anchor分布蒸馏（原值）"),
     "anchor_logit_distill_loss": ("损失", "动作头跨Anchor分布蒸馏"),
     "base_action_token_ce_loss": ("损失", "Base动作Token交叉熵"),
@@ -1187,13 +1199,24 @@ SWANLAB_CORE_METRIC_LABELS = {
     "rollout_exposure_gap": ("自回滚", "Teacher-Forcing暴露差距"),
     "rollout_top2_accuracy": ("自回滚", "Top2覆盖率"),
     "rollout_runner_up_rescue_rate": ("自回滚", "第二候选覆盖增益"),
+    "rollout_conditional_runner_up_rescue_rate": ("自回滚", "错误位置第二候选挽救率"),
+    "base_rollout_expected_prefix_length": ("推理代理", "Draft基础连续命中长度"),
     "rollout_expected_prefix_length": ("自回滚", "平均连续命中长度"),
+    "rollout_prefix_length_gain": ("推理代理", "Action-RNN连续命中增益"),
+    "base_distribution_overlap": ("推理代理", "Draft与Teacher分布重合率"),
+    "rollout_distribution_overlap": ("推理代理", "Action-RNN与Teacher分布重合率"),
+    "base_expected_accept_length_proxy": ("推理代理", "Draft理论期望接受长度"),
+    "rollout_expected_accept_length_proxy": ("推理代理", "Action-RNN理论期望接受长度"),
+    "action_head_accept_length_proxy_gain": ("推理代理", "Action-RNN理论接受长度增益"),
+    "hidden_cosine_similarity": ("表征", "Hidden余弦相似度"),
+    "representation_token_gap": ("推理代理", "Token命中与Hidden相似度差距"),
     "stage_id": ("阶段", "当前阶段"),
     "stage2_scale": ("阶段", "Draft分布阶段渐入比例"),
     "stage3_scale": ("阶段", "Action-RNN阶段渐入比例"),
     "curriculum_progress": ("课程", "训练总进度"),
     "curriculum_base_scale": ("课程", "Base监督比例"),
     "curriculum_final_scale": ("课程", "Final监督比例"),
+    "curriculum_token_envelope": ("课程", "Token监督渐入比例"),
     "active_soft_w": ("阶段", "当前Soft权重"),
     "active_backbone_anchor_kl_w": ("阶段", "当前Draft跨Anchor权重"),
     "active_action_ce_w": ("阶段", "当前动作CE权重"),
@@ -1290,6 +1313,7 @@ def build_scheduler(
     warmup_ratio: float,
     action_start_step: Optional[int] = None,
     action_warmup_steps: int = 0,
+    action_curriculum_power: Optional[float] = None,
 ):
     def draft_lr_lambda(current_step: int) -> float:
         return linear_warmup_decay_scale(
@@ -1301,7 +1325,21 @@ def build_scheduler(
 
     lr_lambdas = []
     for group in optimizer.param_groups:
-        if group.get("group_name") == "action_head" and action_start_step is not None:
+        if group.get("group_name") == "action_head" and action_curriculum_power is not None:
+
+            def action_curriculum_lr_lambda(current_step: int) -> float:
+                progress = min(1.0, max(0.0, float(current_step) / float(max(1, total_steps))))
+                curriculum_progress = cosine_curriculum_scale(progress) ** action_curriculum_power
+                effective_step = int(round(curriculum_progress * total_steps))
+                return linear_warmup_decay_scale(
+                    effective_step,
+                    total_steps,
+                    action_warmup_steps,
+                    warmup_ratio,
+                )
+
+            lr_lambdas.append(action_curriculum_lr_lambda)
+        elif group.get("group_name") == "action_head" and action_start_step is not None:
             action_total_steps = max(1, total_steps - action_start_step)
 
             def action_lr_lambda(
@@ -1412,28 +1450,38 @@ def build_training_control(
             "progress": min(1.0, float(global_step) / float(max(1, total_optimizer_steps))),
             "base_scale": 0.0,
             "final_scale": 1.0,
+            "token_envelope": 1.0,
         }
 
     progress = min(1.0, float(global_step) / float(max(1, total_optimizer_steps)))
     final_scale = cosine_curriculum_scale(progress)
+    curriculum_power = float(getattr(args, "token_curriculum_power", 4.0))
+    token_envelope = final_scale ** curriculum_power
     weights = {name: float(getattr(args, name)) for name in STAGED_LOSS_WEIGHT_NAMES}
-    # 表征监督始终存在；结构监督与修正头辅助监督共用一个连续时钟。
+    # hidden/cos 始终存在。token 与跨 Anchor 使用高阶包络延迟入场；
+    # Action-RNN 专属辅助目标再乘 Final 比例，与 Base->Final 交接同步。
     for name in (
+        "soft_w",
         "backbone_anchor_logit_distill_w",
+        "action_token_ce_w",
+    ):
+        weights[name] *= token_envelope
+    for name in (
         "action_distill_l1_w",
         "prefix_survival_w",
         "action_confidence_w",
         "anchor_logit_distill_w",
     ):
-        weights[name] *= final_scale
+        weights[name] *= token_envelope * final_scale
     return {
         "id": 4,
-        "name": "unified_cosine_curriculum",
-        "stage2_scale": final_scale,
-        "stage3_scale": final_scale,
+        "name": "delayed_cosine_token_curriculum",
+        "stage2_scale": token_envelope,
+        "stage3_scale": token_envelope * final_scale,
         "progress": progress,
         "base_scale": 1.0 - final_scale,
         "final_scale": final_scale,
+        "token_envelope": token_envelope,
         "weights": weights,
     }
 
@@ -1584,6 +1632,7 @@ def compute_loss_and_accuracy(
     }
     base_curriculum_scale = float((curriculum_state or {}).get("base_scale", 0.0))
     final_curriculum_scale = float((curriculum_state or {}).get("final_scale", 1.0))
+    token_curriculum_envelope = float((curriculum_state or {}).get("token_envelope", 1.0))
     prompt_selected = batch["prompt_selected"].to(device=device, dtype=torch.bfloat16)# 完整 prefill/prefix 上下文 [B, P, L*hidden]
     prompt_position_ids = batch["prompt_position_ids"].to(device=device)# 完整 prefill/prefix 的绝对 position [B, P]
     prompt_attention_mask = batch["prompt_attention_mask"].to(device=device)# prefix padding mask [B, P]
@@ -1594,7 +1643,8 @@ def compute_loss_and_accuracy(
     lengths = batch["lengths"].to(device=device)# 目标模型生成的 序列 的长度[B, ]
 
     batch_size, seq_len, _ = target_hidden.shape
-    soft_sum = torch.zeros((), device=device, dtype=torch.float32)
+    base_soft_sum = torch.zeros((), device=device, dtype=torch.float32)
+    final_soft_sum = torch.zeros((), device=device, dtype=torch.float32)
     hidden_sum = torch.zeros((), device=device, dtype=torch.float32)
     cos_sum = torch.zeros((), device=device, dtype=torch.float32)
     anchor_consistency_sum = torch.zeros((), device=device, dtype=torch.float32)
@@ -1634,8 +1684,13 @@ def compute_loss_and_accuracy(
     rollout_total_correct = torch.zeros((), device=device, dtype=torch.float32)
     rollout_total_top2_correct = torch.zeros((), device=device, dtype=torch.float32)
     rollout_runner_up_rescues = torch.zeros((), device=device, dtype=torch.float32)
+    base_rollout_prefix_sum = torch.zeros((), device=device, dtype=torch.float32)
     rollout_prefix_sum = torch.zeros((), device=device, dtype=torch.float32)
     rollout_prefix_blocks = torch.zeros((), device=device, dtype=torch.float32)
+    base_distribution_overlap_sum = torch.zeros((), device=device, dtype=torch.float32)
+    rollout_distribution_overlap_sum = torch.zeros((), device=device, dtype=torch.float32)
+    base_expected_accept_prefix_sum = torch.zeros((), device=device, dtype=torch.float32)
+    rollout_expected_accept_prefix_sum = torch.zeros((), device=device, dtype=torch.float32)
     anchor_correct = torch.zeros(seq_len, device=device, dtype=torch.float32)
     anchor_total = torch.zeros(seq_len, device=device, dtype=torch.float32)
     position_correct = torch.zeros(seq_len, device=device, dtype=torch.float32)
@@ -1849,6 +1904,7 @@ def compute_loss_and_accuracy(
             or active_loss_weights["action_distill_l1_w"] > 0
             or active_loss_weights["prefix_survival_w"] > 0
             or active_loss_weights["action_confidence_w"] > 0
+            or (draft_model.action_sequential_enabled and anchor == 0)
         )
         teacher_logits = None
         teacher_probs = None
@@ -1862,17 +1918,26 @@ def compute_loss_and_accuracy(
                 else:
                     teacher_logits = lm_head(teacher_hidden.to(torch.bfloat16)).float()
 
-        # SpecVLA 风格的 soft distribution 交叉熵：学习 teacher 的相对偏好，而不是 hard token id。
+        # SpecVLA 风格的 soft distribution 交叉熵：Base 和 Final 共用 Domino 式连续交接。
         if active_loss_weights["soft_w"] > 0:
             with torch.no_grad():
                 teacher_probs = F.softmax(teacher_logits / args.soft_temperature, dim=-1)
-            # soft loss 只监督 Draft 主干经冻结 lm_head 得到的基础分布。
-            student_log_probs = F.log_softmax(
+            base_student_log_probs = F.log_softmax(
                 backbone_student_logits / args.soft_temperature,
                 dim=-1,
             )
-            soft_ce = -(teacher_probs * student_log_probs).sum(dim=-1) * (args.soft_temperature ** 2)
-            soft_sum += (soft_ce * loss_weight).sum()
+            final_student_log_probs = F.log_softmax(
+                student_logits / args.soft_temperature,
+                dim=-1,
+            )
+            base_soft_ce = -(teacher_probs * base_student_log_probs).sum(dim=-1) * (
+                args.soft_temperature ** 2
+            )
+            final_soft_ce = -(teacher_probs * final_student_log_probs).sum(dim=-1) * (
+                args.soft_temperature ** 2
+            )
+            base_soft_sum += (base_soft_ce * loss_weight).sum()
+            final_soft_sum += (final_soft_ce * loss_weight).sum()
 
         if draft_model.action_sequential_enabled:
             local_target_tokens = draft_model.action_token_ids_to_local(target_tokens)
@@ -1992,13 +2057,47 @@ def compute_loss_and_accuracy(
                     rollout_top2_mask & ~rollout_correct_mask
                 ).sum().float()
 
+                base_prefix_survives = torch.cumprod(
+                    (base_correct_mask | ~rollout_valid).float(),
+                    dim=1,
+                ) * rollout_valid.float()
                 prefix_survives = torch.cumprod(
                     (rollout_correct_mask | ~rollout_valid).float(),
                     dim=1,
                 ) * rollout_valid.float()
+                base_rollout_prefix_sum += base_prefix_survives.sum()
                 rollout_prefix_sum += prefix_survives.sum()
                 rollout_block_count = rollout_valid[:, 0].sum().float()
                 rollout_prefix_blocks += rollout_block_count
+
+                # maximal-coupling 下的分布重合率 alpha=sum(min(p,q))，其累乘和
+                # 是 accepted-prefix 的理论代理；它比 teacher-forcing accuracy 更接近
+                # 投机验证目标，但最终仍须以在线 LIBERO Length/Speedup 为准。
+                teacher_accept_probs = F.softmax(teacher_logits, dim=-1)
+                base_accept_probs = F.softmax(backbone_student_logits, dim=-1)
+                rollout_accept_probs = F.softmax(rollout_logits, dim=-1)
+                base_overlap = torch.minimum(
+                    teacher_accept_probs,
+                    base_accept_probs,
+                ).sum(dim=-1)
+                rollout_overlap = torch.minimum(
+                    teacher_accept_probs,
+                    rollout_accept_probs,
+                ).sum(dim=-1)
+                base_distribution_overlap_sum += (base_overlap * rollout_valid.float()).sum()
+                rollout_distribution_overlap_sum += (
+                    rollout_overlap * rollout_valid.float()
+                ).sum()
+                base_overlap_survival = torch.cumprod(
+                    torch.where(rollout_valid, base_overlap, torch.ones_like(base_overlap)),
+                    dim=1,
+                ) * rollout_valid.float()
+                rollout_overlap_survival = torch.cumprod(
+                    torch.where(rollout_valid, rollout_overlap, torch.ones_like(rollout_overlap)),
+                    dim=1,
+                ) * rollout_valid.float()
+                base_expected_accept_prefix_sum += base_overlap_survival.sum()
+                rollout_expected_accept_prefix_sum += rollout_overlap_survival.sum()
                 rollout_prefix_total[:max_block_len] += rollout_block_count
                 rollout_prefix_correct[:max_block_len] += prefix_survives.sum(dim=0)
                 for local_pos in range(max_block_len):
@@ -2264,7 +2363,16 @@ def compute_loss_and_accuracy(
     residual_token_ce_denom = residual_token_ce_weight_sum.clamp_min(1.0)
     anchor_logit_distill_denom = anchor_logit_distill_weight_sum.clamp_min(1.0)
     backbone_anchor_logit_distill_denom = backbone_anchor_logit_distill_weight_sum.clamp_min(1.0)
-    soft_loss = soft_sum / loss_denom
+    base_soft_loss = base_soft_sum / loss_denom
+    final_soft_loss = final_soft_sum / loss_denom
+    base_scale_tensor = torch.tensor(base_curriculum_scale, device=device, dtype=torch.float32)
+    final_scale_tensor = torch.tensor(final_curriculum_scale, device=device, dtype=torch.float32)
+    token_envelope_tensor = torch.tensor(
+        token_curriculum_envelope,
+        device=device,
+        dtype=torch.float32,
+    )
+    soft_loss = base_scale_tensor * base_soft_loss + final_scale_tensor * final_soft_loss
     hidden_loss = hidden_sum / loss_denom
     cos_loss = cos_sum / loss_denom
     anchor_consistency_loss = anchor_consistency_sum / consistency_denom
@@ -2307,8 +2415,6 @@ def compute_loss_and_accuracy(
         active_loss_weights["backbone_anchor_logit_distill_w"]
         * backbone_anchor_logit_distill_loss
     )
-    base_scale_tensor = torch.tensor(base_curriculum_scale, device=device, dtype=torch.float32)
-    final_scale_tensor = torch.tensor(final_curriculum_scale, device=device, dtype=torch.float32)
     action_token_ce_component = active_loss_weights["action_token_ce_w"] * action_token_ce_loss
     token_curriculum_component = active_loss_weights["action_token_ce_w"] * (
         base_scale_tensor * base_action_token_ce_loss
@@ -2343,12 +2449,36 @@ def compute_loss_and_accuracy(
     rollout_accuracy = rollout_total_correct / rollout_metric_denom
     rollout_top2_accuracy = rollout_total_top2_correct / rollout_metric_denom
     rollout_runner_up_rescue_rate = rollout_runner_up_rescues / rollout_metric_denom
+    rollout_conditional_runner_up_rescue_rate = rollout_runner_up_rescues / (
+        rollout_total_positions - rollout_total_correct
+    ).clamp_min(1.0)
+    base_rollout_expected_prefix_length = (
+        base_rollout_prefix_sum / rollout_prefix_blocks.clamp_min(1.0)
+    )
     rollout_expected_prefix_length = rollout_prefix_sum / rollout_prefix_blocks.clamp_min(1.0)
+    rollout_prefix_length_gain = (
+        rollout_expected_prefix_length - base_rollout_expected_prefix_length
+    )
+    base_distribution_overlap = base_distribution_overlap_sum / rollout_metric_denom
+    rollout_distribution_overlap = rollout_distribution_overlap_sum / rollout_metric_denom
+    base_expected_accept_length_proxy = (
+        base_expected_accept_prefix_sum / rollout_prefix_blocks.clamp_min(1.0)
+    )
+    rollout_expected_accept_length_proxy = (
+        rollout_expected_accept_prefix_sum / rollout_prefix_blocks.clamp_min(1.0)
+    )
+    action_head_accept_length_proxy_gain = (
+        rollout_expected_accept_length_proxy - base_expected_accept_length_proxy
+    )
+    hidden_cosine_similarity = 1.0 - cos_loss
+    representation_token_gap = base_accuracy - hidden_cosine_similarity
     residual_token_ce_accuracy = residual_token_ce_correct / residual_token_ce_total.clamp_min(1.0)
 
     return {
         "loss": total_loss,
         "soft_loss": soft_loss,
+        "base_soft_loss": base_soft_loss,
+        "final_soft_loss": final_soft_loss,
         "hidden_loss": hidden_loss,
         "cos_loss": cos_loss,
         "anchor_consistency_loss": anchor_consistency_loss,
@@ -2375,6 +2505,7 @@ def compute_loss_and_accuracy(
         "token_curriculum_component": token_curriculum_component,
         "curriculum_base_scale": base_scale_tensor.detach(),
         "curriculum_final_scale": final_scale_tensor.detach(),
+        "curriculum_token_envelope": token_envelope_tensor.detach(),
         "action_distill_l1_component": action_distill_l1_component,
         "prefix_survival_component": prefix_survival_component,
         "action_confidence_component": action_confidence_component,
@@ -2390,7 +2521,17 @@ def compute_loss_and_accuracy(
         "rollout_accuracy": rollout_accuracy,
         "rollout_top2_accuracy": rollout_top2_accuracy,
         "rollout_runner_up_rescue_rate": rollout_runner_up_rescue_rate,
+        "rollout_conditional_runner_up_rescue_rate": rollout_conditional_runner_up_rescue_rate,
+        "base_rollout_expected_prefix_length": base_rollout_expected_prefix_length,
         "rollout_expected_prefix_length": rollout_expected_prefix_length,
+        "rollout_prefix_length_gain": rollout_prefix_length_gain,
+        "base_distribution_overlap": base_distribution_overlap,
+        "rollout_distribution_overlap": rollout_distribution_overlap,
+        "base_expected_accept_length_proxy": base_expected_accept_length_proxy,
+        "rollout_expected_accept_length_proxy": rollout_expected_accept_length_proxy,
+        "action_head_accept_length_proxy_gain": action_head_accept_length_proxy_gain,
+        "hidden_cosine_similarity": hidden_cosine_similarity,
+        "representation_token_gap": representation_token_gap,
         "residual_token_ce_accuracy": residual_token_ce_accuracy,
         "action_accept_probability_proxy": action_accept_probability_proxy,
         "expected_prefix_length": expected_prefix_length,
@@ -2424,6 +2565,8 @@ def evaluate(
     model.eval()
     total_loss = 0.0
     total_soft = 0.0
+    total_base_soft = 0.0
+    total_final_soft = 0.0
     total_hidden = 0.0
     total_cos = 0.0
     total_anchor_consistency = 0.0
@@ -2460,7 +2603,17 @@ def evaluate(
     total_rollout_acc = 0.0
     total_rollout_top2_acc = 0.0
     total_rollout_runner_up_rescue_rate = 0.0
+    total_rollout_conditional_runner_up_rescue_rate = 0.0
+    total_base_rollout_expected_prefix_length = 0.0
     total_rollout_expected_prefix_length = 0.0
+    total_rollout_prefix_length_gain = 0.0
+    total_base_distribution_overlap = 0.0
+    total_rollout_distribution_overlap = 0.0
+    total_base_expected_accept_length_proxy = 0.0
+    total_rollout_expected_accept_length_proxy = 0.0
+    total_action_head_accept_length_proxy_gain = 0.0
+    total_hidden_cosine_similarity = 0.0
+    total_representation_token_gap = 0.0
     total_action_accept_probability_proxy = 0.0
     total_expected_prefix_length = 0.0
     total_confidence_mae = 0.0
@@ -2481,6 +2634,8 @@ def evaluate(
         bs = batch["lengths"].shape[0]
         total_loss += metrics["loss"].item() * bs
         total_soft += metrics["soft_loss"].item() * bs
+        total_base_soft += metrics["base_soft_loss"].item() * bs
+        total_final_soft += metrics["final_soft_loss"].item() * bs
         total_hidden += metrics["hidden_loss"].item() * bs
         total_cos += metrics["cos_loss"].item() * bs
         total_anchor_consistency += metrics["anchor_consistency_loss"].item() * bs
@@ -2523,7 +2678,27 @@ def evaluate(
         total_rollout_acc += metrics["rollout_accuracy"].item() * bs
         total_rollout_top2_acc += metrics["rollout_top2_accuracy"].item() * bs
         total_rollout_runner_up_rescue_rate += metrics["rollout_runner_up_rescue_rate"].item() * bs
+        total_rollout_conditional_runner_up_rescue_rate += metrics[
+            "rollout_conditional_runner_up_rescue_rate"
+        ].item() * bs
+        total_base_rollout_expected_prefix_length += metrics[
+            "base_rollout_expected_prefix_length"
+        ].item() * bs
         total_rollout_expected_prefix_length += metrics["rollout_expected_prefix_length"].item() * bs
+        total_rollout_prefix_length_gain += metrics["rollout_prefix_length_gain"].item() * bs
+        total_base_distribution_overlap += metrics["base_distribution_overlap"].item() * bs
+        total_rollout_distribution_overlap += metrics["rollout_distribution_overlap"].item() * bs
+        total_base_expected_accept_length_proxy += metrics[
+            "base_expected_accept_length_proxy"
+        ].item() * bs
+        total_rollout_expected_accept_length_proxy += metrics[
+            "rollout_expected_accept_length_proxy"
+        ].item() * bs
+        total_action_head_accept_length_proxy_gain += metrics[
+            "action_head_accept_length_proxy_gain"
+        ].item() * bs
+        total_hidden_cosine_similarity += metrics["hidden_cosine_similarity"].item() * bs
+        total_representation_token_gap += metrics["representation_token_gap"].item() * bs
         total_action_accept_probability_proxy += metrics["action_accept_probability_proxy"].item() * bs
         total_expected_prefix_length += metrics["expected_prefix_length"].item() * bs
         total_confidence_mae += metrics["confidence_mae"].item() * bs
@@ -2535,6 +2710,8 @@ def evaluate(
     result = {
         "val/loss": total_loss / denom,
         "val/soft_loss": total_soft / denom,
+        "val/base_soft_loss": total_base_soft / denom,
+        "val/final_soft_loss": total_final_soft / denom,
         "val/hidden_loss": total_hidden / denom,
         "val/cos_loss": total_cos / denom,
         "val/anchor_consistency_loss": total_anchor_consistency / denom,
@@ -2577,7 +2754,27 @@ def evaluate(
         "val/rollout_exposure_gap": (total_acc - total_rollout_acc) / denom,
         "val/rollout_top2_accuracy": total_rollout_top2_acc / denom,
         "val/rollout_runner_up_rescue_rate": total_rollout_runner_up_rescue_rate / denom,
+        "val/rollout_conditional_runner_up_rescue_rate": (
+            total_rollout_conditional_runner_up_rescue_rate / denom
+        ),
+        "val/base_rollout_expected_prefix_length": (
+            total_base_rollout_expected_prefix_length / denom
+        ),
         "val/rollout_expected_prefix_length": total_rollout_expected_prefix_length / denom,
+        "val/rollout_prefix_length_gain": total_rollout_prefix_length_gain / denom,
+        "val/base_distribution_overlap": total_base_distribution_overlap / denom,
+        "val/rollout_distribution_overlap": total_rollout_distribution_overlap / denom,
+        "val/base_expected_accept_length_proxy": (
+            total_base_expected_accept_length_proxy / denom
+        ),
+        "val/rollout_expected_accept_length_proxy": (
+            total_rollout_expected_accept_length_proxy / denom
+        ),
+        "val/action_head_accept_length_proxy_gain": (
+            total_action_head_accept_length_proxy_gain / denom
+        ),
+        "val/hidden_cosine_similarity": total_hidden_cosine_similarity / denom,
+        "val/representation_token_gap": total_representation_token_gap / denom,
         "val/action_accept_probability_proxy": total_action_accept_probability_proxy / denom,
         "val/expected_prefix_length": total_expected_prefix_length / denom,
         "val/confidence_mae": total_confidence_mae / denom,
@@ -2596,6 +2793,8 @@ def main():
     is_main = ddp_info["is_main"]
     if args.soft_temperature <= 0:
         raise ValueError("--soft_temperature must be > 0.")
+    if args.token_curriculum_power <= 0:
+        raise ValueError("--token_curriculum_power must be > 0.")
     if args.slot_decay <= 0 or args.slot_decay > 1:
         raise ValueError("--slot_decay must be in (0, 1].")
     for loss_name in (
@@ -2993,6 +3192,11 @@ def main():
         args.warmup_ratio,
         action_start_step=action_start_step,
         action_warmup_steps=args.action_head_warmup_steps,
+        action_curriculum_power=(
+            args.token_curriculum_power
+            if args.unified_cosine_curriculum and action_head_params
+            else None
+        ),
     )
 
     global_step = 0
@@ -3102,7 +3306,16 @@ def main():
             )
             active_loss_weights = stage["weights"]
             action_head_active = (
-                stage["final_scale"] > 0
+                any(
+                    active_loss_weights[name] > 0
+                    for name in (
+                        "action_token_ce_w",
+                        "action_distill_l1_w",
+                        "prefix_survival_w",
+                        "action_confidence_w",
+                        "anchor_logit_distill_w",
+                    )
+                )
                 if args.unified_cosine_curriculum
                 else (not args.staged_training or epoch >= args.stage3_start_epoch)
             )
@@ -3122,6 +3335,7 @@ def main():
                         "curriculum/progress": stage["progress"],
                         "curriculum/base_scale": stage["base_scale"],
                         "curriculum/final_scale": stage["final_scale"],
+                        "curriculum/token_envelope": stage["token_envelope"],
                         **{
                             f"curriculum/{name}": value
                             for name, value in active_loss_weights.items()
@@ -3146,8 +3360,9 @@ def main():
                     append_jsonl(metrics_log_path, stage_payload)
                     if args.unified_cosine_curriculum:
                         print(
-                            f"\n启用统一余弦训练课程 | epoch={epoch} | "
+                            f"\n启用延迟余弦训练课程 | epoch={epoch} | "
                             f"base={stage['base_scale']:.6f} final={stage['final_scale']:.6f} "
+                            f"token_gate={stage['token_envelope']:.6f} "
                             f"soft_w={active_loss_weights['soft_w']:.4f} "
                             f"draft_anchor_kl_w={active_loss_weights['backbone_anchor_logit_distill_w']:.6f} "
                             f"action_ce_w={active_loss_weights['action_token_ce_w']:.4f} "
@@ -3170,6 +3385,8 @@ def main():
             optimizer.zero_grad(set_to_none=True)
             train_loss_sum = 0.0
             train_soft_sum = 0.0
+            train_base_soft_sum = 0.0
+            train_final_soft_sum = 0.0
             train_hidden_sum = 0.0
             train_cos_sum = 0.0
             train_anchor_consistency_sum = 0.0
@@ -3208,7 +3425,17 @@ def main():
             train_rollout_acc_sum = 0.0
             train_rollout_top2_acc_sum = 0.0
             train_rollout_runner_up_rescue_rate_sum = 0.0
+            train_rollout_conditional_runner_up_rescue_rate_sum = 0.0
+            train_base_rollout_expected_prefix_length_sum = 0.0
             train_rollout_expected_prefix_length_sum = 0.0
+            train_rollout_prefix_length_gain_sum = 0.0
+            train_base_distribution_overlap_sum = 0.0
+            train_rollout_distribution_overlap_sum = 0.0
+            train_base_expected_accept_length_proxy_sum = 0.0
+            train_rollout_expected_accept_length_proxy_sum = 0.0
+            train_action_head_accept_length_proxy_gain_sum = 0.0
+            train_hidden_cosine_similarity_sum = 0.0
+            train_representation_token_gap_sum = 0.0
             train_residual_token_ce_acc_sum = 0.0
             train_action_accept_probability_proxy_sum = 0.0
             train_expected_prefix_length_sum = 0.0
@@ -3218,6 +3445,8 @@ def main():
             epoch_metric_names = (
                 "loss",
                 "soft_loss",
+                "base_soft_loss",
+                "final_soft_loss",
                 "hidden_loss",
                 "cos_loss",
                 "base_action_token_ce_loss",
@@ -3230,12 +3459,15 @@ def main():
                 "accuracy",
                 "base_accuracy",
                 "rollout_accuracy",
+                "base_rollout_expected_prefix_length",
                 "rollout_expected_prefix_length",
+                "base_expected_accept_length_proxy",
+                "rollout_expected_accept_length_proxy",
             )
             epoch_metric_sums = {name: 0.0 for name in epoch_metric_names}
             epoch_metric_steps = 0
             progress_mode = (
-                "curriculum=cosine"
+                "curriculum=delayed_cosine"
                 if args.unified_cosine_curriculum
                 else f"stage={stage['id']}"
             )
@@ -3253,7 +3485,16 @@ def main():
                 )
                 active_loss_weights = stage["weights"]
                 action_head_active = (
-                    stage["final_scale"] > 0
+                    any(
+                        active_loss_weights[name] > 0
+                        for name in (
+                            "action_token_ce_w",
+                            "action_distill_l1_w",
+                            "prefix_survival_w",
+                            "action_confidence_w",
+                            "anchor_logit_distill_w",
+                        )
+                    )
                     if args.unified_cosine_curriculum
                     else (not args.staged_training or epoch >= args.stage3_start_epoch)
                 )
@@ -3291,6 +3532,8 @@ def main():
 
                 train_loss_sum += log_metrics["loss"].item()
                 train_soft_sum += log_metrics["soft_loss"].item()
+                train_base_soft_sum += log_metrics["base_soft_loss"].item()
+                train_final_soft_sum += log_metrics["final_soft_loss"].item()
                 train_hidden_sum += log_metrics["hidden_loss"].item()
                 train_cos_sum += log_metrics["cos_loss"].item()
                 train_anchor_consistency_sum += log_metrics["anchor_consistency_loss"].item()
@@ -3339,8 +3582,38 @@ def main():
                 train_rollout_runner_up_rescue_rate_sum += log_metrics[
                     "rollout_runner_up_rescue_rate"
                 ].item()
+                train_rollout_conditional_runner_up_rescue_rate_sum += log_metrics[
+                    "rollout_conditional_runner_up_rescue_rate"
+                ].item()
+                train_base_rollout_expected_prefix_length_sum += log_metrics[
+                    "base_rollout_expected_prefix_length"
+                ].item()
                 train_rollout_expected_prefix_length_sum += log_metrics[
                     "rollout_expected_prefix_length"
+                ].item()
+                train_rollout_prefix_length_gain_sum += log_metrics[
+                    "rollout_prefix_length_gain"
+                ].item()
+                train_base_distribution_overlap_sum += log_metrics[
+                    "base_distribution_overlap"
+                ].item()
+                train_rollout_distribution_overlap_sum += log_metrics[
+                    "rollout_distribution_overlap"
+                ].item()
+                train_base_expected_accept_length_proxy_sum += log_metrics[
+                    "base_expected_accept_length_proxy"
+                ].item()
+                train_rollout_expected_accept_length_proxy_sum += log_metrics[
+                    "rollout_expected_accept_length_proxy"
+                ].item()
+                train_action_head_accept_length_proxy_gain_sum += log_metrics[
+                    "action_head_accept_length_proxy_gain"
+                ].item()
+                train_hidden_cosine_similarity_sum += log_metrics[
+                    "hidden_cosine_similarity"
+                ].item()
+                train_representation_token_gap_sum += log_metrics[
+                    "representation_token_gap"
                 ].item()
                 train_residual_token_ce_acc_sum += log_metrics["residual_token_ce_accuracy"].item()
                 train_action_accept_probability_proxy_sum += log_metrics["action_accept_probability_proxy"].item()
@@ -3373,6 +3646,7 @@ def main():
                             "train/curriculum_progress": stage["progress"],
                             "train/curriculum_base_scale": stage["base_scale"],
                             "train/curriculum_final_scale": stage["final_scale"],
+                            "train/curriculum_token_envelope": stage["token_envelope"],
                             "train/active_soft_w": active_loss_weights["soft_w"],
                             "train/active_backbone_anchor_kl_w": active_loss_weights[
                                 "backbone_anchor_logit_distill_w"
@@ -3382,6 +3656,8 @@ def main():
                             "train/active_prefix_w": active_loss_weights["prefix_survival_w"],
                             "train/loss": train_loss_sum / denom_log_steps,
                             "train/soft_loss": train_soft_sum / denom_log_steps,
+                            "train/base_soft_loss": train_base_soft_sum / denom_log_steps,
+                            "train/final_soft_loss": train_final_soft_sum / denom_log_steps,
                             "train/hidden_loss": train_hidden_sum / denom_log_steps,
                             "train/cos_loss": train_cos_sum / denom_log_steps,
                             "train/anchor_consistency_loss": train_anchor_consistency_sum / denom_log_steps,
@@ -3436,7 +3712,38 @@ def main():
                             ) / denom_log_steps,
                             "train/rollout_top2_accuracy": train_rollout_top2_acc_sum / denom_log_steps,
                             "train/rollout_runner_up_rescue_rate": train_rollout_runner_up_rescue_rate_sum / denom_log_steps,
+                            "train/rollout_conditional_runner_up_rescue_rate": (
+                                train_rollout_conditional_runner_up_rescue_rate_sum
+                                / denom_log_steps
+                            ),
+                            "train/base_rollout_expected_prefix_length": (
+                                train_base_rollout_expected_prefix_length_sum / denom_log_steps
+                            ),
                             "train/rollout_expected_prefix_length": train_rollout_expected_prefix_length_sum / denom_log_steps,
+                            "train/rollout_prefix_length_gain": (
+                                train_rollout_prefix_length_gain_sum / denom_log_steps
+                            ),
+                            "train/base_distribution_overlap": (
+                                train_base_distribution_overlap_sum / denom_log_steps
+                            ),
+                            "train/rollout_distribution_overlap": (
+                                train_rollout_distribution_overlap_sum / denom_log_steps
+                            ),
+                            "train/base_expected_accept_length_proxy": (
+                                train_base_expected_accept_length_proxy_sum / denom_log_steps
+                            ),
+                            "train/rollout_expected_accept_length_proxy": (
+                                train_rollout_expected_accept_length_proxy_sum / denom_log_steps
+                            ),
+                            "train/action_head_accept_length_proxy_gain": (
+                                train_action_head_accept_length_proxy_gain_sum / denom_log_steps
+                            ),
+                            "train/hidden_cosine_similarity": (
+                                train_hidden_cosine_similarity_sum / denom_log_steps
+                            ),
+                            "train/representation_token_gap": (
+                                train_representation_token_gap_sum / denom_log_steps
+                            ),
                             "train/residual_token_ce_accuracy": train_residual_token_ce_acc_sum / denom_log_steps,
                             "train/action_accept_probability_proxy": train_action_accept_probability_proxy_sum / denom_log_steps,
                             "train/expected_prefix_length": train_expected_prefix_length_sum / denom_log_steps,
@@ -3487,6 +3794,7 @@ def main():
                         print(
                             f"train step={global_step} epoch={epoch} "
                             f"loss={train_payload['train/loss']:.4f} "
+                            f"gate={train_payload['train/curriculum_token_envelope']:.4f} "
                             f"soft={train_payload['train/soft_loss']:.4f} "
                             f"soft*={train_payload['train/soft_component']:.4f} "
                             f"h={train_payload['train/hidden_loss']:.4f} "
@@ -3514,13 +3822,18 @@ def main():
                             f"roll={train_payload['train/rollout_accuracy']:.3f} "
                             f"exposure_gap={train_payload['train/rollout_exposure_gap']:.3f} "
                             f"roll2={train_payload['train/rollout_top2_accuracy']:.3f} "
-                            f"rollL={train_payload['train/rollout_expected_prefix_length']:.2f} "
+                            f"rollL={train_payload['train/base_rollout_expected_prefix_length']:.2f}->"
+                            f"{train_payload['train/rollout_expected_prefix_length']:.2f} "
+                            f"acceptL={train_payload['train/base_expected_accept_length_proxy']:.2f}->"
+                            f"{train_payload['train/rollout_expected_accept_length_proxy']:.2f} "
                             f"lr={train_payload['train/lr']:.2e}/"
                             f"{train_payload['train/action_head_lr']:.2e}",
                             flush=True,
                         )
                         train_loss_sum = 0.0
                         train_soft_sum = 0.0
+                        train_base_soft_sum = 0.0
+                        train_final_soft_sum = 0.0
                         train_hidden_sum = 0.0
                         train_cos_sum = 0.0
                         train_anchor_consistency_sum = 0.0
@@ -3559,7 +3872,17 @@ def main():
                         train_rollout_acc_sum = 0.0
                         train_rollout_top2_acc_sum = 0.0
                         train_rollout_runner_up_rescue_rate_sum = 0.0
+                        train_rollout_conditional_runner_up_rescue_rate_sum = 0.0
+                        train_base_rollout_expected_prefix_length_sum = 0.0
                         train_rollout_expected_prefix_length_sum = 0.0
+                        train_rollout_prefix_length_gain_sum = 0.0
+                        train_base_distribution_overlap_sum = 0.0
+                        train_rollout_distribution_overlap_sum = 0.0
+                        train_base_expected_accept_length_proxy_sum = 0.0
+                        train_rollout_expected_accept_length_proxy_sum = 0.0
+                        train_action_head_accept_length_proxy_gain_sum = 0.0
+                        train_hidden_cosine_similarity_sum = 0.0
+                        train_representation_token_gap_sum = 0.0
                         train_residual_token_ce_acc_sum = 0.0
                         train_action_accept_probability_proxy_sum = 0.0
                         train_expected_prefix_length_sum = 0.0

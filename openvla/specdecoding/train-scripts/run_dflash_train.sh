@@ -1,105 +1,113 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 当前 DFlash 训练统一入口。
+# DFlash 两阶段训练的唯一入口。
 #
-#   bash .../run_dflash_train.sh main        # 推荐：一层、延迟余弦课程、Draft 跨 anchor + Action-RNN
-#   bash .../run_dflash_train.sh three_layer # 容量消融：三层主干
-#   bash .../run_dflash_train.sh no_prefix   # 去掉 Prefix Survival
-#   bash .../run_dflash_train.sh no_anchor   # 去掉跨 anchor logits 蒸馏
+#   bash openvla/specdecoding/train-scripts/run_dflash_train.sh stage1
+#   bash openvla/specdecoding/train-scripts/run_dflash_train.sh stage2
 #
-# 所有默认值均可用同名环境变量覆盖；启动时会完整打印最终配置。
+# stage1: 只训练 Draft hidden/cos，Action-RNN 构造但冻结且不执行前向。
+# stage2: 自动加载 stage1/latest，仅加载模型参数；重新创建 optimizer、scheduler 和 SwanLab run。
+# 两个阶段使用不同输出目录，不续接彼此的 epoch、step 或日志。
 
-PROFILE="${1:-main}"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
-cd "${REPO_ROOT}"
-
-case "${PROFILE}" in
-  main)
-    PROFILE_LAYERS=1
-    PROFILE_PREFIX_W=0.20
-    PROFILE_ANCHOR_W=0.05
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_delayed_curriculum_action_rnn_1layer_b16x1_4gpu
+PHASE="${1:-}"
+case "${PHASE}" in
+  stage1|representation)
+    TRAINING_PHASE=representation
     ;;
-  three_layer)
-    PROFILE_LAYERS=3
-    PROFILE_PREFIX_W=0.20
-    PROFILE_ANCHOR_W=0.05
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_delayed_curriculum_action_rnn_3layer_b16x1_4gpu
-    ;;
-  no_prefix)
-    PROFILE_LAYERS=1
-    PROFILE_PREFIX_W=0
-    PROFILE_ANCHOR_W=0.05
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_delayed_curriculum_no_prefix_1layer_b16x1_4gpu
-    ;;
-  no_anchor)
-    PROFILE_LAYERS=1
-    PROFILE_PREFIX_W=0.20
-    PROFILE_ANCHOR_W=0
-    PROFILE_OUTPUT_NAME=ckpt_goal_dflash_delayed_curriculum_no_anchor_1layer_b16x1_4gpu
+  stage2|refinement)
+    TRAINING_PHASE=refinement
     ;;
   *)
-    echo "用法: bash $0 [main|three_layer|no_prefix|no_anchor]" >&2
+    echo "用法: bash $0 [stage1|stage2]" >&2
     exit 1
     ;;
 esac
 
-NUM_DRAFT_LAYERS="${NUM_DRAFT_LAYERS:-${PROFILE_LAYERS}}"
-PREFIX_SURVIVAL_W="${PREFIX_SURVIVAL_W:-${PROFILE_PREFIX_W}}"
-OUTPUT_NAME="${OUTPUT_NAME:-${PROFILE_OUTPUT_NAME}}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+cd "${REPO_ROOT}"
 
 if [[ -d "/data/wulin" ]]; then
+  MACHINE_DATA_ROOT="/data/wulin/c/specvla-data"
   DEFAULT_VLA_PATH="/data/wulin/hf_files/openvla-7b-finetuned-libero-goal"
-  DEFAULT_DATAPATH="/data/wulin/c/specvla-data/dflash_goal_dataset_envfix_20260714.h5"
-  DEFAULT_OUTPUT_DIR="/data/wulin/c/specvla-data/${OUTPUT_NAME}"
 elif [[ -d "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh" ]]; then
   MACHINE_ROOT="/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh"
+  MACHINE_DATA_ROOT="${MACHINE_ROOT}/specvla-data"
   DEFAULT_VLA_PATH="${MACHINE_ROOT}/hf_files/openvla-7b-finetuned-libero-goal"
-  DEFAULT_DATAPATH="${MACHINE_ROOT}/specvla-data/dflash_goal_dataset_envfix_20260714.h5"
-  DEFAULT_OUTPUT_DIR="${MACHINE_ROOT}/specvla-data/${OUTPUT_NAME}"
 elif [[ -d "/mnt/storage/cgh" ]]; then
+  MACHINE_DATA_ROOT="/mnt/storage/cgh/specvla-data"
   DEFAULT_VLA_PATH="/mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-goal"
-  DEFAULT_DATAPATH="/mnt/storage/cgh/specvla-data/dflash_goal_dataset_envfix_20260714.h5"
-  DEFAULT_OUTPUT_DIR="/mnt/storage/cgh/specvla-data/${OUTPUT_NAME}"
 else
-  echo "无法识别机器路径；请显式设置 VLA_PATH、DATAPATH 和 OUTPUT_DIR。" >&2
+  echo "无法识别机器路径；请显式设置 VLA_PATH、DATAPATH 和 TWO_STAGE_ROOT。" >&2
   exit 1
 fi
 
 VLA_PATH="${VLA_PATH:-${DEFAULT_VLA_PATH}}"
-DATAPATH="${DATAPATH:-${DEFAULT_DATAPATH}}"
-OUTPUT_DIR="${OUTPUT_DIR:-${DEFAULT_OUTPUT_DIR}}"
+DATAPATH="${DATAPATH:-${MACHINE_DATA_ROOT}/dflash_goal_dataset_envfix_20260714.h5}"
+TWO_STAGE_ROOT="${TWO_STAGE_ROOT:-${MACHINE_DATA_ROOT}/ckpt_goal_dflash_two_stage_1layer_b16x1_4gpu}"
+STAGE1_OUTPUT_DIR="${STAGE1_OUTPUT_DIR:-${TWO_STAGE_ROOT}/stage1_representation}"
+STAGE2_OUTPUT_DIR="${STAGE2_OUTPUT_DIR:-${TWO_STAGE_ROOT}/stage2_refinement}"
+
 CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3}"
 NPROC_PER_NODE="${NPROC_PER_NODE:-4}"
-
-# 训练规模：默认 global batch = 16 micro-batch * 1 累积 * 4 GPU = 64。
 BATCH_SIZE="${BATCH_SIZE:-16}"
 GRAD_ACCUM_STEPS="${GRAD_ACCUM_STEPS:-1}"
-NUM_EPOCHS="${NUM_EPOCHS:-200}"
-LR="${LR:-2e-5}"
-ACTION_HEAD_LR="${ACTION_HEAD_LR:-5e-5}"
-WARMUP_STEPS="${WARMUP_STEPS:-1000}"
-ACTION_HEAD_WARMUP_STEPS="${ACTION_HEAD_WARMUP_STEPS:-500}"
+NUM_DRAFT_LAYERS="${NUM_DRAFT_LAYERS:-1}"
 SAVE_EVERY="${SAVE_EVERY:-10}"
 SEED="${SEED:-7}"
-
-# 延迟课程：hidden/cos 全程训练；其余目标约从训练中点后平滑进入。
-HIDDEN_W="${HIDDEN_W:-1.00}"
-COS_W="${COS_W:-0.05}"
-SOFT_W="${SOFT_W:-0.05}"
-TOKEN_CURRICULUM_POWER="${TOKEN_CURRICULUM_POWER:-4.0}"
-BACKBONE_ANCHOR_LOGIT_DISTILL_W="${BACKBONE_ANCHOR_LOGIT_DISTILL_W:-${PROFILE_ANCHOR_W}}"
-# 主实验把跨 anchor 蒸馏限定在 Draft 主干；Action-RNN 只接受 CE/L1/Prefix 直接监督。
-ANCHOR_LOGIT_DISTILL_W="${ANCHOR_LOGIT_DISTILL_W:-0}"
-ACTION_TOKEN_CE_W="${ACTION_TOKEN_CE_W:-0.10}"
-ACTION_DISTILL_L1_W="${ACTION_DISTILL_L1_W:-0.40}"
-
-# 共享服务器 IO 与 SwanLab 设置。
 NUM_WORKERS="${NUM_WORKERS:-1}"
 SWANLAB_LOG_EVERY_STEPS="${SWANLAB_LOG_EVERY_STEPS:-20}"
 SWANLAB_DETAIL_EVERY_STEPS="${SWANLAB_DETAIL_EVERY_STEPS:-200}"
+
+# 两阶段共同的高维表征约束。
+HIDDEN_W="${HIDDEN_W:-1.00}"
+COS_W="${COS_W:-0.05}"
+SLOT_DECAY="${SLOT_DECAY:-0.90}"
+HIDDEN_NOISE="${HIDDEN_NOISE:-0.03}"
+
+INIT_ARGS=()
+if [[ "${TRAINING_PHASE}" == "representation" ]]; then
+  OUTPUT_DIR="${OUTPUT_DIR:-${STAGE1_OUTPUT_DIR}}"
+  NUM_EPOCHS="${NUM_EPOCHS:-100}"
+  LR="${LR:-2e-5}"
+  ACTION_HEAD_LR="${ACTION_HEAD_LR:-5e-5}"
+  WARMUP_STEPS="${WARMUP_STEPS:-1000}"
+  ACTION_HEAD_WARMUP_STEPS="${ACTION_HEAD_WARMUP_STEPS:-500}"
+  SOFT_W=0
+  ACTION_TOKEN_CE_W=0
+  BACKBONE_ANCHOR_LOGIT_DISTILL_W=0
+  ACTION_DISTILL_L1_W=0
+  PREFIX_SURVIVAL_W=0
+  ACTION_HEAD_STATUS="frozen_and_skipped"
+  RUN_NAME="${RUN_NAME:-dflash-stage1-representation-${NUM_DRAFT_LAYERS}layer-b${BATCH_SIZE}x${GRAD_ACCUM_STEPS}-${NPROC_PER_NODE}gpu}"
+else
+  OUTPUT_DIR="${OUTPUT_DIR:-${STAGE2_OUTPUT_DIR}}"
+  NUM_EPOCHS="${NUM_EPOCHS:-100}"
+  # 阶段二保护已成熟的 Draft，同时让新训练的 Action-RNN 使用独立较大学习率。
+  LR="${LR:-5e-6}"
+  ACTION_HEAD_LR="${ACTION_HEAD_LR:-5e-5}"
+  WARMUP_STEPS="${WARMUP_STEPS:-500}"
+  ACTION_HEAD_WARMUP_STEPS="${ACTION_HEAD_WARMUP_STEPS:-500}"
+  SOFT_W="${SOFT_W:-0.05}"
+  ACTION_TOKEN_CE_W="${ACTION_TOKEN_CE_W:-0.05}"
+  BACKBONE_ANCHOR_LOGIT_DISTILL_W="${BACKBONE_ANCHOR_LOGIT_DISTILL_W:-0.05}"
+  ACTION_DISTILL_L1_W="${ACTION_DISTILL_L1_W:-0.10}"
+  PREFIX_SURVIVAL_W="${PREFIX_SURVIVAL_W:-0.05}"
+  ACTION_HEAD_STATUS="trainable"
+  STAGE1_CKPT="${STAGE1_CKPT:-${STAGE1_OUTPUT_DIR}}"
+  if [[ ! -d "${STAGE1_CKPT}" ]]; then
+    echo "阶段一 checkpoint 路径不存在: ${STAGE1_CKPT}" >&2
+    exit 1
+  fi
+  if [[ ! -f "${STAGE1_CKPT}/pytorch_model.bin" ]] && \
+     [[ ! -f "${STAGE1_CKPT}/latest_checkpoint.txt" ]]; then
+    echo "阶段一目录缺少 pytorch_model.bin/latest_checkpoint.txt: ${STAGE1_CKPT}" >&2
+    exit 1
+  fi
+  INIT_ARGS=(--init_model_checkpoint "${STAGE1_CKPT}")
+  RUN_NAME="${RUN_NAME:-dflash-stage2-final-refinement-${NUM_DRAFT_LAYERS}layer-b${BATCH_SIZE}x${GRAD_ACCUM_STEPS}-${NPROC_PER_NODE}gpu}"
+fi
 
 for path in "${VLA_PATH}" "${DATAPATH}"; do
   if [[ ! -e "${path}" ]]; then
@@ -108,62 +116,51 @@ for path in "${VLA_PATH}" "${DATAPATH}"; do
   fi
 done
 
+if [[ -e "${OUTPUT_DIR}/run_config.json" ]] || \
+   [[ -e "${OUTPUT_DIR}/metrics.jsonl" ]] || \
+   [[ -d "${OUTPUT_DIR}/swanlog" ]]; then
+  echo "输出目录已有本阶段日志: ${OUTPUT_DIR}" >&2
+  echo "请归档旧目录，或设置新的 TWO_STAGE_ROOT；不要把两个 SwanLab run 写进同一目录。" >&2
+  exit 1
+fi
+
 cat <<EOF
-========== DFlash Goal 训练 ==========
-PROFILE=${PROFILE}
+========== DFlash 两阶段训练 ==========
+PHASE=${PHASE} (${TRAINING_PHASE})
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}
-NPROC_PER_NODE=${NPROC_PER_NODE}
+GLOBAL_BATCH=${BATCH_SIZE} * ${GRAD_ACCUM_STEPS} * ${NPROC_PER_NODE}
 VLA_PATH=${VLA_PATH}
 DATAPATH=${DATAPATH}
 OUTPUT_DIR=${OUTPUT_DIR}
-
-[模型]
-NUM_DRAFT_LAYERS=${NUM_DRAFT_LAYERS}
-ACTION_HEAD=slot_rnn(rank=256)
-TARGET_FEATURE_LAYERS=5_evenly_spaced
-
-[优化]
-GLOBAL_BATCH=${BATCH_SIZE} * ${GRAD_ACCUM_STEPS} * ${NPROC_PER_NODE}
+TWO_STAGE_ROOT=${TWO_STAGE_ROOT}
 NUM_EPOCHS=${NUM_EPOCHS}
 LR=${LR}
-ACTION_HEAD_LR=${ACTION_HEAD_LR}
-WARMUP_STEPS=${WARMUP_STEPS}
-ACTION_HEAD_WARMUP_STEPS=${ACTION_HEAD_WARMUP_STEPS}
-CURRICULUM=delayed_cosine_power_${TOKEN_CURRICULUM_POWER}_over_${NUM_EPOCHS}_epochs
-TOKEN_GATE=cosine(progress)^${TOKEN_CURRICULUM_POWER}
-TOKEN_CE=TOKEN_GATE*((1-s)*BaseCE+s*FinalCE)
-SAVE_EVERY=${SAVE_EVERY}
-SEED=${SEED}
-
-[损失权重]
+ACTION_HEAD_LR=${ACTION_HEAD_LR} (${ACTION_HEAD_STATUS})
 HIDDEN_W=${HIDDEN_W}
 COS_W=${COS_W}
-SOFT_W=${SOFT_W}
-TOKEN_CURRICULUM_POWER=${TOKEN_CURRICULUM_POWER}
-BACKBONE_ANCHOR_LOGIT_DISTILL_W=${BACKBONE_ANCHOR_LOGIT_DISTILL_W}
-ACTION_TOKEN_CE_W=${ACTION_TOKEN_CE_W}
-ACTION_DISTILL_L1_W=${ACTION_DISTILL_L1_W}
-PREFIX_SURVIVAL_W=${PREFIX_SURVIVAL_W}
-ANCHOR_LOGIT_DISTILL_W=${ANCHOR_LOGIT_DISTILL_W}
-
-[IO / 日志]
-NUM_WORKERS=${NUM_WORKERS}
-SWANLAB_LOG_EVERY_STEPS=${SWANLAB_LOG_EVERY_STEPS}
-SWANLAB_DETAIL_EVERY_STEPS=${SWANLAB_DETAIL_EVERY_STEPS}
-======================================
+SOFT_KL_W=${SOFT_W}
+FINAL_HARD_CE_W=${ACTION_TOKEN_CE_W}
+CROSS_ANCHOR_KL_W=${BACKBONE_ANCHOR_LOGIT_DISTILL_W}
+ACTION_RNN_L1_W=${ACTION_DISTILL_L1_W}
+PREFIX_W=${PREFIX_SURVIVAL_W}
+STAGE1_CKPT=${STAGE1_CKPT:-N/A}
+SWANLAB_RUN=${RUN_NAME}
+========================================
 EOF
 
 export CUDA_VISIBLE_DEVICES
 export HDF5_USE_FILE_LOCKING="${HDF5_USE_FILE_LOCKING:-FALSE}"
 
 if [[ "${DRY_RUN:-False}" == "True" ]]; then
-  echo "DRY_RUN=True：路径和配置检查通过，不启动 torchrun。"
+  echo "DRY_RUN=True：路径、阶段依赖和输出隔离检查通过。"
   exit 0
 fi
 
 torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   openvla/specdecoding/train-scripts/train_dflash_libero_goal.py \
-  --run_name "dflash-delayed-curriculum-action-rnn-${PROFILE}-${NUM_DRAFT_LAYERS}layer-b${BATCH_SIZE}x${GRAD_ACCUM_STEPS}-${NPROC_PER_NODE}gpu" \
+  --training_phase "${TRAINING_PHASE}" \
+  "${INIT_ARGS[@]}" \
+  --run_name "${RUN_NAME}" \
   --vla_path "${VLA_PATH}" \
   --datapath "${DATAPATH}" \
   --dataset_format auto \
@@ -181,22 +178,23 @@ torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   --hidden_w "${HIDDEN_W}" \
   --cos_w "${COS_W}" \
   --soft_w "${SOFT_W}" \
+  --soft_loss_type kl \
   --soft_temperature 2.0 \
   --action_token_ce_w "${ACTION_TOKEN_CE_W}" \
   --action_distill_l1_w "${ACTION_DISTILL_L1_W}" \
   --action_distill_temperature 1.0 \
   --prefix_survival_w "${PREFIX_SURVIVAL_W}" \
   --action_confidence_w 0 \
-  --slot_decay 1.0 \
+  --slot_decay "${SLOT_DECAY}" \
   --position_balance \
-  --hidden_noise 0.03 \
+  --hidden_noise "${HIDDEN_NOISE}" \
   --anchor_consistency_w 0 \
   --causal_residual_type none \
   --causal_residual_cad_w 0 \
   --refined_hidden_w 0 \
   --residual_token_ce_w 0 \
   --logit_markov_type none \
-  --anchor_logit_distill_w "${ANCHOR_LOGIT_DISTILL_W}" \
+  --anchor_logit_distill_w 0 \
   --backbone_anchor_logit_distill_w "${BACKBONE_ANCHOR_LOGIT_DISTILL_W}" \
   --anchor_logit_distill_temperature 2.0 \
   --anchor_logit_distill_min_position 2 \
@@ -206,8 +204,7 @@ torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   --lr "${LR}" \
   --action_head_lr "${ACTION_HEAD_LR}" \
   --no-staged_training \
-  --unified_cosine_curriculum \
-  --token_curriculum_power "${TOKEN_CURRICULUM_POWER}" \
+  --no-unified_cosine_curriculum \
   --action_head_warmup_steps "${ACTION_HEAD_WARMUP_STEPS}" \
   --batch_size "${BATCH_SIZE}" \
   --gradient_accumulation_steps "${GRAD_ACCUM_STEPS}" \

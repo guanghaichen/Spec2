@@ -3,9 +3,9 @@
 本仓库研究一个具体问题：能否把 DFlash 式块并行草稿模型迁移到 OpenVLA，在保持目标模型校验可靠性的
 前提下，提高 LIBERO 动作解码速度。
 
-当前完整方案由三层组成：块并行 Draft 负责低成本提案；跨 Anchor 蒸馏、Domino 式 Base/Final 课程和
-DSpark 风格 Action-RNN 负责提高弱路径命中；动作组级宽松校验与校准式稀疏多候选树负责在推理阶段扩大
-可接受候选覆盖。它们最终都必须接受成功率、Length 和端到端 Speedup 的共同检验。
+当前完整方案由三层组成：块并行 Draft 负责低成本提案；独立 Hidden-first 两阶段训练、跨 Anchor 蒸馏和
+DSpark/Domino 启发的 Action-RNN 负责提高弱路径命中；动作组级宽松校验与校准式稀疏多候选树负责在推理
+阶段扩大可接受候选覆盖。它们最终都必须接受成功率、Length 和端到端 Speedup 的共同检验。
 
 代码基于 [SpecVLA](https://github.com/PineTreeWss/SpecVLA)，而 SpecVLA 又基于
 [OpenVLA](https://github.com/openvla/openvla)。当前仓库仍是研究代码，不是已经定稿的公开复现包。
@@ -113,15 +113,15 @@ parallel_draft=False
 | --- | --- | --- | --- |
 | hidden 条件下的块并行主干 | DFlash | 适配 OpenVLA 七维动作、完整多层 prompt hidden 和已验证 action hidden | 基础骨架 |
 | 轻量顺序因果修正 | [DSpark](https://arxiv.org/abs/2607.05147)/同类半自回归 draft 的启发 | frozen `lm_head` 后增加低秩 Action-RNN，训练读真实前 token，推理读自身前 token | 吸收短程因果建模精髓，不声称复现 DSpark 全系统 |
-| Base/Final 课程 | [Domino](https://arxiv.org/abs/2605.29707) 的 base-anchored curriculum | `BaseCE` 到 `FinalCE` 的全程余弦交接，Final CE 联合更新 Draft 与 RNN | 吸收防止修正头走捷径的核心经验 |
+| Base/Final 训练次序 | [Domino](https://arxiv.org/abs/2605.29707) 的 base-anchored curriculum | 改为两次独立训练：先只学 Draft 高维表示，再从该权重初始化 Final 联合微调 | 吸收“先立主干、再学因果修正”的核心经验，但不照搬单阶段滑动 |
 | 跨 Anchor 长程因果迁移 | 本项目 | 同一目标位置上，让完整前缀强路径的 base 分布蒸馏短前缀弱路径 | 训练端主要自有设计 |
-| 单时钟联合课程 | 本项目在 Domino 思路上的扩展 | 同一余弦系数同步控制 Base/Final、跨 Anchor、L1 和 Prefix Survival | 减少硬阶段和人工 epoch 边界 |
+| 独立 Hidden-first 两阶段 | 本项目结合历史训练诊断形成 | 阶段一仅 Hidden/Cos；阶段二重置优化器，以低权重 Final Soft/CE、跨 Anchor 和 RNN 继续微调 | 隔离高维表征学习与低维强监督，两个阶段日志和优化状态完全独立 |
 | 动作组级宽松校验 | 本项目在 SpecVLA relaxed 上的结构化扩展 | 平移组、旋转组使用组内平方误差预算，夹爪保持精确 | 推理端自有设计之一 |
 | 校准式稀疏多候选树 | 本项目 | 一个 runner-up 单分叉形成双路径稀疏树，一次目标 forward 校验，实测无收益则关闭 | 推理端自有设计之二 |
 
 因此，论文主线应表述为：**块并行主干负责低成本长程预测，Action-RNN 补充显式短程因果，跨 Anchor 蒸馏
 补充训练时可获得的长前缀知识；动作组校验与稀疏候选树再把更高的候选覆盖率转化为在线接受长度和速度。**
-其中 Domino 与 DSpark 是清晰标注的机制启发，跨 Anchor、统一课程的组合方式及两项推理机制是当前拟通过
+其中 Domino 与 DSpark 是清晰标注的机制启发，跨 Anchor、独立两阶段训练及两项推理机制是当前拟通过
 消融证明的自有增量。最终的新颖性表述仍应以完整文献检索和实验结果为准。
 
 ## 3. 方法是怎样一步步形成的
@@ -183,7 +183,7 @@ anchor hidden。历史目录名称使用 `Residual-CAD`；为了避免缩写混�
 这一步的重要贡献是确定了方向：token 级因果信息和跨 anchor 蒸馏确实能抬高弱路径；但不能只追求离线
 teacher-forced accuracy，也不能忽视推理头成本。
 
-### 3.6 阶段六：当前 Action-RNN Prefix Survival
+### 3.6 阶段六：Action-RNN 与独立 Hidden-first 两阶段
 
 当前版本保留一层并行 DFlash 主干，把旧的 hidden residual 和全词表 Markov bias 合并为一个很小的
 动作专用顺序残差头。
@@ -210,17 +210,19 @@ final_action_logits = frozen_lm_head_action_logits + action_rnn_bias
 RNN 每一步读取：当前位置 DFlash hidden、前一个 action token、当前位置 embedding、上一步 RNN state。
 输出层零初始化，因此训练起点严格等于 frozen `lm_head`。
 
-当前版本不再把 Draft 与 Action-RNN 完全割裂。它同时计算修正前 `BaseCE` 和修正后 `FinalCE`，并用覆盖完整
-训练预算的余弦系数 `s` 平滑交接：
+`Base` 是并行 Draft hidden 经过冻结动作 `lm_head` 后的原始分布；`Final` 是 Base 加上 Action-RNN 残差后的
+最终分布。Domino 在一次训练内从 Base CE 平滑移向 Final CE；本项目根据历史训练中“低维 token 监督早于
+hidden 成熟并迅速背题”的现象，把这个先后关系改成两次独立训练：
 
 ```text
-L_token = (1-s) * BaseCE + s * FinalCE
+阶段一：只训练 Draft Hidden + Cos；Action-RNN 冻结且不执行前向
+阶段二：加载阶段一模型参数，重建 optimizer/scheduler/SwanLab，只监督 Final Soft/CE
 ```
 
-`BaseCE` 直接锚定并行 Draft；`FinalCE` 不执行 `stop_gradient`，同时改善 Draft 和 Action-RNN。hidden/cos/soft
-继续全程监督 Draft，跨 Anchor KL 随 `s` 渐入。动作分布 L1 和 Prefix Survival 仍使用 detached Draft 输入，
-只训练 Action-RNN，防止辅助目标借共享 hidden 走捷径。这样既保留 Domino 式基础分布锚点，又不会把 RNN
-降成与 Draft 无关的纯后处理器。
+阶段二不再混入 Base Soft/CE。Final Soft/CE 不执行 `stop_gradient`，因此同时改善 Draft 和 Action-RNN；
+Hidden/Cos 继续约束主干，Draft-only 跨 Anchor KL 继续补强弱路径。动作分布 L1 和 Prefix Survival 使用
+detached Draft 输入，只训练 Action-RNN，避免辅助目标重复扭曲共享 hidden。这样第一阶段负责建立高维模式，
+第二阶段才用低权重动作信号和短程因果修正做微调。
 
 训练使用 teacher forcing。以 anchor0 为例：
 
@@ -297,61 +299,56 @@ HDF5 不保存 `pixel_values`；final hidden 已在 selected prompt 中，也不
 - prefix position 从 0 连续增长，action context 和 block position 紧随 prefix。
 - `action_dim_embed` 标识动作维度；它补充 RoPE，不替代 RoPE。
 
-### 4.3 当前 Hidden-first 延迟余弦课程
+### 4.3 当前独立 Hidden-first 两阶段训练
 
-早期实验表明，Soft/Hard CE 从第 1 轮开始生效时，动作 token 准确率会在 hidden 尚未稳定前迅速接近 99%，
-这更像在低维动作子空间里记忆训练轨迹，而不是先学会可迁移的高维 teacher 表征。当前主实验因此不再按
-epoch 硬切阶段，而是只使用归一化训练进度 `p=global_step/total_steps` 构造连续课程：
+旧单次余弦课程虽然把 token 权重压得很低，但仍把两种不同学习目标放在同一个 optimizer/scheduler 和总损失
+时间轴中。当前主实验改成两个可以分别启动、分别审计的训练任务。
+
+**阶段一：高维表示预训练，100 epoch**
 
 ```text
-s(p) = (1 - cos(pi * p)) / 2
-g(p) = s(p)^4
-
-L_soft  = 0.05 * g * ((1-s) * BaseSoftCE + s * FinalSoftCE)
-L_token = 0.10 * g * ((1-s) * BaseHardCE + s * FinalHardCE)
-
-L_total = 1.00 * hidden_smooth_l1
-        + 0.05 * hidden_cosine
-        + L_soft
-        + g * 0.05 * backbone_cross_anchor_logit_kl
-        + L_token
-        + g * s * 0.40 * action_distribution_l1
-        + g * s * 0.20 * prefix_survival
+L_stage1 = 1.00 * hidden_smooth_l1
+         + 0.05 * hidden_cosine
 ```
 
-`g=s^4` 是 token 监督总包络；`s` 是包络内部从 Base 到 Final 的 Domino 式交接。对 200 epoch 训练，`g` 在
-epoch 50/100/125/150/175/200 附近约为 `0.0005/0.0625/0.228/0.531/0.856/1.0`。因此前半程几乎由
-hidden/cosine 建立高维表征，约从中点后 Soft、Hard CE、跨 Anchor 与 Action-RNN 才一起平滑增强，没有
-epoch 边界处的 loss 跳变。
+Action-RNN 参数仍随模型构造并写入 checkpoint，保证阶段二可以严格加载相同结构；但它在阶段一被冻结、排除
+在 optimizer 之外，也不执行 teacher-forcing 或 self-rollout 前向。SwanLab 只记录 Hidden/Cos、Draft 命中、
+连续前缀代理和 Draft 优化器指标。
 
-`BaseCE/BaseSoftCE` 监督 Action-RNN 修正前的 Draft logits；`FinalCE/FinalSoftCE` 监督加上 RNN 残差后的
-logits。Final 分支不 `detach`，所以后半程同时改善 Draft 与 Action-RNN；hidden/cosine 全程保留，Draft
-不会在交接后被冻结。L1/Prefix 使用 detached Draft 输入，只作为 Action-RNN 的专属辅助目标。跨 Anchor
-只作用于 Draft base logits。Action-RNN 学习率也使用 `g` 作为自己的连续训练时钟，避免其监督尚未入场时
-学习率已经提前衰减。
+**阶段二：Final 分布与因果修正微调，100 epoch**
 
-它们对参数的作用不同：
+阶段二只加载阶段一 `pytorch_model.bin`。epoch/global step 从 1/0 重新开始，optimizer、scheduler 和 SwanLab
+全部新建；不读取阶段一的 `training_state.pt` 或 SwanLab run id。
 
-| Loss | 直接训练 Action-RNN | 直接训练 DFlash 主干 | 目的 |
-| --- | --- | --- | --- |
-| hidden SmoothL1 | 否 | 是 | 保持目标 hidden 表征 |
-| hidden cosine | 否 | 是 | 对齐 hidden 方向 |
-| Base soft CE | 否 | 是 | 让修正前 logits 对齐 teacher 的 256 类动作分布 |
-| Final soft CE | 是 | 是 | 在后半程联合对齐修正后分布 |
-| backbone cross-anchor logit KL | 否 | 是 | 让主干远端弱路径追近端强路径 |
-| Base token CE | 否 | 是 | 防止 RNN 走捷径并保持基础草稿可用 |
-| Final token CE | 是 | 是 | 联合改善 Draft 与修正后的最终 top-1 |
-| action distribution L1 | 是 | 否 | 对齐 256 类 teacher 动作分布 |
-| prefix survival | 是 | 否 | 直接鼓励连续接受前缀 |
+```text
+L_stage2 = 1.00 * hidden_smooth_l1
+         + 0.05 * hidden_cosine
+         + 0.05 * final_soft_KL
+         + 0.05 * final_hard_CE
+         + 0.05 * backbone_cross_anchor_logit_KL
+         + 0.10 * action_distribution_L1
+         + 0.05 * prefix_survival
+```
 
-当前 soft CE 只在 256 个动作 token 子词表上计算，不做昂贵且无关的全词表 soft CE。当前关闭：confidence
-head、旧 hidden CAD、旧 causal residual、旧 refined hidden、旧 residual CE。
-`slot_decay=1.0`；只保留 `position_balance` 来抵消 multi-anchor 对后部绝对位置的重复监督偏差。
-优化器仍使用两组学习率：Draft `2e-5`、Action-RNN `5e-5`。Draft 按完整训练步数 warmup 1000 step 后
-线性退火；Action-RNN 按 `g` 映射出的有效训练进度 warmup 500 step 后退火。
-L1/Prefix 通过 detached Draft 输入只更新 RNN；Final CE 不 detach，联合更新两者。所有可训练参数按同一个
-全局 L2 范数裁剪到 `0.5`，同时分别记录 Draft、Action-RNN 和全局裁剪前范数。这样联合 Final CE 的梯度方向
-不会被两套独立缩放系数扭曲；非有限梯度会立即报错。
+阶段二没有 Base Soft/CE 混合：Soft/Hard token 监督只取 Action-RNN 修正后的 Final logits，并联合反传到 Draft
+与 RNN。Soft 使用 KL 而不是交叉熵；两者对 student 的梯度相同，但 KL 去掉不可优化的 teacher entropy，
+使阶段二总损失从可比较的零基线开始。跨 Anchor KL 只作用于 Draft base logits；L1/Prefix 使用 detached Draft
+输入，只训练 Action-RNN。
+
+| Loss | 阶段一 | 阶段二更新 Draft | 阶段二更新 RNN | 目的 |
+| --- | ---: | ---: | ---: | --- |
+| hidden SmoothL1 | 1.00 | 是 | 否 | 保持高维 teacher 表征 |
+| hidden cosine | 0.05 | 是 | 否 | 对齐 hidden 方向 |
+| Final soft KL | 0 | 是 | 是 | 对齐 teacher 动作分布 |
+| Final hard CE | 0 | 是 | 是 | 提高 strict top-1 命中 |
+| backbone cross-anchor KL | 0 | 是 | 否 | 把近端强路径分布迁移给远端弱路径 |
+| action distribution L1 | 0 | 否 | 是 | 给修正头直接分布监督 |
+| prefix survival | 0 | 否 | 是 | 鼓励连续接受前缀 |
+
+阶段一 Draft 学习率为 `2e-5`，warmup 1000 step；阶段二 Draft 学习率降至 `5e-6`，Action-RNN 为 `5e-5`，
+两者分别 warmup 500 step 后线性退火。两阶段都使用 global batch 64、`slot_decay=0.90`、
+`position_balance=True`、gradient clip `0.5`。confidence head、旧 hidden CAD、旧 causal residual、旧 refined
+hidden、旧 residual CE 和 Action-RNN 自身的跨 Anchor KL 均关闭。
 
 ### 4.4 SwanLab 指标怎样读
 
@@ -368,13 +365,11 @@ component = raw_loss * 配置权重
 | `base_accuracy` | Action-RNN 残差加入前的 frozen-lm-head 命中率 |
 | `accuracy` | teacher-forced Action-RNN 修正后的总体命中率 |
 | `action_head_accuracy_gain` | `accuracy-base_accuracy`；直接判断残差动作头是否真的带来收益 |
-| `base_action_token_ce_loss` | 修正前 Base logits 的真实动作 token CE |
-| `action_token_ce_loss` | 修正后 Final logits 的真实动作 token CE |
-| `token_curriculum_component` | `0.10*g*((1-s)*BaseCE+s*FinalCE)`，实际计入总 loss 的 hard token 项 |
-| `curriculum_base_scale/final_scale` | 同一余弦时钟的 Base/Final 比例，两者之和恒为 1 |
-| `curriculum_token_envelope` | `g=s^4`，Soft/CE/跨 Anchor/RNN 的总渐入强度 |
-| `base_soft_loss` / `final_soft_loss` | 修正前/修正后的 teacher soft CE 原值；包含 teacher entropy，不以 0 为理论下限 |
-| `soft_loss` / `soft_component` | Base/Final 交接后的 soft 原值 / 再乘 `0.05*g` 后的实际贡献 |
+| `base_action_token_ce_loss` | 修正前 Base logits 的诊断 CE；阶段二不计入总 loss |
+| `action_token_ce_loss` | 修正后 Final logits 的 hard CE；阶段二以 0.05 计入总 loss |
+| `token_curriculum_component` | 兼容字段名；当前阶段二固定等于 `0.05*FinalHardCE`，没有 curriculum |
+| `base_soft_loss` | Base 分布诊断 KL；阶段二不计入总 loss |
+| `final_soft_loss` / `soft_loss` | Final teacher KL；阶段二两者相同，以 0.05 计入总 loss |
 | `backbone_anchor_logit_distill_loss` | Draft base logits 的跨 anchor KL；只更新主干 |
 | `anchor_logit_distill_loss` | 旧 Action-RNN 跨 anchor KL；当前主实验关闭，仅保留兼容代码 |
 | `rollout_accuracy` | anchor0 使用自身预测前缀回滚时的 top-1 命中率 |
@@ -410,8 +405,9 @@ rollout_expected_prefix_length = sum(k=1..6, rollout_prefix_k_success_rate)
 `train/*` 是每 20 optimizer step 的局部窗口，可能受批次难度影响；`train_epoch/*` 是整轮均值并完整保存在
 `metrics.jsonl`，判断长期收敛时应优先看后者。
 
-SwanLab 默认只上传当前启用且有解释价值的精选指标，不再上传恒为 0 的旧模块、`raw/component` 重复曲线、
-全量 anchor 矩阵和重复的 epoch 曲线。在线表名使用中文并按以下类别组织：
+两个阶段分别写入 `stage1_representation/swanlog` 和 `stage2_refinement/swanlog`，也会创建两个独立 SwanLab
+run。阶段一额外过滤 Soft/CE/跨 Anchor/RNN 等恒为零的图表；阶段二记录 Final、跨 Anchor、RNN 与
+Hidden/Cos 指标。在线表名使用中文并按以下类别组织：
 
 ```text
 训练损失 / 训练准确率 / 训练自回滚
@@ -423,8 +419,8 @@ SwanLab 默认只上传当前启用且有解释价值的精选指标，不再上
 checkpoint 副本，用于降低共享服务器 IO 压力。
 
 SwanLab 的 loss 曲线是最近 20 optimizer step 的窗口均值，可能随 batch 难度在单个 epoch 内上扬；跨 epoch
-收敛应读取 `metrics.jsonl` 中的 `train_epoch/*`。课程权重可查看“训练课程/Token监督渐入比例”以及
-Base/Final 监督比例；跨 Anchor、Soft/CE、L1、Prefix 均在后半程连续增强。
+收敛应读取各阶段目录 `metrics.jsonl` 中的 `train_epoch/*`。阶段一与阶段二目标不同，不能把两者 total loss
+首尾相接比较；每个阶段只在自己的时间轴上判断收敛。
 
 ## 5. 推理和验证
 
@@ -497,7 +493,7 @@ runner-up，而不是盲目增加候选数。默认只在 anchor0 的首个最�
 
 ### 5.4 训练创新与推理创新怎样闭环
 
-跨 Anchor、Base/Final 课程和 Action-RNN 解决“候选能否覆盖目标 token”；动作组校验和稀疏候选树解决
+独立两阶段训练、跨 Anchor 和 Action-RNN 解决“候选能否覆盖目标 token”；动作组校验和稀疏候选树解决
 “已有候选怎样以有限验证成本转化为更长接受前缀”。两类推理机制彼此正交：树增加离散候选覆盖，动作组规则
 放宽连续运动误差；二者可以组合，但必须分别做 `off/on` 消融并计入完整动作延迟。strict + tree 仍保持目标
 token 精确校验；action-group relaxed 则以成功率约束换取更大的接受空间。
@@ -514,7 +510,8 @@ token 精确校验；action-group relaxed 则以成功率约束换取更大的�
 | Clean Markov-ACD 200 epoch | 删除手工 boost，覆盖 slot0，低权重 soft | teacher-forced acc 约 0.999 | 离线饱和不代表在线饱和 |
 | 三阶段 Action-RNN Prefix Survival | epoch 21/101 硬切模块，动作目标与主干完全 detach | 未完成，改为课程版 | 硬边界与完全隔离不利于 Draft/RNN 共同优化 |
 | 旧统一余弦课程 Action-RNN | Soft/CE 从第 1 轮生效，Base/Final 连续交接 | 约 43 epoch 时 token acc 已接近 99%，hidden 尚未稳定 | token 监督入场过早，出现低维动作子空间捷径 |
-| Hidden-first 延迟余弦课程 | hidden/cos 全程；`g=s^4` 延迟 Soft/CE/跨 Anchor/RNN；Base/Final 联合交接 | 当前待训练 | 先学高维表征，再在后半程补强 token 与短因果修正 |
+| Hidden-first 延迟余弦课程 | hidden/cos 全程；`g=s^4` 延迟 Soft/CE/跨 Anchor/RNN | 初期 raw token loss 抖动不影响梯度，但后程加权总 loss 的解释仍复杂 | 单次课程无法提供完全独立、干净的两种优化过程 |
+| 当前独立两阶段 | 100 epoch Hidden/Cos；重新启动 100 epoch Final/KL/CE/跨 Anchor/RNN | 待训练 | 先建立高维 Draft，再以低权重强信号和因果头独立微调 |
 
 Pure hidden、Residual-CAD、Markov-ACD 的代表性 anchor0 结果：
 
@@ -565,10 +562,9 @@ Length 高于 SpecVLA strict 却更慢，证明 Length 不包含 draft 自身成
 相关系数约为 `-0.61/-0.53/-0.47`。epoch 12 时 teacher-forced head accuracy 约 `0.922`，base accuracy
 约 `0.921`，动作头净增益仅约 `0.0005`，而 rollout 约 `0.889`。这说明高权重动作损失主要在改动共享
 Draft hidden，Action-RNN 本身几乎没有学到有效残差。该版随后在 hidden 尚未收敛时就出现接近 99% 的
-训练 token acc，已判定为 token 级监督过早。中间的三阶段版本虽然隔离了梯度冲突，却又把 RNN
-降成纯后处理器，无法通过最终预测反向改善 Draft。当前版本改用高阶延迟余弦课程：早期只让 hidden/cos
-建立高维表征，后半程再连续增加 Base/Final Soft 与 CE、Draft 跨 Anchor KL 和 RNN 辅助监督。动作头不再
-使用自己的跨 Anchor KL；旧输出目录不得续训到新配方。
+训练 token acc，已判定为 token 级监督过早。后续高阶延迟余弦课程虽然让早期 token 梯度近似为零，但仍将
+两类目标放在同一个 optimizer、scheduler 和 total-loss 时间轴中。当前版本最终收敛为两次独立训练：阶段一
+只建立高维表征；阶段二只加载模型权重并重新训练 Final、跨 Anchor 与 RNN。旧输出目录不得续训到新配方。
 
 ## 7. 当前标准工作流
 
@@ -625,68 +621,67 @@ PY
 
 ### 7.2 3090 四卡训练
 
-当前推荐主实验：
+两个阶段各启动一次，不能写入同一个输出目录。先运行阶段一：
 
 ```bash
 CUDA_VISIBLE_DEVICES=0,1,2,3 \
-  bash openvla/specdecoding/train-scripts/run_dflash_train.sh main
+  bash openvla/specdecoding/train-scripts/run_dflash_train.sh stage1
 ```
 
-只需启动这一次。脚本默认：一层 draft、global batch 64、200 epoch、每 10 epoch 保存一次，并自动执行：
+默认输出：
 
 ```text
-hidden/cos 在完整 200 epoch 始终保持 1.00/0.05
-token 总包络 g=s(p)^4：前半程近零，后半程平滑增强到 1
-包络内部 Soft/Hard CE 从 Base 连续交接到 Final
-Draft 跨 Anchor KL 随 g 渐入；Action-RNN L1/Prefix 随 g*s 渐入
+/data/wulin/c/specvla-data/ckpt_goal_dflash_two_stage_1layer_b16x1_4gpu/
+└── stage1_representation/
+    ├── metrics.jsonl
+    ├── run_config.json
+    ├── swanlog/
+    ├── latest_checkpoint.txt
+    └── epoch_100_step_*/
 ```
 
-Draft/Action-RNN 目标学习率分别为 `2e-5/5e-5`。Draft 按完整步数 warmup 1000 step；Action-RNN 用
-`g` 作为有效训练时钟 warmup 500 step。Final Soft/CE 联合更新两者，L1/Prefix 只更新 Action-RNN，
-Action-RNN 自身的跨 Anchor KL 固定关闭。全局梯度裁剪阈值为 `0.5`。
-不要用旧 checkpoint 续训，也不要复用旧输出目录。
-
-常用消融：
+阶段一完成后直接启动阶段二；脚本自动读取阶段一 `latest_checkpoint.txt`：
 
 ```bash
-# 三层容量消融
 CUDA_VISIBLE_DEVICES=0,1,2,3 \
-  bash openvla/specdecoding/train-scripts/run_dflash_train.sh three_layer
-
-# 去掉 Prefix Survival
-CUDA_VISIBLE_DEVICES=0,1,2,3 \
-  bash openvla/specdecoding/train-scripts/run_dflash_train.sh no_prefix
-
-# 去掉 Draft 跨 anchor logits 蒸馏
-CUDA_VISIBLE_DEVICES=0,1,2,3 \
-  bash openvla/specdecoding/train-scripts/run_dflash_train.sh no_anchor
+  bash openvla/specdecoding/train-scripts/run_dflash_train.sh stage2
 ```
 
-使用新 HDF5 时显式覆盖：
+阶段二输出到同一实验根目录下的 `stage2_refinement/`，但 epoch、global step、optimizer、scheduler、
+`metrics.jsonl` 和 SwanLab run 全部重新开始。阶段一不需要 `training_state.pt`；阶段二只读取
+`pytorch_model.bin`，模型结构由同一启动脚本的参数重新构建并用 strict load 校验。推理只使用阶段二 checkpoint。
+
+若要使用新数据或另开实验，两个阶段必须传入同一个 `TWO_STAGE_ROOT`：
 
 ```bash
 DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset_new.h5 \
-OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_action_rnn_new \
+TWO_STAGE_ROOT=/data/wulin/c/specvla-data/ckpt_goal_dflash_two_stage_new \
 CUDA_VISIBLE_DEVICES=0,1,2,3 \
-  bash openvla/specdecoding/train-scripts/run_dflash_train.sh main
+  bash openvla/specdecoding/train-scripts/run_dflash_train.sh stage1
+
+DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset_new.h5 \
+TWO_STAGE_ROOT=/data/wulin/c/specvla-data/ckpt_goal_dflash_two_stage_new \
+CUDA_VISIBLE_DEVICES=0,1,2,3 \
+  bash openvla/specdecoding/train-scripts/run_dflash_train.sh stage2
 ```
 
-不要把不同数据、模型结构或 loss 配方写进同一个输出目录。
+脚本发现本阶段目录已有 `run_config.json`、`metrics.jsonl` 或 `swanlog/` 时会拒绝启动，防止日志串线。
+重新实验应换一个新的 `TWO_STAGE_ROOT`。
 
 ### 7.3 把 checkpoint 搬到 4090
 
-在本地终端执行。下面以 epoch 200 为例：
+在本地终端执行。下面以阶段二 epoch 100 为例：
 
 ```bash
 CKPT_3090=$(ssh 3090_wulin \
-  "find /data/wulin/c/specvla-data/ckpt_goal_dflash_delayed_curriculum_action_rnn_1layer_b16x1_4gpu \
-   -maxdepth 1 -type d -name 'epoch_200_step_*' | sort -V | tail -1")
+  "find /data/wulin/c/specvla-data/ckpt_goal_dflash_two_stage_1layer_b16x1_4gpu/stage2_refinement \
+   -maxdepth 1 -type d -name 'epoch_100_step_*' | sort -V | tail -1")
 
 ssh 4090 \
-  'mkdir -p /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_delayed_curriculum_action_rnn_1layer_b16x1_4gpu'
+  'mkdir -p /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_two_stage_1layer_b16x1_4gpu/stage2_refinement'
 
 scp -3 -r "3090_wulin:${CKPT_3090}" \
-  '4090:/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_delayed_curriculum_action_rnn_1layer_b16x1_4gpu/'
+  '4090:/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_two_stage_1layer_b16x1_4gpu/stage2_refinement/'
 ```
 
 ### 7.4 4090 复现 SpecVLA Goal baseline
@@ -733,8 +728,8 @@ bash openvla/specdecoding/decode-scripts/run_specvla_main_table_eval.sh
 当前 Goal 权重不能用于 Object、Spatial 或 Long。成对评测：
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 EVAL_EPOCH=200 \
-DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_delayed_curriculum_action_rnn_1layer_b16x1_4gpu \
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 EVAL_EPOCH=100 \
+DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_two_stage_1layer_b16x1_4gpu/stage2_refinement \
   bash openvla/specdecoding/decode-scripts/run_dflash_action_rnn_goal_pair_eval.sh
 ```
 
@@ -744,8 +739,8 @@ DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-d
 单独执行：
 
 ```bash
-EVAL_EPOCH=200 bash openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh strict
-EVAL_EPOCH=200 bash openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh relaxed
+EVAL_EPOCH=100 bash openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh strict
+EVAL_EPOCH=100 bash openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh relaxed
 ```
 
 推理机制消融必须固定同一 checkpoint、seed 和计时口径：
@@ -753,21 +748,21 @@ EVAL_EPOCH=200 bash openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh 
 ```bash
 # 线性 strict：关闭候选树
 DFLASH_TREE_MODE=off DFLASH_TREE_AUTO_CALIBRATE=False \
-  EVAL_EPOCH=200 bash openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh strict
+  EVAL_EPOCH=100 bash openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh strict
 
 # 原逐 token relaxed：关闭动作组规则与候选树
 DFLASH_ACCEPTANCE_MODE=token DFLASH_TREE_MODE=off \
-  EVAL_EPOCH=200 bash openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh relaxed
+  EVAL_EPOCH=100 bash openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh relaxed
 
 # 动作组 relaxed，但关闭候选树
 DFLASH_ACCEPTANCE_MODE=action_group DFLASH_TREE_MODE=off \
-  EVAL_EPOCH=200 bash openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh relaxed
+  EVAL_EPOCH=100 bash openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh relaxed
 ```
 
 五个 seed 重复性评测：
 
 ```bash
-EVAL_EPOCH=200 REPEAT_SEEDS="7 8 9 10 11" \
+EVAL_EPOCH=100 REPEAT_SEEDS="7 8 9 10 11" \
   bash openvla/specdecoding/decode-scripts/run_dflash_goal_repeat_eval.sh
 ```
 
@@ -810,9 +805,11 @@ AR、strict、relaxed 必须同机、同 GPU、串行执行。4090 是正式速�
 | 脚本 | 用法 |
 | --- | --- |
 | `run_dflash_data_goal.sh` | `smoke` 或 `full` 生成单文件 HDF5 |
-| `run_dflash_train.sh` | `main`、`three_layer`、`no_prefix`、`no_anchor` |
+| `run_dflash_train.sh stage1` | 独立运行 100 epoch Hidden/Cos 表示预训练 |
+| `run_dflash_train.sh stage2` | 自动加载阶段一 latest，独立运行 100 epoch Final/RNN 微调 |
 
-`train_dflash_libero_goal.py` 是底层训练实现，不建议日常手写几十个 CLI 参数。
+`train_dflash_libero_goal.py` 是底层训练实现，不建议日常手写几十个 CLI 参数。历史单次课程仍保留在 Python
+兼容参数中用于解释旧 checkpoint，但当前主实验入口不会再启用它。
 
 ### 8.2 推理入口
 

@@ -11,7 +11,7 @@ set -euo pipefail
 #     bash openvla/specdecoding/decode-scripts/run_dflash_goal_repeat_eval.sh
 #
 # Useful overrides:
-#   REPEAT_SEEDS="7 8 9 10 11" EVAL_EPOCH=200 bash ...
+#   REPEAT_SEEDS="7 8 9 10 11" EVAL_EPOCH=100 bash ...
 #   RUN_STRICT=False RUN_RELAXED=True bash ...
 #   DFLASH_OUTPUT_DIR=/path/to/ckpt_root SPEC_CKPT=/path/to/epoch_ckpt bash ...
 
@@ -19,7 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/libero_eval_common.sh"
 
 export TASK_SUITE_NAME="libero_goal"
-export EVAL_EPOCH="${EVAL_EPOCH:-200}"
+export EVAL_EPOCH="${EVAL_EPOCH:-100}"
 export RUN_STRICT="${RUN_STRICT:-True}"
 export RUN_RELAXED="${RUN_RELAXED:-True}"
 export STRICT_ACCEPT_THRESHOLD="${STRICT_ACCEPT_THRESHOLD:-0}"

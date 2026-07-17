@@ -5,24 +5,13 @@ set -euo pipefail
 # 推荐主实验是一层 Draft；具体深度和均匀层索引最终以 checkpoint 的 dflash_config.json 为准。
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [[ -d "/data/wulin" ]]; then
-  DEFAULT_OUTPUT_DIR="/data/wulin/c/specvla-data/ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu"
-  DEFAULT_LOG_DIR="/data/wulin/c/specvla-data/eval_logs"
-elif [[ -d "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh" ]]; then
-  DEFAULT_OUTPUT_DIR="/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu"
-  DEFAULT_LOG_DIR="/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs"
-elif [[ -d "/mnt/storage/cgh" ]]; then
-  DEFAULT_OUTPUT_DIR="/mnt/storage/cgh/specvla-data/ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu"
-  DEFAULT_LOG_DIR="/mnt/storage/cgh/specvla-data/eval_logs"
-else
-  DEFAULT_OUTPUT_DIR="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/ckpt_goal_dflash_action_rnn_prefix_1layer_b8x2_4gpu"
-  DEFAULT_LOG_DIR="/mnt/3b51049a-abd1-486a-89ce-cfd16ced42a8/cgh/specvla-data/eval_logs"
-fi
+source "${SCRIPT_DIR}/libero_eval_common.sh"
+init_libero_eval_env libero_goal
 
 export TASK_SUITE_NAME=libero_goal
-export DFLASH_OUTPUT_DIR="${DFLASH_OUTPUT_DIR:-${DEFAULT_OUTPUT_DIR}}"
-export LOG_DIR="${LOG_DIR:-${DEFAULT_LOG_DIR}}"
-export EVAL_EPOCH="${EVAL_EPOCH:-200}"
+export DFLASH_OUTPUT_DIR
+export LOG_DIR
+export EVAL_EPOCH="${EVAL_EPOCH:-100}"
 export DFLASH_NUM_DRAFT_LAYERS=1
 export DFLASH_USE_CAUSAL_RESIDUAL_SAMPLING=True
 export SYNC_CUDA_TIMING="${SYNC_CUDA_TIMING:-False}"
@@ -41,6 +30,15 @@ SPEC_CKPT="" ACCEPT_THRESHOLD=0 DFLASH_ACCEPTANCE_MODE=token \
 DFLASH_TREE_BRANCH_POSITION=0 DFLASH_TREE_AUTO_CALIBRATE="${DFLASH_TREE_AUTO_CALIBRATE}" \
 RUN_ID_NOTE="${STRICT_RUN_NOTE}" \
   bash "${SCRIPT_DIR}/run_dflash_goal_eval.sh" strict
+
+if [[ "${DRY_RUN:-False}" == "True" ]]; then
+  echo "DRY_RUN=True：strict 已通过；relaxed 使用占位分叉位置 0 继续检查。"
+  SPEC_CKPT="" ACCEPT_THRESHOLD="${RELAXED_ACCEPT_THRESHOLD:-9}" \
+  DFLASH_ACCEPTANCE_MODE=action_group DFLASH_TREE_BRANCH_POSITION=0 \
+  DFLASH_TREE_AUTO_CALIBRATE=False RUN_ID_NOTE="${RELAXED_RUN_NOTE}" \
+    bash "${SCRIPT_DIR}/run_dflash_goal_eval.sh" relaxed
+  exit 0
+fi
 
 STRICT_SUMMARY="$(find "${LOG_DIR}/dflash_strict" -maxdepth 1 -type f \
   -name "*--${STRICT_RUN_NOTE}-dflash_strict_summary.json" -print | sort | tail -n 1)"

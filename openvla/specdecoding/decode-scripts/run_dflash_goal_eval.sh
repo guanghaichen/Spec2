@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # 当前 DFlash 只在 LIBERO-Goal 上训练，因此本入口故意不接受其它 suite。
-# 用法：EVAL_EPOCH=200 bash .../run_dflash_goal_eval.sh [strict|relaxed]
+# 用法：EVAL_EPOCH=100 bash .../run_dflash_goal_eval.sh [strict|relaxed]
 
 MODE="${1:-${EVAL_MODE:-strict}}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

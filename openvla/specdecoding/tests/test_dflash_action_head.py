@@ -1,7 +1,9 @@
 from types import SimpleNamespace
 import unittest
+from unittest import mock
 import importlib.util
 from pathlib import Path
+import tempfile
 
 import torch
 
@@ -45,6 +47,82 @@ def tiny_config():
 
 
 class DFlashActionHeadTest(unittest.TestCase):
+    def test_stage2_model_initialization_needs_no_training_state(self):
+        train_module = load_training_module()
+        source_model = DFlashDraftModel(tiny_config())
+        target_model = DFlashDraftModel(tiny_config())
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stage1_root = Path(tmpdir) / "stage1_representation"
+            checkpoint_dir = stage1_root / "epoch_100_step_001000"
+            checkpoint_dir.mkdir(parents=True)
+            torch.save(source_model.state_dict(), checkpoint_dir / "pytorch_model.bin")
+            (stage1_root / "latest_checkpoint.txt").write_text(
+                str(checkpoint_dir),
+                encoding="utf-8",
+            )
+            resolved = train_module.resolve_model_init_checkpoint(str(stage1_root))
+            self.assertEqual(resolved, checkpoint_dir)
+            self.assertFalse((checkpoint_dir / "training_state.pt").exists())
+            train_module.load_model_initialization(resolved, target_model, torch.device("cpu"))
+            for source_parameter, target_parameter in zip(
+                source_model.parameters(),
+                target_model.parameters(),
+            ):
+                self.assertTrue(torch.equal(source_parameter, target_parameter))
+
+    def test_stage1_freezes_only_action_head_parameters(self):
+        train_module = load_training_module()
+        model = DFlashDraftModel(tiny_config())
+        train_module.configure_training_phase_trainability(model, "representation")
+        for name, parameter in model.named_parameters():
+            if train_module.is_action_head_parameter(name):
+                self.assertFalse(parameter.requires_grad, name)
+            else:
+                self.assertTrue(parameter.requires_grad, name)
+        train_module.configure_training_phase_trainability(model, "refinement")
+        self.assertTrue(all(parameter.requires_grad for parameter in model.parameters()))
+
+    def test_independent_two_stage_controls_are_fixed_and_final_only(self):
+        train_module = load_training_module()
+        common = dict(
+            unified_cosine_curriculum=False,
+            staged_training=False,
+            hidden_w=1.0,
+            cos_w=0.05,
+            soft_w=0.05,
+            backbone_anchor_logit_distill_w=0.05,
+            action_token_ce_w=0.05,
+            action_distill_l1_w=0.10,
+            prefix_survival_w=0.05,
+            action_confidence_w=0.0,
+            anchor_logit_distill_w=0.0,
+        )
+        stage1 = train_module.build_training_control(
+            SimpleNamespace(training_phase="representation", **common),
+            epoch=50,
+            global_step=500,
+            total_optimizer_steps=1000,
+        )
+        self.assertEqual(stage1["base_scale"], 1.0)
+        self.assertEqual(stage1["final_scale"], 0.0)
+        self.assertEqual(stage1["weights"]["hidden_w"], 1.0)
+        self.assertEqual(stage1["weights"]["cos_w"], 0.05)
+        for name in train_module.STAGED_LOSS_WEIGHT_NAMES:
+            if name not in ("hidden_w", "cos_w"):
+                self.assertEqual(stage1["weights"][name], 0.0)
+
+        stage2 = train_module.build_training_control(
+            SimpleNamespace(training_phase="refinement", **common),
+            epoch=1,
+            global_step=0,
+            total_optimizer_steps=1000,
+        )
+        self.assertEqual(stage2["base_scale"], 0.0)
+        self.assertEqual(stage2["final_scale"], 1.0)
+        self.assertEqual(stage2["weights"]["soft_w"], 0.05)
+        self.assertEqual(stage2["weights"]["action_token_ce_w"], 0.05)
+        self.assertEqual(stage2["weights"]["backbone_anchor_logit_distill_w"], 0.05)
+
     def test_unified_cosine_curriculum_is_smooth_and_uses_one_clock(self):
         train_module = load_training_module()
         args = SimpleNamespace(
@@ -409,6 +487,39 @@ class DFlashActionHeadTest(unittest.TestCase):
             anchor_logit_distill_correct_teacher_only=True,
         )
 
+        # 独立阶段一必须完全绕过 Action-RNN 的 teacher-forcing 与自回滚前向。
+        args.training_phase = "representation"
+        with mock.patch.object(
+            model,
+            "apply_action_sequential_head",
+            side_effect=AssertionError("representation phase called Action-RNN"),
+        ), mock.patch.object(
+            model,
+            "sample_action_block",
+            side_effect=AssertionError("representation phase called Action-RNN rollout"),
+        ):
+            representation_metrics = train_module.compute_loss_and_accuracy(
+                model,
+                embed_tokens,
+                lm_head,
+                batch,
+                args,
+                device,
+                loss_weights={
+                    "soft_w": 0.0,
+                    "backbone_anchor_logit_distill_w": 0.0,
+                    "action_token_ce_w": 0.0,
+                    "action_distill_l1_w": 0.0,
+                    "prefix_survival_w": 0.0,
+                    "action_confidence_w": 0.0,
+                    "anchor_logit_distill_w": 0.0,
+                },
+            )
+        representation_metrics["loss"].backward()
+        self.assertIsNone(model.action_head_out.weight.grad)
+        model.zero_grad(set_to_none=True)
+        args.training_phase = "legacy"
+
         # 阶段一只计算 Draft hidden/cos；尚未入场的 raw loss 必须严格为 0。
         args.soft_w = 0.05
         args.backbone_anchor_logit_distill_w = 0.05
@@ -501,10 +612,11 @@ class DFlashActionHeadTest(unittest.TestCase):
             backbone_grad is None or torch.count_nonzero(backbone_grad).item() == 0
         )
 
-        # 统一课程的 Final CE 是联合目标：修正头和 Draft 主干必须同时收到梯度。
+        # 独立阶段二的 Final CE 是联合目标：修正头和 Draft 主干必须同时收到梯度。
         model.zero_grad(set_to_none=True)
-        args.unified_cosine_curriculum = True
-        args.detach_action_head_inputs = False
+        args.training_phase = "refinement"
+        args.unified_cosine_curriculum = False
+        args.detach_action_head_inputs = True
         args.action_distill_l1_w = 0.0
         args.prefix_survival_w = 0.0
         args.action_confidence_w = 0.0
@@ -524,14 +636,20 @@ class DFlashActionHeadTest(unittest.TestCase):
         self.assertGreater(backbone_grad.abs().sum().item(), 0.0)
         self.assertGreater(joint_metrics["base_action_token_ce_loss"].item(), 0.0)
         self.assertGreater(joint_metrics["action_token_ce_loss"].item(), 0.0)
+        self.assertAlmostEqual(
+            joint_metrics["token_curriculum_component"].item(),
+            args.action_token_ce_w * joint_metrics["action_token_ce_loss"].item(),
+            places=5,
+        )
 
-        # Base Soft 只训练 Draft；Final Soft 则沿 Domino 式联合图同时训练两者。
+        # Base Soft 只训练 Draft；阶段二 Final Soft 沿联合图同时训练 Draft 与 RNN。
         model.zero_grad(set_to_none=True)
         args.action_token_ce_w = 0.0
         args.action_distill_l1_w = 0.0
         args.prefix_survival_w = 0.0
         args.action_confidence_w = 0.0
         args.soft_w = 0.05
+        args.soft_loss_type = "kl"
         backbone_soft_metrics = train_module.compute_loss_and_accuracy(
             model,
             embed_tokens,

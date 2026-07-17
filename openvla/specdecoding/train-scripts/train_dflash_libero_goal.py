@@ -109,6 +109,26 @@ def parse_args():
         help="Action-RNN 独立学习率；动作头参数量较小，可高于 Draft 主干",
     )
     parser.add_argument(
+        "--training_phase",
+        type=str,
+        choices=["legacy", "representation", "refinement"],
+        default="legacy",
+        help=(
+            "训练职责：representation=阶段一，只训练 Draft hidden/cos；"
+            "refinement=阶段二，从阶段一权重初始化并训练 Final 分布与 Action-RNN；"
+            "legacy=兼容旧的单次训练课程"
+        ),
+    )
+    parser.add_argument(
+        "--init_model_checkpoint",
+        type=str,
+        default=None,
+        help=(
+            "仅加载模型参数作为全新训练的初始化，不恢复 epoch/optimizer/scheduler/SwanLab；"
+            "阶段二必填，可传阶段一输出根目录、具体 checkpoint 目录或 latest"
+        ),
+    )
+    parser.add_argument(
         "--staged_training",
         action=argparse.BooleanOptionalAction,
         default=False,
@@ -169,6 +189,16 @@ def parse_args():
     # ---- 基础蒸馏损失 ----
     parser.add_argument("--hidden_w", type=float, default=1.0, help="基础 hidden 蒸馏权重；让 draft hidden 追目标模型最后层 hidden，是当前最核心的监督")
     parser.add_argument("--soft_w", type=float, default=0, help="teacher soft distribution 蒸馏权重；用目标模型 logits 的软分布辅助 token 层对齐")
+    parser.add_argument(
+        "--soft_loss_type",
+        type=str,
+        choices=["cross_entropy", "kl"],
+        default="cross_entropy",
+        help=(
+            "soft 蒸馏形式；kl 与 soft cross-entropy 对 student 梯度相同，但去掉 teacher entropy 常数，"
+            "阶段二推荐 kl，使总损失可解释"
+        ),
+    )
     parser.add_argument("--soft_temperature", type=float, default=2.0, help="soft distribution 蒸馏温度；越大分布越平滑")
     parser.add_argument("--cos_w", type=float, default=0.05, help="hidden cosine 辅助约束权重；强调方向一致性，通常小权重即可")
     parser.add_argument("--slot_decay", type=float, default=0.90, help="块内位置衰减权重；1.0 表示 p1-p6 不衰减，<1 时更重视靠前 slot，推荐默认 0.90")
@@ -352,7 +382,12 @@ def parse_args():
     )
     parser.add_argument("--action_dim", type=int, default=7, help="OpenVLA action token 维度数，用于 action-dimension embedding")
     parser.add_argument("--hidden_noise", type=float, default=0.03, help="训练时 context hidden 加噪标准差（0=不加，推荐 0.03）")
-    parser.add_argument("--grad_clip", type=float, default=0.5, help="Draft 与 Action-RNN 各自独立的梯度范数上限")
+    parser.add_argument(
+        "--grad_clip",
+        type=float,
+        default=0.5,
+        help="对 Draft 与 Action-RNN 的全部有效梯度做一次全局范数裁剪",
+    )
     parser.add_argument("--log_every_steps", type=int, default=20, help="每多少个 optimizer step 记录一次训练日志")
     parser.add_argument("--resume_from_checkpoint", type=str, default=None, help="恢复训练；可传具体 checkpoint 目录，或 latest")
     parser.add_argument("--run_name", type=str, default=None, help="实验名；默认自动生成")
@@ -907,6 +942,7 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "include_anchor_hidden": args.include_anchor_hidden,
         "hidden_w": args.hidden_w,
         "soft_w": args.soft_w,
+        "soft_loss_type": args.soft_loss_type,
         "soft_temperature": args.soft_temperature,
         "cos_w": args.cos_w,
         "action_head_type": args.action_head_type,
@@ -960,6 +996,8 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "num_epochs": args.num_epochs,
         "lr": args.lr,
         "action_head_lr": args.action_head_lr,
+        "training_phase": args.training_phase,
+        "init_model_checkpoint": args.init_model_checkpoint,
         "staged_training": args.staged_training,
         "unified_cosine_curriculum": args.unified_cosine_curriculum,
         "token_curriculum_power": args.token_curriculum_power,
@@ -1075,6 +1113,39 @@ def resolve_resume_checkpoint(output_dir: str, resume_from_checkpoint: Optional[
     return checkpoint_dir
 
 
+def resolve_model_init_checkpoint(init_model_checkpoint: Optional[str]) -> Optional[Path]:
+    """解析仅用于权重初始化的 checkpoint，不携带任何训练状态。"""
+    if not init_model_checkpoint:
+        return None
+    checkpoint_path = Path(init_model_checkpoint).expanduser()
+    if init_model_checkpoint == "latest":
+        raise ValueError(
+            "--init_model_checkpoint latest 缺少阶段一输出目录；请传阶段一输出根目录或具体 checkpoint。"
+        )
+    if checkpoint_path.is_dir() and not (checkpoint_path / "pytorch_model.bin").exists():
+        latest_path = checkpoint_path / "latest_checkpoint.txt"
+        if not latest_path.exists():
+            raise ValueError(
+                f"初始化目录 {checkpoint_path} 中既没有 pytorch_model.bin，也没有 latest_checkpoint.txt。"
+            )
+        checkpoint_path = Path(latest_path.read_text(encoding="utf-8").strip()).expanduser()
+    model_path = checkpoint_path / "pytorch_model.bin"
+    if not model_path.exists():
+        raise ValueError(f"初始化 checkpoint 缺少模型权重: {model_path}")
+    return checkpoint_path
+
+
+def load_model_initialization(
+    checkpoint_dir: Path,
+    model: DFlashDraftModel,
+    device: torch.device,
+) -> None:
+    """严格加载阶段一模型参数；阶段二会另建 optimizer、scheduler 和日志。"""
+    model_path = checkpoint_dir / "pytorch_model.bin"
+    state_dict = torch.load(model_path, map_location=device)
+    unwrap_model(model).load_state_dict(state_dict, strict=True)
+
+
 def load_checkpoint(
     checkpoint_dir: Path,
     model: DFlashDraftModel,
@@ -1161,6 +1232,20 @@ def count_trainable_parameters(model: nn.Module) -> int:
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
+def is_action_head_parameter(parameter_name: str) -> bool:
+    return parameter_name.startswith("action_head_") or parameter_name.startswith(
+        "action_confidence_head"
+    )
+
+
+def configure_training_phase_trainability(model: nn.Module, training_phase: str) -> None:
+    """阶段一冻结修正头；阶段二和兼容训练保持模型默认可训练状态。"""
+    freeze_action_head = training_phase == "representation"
+    for parameter_name, parameter in model.named_parameters():
+        if is_action_head_parameter(parameter_name):
+            parameter.requires_grad_(not freeze_action_head)
+
+
 def is_swanlab_detail_metric(metric_key: str) -> bool:
     """判断是否为高基数的细粒度位置指标。
 
@@ -1182,14 +1267,14 @@ SWANLAB_CORE_METRIC_LABELS = {
     "loss": ("损失", "总损失"),
     "hidden_loss": ("损失", "主干Hidden损失"),
     "cos_loss": ("损失", "主干余弦损失"),
-    "soft_loss": ("损失", "BaseFinal课程Soft分布损失（原值）"),
+    "soft_loss": ("损失", "当前Soft分布损失"),
     "base_soft_loss": ("损失", "Base Soft分布损失"),
     "final_soft_loss": ("损失", "Final Soft分布损失"),
     "backbone_anchor_logit_distill_loss": ("损失", "主干跨Anchor分布蒸馏（原值）"),
     "anchor_logit_distill_loss": ("损失", "动作头跨Anchor分布蒸馏"),
     "base_action_token_ce_loss": ("损失", "Base动作Token交叉熵"),
     "action_token_ce_loss": ("损失", "Final动作Token交叉熵"),
-    "token_curriculum_component": ("损失", "BaseFinal课程Token损失"),
+    "token_curriculum_component": ("损失", "当前Token监督项"),
     "action_distill_l1_loss": ("损失", "动作分布L1损失"),
     "prefix_survival_loss": ("损失", "连续前缀生存损失"),
     "accuracy": ("准确率", "Teacher-Forcing总体准确率"),
@@ -1257,6 +1342,37 @@ def translate_swanlab_metric_key(metric_key: str) -> Optional[str]:
     return None
 
 
+REPRESENTATION_SWANLAB_LEAVES = {
+    "loss",
+    "hidden_loss",
+    "cos_loss",
+    "hidden_component",
+    "cos_component",
+    "base_accuracy",
+    "base_rollout_expected_prefix_length",
+    "base_distribution_overlap",
+    "base_expected_accept_length_proxy",
+    "hidden_cosine_similarity",
+    "representation_token_gap",
+    "lr",
+    "draft_grad_norm",
+    "global_grad_norm",
+}
+
+
+def swanlab_metric_matches_training_phase(metric_key: str, training_phase: str) -> bool:
+    """阶段一只上传表示/Draft 指标，避免产生一批恒为零的 RNN/Token 图表。"""
+    if training_phase != "representation":
+        return True
+    leaf = metric_key.split("/", 1)[-1]
+    if leaf in REPRESENTATION_SWANLAB_LEAVES:
+        return True
+    return bool(
+        re.fullmatch(r"rollout_position_\d+_(acc|top2_acc)", leaf)
+        or re.fullmatch(r"rollout_prefix_\d+_success_rate", leaf)
+    )
+
+
 def build_swanlab_metrics_payload(
     payload: Dict[str, Any],
     args,
@@ -1279,7 +1395,10 @@ def build_swanlab_metrics_payload(
         return numeric
 
     translated: Dict[str, float] = {}
+    training_phase = getattr(args, "training_phase", "legacy")
     for key, value in numeric.items():
+        if not swanlab_metric_matches_training_phase(key, training_phase):
+            continue
         if is_swanlab_detail_metric(key) and not include_detail:
             continue
         translated_key = translate_swanlab_metric_key(key)
@@ -1443,17 +1562,49 @@ def build_training_control(
     total_optimizer_steps: int,
 ) -> Dict[str, Any]:
     """返回当前 step 的损失权重与 Base/Final 交接比例。"""
+    training_phase = getattr(args, "training_phase", "legacy")
+    progress = min(1.0, float(global_step) / float(max(1, total_optimizer_steps)))
+    if training_phase == "representation":
+        weights = {name: float(getattr(args, name)) for name in STAGED_LOSS_WEIGHT_NAMES}
+        for name in STAGED_LOSS_WEIGHT_NAMES:
+            if name not in ("hidden_w", "cos_w"):
+                weights[name] = 0.0
+        return {
+            "id": 1,
+            "name": "representation_pretraining",
+            "stage2_scale": 0.0,
+            "stage3_scale": 0.0,
+            "progress": progress,
+            "base_scale": 1.0,
+            "final_scale": 0.0,
+            "token_envelope": 0.0,
+            "weights": weights,
+        }
+    if training_phase == "refinement":
+        return {
+            "id": 2,
+            "name": "final_distribution_refinement",
+            "stage2_scale": 1.0,
+            "stage3_scale": 1.0,
+            "progress": progress,
+            # 阶段一已完成 Base 表征预训练；阶段二的 teacher Soft/CE 只监督 Final。
+            "base_scale": 0.0,
+            "final_scale": 1.0,
+            "token_envelope": 1.0,
+            "weights": {
+                name: float(getattr(args, name)) for name in STAGED_LOSS_WEIGHT_NAMES
+            },
+        }
     if not args.unified_cosine_curriculum:
         stage = build_training_stage(args, epoch)
         return {
             **stage,
-            "progress": min(1.0, float(global_step) / float(max(1, total_optimizer_steps))),
+            "progress": progress,
             "base_scale": 0.0,
             "final_scale": 1.0,
             "token_envelope": 1.0,
         }
 
-    progress = min(1.0, float(global_step) / float(max(1, total_optimizer_steps)))
     final_scale = cosine_curriculum_scale(progress)
     curriculum_power = float(getattr(args, "token_curriculum_power", 4.0))
     token_envelope = final_scale ** curriculum_power
@@ -1808,49 +1959,59 @@ def compute_loss_and_accuracy(
         # 新版只取 lm_head 的 256 个动作行做块投影，随后在动作子词表上递推前缀状态。
         action_confidence_logits = None
         auxiliary_student_logits = None
+        training_phase = getattr(args, "training_phase", "legacy")
+        action_head_forward_enabled = (
+            draft_model.action_sequential_enabled and training_phase != "representation"
+        )
         if draft_model.action_sequential_enabled:
             backbone_student_logits = draft_model.project_action_logits(
                 student_hidden.to(torch.bfloat16),
                 lm_head,
             ).float()
-            action_base_logits = backbone_student_logits
-            action_head_hidden = pred_hidden[:, :max_block_len, :]
-            use_joint_final_ce = bool(getattr(args, "unified_cosine_curriculum", False))
-            if args.detach_action_head_inputs and not use_joint_final_ce:
-                action_base_logits = action_base_logits.detach()
-                action_head_hidden = action_head_hidden.detach()
-            student_logits, action_confidence_logits = draft_model.apply_action_sequential_head(
-                action_base_logits,
-                action_head_hidden,
-                prev_token_ids=prev_token_ids,
-                action_position_ids=action_position_ids,
-            )
-            # L1/Prefix 是 Action-RNN 专属辅助目标：使用同一个动作头，但切断其
-            # Draft 输入。Final CE 则保留联合图，让修正结果也能反向改善主干。
-            need_detached_action_aux = (
-                active_loss_weights["action_distill_l1_w"] > 0
-                or active_loss_weights["prefix_survival_w"] > 0
-                or active_loss_weights["action_confidence_w"] > 0
-            )
-            if use_joint_final_ce and need_detached_action_aux:
-                auxiliary_student_logits, auxiliary_confidence_logits = (
-                    draft_model.apply_action_sequential_head(
-                        backbone_student_logits.detach(),
-                        pred_hidden[:, :max_block_len, :].detach(),
-                        prev_token_ids=prev_token_ids,
-                        action_position_ids=action_position_ids,
+            if action_head_forward_enabled:
+                action_base_logits = backbone_student_logits
+                action_head_hidden = pred_hidden[:, :max_block_len, :]
+                use_joint_final_training = (
+                    training_phase == "refinement"
+                    or bool(getattr(args, "unified_cosine_curriculum", False))
+                )
+                if args.detach_action_head_inputs and not use_joint_final_training:
+                    action_base_logits = action_base_logits.detach()
+                    action_head_hidden = action_head_hidden.detach()
+                student_logits, action_confidence_logits = draft_model.apply_action_sequential_head(
+                    action_base_logits,
+                    action_head_hidden,
+                    prev_token_ids=prev_token_ids,
+                    action_position_ids=action_position_ids,
+                )
+                # Final Soft/CE 联合更新 Draft 与 RNN；L1/Prefix 使用同一个头，
+                # 但切断 Draft 输入，使它们只承担修正头的专属辅助监督。
+                need_detached_action_aux = (
+                    active_loss_weights["action_distill_l1_w"] > 0
+                    or active_loss_weights["prefix_survival_w"] > 0
+                    or active_loss_weights["action_confidence_w"] > 0
+                )
+                if use_joint_final_training and need_detached_action_aux:
+                    auxiliary_student_logits, auxiliary_confidence_logits = (
+                        draft_model.apply_action_sequential_head(
+                            backbone_student_logits.detach(),
+                            pred_hidden[:, :max_block_len, :].detach(),
+                            prev_token_ids=prev_token_ids,
+                            action_position_ids=action_position_ids,
+                        )
                     )
-                )
-                action_confidence_logits = auxiliary_confidence_logits
+                    action_confidence_logits = auxiliary_confidence_logits
+                else:
+                    auxiliary_student_logits = student_logits
+                action_head_graph_anchor = action_head_graph_anchor + student_logits.sum() * 0.0
+                if action_confidence_logits is not None:
+                    action_head_graph_anchor = (
+                        action_head_graph_anchor + action_confidence_logits.sum() * 0.0
+                    )
             else:
-                auxiliary_student_logits = student_logits
-            # 阶段三前动作损失不计算，但 DDP 仍需看到动作头位于 loss 图中。
-            # 零值图锚不会产生有效梯度，随后还会把动作头 grad 设回 None。
-            action_head_graph_anchor = action_head_graph_anchor + student_logits.sum() * 0.0
-            if action_confidence_logits is not None:
-                action_head_graph_anchor = (
-                    action_head_graph_anchor + action_confidence_logits.sum() * 0.0
-                )
+                # 阶段一完全跳过随机 Action-RNN，Final 指标退化为 Base 指标。
+                student_logits = backbone_student_logits
+                auxiliary_student_logits = backbone_student_logits
             base_metric_logits = backbone_student_logits
         else:
             base_student_logits = lm_head(student_hidden.to(torch.bfloat16)).float()
@@ -1918,7 +2079,7 @@ def compute_loss_and_accuracy(
                 else:
                     teacher_logits = lm_head(teacher_hidden.to(torch.bfloat16)).float()
 
-        # SpecVLA 风格的 soft distribution 交叉熵：Base 和 Final 共用 Domino 式连续交接。
+        # Soft distribution 蒸馏。独立阶段二只取 Final；旧课程仍可按 Base/Final 比例兼容运行。
         if active_loss_weights["soft_w"] > 0:
             with torch.no_grad():
                 teacher_probs = F.softmax(teacher_logits / args.soft_temperature, dim=-1)
@@ -1930,12 +2091,24 @@ def compute_loss_and_accuracy(
                 student_logits / args.soft_temperature,
                 dim=-1,
             )
-            base_soft_ce = -(teacher_probs * base_student_log_probs).sum(dim=-1) * (
-                args.soft_temperature ** 2
-            )
-            final_soft_ce = -(teacher_probs * final_student_log_probs).sum(dim=-1) * (
-                args.soft_temperature ** 2
-            )
+            if getattr(args, "soft_loss_type", "cross_entropy") == "kl":
+                base_soft_ce = F.kl_div(
+                    base_student_log_probs,
+                    teacher_probs,
+                    reduction="none",
+                ).sum(dim=-1) * (args.soft_temperature ** 2)
+                final_soft_ce = F.kl_div(
+                    final_student_log_probs,
+                    teacher_probs,
+                    reduction="none",
+                ).sum(dim=-1) * (args.soft_temperature ** 2)
+            else:
+                base_soft_ce = -(teacher_probs * base_student_log_probs).sum(dim=-1) * (
+                    args.soft_temperature ** 2
+                )
+                final_soft_ce = -(teacher_probs * final_student_log_probs).sum(dim=-1) * (
+                    args.soft_temperature ** 2
+                )
             base_soft_sum += (base_soft_ce * loss_weight).sum()
             final_soft_sum += (final_soft_ce * loss_weight).sum()
 
@@ -2031,14 +2204,19 @@ def compute_loss_and_accuracy(
         # 衡量单分叉验证树是否有可利用的 runner-up 候选。
         if draft_model.action_sequential_enabled and anchor == 0:
             with torch.no_grad():
-                rollout_tokens, rollout_logits, _ = draft_model.sample_action_block(
-                    base_logits=backbone_student_logits.detach(),
-                    hidden_states=pred_hidden[:, :max_block_len, :].detach(),
-                    first_prev_token_ids=tokens[:, known_token_index : known_token_index + 1],
-                    action_position_ids=action_position_ids,
-                    temperature=0.0,
-                    confidence_threshold=0.0,
-                )
+                if action_head_forward_enabled:
+                    rollout_tokens, rollout_logits, _ = draft_model.sample_action_block(
+                        base_logits=backbone_student_logits.detach(),
+                        hidden_states=pred_hidden[:, :max_block_len, :].detach(),
+                        first_prev_token_ids=tokens[:, known_token_index : known_token_index + 1],
+                        action_position_ids=action_position_ids,
+                        temperature=0.0,
+                        confidence_threshold=0.0,
+                    )
+                else:
+                    # 阶段一的自回滚代理就是并行 Base 本身，不能调用随机且冻结的 RNN。
+                    rollout_tokens = base_pred_tokens.detach()
+                    rollout_logits = backbone_student_logits.detach()
                 rollout_valid = valid_mask.bool()
                 rollout_correct_mask = (rollout_tokens == target_tokens) & rollout_valid
                 local_rollout_targets = draft_model.action_token_ids_to_local(target_tokens)
@@ -2826,6 +3004,26 @@ def main():
         raise ValueError("--lr and --action_head_lr must both be > 0.")
     if args.grad_clip <= 0:
         raise ValueError("--grad_clip must be > 0.")
+    if args.training_phase != "legacy" and (
+        args.staged_training or args.unified_cosine_curriculum
+    ):
+        raise ValueError(
+            "独立两阶段模式不能叠加旧的 staged/unified curriculum；"
+            "请同时使用 --no-staged_training --no-unified_cosine_curriculum。"
+        )
+    if args.training_phase == "representation":
+        if args.init_model_checkpoint is not None:
+            raise ValueError("阶段一必须从头训练，不能设置 --init_model_checkpoint。")
+        if args.action_head_type != "slot_rnn":
+            raise ValueError("阶段一必须构造 slot_rnn，以便 checkpoint 可被阶段二严格加载。")
+    if args.training_phase == "refinement":
+        if args.init_model_checkpoint is None and args.resume_from_checkpoint is None:
+            raise ValueError(
+                "阶段二必须通过 --init_model_checkpoint 指向阶段一 checkpoint；"
+                "只有恢复阶段二自身训练时才可改用 --resume_from_checkpoint。"
+            )
+        if args.action_head_type != "slot_rnn":
+            raise ValueError("阶段二需要 --action_head_type slot_rnn。")
     if args.staged_training and args.unified_cosine_curriculum:
         raise ValueError("--staged_training and --unified_cosine_curriculum are mutually exclusive.")
     if args.staged_training:
@@ -2916,6 +3114,18 @@ def main():
     if args.run_name is None:
         args.run_name = f"dflash-libero-goal-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 
+    output_path = Path(args.output_dir)
+    if (
+        args.training_phase != "legacy"
+        and args.resume_from_checkpoint is None
+        and any((output_path / name).exists() for name in ("run_config.json", "metrics.jsonl", "swanlog"))
+    ):
+        raise ValueError(
+            f"{args.training_phase} 输出目录已包含训练日志: {output_path}。"
+            "为保证两阶段 SwanLab/metrics 完全隔离，请换一个 TWO_STAGE_ROOT，"
+            "或先归档该阶段目录后再启动。"
+        )
+
     if is_main:
         os.makedirs(args.output_dir, exist_ok=True)
     if distributed:
@@ -2988,6 +3198,19 @@ def main():
     draft_config.dflash_action_token_start = args.action_token_start
     draft_config.dflash_action_confidence_enabled = args.action_confidence_enabled
     model = DFlashDraftModel(draft_config).to(device=device, dtype=torch.bfloat16)# 实例化草稿模型
+
+    init_checkpoint_dir = resolve_model_init_checkpoint(args.init_model_checkpoint)
+    if init_checkpoint_dir is not None:
+        load_model_initialization(init_checkpoint_dir, model, device)
+        args.init_model_checkpoint = str(init_checkpoint_dir)
+        rank0_print(
+            is_main,
+            f"已从 {init_checkpoint_dir} 初始化模型参数；optimizer、scheduler、epoch 与 SwanLab 均重新开始。",
+        )
+
+    # 阶段一保留 Action-RNN 参数在 checkpoint 中以保证阶段二结构严格兼容，
+    # 但冻结并跳过其前向，不让随机修正头污染表示预训练。
+    configure_training_phase_trainability(model, args.training_phase)
     trainable_params = count_trainable_parameters(model)
     if distributed:
         model = DDP(model, device_ids=[local_rank], output_device=local_rank)
@@ -3143,7 +3366,7 @@ def main():
     for parameter_name, parameter in raw_model.named_parameters():
         if not parameter.requires_grad:
             continue
-        if parameter_name.startswith("action_head_") or parameter_name.startswith("action_confidence_head"):
+        if is_action_head_parameter(parameter_name):
             action_head_params.append(parameter)
         else:
             draft_backbone_params.append(parameter)
@@ -3181,7 +3404,9 @@ def main():
     steps_per_epoch = max(1, (len(train_loader) + args.gradient_accumulation_steps - 1) // args.gradient_accumulation_steps)
     total_optimizer_steps = max(1, args.num_epochs * steps_per_epoch)# 计算总的优化器步数，用于学习率调度器
     action_start_step = None
-    if args.unified_cosine_curriculum and action_head_params:
+    if args.training_phase == "refinement" and action_head_params:
+        action_start_step = 0
+    elif args.unified_cosine_curriculum and action_head_params:
         action_start_step = 0
     elif args.staged_training and action_head_params:
         action_start_step = (args.stage3_start_epoch - 1) * steps_per_epoch
@@ -3305,20 +3530,25 @@ def main():
                 total_optimizer_steps,
             )
             active_loss_weights = stage["weights"]
-            action_head_active = (
-                any(
-                    active_loss_weights[name] > 0
-                    for name in (
-                        "action_token_ce_w",
-                        "action_distill_l1_w",
-                        "prefix_survival_w",
-                        "action_confidence_w",
-                        "anchor_logit_distill_w",
+            if args.training_phase == "representation":
+                action_head_active = False
+            elif args.training_phase == "refinement":
+                action_head_active = True
+            else:
+                action_head_active = (
+                    any(
+                        active_loss_weights[name] > 0
+                        for name in (
+                            "action_token_ce_w",
+                            "action_distill_l1_w",
+                            "prefix_survival_w",
+                            "action_confidence_w",
+                            "anchor_logit_distill_w",
+                        )
                     )
+                    if args.unified_cosine_curriculum
+                    else (not args.staged_training or epoch >= args.stage3_start_epoch)
                 )
-                if args.unified_cosine_curriculum
-                else (not args.staged_training or epoch >= args.stage3_start_epoch)
-            )
             training_control = (
                 "unified_cosine_curriculum"
                 if args.unified_cosine_curriculum
@@ -3484,20 +3714,25 @@ def main():
                     total_optimizer_steps,
                 )
                 active_loss_weights = stage["weights"]
-                action_head_active = (
-                    any(
-                        active_loss_weights[name] > 0
-                        for name in (
-                            "action_token_ce_w",
-                            "action_distill_l1_w",
-                            "prefix_survival_w",
-                            "action_confidence_w",
-                            "anchor_logit_distill_w",
+                if args.training_phase == "representation":
+                    action_head_active = False
+                elif args.training_phase == "refinement":
+                    action_head_active = True
+                else:
+                    action_head_active = (
+                        any(
+                            active_loss_weights[name] > 0
+                            for name in (
+                                "action_token_ce_w",
+                                "action_distill_l1_w",
+                                "prefix_survival_w",
+                                "action_confidence_w",
+                                "anchor_logit_distill_w",
+                            )
                         )
+                        if args.unified_cosine_curriculum
+                        else (not args.staged_training or epoch >= args.stage3_start_epoch)
                     )
-                    if args.unified_cosine_curriculum
-                    else (not args.staged_training or epoch >= args.stage3_start_epoch)
-                )
                 if args.anchor_consistency_w > 0 and args.anchor_consistency_warmup_steps > 0:
                     consistency_scale = min(
                         1.0,
@@ -3751,8 +3986,8 @@ def main():
                             "train/lr": scheduler.get_last_lr()[0],
                             "train/action_head_lr": (
                                 scheduler.get_last_lr()[1]
-                                if len(scheduler.get_last_lr()) > 1
-                                else scheduler.get_last_lr()[0]
+                                if action_head_params and len(scheduler.get_last_lr()) > 1
+                                else 0.0
                             ),
                             "train/draft_grad_norm": gradient_norms.get(
                                 "draft_backbone",
@@ -3938,8 +4173,8 @@ def main():
                     "train_epoch/lr": scheduler.get_last_lr()[0],
                     "train_epoch/action_head_lr": (
                         scheduler.get_last_lr()[1]
-                        if len(scheduler.get_last_lr()) > 1
-                        else scheduler.get_last_lr()[0]
+                        if action_head_params and len(scheduler.get_last_lr()) > 1
+                        else 0.0
                     ),
                 }
                 if not args.unified_cosine_curriculum:

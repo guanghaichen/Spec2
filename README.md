@@ -324,9 +324,9 @@ Action-RNN 参数仍随模型构造并写入 checkpoint，保证阶段二可以�
 L_stage2 = 1.00 * hidden_smooth_l1
          + 0.05 * hidden_cosine
          + 0.05 * final_soft_KL
-         + 0.05 * final_hard_CE
+         + 0.01 * final_hard_CE
          + 0.05 * backbone_cross_anchor_logit_KL
-         + 0.10 * action_distribution_L1
+         + 0.05 * action_distribution_L1
          + 0.05 * prefix_survival
 ```
 
@@ -335,15 +335,19 @@ L_stage2 = 1.00 * hidden_smooth_l1
 使阶段二总损失从可比较的零基线开始。跨 Anchor KL 只作用于 Draft base logits；L1/Prefix 使用 detached Draft
 输入，只训练 Action-RNN。
 
-| Loss | 阶段一 | 阶段二更新 Draft | 阶段二更新 RNN | 目的 |
-| --- | ---: | ---: | ---: | --- |
-| hidden SmoothL1 | 1.00 | 是 | 否 | 保持高维 teacher 表征 |
-| hidden cosine | 0.05 | 是 | 否 | 对齐 hidden 方向 |
-| Final soft KL | 0 | 是 | 是 | 对齐 teacher 动作分布 |
-| Final hard CE | 0 | 是 | 是 | 提高 strict top-1 命中 |
-| backbone cross-anchor KL | 0 | 是 | 否 | 把近端强路径分布迁移给远端弱路径 |
-| action distribution L1 | 0 | 否 | 是 | 给修正头直接分布监督 |
-| prefix survival | 0 | 否 | 是 | 鼓励连续接受前缀 |
+Final Soft KL 是阶段二主要的低维分布监督；Hard CE 仅以 `0.01` 作为 strict top-1 的轻量排序约束，避免
+one-hot 信号过早压平第二候选空间。Action distribution L1 与 Soft KL 的目标方向相关，但其 Draft 输入已
+detach，职责是确保 Action-RNN 自身学到局部分布修正；Prefix Survival 再把这些局部修正组织成连续前缀目标。
+
+| Loss | 阶段一权重 | 阶段二权重 | 阶段二更新 Draft | 阶段二更新 RNN | 目的 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| hidden SmoothL1 | 1.00 | 1.00 | 是 | 否 | 保持高维 teacher 表征 |
+| hidden cosine | 0.05 | 0.05 | 是 | 否 | 对齐 hidden 方向 |
+| Final soft KL | 0 | 0.05 | 是 | 是 | 对齐 teacher 动作分布 |
+| Final hard CE | 0 | 0.01 | 是 | 是 | 轻量提高 strict top-1 命中 |
+| backbone cross-anchor KL | 0 | 0.05 | 是 | 否 | 把近端强路径分布迁移给远端弱路径 |
+| action distribution L1 | 0 | 0.05 | 否 | 是 | 给修正头稳定的局部分布监督 |
+| prefix survival | 0 | 0.05 | 否 | 是 | 鼓励连续接受前缀 |
 
 阶段一 Draft 学习率为 `2e-5`，warmup 1000 step；阶段二 Draft 学习率降至 `5e-6`，Action-RNN 为 `5e-5`，
 两者分别 warmup 500 step 后线性退火。两阶段都使用 global batch 64、`slot_decay=0.90`、

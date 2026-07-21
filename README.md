@@ -124,6 +124,12 @@ parallel_draft=False
 其中 Domino 与 DSpark 是清晰标注的机制启发，跨 Anchor、自动损失标定及两项推理机制是当前拟通过
 消融证明的自有增量。最终的新颖性表述仍应以完整文献检索和实验结果为准。
 
+与 Domino 的关系需要准确表述：当前训练骨架与其核心思想高度一致，都是在同一次训练中令 Base 任务权重
+线性下降、Final 任务权重线性上升，并让 Final 梯度继续穿过修正头更新 Draft；但本项目不是原样复现。
+Domino 的公开实现主要交接 Base/Final CE，本项目交接的是 `Soft KL + 小权重 hard CE`，并额外保留完整
+Hidden/Cos、Draft-only 跨 Anchor、Action-RNN L1/Prefix 及启动前固定损失标定。这些差异来自 VLA 离线
+多层 hidden、块内动作因果关系和历史训练退化，而不是为了形式上制造不同。
+
 ## 3. 方法是怎样一步步形成的
 
 ### 3.1 阶段一：最初的块并行迁移
@@ -513,7 +519,49 @@ Pure hidden、Residual-CAD、Markov-ACD 的代表性 anchor0 结果：
 | Residual-CAD 末值 | 0.846 | 0.671 | 0.717 | 0.647 | 0.718 | 0.936 |
 | Markov-ACD 短跑末值 | 0.820 | 0.860 | 0.913 | 0.881 | 0.880 | 0.963 |
 
-### 6.2 Markov-ACD 在线结果
+### 6.2 已废弃的独立两阶段实验
+
+两阶段实验先运行 100 epoch Hidden/Cos，再从阶段一权重初始化一个全新的 100 epoch Final/RNN 任务。阶段二
+重新创建 optimizer、scheduler 和 SwanLab，本意是避免低维动作监督在 hidden 成熟前诱导记忆捷径；实际却
+产生了新的表示切换冲突。阶段一终点与阶段二约 epoch 19 的可比指标如下：
+
+| 指标 | 阶段一 epoch 100 | 阶段二约 epoch 19 | 变化 |
+| --- | ---: | ---: | ---: |
+| Hidden loss | 0.74734 | 0.75439 | 退化 |
+| Hidden cosine similarity | 0.58466 | 0.56247 | 退化 |
+| Base accuracy | 0.62864 | 0.62950 | 基本不变 |
+| Final teacher-forced accuracy | - | 0.63685 | 仅小幅超过 Base |
+| 自回滚总体准确率 | 0.51748 | 0.52563 | 小幅提高 |
+| Base连续前缀长度代理 | 1.0204 | 0.9286 | 明显退化 |
+| Final连续前缀长度代理 | - | 1.0652 | 相对阶段一净增益很小 |
+| 理论接受长度代理 | 1.0368 | 1.0726 | 仅小幅提高 |
+
+阶段二内部看，Action-RNN 相对“已经退化的当前 Base”能增加约 `0.136` 的连续前缀长度；但相对阶段一终点，
+最终净增益只有约 `0.045`。同时低维加权项约占总损失 38%，Draft 裁剪前梯度范数由阶段一约 `0.35` 上升到
+约 `5.7`。因此 RNN 的很大一部分能力被用于补偿阶段切换造成的 Draft 退化，而不是在稳定底稿上增加因果
+修正。这是废弃两阶段、恢复单次平滑交接的直接证据，并非仅凭总 loss 曲线作出的判断。
+
+### 6.3 当前 Base/Final 线性交接实验
+
+当前实验从随机初始化一次训练 200 epoch，不加载上述阶段一 checkpoint。实验目录和入口分别为：
+
+```text
+/data/wulin/c/specvla-data/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu
+bash openvla/specdecoding/train-scripts/run_dflash_train.sh joint
+```
+
+本版只让一件事随训练进度改变：`lambda_base` 从 1 线性下降到 0，`lambda_final` 同步从 0 上升到 1。Soft KL
+与 hard CE 一起交接；Hidden/Cos、Draft-only 跨 Anchor 和自动求得的低维总缩放保持固定口径；RNN 专属
+L1/Prefix 随 Final 比例进入。正式 step 0 前 8 个只读 batch 负责求固定 `alpha`，目标是初始低维损失占比不
+超过10%。本实验首先需要验证：
+
+1. `low_dim_fraction` 初期接近且不显著超过 0.10，整程不出现后期权重口径突变。
+2. Hidden loss与相似度不再像两阶段切换后那样退化。
+3. Base连续前缀代理保持成长，Final相对Base的增益不是建立在Base下降之上。
+4. p2-p5、连续前缀成功率和在线接受长度同步提高，而不只是teacher-forced accuracy饱和。
+5. 最终仍以4090上的Success Rate、Length和端到端Speedup判断，不以训练代理宣布成功。
+
+### 6.4 Markov-ACD 在线结果
 
 2026-07-12 的历史 Goal rollout 使用了错误的纯 OpenVLA AR 分母，因此 Speedup 不能进入论文主表；它仍能
 用于比较 Length、在线命中与开销：
@@ -530,7 +578,7 @@ Pure hidden、Residual-CAD、Markov-ACD 的代表性 anchor0 结果：
 `0.687/0.326/0.411/0.393/0.468/0.577`。这证明 exposure gap 是实质问题。另一方面，DFlash strict
 Length 高于 SpecVLA strict 却更慢，证明 Length 不包含 draft 自身成本，不能单独作为加速结论。
 
-### 6.3 已废弃的旧余弦课程早期快照
+### 6.5 已废弃的旧余弦课程早期快照
 
 2026-07-15，旧 3090 主训练在 step 500、warmup 进行到一半时：
 

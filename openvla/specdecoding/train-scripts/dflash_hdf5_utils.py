@@ -6,16 +6,79 @@ are stored as int16 raw bits because h5py/numpy do not have native bfloat16.
 
 from __future__ import annotations
 
+import math
+import random
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 import h5py
 import numpy as np
 import torch
+from torch.utils.data import Sampler
 
 HDF5_FORMAT = "dflash_hdf5_v1"
 HDF5_DATA_FORMAT = "full_prefix_plus_action_hidden_v4"
 DEFAULT_HDF5_NAMES = ("dflash_goal_dataset.h5", "dflash_dataset.h5")
+
+
+class DistributedBlockSampler(Sampler[int]):
+    """Shuffle contiguous sample blocks while keeping reads sequential inside each block.
+
+    A regular ``DistributedSampler(shuffle=True)`` turns a large HDF5 file into many
+    concurrent random reads. This sampler changes only the sample order: every epoch
+    shuffles physical blocks, splits the resulting stream evenly across ranks, and
+    keeps indices inside each block contiguous. It therefore preserves epoch-level
+    stochasticity without making every sample a separate disk seek.
+    """
+
+    def __init__(
+        self,
+        dataset_size: int,
+        num_replicas: int = 1,
+        rank: int = 0,
+        block_size: int = 16,
+        shuffle: bool = True,
+        seed: int = 0,
+    ) -> None:
+        if dataset_size <= 0:
+            raise ValueError("dataset_size must be > 0")
+        if num_replicas <= 0:
+            raise ValueError("num_replicas must be > 0")
+        if rank < 0 or rank >= num_replicas:
+            raise ValueError(f"rank must be in [0, {num_replicas}), got {rank}")
+        if block_size <= 0:
+            raise ValueError("block_size must be > 0")
+        self.dataset_size = int(dataset_size)
+        self.num_replicas = int(num_replicas)
+        self.rank = int(rank)
+        self.block_size = int(block_size)
+        self.shuffle = bool(shuffle)
+        self.seed = int(seed)
+        self.epoch = 0
+        self.num_blocks = int(math.ceil(self.dataset_size / self.block_size))
+        self.blocks_per_replica = int(math.ceil(self.num_blocks / self.num_replicas))
+        self.num_samples = self.blocks_per_replica * self.block_size
+
+    def __iter__(self):
+        blocks = [
+            list(range(start, min(start + self.block_size, self.dataset_size)))
+            for start in range(0, self.dataset_size, self.block_size)
+        ]
+        if len(blocks[-1]) < self.block_size:
+            blocks[-1].extend(range(self.block_size - len(blocks[-1])))
+        if self.shuffle:
+            random.Random(self.seed + self.epoch).shuffle(blocks)
+        required_blocks = self.blocks_per_replica * self.num_replicas
+        if len(blocks) < required_blocks:
+            blocks.extend(blocks[: required_blocks - len(blocks)])
+        rank_blocks = blocks[self.rank : required_blocks : self.num_replicas]
+        return iter([index for block in rank_blocks for index in block])
+
+    def __len__(self) -> int:
+        return self.num_samples
+
+    def set_epoch(self, epoch: int) -> None:
+        self.epoch = int(epoch)
 
 
 def resolve_hdf5_path(path: str | Path) -> Optional[Path]:

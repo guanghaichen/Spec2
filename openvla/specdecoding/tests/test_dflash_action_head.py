@@ -164,6 +164,39 @@ class DFlashActionHeadTest(unittest.TestCase):
         self.assertAlmostEqual(middle["weights"]["action_distill_l1_w"], 0.0125)
         self.assertEqual(end["weights"]["prefix_survival_w"], 0.20)
 
+    def test_domino_curriculum_linearly_hands_soft_and_ce_to_final(self):
+        train_module = load_training_module()
+        args = SimpleNamespace(
+            training_phase="joint",
+            domino_linear_curriculum=True,
+            unified_cosine_curriculum=False,
+            staged_training=False,
+            hidden_w=1.0,
+            cos_w=0.05,
+            soft_w=0.05,
+            backbone_anchor_logit_distill_w=0.05,
+            action_token_ce_w=0.01,
+            action_distill_l1_w=0.05,
+            prefix_survival_w=0.05,
+            action_confidence_w=0.0,
+            anchor_logit_distill_w=0.0,
+        )
+
+        start = train_module.build_training_control(args, 1, 0, 101, low_dim_scale=0.2)
+        middle = train_module.build_training_control(args, 100, 50, 101, low_dim_scale=0.2)
+        end = train_module.build_training_control(args, 200, 100, 101, low_dim_scale=0.2)
+
+        self.assertEqual(start["base_scale"], 1.0)
+        self.assertEqual(start["final_scale"], 0.0)
+        self.assertAlmostEqual(middle["base_scale"], 0.5)
+        self.assertAlmostEqual(middle["final_scale"], 0.5)
+        self.assertEqual(end["base_scale"], 0.0)
+        self.assertEqual(end["final_scale"], 1.0)
+        self.assertEqual(start["weights"]["soft_w"], end["weights"]["soft_w"])
+        self.assertEqual(start["weights"]["action_token_ce_w"], end["weights"]["action_token_ce_w"])
+        self.assertEqual(start["low_dim_scale"], 0.2)
+        self.assertEqual(end["low_dim_scale"], 0.2)
+
     def test_action_head_lr_uses_delayed_curriculum_clock(self):
         train_module = load_training_module()
         draft_parameter = torch.nn.Parameter(torch.ones(()))

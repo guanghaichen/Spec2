@@ -27,7 +27,12 @@ from torch.utils.data.distributed import DistributedSampler
 from tqdm import tqdm
 from transformers import AutoConfig, AutoImageProcessor, AutoModelForVision2Seq, AutoProcessor
 
-from dflash_hdf5_utils import get_hdf5_sample_count, read_sample as read_hdf5_sample, resolve_hdf5_path
+from dflash_hdf5_utils import (
+    DistributedBlockSampler,
+    get_hdf5_sample_count,
+    read_sample as read_hdf5_sample,
+    resolve_hdf5_path,
+)
 from openvla.prismatic.extern.hf.configuration_prismatic import OpenVLAConfig# 导入VLA配置类
 from openvla.prismatic.extern.hf.modeling_prismatic import OpenVLAForActionPrediction# 导入VLA模型
 from openvla.prismatic.extern.hf.processing_prismatic import PrismaticImageProcessor, PrismaticProcessor
@@ -98,6 +103,15 @@ def parse_args():
     parser.add_argument("--gradient_accumulation_steps", type=int, default=1, help="梯度累积步数；显存不够时可增大它来保持全局 batch")
     parser.add_argument("--num_workers", type=int, default=1, help="DataLoader worker 数；共享硬盘上建议设为 1，减少并发随机读")
     parser.add_argument("--dataloader_prefetch_factor", type=int, default=1, help="每个 DataLoader worker 预取 batch 数；默认 1，避免共享硬盘被预取队列打满")
+    parser.add_argument(
+        "--hdf5_block_size",
+        type=int,
+        default=0,
+        help=(
+            "HDF5 块级随机采样的连续样本数；0 表示自动使用每卡 batch_size。"
+            "每轮打乱块顺序、块内顺序读取，可显著减少共享机械盘随机寻址"
+        ),
+    )
     parser.add_argument("--pin_memory", action=argparse.BooleanOptionalAction, default=False, help="是否启用 DataLoader pinned memory；默认关闭以降低主机内存/IO 压力")
     parser.add_argument("--persistent_workers", action=argparse.BooleanOptionalAction, default=False, help="是否保持 DataLoader worker 常驻；默认关闭，避免训练结束后 worker/文件句柄残留")
     parser.add_argument("--num_epochs", type=int, default=200, help="最大训练 epochs")
@@ -111,10 +125,11 @@ def parse_args():
     parser.add_argument(
         "--training_phase",
         type=str,
-        choices=["legacy", "representation", "refinement"],
-        default="legacy",
+        choices=["legacy", "joint", "representation", "refinement"],
+        default="joint",
         help=(
-            "训练职责：representation=阶段一，只训练 Draft hidden/cos；"
+            "训练职责：joint=当前单阶段 Base/Final 联合训练；"
+            "representation=历史阶段一，只训练 Draft hidden/cos；"
             "refinement=阶段二，从阶段一权重初始化并训练 Final 分布与 Action-RNN；"
             "legacy=兼容旧的单次训练课程"
         ),
@@ -146,6 +161,33 @@ def parse_args():
             "使用统一的延迟余弦课程：hidden/cos 全程训练，token/跨 Anchor/Action-RNN "
             "在训练后半程平滑渐入；主实验推荐开启，且与 staged_training 互斥"
         ),
+    )
+    parser.add_argument(
+        "--domino_linear_curriculum",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            "当前主实验课程：训练全程把 Base 监督比例从 1 线性降到 0，Final 比例同步从 0 升到 1；"
+            "Soft 与 hard CE 使用同一交接，不冻结 Draft"
+        ),
+    )
+    parser.add_argument(
+        "--low_dim_budget_ratio",
+        type=float,
+        default=0.10,
+        help="低维 token/分布/RNN 损失在初始总损失中的目标上限；0.10 对应高维:低维约 9:1",
+    )
+    parser.add_argument(
+        "--low_dim_scale",
+        type=float,
+        default=-1.0,
+        help="低维损失总缩放；负数表示训练前自动标定，非负数表示显式固定值",
+    )
+    parser.add_argument(
+        "--loss_scale_calibration_steps",
+        type=int,
+        default=8,
+        help="自动标定低维损失尺度所用的只读 batch 数；不更新模型、优化器或学习率",
     )
     parser.add_argument(
         "--token_curriculum_power",
@@ -1000,6 +1042,10 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "init_model_checkpoint": args.init_model_checkpoint,
         "staged_training": args.staged_training,
         "unified_cosine_curriculum": args.unified_cosine_curriculum,
+        "domino_linear_curriculum": args.domino_linear_curriculum,
+        "low_dim_budget_ratio": args.low_dim_budget_ratio,
+        "low_dim_scale": args.low_dim_scale,
+        "loss_scale_calibration_steps": args.loss_scale_calibration_steps,
         "token_curriculum_power": args.token_curriculum_power,
         "stage2_start_epoch": args.stage2_start_epoch,
         "stage3_start_epoch": args.stage3_start_epoch,
@@ -1017,6 +1063,7 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "save_latest_root_copy": args.save_latest_root_copy,
         "num_workers": args.num_workers,
         "dataloader_prefetch_factor": args.dataloader_prefetch_factor,
+        "hdf5_block_size": args.hdf5_block_size,
         "pin_memory": args.pin_memory,
         "persistent_workers": args.persistent_workers,
         "resume_from_checkpoint": args.resume_from_checkpoint,
@@ -1275,6 +1322,11 @@ SWANLAB_CORE_METRIC_LABELS = {
     "base_action_token_ce_loss": ("损失", "Base动作Token交叉熵"),
     "action_token_ce_loss": ("损失", "Final动作Token交叉熵"),
     "token_curriculum_component": ("损失", "当前Token监督项"),
+    "high_dim_component": ("损失构成", "高维Hidden组加权值"),
+    "low_dim_unscaled_component": ("损失构成", "低维组标定前加权值"),
+    "low_dim_component": ("损失构成", "低维组最终加权值"),
+    "low_dim_fraction": ("损失构成", "低维组占比"),
+    "low_dim_scale": ("课程", "低维损失固定缩放"),
     "action_distill_l1_loss": ("损失", "动作分布L1损失"),
     "prefix_survival_loss": ("损失", "连续前缀生存损失"),
     "accuracy": ("准确率", "Teacher-Forcing总体准确率"),
@@ -1560,6 +1612,7 @@ def build_training_control(
     epoch: int,
     global_step: int,
     total_optimizer_steps: int,
+    low_dim_scale: float = 1.0,
 ) -> Dict[str, Any]:
     """返回当前 step 的损失权重与 Base/Final 交接比例。"""
     training_phase = getattr(args, "training_phase", "legacy")
@@ -1578,6 +1631,7 @@ def build_training_control(
             "base_scale": 1.0,
             "final_scale": 0.0,
             "token_envelope": 0.0,
+            "low_dim_scale": 0.0,
             "weights": weights,
         }
     if training_phase == "refinement":
@@ -1591,6 +1645,27 @@ def build_training_control(
             "base_scale": 0.0,
             "final_scale": 1.0,
             "token_envelope": 1.0,
+            "low_dim_scale": 1.0,
+            "weights": {
+                name: float(getattr(args, name)) for name in STAGED_LOSS_WEIGHT_NAMES
+            },
+        }
+    if bool(getattr(args, "domino_linear_curriculum", False)):
+        linear_progress = min(
+            1.0,
+            float(global_step) / float(max(1, total_optimizer_steps - 1)),
+        )
+        base_scale = 1.0 - linear_progress
+        return {
+            "id": 5,
+            "name": "domino_linear_base_final_handoff",
+            "stage2_scale": 1.0,
+            "stage3_scale": 1.0 - base_scale,
+            "progress": linear_progress,
+            "base_scale": base_scale,
+            "final_scale": 1.0 - base_scale,
+            "token_envelope": 1.0,
+            "low_dim_scale": float(low_dim_scale),
             "weights": {
                 name: float(getattr(args, name)) for name in STAGED_LOSS_WEIGHT_NAMES
             },
@@ -1603,6 +1678,7 @@ def build_training_control(
             "base_scale": 0.0,
             "final_scale": 1.0,
             "token_envelope": 1.0,
+            "low_dim_scale": 1.0,
         }
 
     final_scale = cosine_curriculum_scale(progress)
@@ -1633,6 +1709,7 @@ def build_training_control(
         "base_scale": 1.0 - final_scale,
         "final_scale": final_scale,
         "token_envelope": token_envelope,
+        "low_dim_scale": 1.0,
         "weights": weights,
     }
 
@@ -1784,6 +1861,7 @@ def compute_loss_and_accuracy(
     base_curriculum_scale = float((curriculum_state or {}).get("base_scale", 0.0))
     final_curriculum_scale = float((curriculum_state or {}).get("final_scale", 1.0))
     token_curriculum_envelope = float((curriculum_state or {}).get("token_envelope", 1.0))
+    low_dim_scale = float((curriculum_state or {}).get("low_dim_scale", 1.0))
     prompt_selected = batch["prompt_selected"].to(device=device, dtype=torch.bfloat16)# 完整 prefill/prefix 上下文 [B, P, L*hidden]
     prompt_position_ids = batch["prompt_position_ids"].to(device=device)# 完整 prefill/prefix 的绝对 position [B, P]
     prompt_attention_mask = batch["prompt_attention_mask"].to(device=device)# prefix padding mask [B, P]
@@ -1974,6 +2052,8 @@ def compute_loss_and_accuracy(
                 use_joint_final_training = (
                     training_phase == "refinement"
                     or bool(getattr(args, "unified_cosine_curriculum", False))
+                    or bool(getattr(args, "domino_linear_curriculum", False))
+                    or training_phase == "joint"
                 )
                 if args.detach_action_head_inputs and not use_joint_final_training:
                     action_base_logits = action_base_logits.detach()
@@ -2079,7 +2159,7 @@ def compute_loss_and_accuracy(
                 else:
                     teacher_logits = lm_head(teacher_hidden.to(torch.bfloat16)).float()
 
-        # Soft distribution 蒸馏。独立阶段二只取 Final；旧课程仍可按 Base/Final 比例兼容运行。
+        # Soft distribution 蒸馏。当前联合课程与 hard CE 使用完全相同的 Base->Final 比例。
         if active_loss_weights["soft_w"] > 0:
             with torch.no_grad():
                 teacher_probs = F.softmax(teacher_logits / args.soft_temperature, dim=-1)
@@ -2550,6 +2630,7 @@ def compute_loss_and_accuracy(
         device=device,
         dtype=torch.float32,
     )
+    low_dim_scale_tensor = torch.tensor(low_dim_scale, device=device, dtype=torch.float32)
     soft_loss = base_scale_tensor * base_soft_loss + final_scale_tensor * final_soft_loss
     hidden_loss = hidden_sum / loss_denom
     cos_loss = cos_sum / loss_denom
@@ -2570,7 +2651,12 @@ def compute_loss_and_accuracy(
     confidence_mae = confidence_abs_error_sum / confidence_weight_sum.clamp_min(1.0)
     expected_prefix_length = expected_prefix_sum / expected_prefix_blocks.clamp_min(1.0)
     hidden_component = active_loss_weights["hidden_w"] * hidden_loss
-    soft_component = active_loss_weights["soft_w"] * soft_loss
+    base_soft_component = active_loss_weights["soft_w"] * base_soft_loss
+    final_soft_component = active_loss_weights["soft_w"] * final_soft_loss
+    soft_component = (
+        base_scale_tensor * base_soft_component
+        + final_scale_tensor * final_soft_component
+    )
     cos_component = active_loss_weights["cos_w"] * cos_loss
     anchor_consistency_scale = torch.tensor(float(consistency_scale), device=device, dtype=torch.float32)
     anchor_consistency_component = (
@@ -2593,10 +2679,13 @@ def compute_loss_and_accuracy(
         active_loss_weights["backbone_anchor_logit_distill_w"]
         * backbone_anchor_logit_distill_loss
     )
+    base_action_token_ce_component = (
+        active_loss_weights["action_token_ce_w"] * base_action_token_ce_loss
+    )
     action_token_ce_component = active_loss_weights["action_token_ce_w"] * action_token_ce_loss
-    token_curriculum_component = active_loss_weights["action_token_ce_w"] * (
-        base_scale_tensor * base_action_token_ce_loss
-        + final_scale_tensor * action_token_ce_loss
+    token_curriculum_component = (
+        base_scale_tensor * base_action_token_ce_component
+        + final_scale_tensor * action_token_ce_component
     )
     action_distill_l1_component = (
         active_loss_weights["action_distill_l1_w"] * action_distill_l1_loss
@@ -2605,20 +2694,46 @@ def compute_loss_and_accuracy(
     action_confidence_component = (
         active_loss_weights["action_confidence_w"] * action_confidence_loss
     )
+    high_dim_component = hidden_component + cos_component
+    # 跨 Anchor 始终直接监督 Draft；RNN 专属辅助项只随 Final 路径渐入。
+    low_dim_unscaled_component = (
+        soft_component
+        + backbone_anchor_logit_distill_component
+        + token_curriculum_component
+        + final_scale_tensor
+        * (
+            anchor_logit_distill_component
+            + action_distill_l1_component
+            + prefix_survival_component
+            + action_confidence_component
+        )
+    )
+    base_low_dim_endpoint = (
+        base_soft_component
+        + base_action_token_ce_component
+        + backbone_anchor_logit_distill_component
+    )
+    final_low_dim_endpoint = (
+        final_soft_component
+        + action_token_ce_component
+        + backbone_anchor_logit_distill_component
+        + anchor_logit_distill_component
+        + action_distill_l1_component
+        + prefix_survival_component
+        + action_confidence_component
+    )
+    low_dim_calibration_component = torch.maximum(
+        base_low_dim_endpoint,
+        final_low_dim_endpoint,
+    )
+    low_dim_component = low_dim_scale_tensor * low_dim_unscaled_component
     total_loss = (
-        hidden_component
-        + soft_component
-        + cos_component
+        high_dim_component
+        + low_dim_component
         + anchor_consistency_component
         + causal_residual_cad_component
         + refined_hidden_component
         + residual_token_ce_component
-        + anchor_logit_distill_component
-        + backbone_anchor_logit_distill_component
-        + token_curriculum_component
-        + action_distill_l1_component
-        + prefix_survival_component
-        + action_confidence_component
         + action_head_graph_anchor
     )
     accuracy = total_correct / metric_denom
@@ -2670,6 +2785,13 @@ def compute_loss_and_accuracy(
         "action_distill_l1_loss": action_distill_l1_loss,
         "prefix_survival_loss": prefix_survival_loss,
         "action_confidence_loss": action_confidence_loss,
+        "high_dim_component": high_dim_component,
+        "low_dim_unscaled_component": low_dim_unscaled_component,
+        "low_dim_calibration_component": low_dim_calibration_component,
+        "low_dim_component": low_dim_component,
+        "low_dim_fraction": low_dim_component.detach()
+        / (high_dim_component.detach() + low_dim_component.detach()).clamp_min(1e-8),
+        "low_dim_scale": low_dim_scale_tensor.detach(),
         "soft_component": soft_component,
         "hidden_component": hidden_component,
         "cos_component": cos_component,
@@ -2725,6 +2847,75 @@ def compute_loss_and_accuracy(
         "rollout_position_total": rollout_position_total.detach(),
         "rollout_prefix_correct": rollout_prefix_correct.detach(),
         "rollout_prefix_total": rollout_prefix_total.detach(),
+    }
+
+
+@torch.no_grad()
+def calibrate_low_dim_scale(
+    model: DFlashDraftModel,
+    embed_tokens: nn.Module,
+    lm_head: nn.Module,
+    train_loader: DataLoader,
+    args,
+    device: torch.device,
+    distributed: bool,
+    total_optimizer_steps: int,
+) -> Dict[str, float]:
+    """Estimate one fixed low-dimensional loss scale before optimizer step zero.
+
+    The calibration uses the larger of the Base and Final endpoint losses, so the
+    configured budget remains conservative throughout the linear handoff. It only
+    performs forward passes and never touches model, optimizer, scheduler, or logs.
+    """
+    calibration_steps = min(max(1, int(args.loss_scale_calibration_steps)), len(train_loader))
+    stage = build_training_control(
+        args,
+        epoch=1,
+        global_step=0,
+        total_optimizer_steps=total_optimizer_steps,
+        low_dim_scale=1.0,
+    )
+    model.train()
+    high_sum = 0.0
+    low_sum = 0.0
+    measured_steps = 0
+    for batch in train_loader:
+        metrics = compute_loss_and_accuracy(
+            model,
+            embed_tokens,
+            lm_head,
+            batch,
+            args,
+            device,
+            loss_weights=stage["weights"],
+            curriculum_state=stage,
+        )
+        pair = torch.stack(
+            [
+                metrics["high_dim_component"].detach().float(),
+                metrics["low_dim_calibration_component"].detach().float(),
+            ]
+        )
+        if distributed:
+            dist.all_reduce(pair, op=dist.ReduceOp.SUM)
+            pair /= dist.get_world_size()
+        high_sum += pair[0].item()
+        low_sum += pair[1].item()
+        measured_steps += 1
+        if measured_steps >= calibration_steps:
+            break
+
+    high_mean = high_sum / max(1, measured_steps)
+    low_mean = low_sum / max(1, measured_steps)
+    target_fraction = float(args.low_dim_budget_ratio)
+    target_odds = target_fraction / max(1e-8, 1.0 - target_fraction)
+    resolved_scale = min(1.0, target_odds * high_mean / max(1e-8, low_mean))
+    return {
+        "steps": measured_steps,
+        "high_dim_mean": high_mean,
+        "low_dim_endpoint_mean": low_mean,
+        "resolved_low_dim_scale": max(0.0, resolved_scale),
+        "target_low_dim_fraction": target_fraction,
     }
 
 
@@ -2973,6 +3164,12 @@ def main():
         raise ValueError("--soft_temperature must be > 0.")
     if args.token_curriculum_power <= 0:
         raise ValueError("--token_curriculum_power must be > 0.")
+    if not 0 < args.low_dim_budget_ratio < 1:
+        raise ValueError("--low_dim_budget_ratio must be in (0, 1).")
+    if args.loss_scale_calibration_steps <= 0:
+        raise ValueError("--loss_scale_calibration_steps must be > 0.")
+    if args.hdf5_block_size < 0:
+        raise ValueError("--hdf5_block_size must be >= 0.")
     if args.slot_decay <= 0 or args.slot_decay > 1:
         raise ValueError("--slot_decay must be in (0, 1].")
     for loss_name in (
@@ -3004,13 +3201,15 @@ def main():
         raise ValueError("--lr and --action_head_lr must both be > 0.")
     if args.grad_clip <= 0:
         raise ValueError("--grad_clip must be > 0.")
-    if args.training_phase != "legacy" and (
-        args.staged_training or args.unified_cosine_curriculum
+    if args.training_phase in {"representation", "refinement"} and (
+        args.staged_training or args.unified_cosine_curriculum or args.domino_linear_curriculum
     ):
         raise ValueError(
             "独立两阶段模式不能叠加旧的 staged/unified curriculum；"
-            "请同时使用 --no-staged_training --no-unified_cosine_curriculum。"
+            "请关闭 staged、unified cosine 和 Domino linear curriculum。"
         )
+    if args.training_phase == "joint" and not args.domino_linear_curriculum:
+        raise ValueError("--training_phase joint requires --domino_linear_curriculum.")
     if args.training_phase == "representation":
         if args.init_model_checkpoint is not None:
             raise ValueError("阶段一必须从头训练，不能设置 --init_model_checkpoint。")
@@ -3024,8 +3223,16 @@ def main():
             )
         if args.action_head_type != "slot_rnn":
             raise ValueError("阶段二需要 --action_head_type slot_rnn。")
-    if args.staged_training and args.unified_cosine_curriculum:
-        raise ValueError("--staged_training and --unified_cosine_curriculum are mutually exclusive.")
+    curriculum_count = sum(
+        bool(flag)
+        for flag in (
+            args.staged_training,
+            args.unified_cosine_curriculum,
+            args.domino_linear_curriculum,
+        )
+    )
+    if curriculum_count > 1:
+        raise ValueError("staged、unified cosine 与 Domino linear curriculum 只能启用一个。")
     if args.staged_training:
         if args.stage2_start_epoch <= 1:
             raise ValueError("--stage2_start_epoch must be > 1 for staged training.")
@@ -3286,14 +3493,16 @@ def main():
             target_layer_ids=args.target_layer_ids,
             selected_hidden_variant=args.selected_hidden_variant,
         )
-        train_sampler = DistributedSampler(
-            train_dataset,
+        hdf5_block_size = int(args.hdf5_block_size) if args.hdf5_block_size > 0 else int(args.batch_size)
+        args.hdf5_block_size = hdf5_block_size
+        train_sampler = DistributedBlockSampler(
+            dataset_size=len(train_dataset),
             num_replicas=world_size,
             rank=rank,
+            block_size=hdf5_block_size,
             shuffle=True,
             seed=args.seed,
-            drop_last=False,
-        ) if distributed else None
+        )
     else:
         train_dataset = OfflineDFlashDataset(
             train_files,
@@ -3406,7 +3615,7 @@ def main():
     action_start_step = None
     if args.training_phase == "refinement" and action_head_params:
         action_start_step = 0
-    elif args.unified_cosine_curriculum and action_head_params:
+    elif (args.unified_cosine_curriculum or args.domino_linear_curriculum) and action_head_params:
         action_start_step = 0
     elif args.staged_training and action_head_params:
         action_start_step = (args.stage3_start_epoch - 1) * steps_per_epoch
@@ -3445,6 +3654,38 @@ def main():
             f"best_val_loss={best_val_loss} best_val_acc={best_val_acc} patience_counter={patience_counter}",
         )
 
+    loss_calibration = None
+    if args.domino_linear_curriculum and args.low_dim_scale < 0:
+        if hasattr(train_dataset, "set_epoch"):
+            train_dataset.set_epoch(0)
+        if train_sampler is not None:
+            train_sampler.set_epoch(0)
+        rank0_print(
+            is_main,
+            f"开始低维损失尺度标定：只前向 {args.loss_scale_calibration_steps} 个 batch，不更新模型。",
+        )
+        loss_calibration = calibrate_low_dim_scale(
+            model,
+            embed_tokens,
+            lm_head,
+            train_loader,
+            args,
+            device,
+            distributed,
+            total_optimizer_steps,
+        )
+        args.low_dim_scale = loss_calibration["resolved_low_dim_scale"]
+        rank0_print(
+            is_main,
+            "低维损失尺度标定完成："
+            f"high={loss_calibration['high_dim_mean']:.6f} "
+            f"low_endpoint={loss_calibration['low_dim_endpoint_mean']:.6f} "
+            f"scale={args.low_dim_scale:.8f} "
+            f"target_fraction={args.low_dim_budget_ratio:.2%}",
+        )
+    elif args.low_dim_scale < 0:
+        args.low_dim_scale = 1.0
+
     config_payload = build_dflash_config_dict(args)
     config_payload.update(
         {
@@ -3464,6 +3705,7 @@ def main():
             "world_size": world_size,
             "per_device_batch": args.batch_size,
             "global_effective_batch": args.batch_size * args.gradient_accumulation_steps * world_size,
+            "loss_scale_calibration": loss_calibration,
         }
     )
     if is_main:
@@ -3487,6 +3729,8 @@ def main():
                 "total_optimizer_steps": total_optimizer_steps,
                 "distributed": distributed,
                 "world_size": world_size,
+                "resolved_low_dim_scale": args.low_dim_scale,
+                "loss_scale_calibration": loss_calibration,
             },
         )
         print(
@@ -3516,6 +3760,8 @@ def main():
                 "运行信息/全局有效批量": float(
                     args.batch_size * args.gradient_accumulation_steps * world_size
                 ),
+                "运行信息/低维损失固定缩放": float(args.low_dim_scale),
+                "运行信息/低维损失预算": float(args.low_dim_budget_ratio),
             },
             step=global_step,
         )
@@ -3528,6 +3774,7 @@ def main():
                 epoch,
                 global_step,
                 total_optimizer_steps,
+                low_dim_scale=args.low_dim_scale,
             )
             active_loss_weights = stage["weights"]
             if args.training_phase == "representation":
@@ -3550,12 +3797,16 @@ def main():
                     else (not args.staged_training or epoch >= args.stage3_start_epoch)
                 )
             training_control = (
-                "unified_cosine_curriculum"
-                if args.unified_cosine_curriculum
-                else f"stage_{stage['id']}"
+                "domino_linear_curriculum"
+                if args.domino_linear_curriculum
+                else (
+                    "unified_cosine_curriculum"
+                    if args.unified_cosine_curriculum
+                    else f"stage_{stage['id']}"
+                )
             )
             if training_control != previous_training_control:
-                if args.unified_cosine_curriculum:
+                if args.unified_cosine_curriculum or args.domino_linear_curriculum:
                     stage_payload = {
                         "event": "training_curriculum_start",
                         "timestamp": datetime.now().isoformat(),
@@ -3566,6 +3817,7 @@ def main():
                         "curriculum/base_scale": stage["base_scale"],
                         "curriculum/final_scale": stage["final_scale"],
                         "curriculum/token_envelope": stage["token_envelope"],
+                        "curriculum/low_dim_scale": stage["low_dim_scale"],
                         **{
                             f"curriculum/{name}": value
                             for name, value in active_loss_weights.items()
@@ -3588,7 +3840,15 @@ def main():
                     }
                 if is_main:
                     append_jsonl(metrics_log_path, stage_payload)
-                    if args.unified_cosine_curriculum:
+                    if args.domino_linear_curriculum:
+                        print(
+                            f"\n启用 Domino 线性交接 | epoch={epoch} | "
+                            f"base={stage['base_scale']:.6f} final={stage['final_scale']:.6f} "
+                            f"low_scale={stage['low_dim_scale']:.8f} "
+                            f"soft_w={active_loss_weights['soft_w']:.4f} "
+                            f"action_ce_w={active_loss_weights['action_token_ce_w']:.4f}"
+                        )
+                    elif args.unified_cosine_curriculum:
                         print(
                             f"\n启用延迟余弦训练课程 | epoch={epoch} | "
                             f"base={stage['base_scale']:.6f} final={stage['final_scale']:.6f} "
@@ -3633,6 +3893,10 @@ def main():
             train_soft_component_sum = 0.0
             train_hidden_component_sum = 0.0
             train_cos_component_sum = 0.0
+            train_high_dim_component_sum = 0.0
+            train_low_dim_unscaled_component_sum = 0.0
+            train_low_dim_component_sum = 0.0
+            train_low_dim_fraction_sum = 0.0
             train_anchor_consistency_component_sum = 0.0
             train_causal_residual_cad_component_sum = 0.0
             train_refined_hidden_component_sum = 0.0
@@ -3682,6 +3946,10 @@ def main():
                 "base_action_token_ce_loss",
                 "action_token_ce_loss",
                 "token_curriculum_component",
+                "high_dim_component",
+                "low_dim_unscaled_component",
+                "low_dim_component",
+                "low_dim_fraction",
                 "action_distill_l1_loss",
                 "prefix_survival_loss",
                 "anchor_logit_distill_loss",
@@ -3697,9 +3965,13 @@ def main():
             epoch_metric_sums = {name: 0.0 for name in epoch_metric_names}
             epoch_metric_steps = 0
             progress_mode = (
-                "curriculum=delayed_cosine"
-                if args.unified_cosine_curriculum
-                else f"stage={stage['id']}"
+                "curriculum=domino_linear"
+                if args.domino_linear_curriculum
+                else (
+                    "curriculum=delayed_cosine"
+                    if args.unified_cosine_curriculum
+                    else f"stage={stage['id']}"
+                )
             )
             pbar = tqdm(
                 train_loader,
@@ -3712,6 +3984,7 @@ def main():
                     epoch,
                     global_step,
                     total_optimizer_steps,
+                    low_dim_scale=args.low_dim_scale,
                 )
                 active_loss_weights = stage["weights"]
                 if args.training_phase == "representation":
@@ -3787,6 +4060,12 @@ def main():
                 train_soft_component_sum += log_metrics["soft_component"].item()
                 train_hidden_component_sum += log_metrics["hidden_component"].item()
                 train_cos_component_sum += log_metrics["cos_component"].item()
+                train_high_dim_component_sum += log_metrics["high_dim_component"].item()
+                train_low_dim_unscaled_component_sum += log_metrics[
+                    "low_dim_unscaled_component"
+                ].item()
+                train_low_dim_component_sum += log_metrics["low_dim_component"].item()
+                train_low_dim_fraction_sum += log_metrics["low_dim_fraction"].item()
                 train_anchor_consistency_component_sum += log_metrics["anchor_consistency_component"].item()
                 train_causal_residual_cad_component_sum += log_metrics["causal_residual_cad_component"].item()
                 train_refined_hidden_component_sum += log_metrics["refined_hidden_component"].item()
@@ -3882,6 +4161,7 @@ def main():
                             "train/curriculum_base_scale": stage["base_scale"],
                             "train/curriculum_final_scale": stage["final_scale"],
                             "train/curriculum_token_envelope": stage["token_envelope"],
+                            "train/low_dim_scale": stage["low_dim_scale"],
                             "train/active_soft_w": active_loss_weights["soft_w"],
                             "train/active_backbone_anchor_kl_w": active_loss_weights[
                                 "backbone_anchor_logit_distill_w"
@@ -3913,6 +4193,12 @@ def main():
                             "train/soft_component": train_soft_component_sum / denom_log_steps,
                             "train/hidden_component": train_hidden_component_sum / denom_log_steps,
                             "train/cos_component": train_cos_component_sum / denom_log_steps,
+                            "train/high_dim_component": train_high_dim_component_sum / denom_log_steps,
+                            "train/low_dim_unscaled_component": (
+                                train_low_dim_unscaled_component_sum / denom_log_steps
+                            ),
+                            "train/low_dim_component": train_low_dim_component_sum / denom_log_steps,
+                            "train/low_dim_fraction": train_low_dim_fraction_sum / denom_log_steps,
                             "train/anchor_consistency_component": train_anchor_consistency_component_sum / denom_log_steps,
                             "train/causal_residual_cad_component": train_causal_residual_cad_component_sum / denom_log_steps,
                             "train/refined_hidden_component": train_refined_hidden_component_sum / denom_log_steps,
@@ -4085,6 +4371,10 @@ def main():
                         train_soft_component_sum = 0.0
                         train_hidden_component_sum = 0.0
                         train_cos_component_sum = 0.0
+                        train_high_dim_component_sum = 0.0
+                        train_low_dim_unscaled_component_sum = 0.0
+                        train_low_dim_component_sum = 0.0
+                        train_low_dim_fraction_sum = 0.0
                         train_anchor_consistency_component_sum = 0.0
                         train_causal_residual_cad_component_sum = 0.0
                         train_refined_hidden_component_sum = 0.0
@@ -4160,6 +4450,9 @@ def main():
                     "train_epoch/active_action_ce_w": active_loss_weights["action_token_ce_w"],
                     "train_epoch/active_action_l1_w": active_loss_weights["action_distill_l1_w"],
                     "train_epoch/active_prefix_w": active_loss_weights["prefix_survival_w"],
+                    "train_epoch/curriculum_base_scale": stage["base_scale"],
+                    "train_epoch/curriculum_final_scale": stage["final_scale"],
+                    "train_epoch/low_dim_scale": stage["low_dim_scale"],
                     **{
                         f"train_epoch/{name}": value / epoch_denom
                         for name, value in epoch_metric_sums.items()

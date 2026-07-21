@@ -26,6 +26,7 @@ DSpark/Domino 启发的 Action-RNN 负责提高弱路径命中；动作组级宽
 | --- | --- | --- |
 | 数据生成 | `openvla/specdecoding/train-scripts/ge_data_all_openvla_token_only_libero_goal.py` | 用冻结 OpenVLA 生成动作 token 和多层 hidden 教师数据 |
 | 数据入口 | `openvla/specdecoding/train-scripts/run_dflash_data_goal.sh` | 统一 smoke/full 数据生成命令 |
+| 数据无损打包 | `openvla/specdecoding/train-scripts/pack_dflash_hdf5.py` | 把每样本 group 的 HDF5 v1 重排为连续 packed v2 |
 | DFlash 训练 | `openvla/specdecoding/train-scripts/train_dflash_libero_goal.py` | multi-anchor、loss、DDP、checkpoint、SwanLab |
 | 训练入口 | `openvla/specdecoding/train-scripts/run_dflash_train.sh` | 当前 Action-RNN 主实验及少量结构消融 |
 | Draft 模型 | `openvla/specdecoding/model/dflash.py` | 块并行主干、动作位置 embedding、Action-RNN、双路径候选 |
@@ -272,7 +273,8 @@ DFlash transformer 仍只 forward 一次，但 Action-RNN 有最多 6 次很小�
 当前 3090 正式数据：
 
 ```text
-/data/wulin/c/specvla-data/dflash_goal_dataset_envfix_20260714.h5
+/data/wulin/c/specvla-data/dflash_goal_dataset_envfix_20260714.h5            # 原始 v1，保留作校验/回退
+/data/wulin/c/specvla-data/dflash_goal_dataset_envfix_20260714_packed_v2.h5  # 正式训练读取
 ```
 
 已核对元数据：
@@ -281,7 +283,8 @@ DFlash transformer 仍只 forward 一次，但 Action-RNN 有最多 6 次很小�
 | --- | --- |
 | `complete` | `True` |
 | 样本数 | 28,501 |
-| 数据格式 | `full_prefix_plus_action_hidden_v4` / `dflash_hdf5_v1` |
+| 训练语义格式 | `full_prefix_plus_action_hidden_v4` |
+| 物理存储格式 | `dflash_hdf5_packed_v2` |
 | selected layers | `[1, 9, 16, 24, 31]` |
 | 文件大小 | 约 322 GiB |
 | `predicted_tokens` | `[7]` |
@@ -295,11 +298,16 @@ HDF5 不保存 `pixel_values`；final hidden 已在 selected prompt 中，也不
 历史 419 GiB、28,639 个小 `.ckpt` 的数据只用于解释旧实验。它会产生大量随机文件 IO，也与当前均匀选层
 格式不一致，禁止继续作为新主实验输入。
 
-单文件并不自动等于顺序读。普通 `DistributedSampler(shuffle=True)` 仍会让四个 rank 在约 322 GiB 文件上逐
-样本随机寻址。当前 HDF5 训练改用块级分布式采样：每轮打乱连续块顺序，块内按物理索引顺序读取；默认块大小
-等于每卡 batch，因此随机寻址次数约从“每个样本一次”降为“每个 local batch 一次”。启动脚本同时固定
-`NUM_WORKERS=1`、`prefetch_factor=1`、关闭 persistent worker，并用低优先级 `ionice/nice` 启动。checkpoint
-仍每 10 epoch 保存一次，但不保存约 1.2 GiB optimizer state，也不额外复制根目录 latest 权重。
+单文件并不自动等于顺序读。v1 内部仍有约二十万个 sample group/dataset；旧块采样又会让四个 rank 同时跳到
+四个无关物理区域。packed v2 对训练实际读取的 BF16 hidden/token 做**逐 bit 无损重排**：完整 prompt 使用一块
+连续数组加 offset，action hidden 与 token 使用固定形状连续数组；一个 local batch 只需一次 prompt hyperslab
+读取。它不量化、不压缩、不改变样本、selected layer、position id 或监督标签。
+
+当前 `DistributedBlockSampler` 以四卡相邻超级块为随机单位：默认每卡连续读取 64 个样本，四卡同一时刻处理
+同一个 256 样本物理区域的相邻切片；每轮打乱超级块并轮换 rank 切片，完整覆盖全体样本，仅尾部按 DDP 规则
+少量补齐。启动脚本固定 `NUM_WORKERS=1`、`prefetch_factor=1` 并开启 persistent worker，使每个 rank 全程复用
+一个只读 HDF5 句柄。低优先级 `ionice/nice` 继续保护共享服务器。checkpoint 仍每 10 epoch 保存一次，但不保存
+约 1.2 GiB optimizer state，也不额外复制根目录 latest 权重。
 
 ### 4.2 Context 和位置不变量
 
@@ -546,7 +554,7 @@ Pure hidden、Residual-CAD、Markov-ACD 的代表性 anchor0 结果：
 当前实验从随机初始化一次训练 200 epoch，不加载上述阶段一 checkpoint。实验目录和入口分别为：
 
 ```text
-/data/wulin/c/specvla-data/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu
+/data/wulin/c/specvla-data/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu_packedv2
 bash openvla/specdecoding/train-scripts/run_dflash_train.sh joint
 ```
 
@@ -635,12 +643,18 @@ CUDA_VISIBLE_DEVICES=0 \
   bash openvla/specdecoding/train-scripts/run_dflash_data_goal.sh smoke
 ```
 
-确认 smoke 后正式生成。当前正式文件已经存在，生成脚本默认拒绝覆盖；重新生成时必须显式提供新文件名：
+`run_dflash_data_goal.sh` 会先生成语义完整的 raw v1，再自动无损打包为训练用 packed v2。确认 smoke 后正式
+生成；当前正式文件已经存在，重新生成时必须同时提供新的中间文件和最终文件名：
 
 ```bash
-GPU_ID=0 OUT_FILE=/data/wulin/c/specvla-data/dflash_goal_dataset_new.h5 \
+GPU_ID=0 \
+RAW_OUT_FILE=/data/wulin/c/specvla-data/dflash_goal_dataset_new_raw_v1.h5 \
+OUT_FILE=/data/wulin/c/specvla-data/dflash_goal_dataset_new_packed_v2.h5 \
   bash openvla/specdecoding/train-scripts/run_dflash_data_goal.sh full
 ```
+
+默认 `KEEP_RAW=True`，便于逐 bit 回查；空间紧张时可显式设 `KEEP_RAW=False`，脚本也只会在 packed 文件完整
+关闭并标记成功后删除中间 v1。不要手工删除 `.partial` 以外的文件。
 
 生成结束检查：
 
@@ -648,16 +662,17 @@ GPU_ID=0 OUT_FILE=/data/wulin/c/specvla-data/dflash_goal_dataset_new.h5 \
 python - <<'PY'
 import h5py
 
-path = "/data/wulin/c/specvla-data/dflash_goal_dataset_new.h5"
+path = "/data/wulin/c/specvla-data/dflash_goal_dataset_new_packed_v2.h5"
 with h5py.File(path, "r") as h5:
     print("complete:", bool(h5.attrs["complete"]))
-    print("format:", h5.attrs["dflash_data_format"])
+    print("storage:", h5.attrs["format"])
+    print("semantics:", h5.attrs["dflash_data_format"])
     print("layers:", list(h5.attrs["hidden_layer_ids"]))
-    print("samples:", len(h5["samples"]))
+    print("samples:", int(h5.attrs["num_samples"]))
 PY
 ```
 
-只有 `complete=True` 才能训练。
+只有 `complete=True`、`storage=dflash_hdf5_packed_v2` 才能作为当前正式训练输入。
 
 ### 7.2 3090 四卡训练
 
@@ -671,7 +686,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 \
 默认输出：
 
 ```text
-/data/wulin/c/specvla-data/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu/
+/data/wulin/c/specvla-data/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu_packedv2/
 ├── metrics.jsonl
 ├── run_config.json
 ├── swanlog/
@@ -683,7 +698,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 \
 目录，只需覆盖环境变量：
 
 ```bash
-DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset_new.h5 \
+DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset_new_packed_v2.h5 \
 OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_joint_new \
 CUDA_VISIBLE_DEVICES=2,3,4,6 \
   bash openvla/specdecoding/train-scripts/run_dflash_train.sh joint
@@ -699,14 +714,14 @@ CUDA_VISIBLE_DEVICES=2,3,4,6 \
 
 ```bash
 CKPT_3090=$(ssh 3090_wulin \
-  "find /data/wulin/c/specvla-data/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu \
+  "find /data/wulin/c/specvla-data/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu_packedv2 \
    -maxdepth 1 -type d -name 'epoch_200_step_*' | sort -V | tail -1")
 
 ssh 4090 \
-  'mkdir -p /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu'
+  'mkdir -p /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu_packedv2'
 
 scp -3 -r "3090_wulin:${CKPT_3090}" \
-  '4090:/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu/'
+  '4090:/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu_packedv2/'
 ```
 
 ### 7.4 4090 复现 SpecVLA Goal baseline
@@ -754,7 +769,7 @@ bash openvla/specdecoding/decode-scripts/run_specvla_main_table_eval.sh
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 EVAL_EPOCH=200 \
-DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu \
+DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu_packedv2 \
   bash openvla/specdecoding/decode-scripts/run_dflash_action_rnn_goal_pair_eval.sh
 ```
 
@@ -829,7 +844,9 @@ AR、strict、relaxed 必须同机、同 GPU、串行执行。4090 是正式速�
 
 | 脚本 | 用法 |
 | --- | --- |
-| `run_dflash_data_goal.sh` | `smoke` 或 `full` 生成单文件 HDF5 |
+| `run_dflash_data_goal.sh` | `smoke` 或 `full` 生成 raw v1 并自动无损打包 packed v2 |
+| `pack_dflash_hdf5.py` | 将既有 v1 数据一次性迁移为 packed v2；日常无需单独调用 |
+| `benchmark_dflash_hdf5.py` | 四进程只读 A/B 测试 legacy v1 与 packed v2 的真实数据吞吐 |
 | `run_dflash_train.sh joint` | 当前主实验：200 epoch 高维主导 Base/Final 线性交接 |
 | `run_dflash_train.sh stage1/stage2` | 仅用于复现已废弃的两阶段消融 |
 

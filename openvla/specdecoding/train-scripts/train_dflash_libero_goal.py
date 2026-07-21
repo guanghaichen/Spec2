@@ -30,6 +30,8 @@ from transformers import AutoConfig, AutoImageProcessor, AutoModelForVision2Seq,
 from dflash_hdf5_utils import (
     DistributedBlockSampler,
     get_hdf5_sample_count,
+    get_hdf5_storage_format,
+    is_packed_hdf5,
     read_sample as read_hdf5_sample,
     resolve_hdf5_path,
 )
@@ -820,6 +822,115 @@ class OfflineDFlashHDF5Dataset(OfflineDFlashSampleMixin, Dataset):
         if h5 is not None:
             try:
                 h5.close()
+            except Exception:
+                pass
+
+
+class OfflineDFlashPackedHDF5Dataset(OfflineDFlashSampleMixin, Dataset):
+    """Packed HDF5 v2 reader with one contiguous hyperslab read per batch."""
+
+    def __init__(
+        self,
+        hdf5_path: str,
+        expected_selected_layers: Optional[int] = None,
+        target_layer_ids: Optional[List[int]] = None,
+        selected_hidden_variant: str = "target_layers",
+    ):
+        self.hdf5_path = str(hdf5_path)
+        self._h5 = None
+        self._configure_format(expected_selected_layers, target_layer_ids, selected_hidden_variant)
+        import h5py
+
+        with h5py.File(self.hdf5_path, "r") as h5_file:
+            self.num_samples = int(h5_file.attrs["num_samples"])
+            self.prompt_offsets = np.asarray(h5_file["prompt_offsets"][()], dtype=np.int64)
+            self.data_format = str(h5_file.attrs["dflash_data_format"])
+            self.layer_ids = [int(value) for value in h5_file["layer_ids"][()].tolist()]
+        if self.prompt_offsets.shape != (self.num_samples + 1,):
+            raise ValueError(
+                f"{self.hdf5_path} prompt_offsets shape={self.prompt_offsets.shape} "
+                f"!= ({self.num_samples + 1},)"
+            )
+
+    def __len__(self) -> int:
+        return self.num_samples
+
+    def _file(self):
+        if self._h5 is None:
+            import h5py
+
+            self._h5 = h5py.File(self.hdf5_path, "r")
+        return self._h5
+
+    @staticmethod
+    def _bf16_from_raw(array: np.ndarray) -> torch.Tensor:
+        array = np.asarray(array)
+        if array.dtype != np.int16:
+            raise TypeError(f"packed BF16 storage must be int16, got {array.dtype}")
+        return torch.from_numpy(array).view(torch.bfloat16)
+
+    def _read_contiguous(self, first_index: int, last_index: int) -> List[Dict[str, Any]]:
+        h5_file = self._file()
+        prompt_start = int(self.prompt_offsets[first_index])
+        prompt_end = int(self.prompt_offsets[last_index + 1])
+        prompt_selected = self._bf16_from_raw(
+            h5_file["prompt_selected"][prompt_start:prompt_end]
+        )
+        prompt_position_ids = torch.from_numpy(
+            np.asarray(h5_file["prompt_position_ids"][prompt_start:prompt_end])
+        ).long()
+        action_selected = self._bf16_from_raw(
+            h5_file["action_selected"][first_index : last_index + 1]
+        )
+        action_last = self._bf16_from_raw(
+            h5_file["action_last"][first_index : last_index + 1]
+        )
+        predicted_tokens = torch.from_numpy(
+            np.asarray(h5_file["predicted_tokens"][first_index : last_index + 1])
+        ).long()
+
+        samples = []
+        for local_index, sample_index in enumerate(range(first_index, last_index + 1)):
+            local_prompt_start = int(self.prompt_offsets[sample_index]) - prompt_start
+            local_prompt_end = int(self.prompt_offsets[sample_index + 1]) - prompt_start
+            prompt_length = local_prompt_end - local_prompt_start
+            sample = {
+                "dflash_data_format": self.data_format,
+                "predicted_tokens": predicted_tokens[local_index],
+                "hidden_state": {
+                    "prompt_selected": prompt_selected[local_prompt_start:local_prompt_end],
+                    "prompt_position_ids": prompt_position_ids[local_prompt_start:local_prompt_end],
+                    "prompt_length": prompt_length,
+                    "action_selected": action_selected[local_index],
+                    "action_last": action_last[local_index],
+                    "layer_ids": self.layer_ids,
+                },
+            }
+            samples.append(self._format_sample(sample, f"{self.hdf5_path}#{sample_index}"))
+        return samples
+
+    def __getitems__(self, indices: List[int]) -> List[Dict[str, Any]]:
+        indices = [int(index) for index in indices]
+        if not indices:
+            return []
+        if all(right == left + 1 for left, right in zip(indices, indices[1:])):
+            return self._read_contiguous(indices[0], indices[-1])
+        # Only the padded final super-block should normally take this path.
+        return [self._read_contiguous(index, index)[0] for index in indices]
+
+    def __getitem__(self, index: int) -> Dict[str, Any]:
+        return self._read_contiguous(int(index), int(index))[0]
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state["_h5"] = None
+        return state
+
+    def __del__(self):
+        h5_file = getattr(self, "_h5", None)
+        if h5_file is not None:
+            try:
+                h5_file.close()
             except Exception:
                 pass
 
@@ -3487,8 +3598,13 @@ def main():
     elif dataset_kind == "hdf5":
         if len(train_files) != 1:
             raise ValueError("HDF5 training expects exactly one dataset file entry.")
-        train_dataset = OfflineDFlashHDF5Dataset(
-            train_files[0]["path"],
+        hdf5_path = train_files[0]["path"]
+        hdf5_storage_format = get_hdf5_storage_format(hdf5_path)
+        hdf5_dataset_class = (
+            OfflineDFlashPackedHDF5Dataset if is_packed_hdf5(hdf5_path) else OfflineDFlashHDF5Dataset
+        )
+        train_dataset = hdf5_dataset_class(
+            hdf5_path,
             expected_selected_layers=len(args.target_layer_ids),
             target_layer_ids=args.target_layer_ids,
             selected_hidden_variant=args.selected_hidden_variant,
@@ -3503,6 +3619,11 @@ def main():
             shuffle=True,
             seed=args.seed,
         )
+        if is_main:
+            print(
+                f"HDF5 storage={hdf5_storage_format}; sampler=adjacent_super_blocks; "
+                f"rank_block_size={hdf5_block_size}; global_super_block={hdf5_block_size * world_size}"
+            )
     else:
         train_dataset = OfflineDFlashDataset(
             train_files,

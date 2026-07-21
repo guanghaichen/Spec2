@@ -46,11 +46,11 @@ else
 fi
 
 VLA_PATH="${VLA_PATH:-${DEFAULT_VLA_PATH}}"
-DATAPATH="${DATAPATH:-${MACHINE_DATA_ROOT}/dflash_goal_dataset_envfix_20260714.h5}"
+DATAPATH="${DATAPATH:-${MACHINE_DATA_ROOT}/dflash_goal_dataset_envfix_20260714_packed_v2.h5}"
 TWO_STAGE_ROOT="${TWO_STAGE_ROOT:-${MACHINE_DATA_ROOT}/ckpt_goal_dflash_two_stage_1layer_b16x1_4gpu}"
 STAGE1_OUTPUT_DIR="${STAGE1_OUTPUT_DIR:-${TWO_STAGE_ROOT}/stage1_representation}"
 STAGE2_OUTPUT_DIR="${STAGE2_OUTPUT_DIR:-${TWO_STAGE_ROOT}/stage2_refinement}"
-JOINT_OUTPUT_DIR="${JOINT_OUTPUT_DIR:-${MACHINE_DATA_ROOT}/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu}"
+JOINT_OUTPUT_DIR="${JOINT_OUTPUT_DIR:-${MACHINE_DATA_ROOT}/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu_packedv2}"
 
 CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3}"
 NPROC_PER_NODE="${NPROC_PER_NODE:-4}"
@@ -60,7 +60,8 @@ NUM_DRAFT_LAYERS="${NUM_DRAFT_LAYERS:-1}"
 SAVE_EVERY="${SAVE_EVERY:-10}"
 SEED="${SEED:-7}"
 NUM_WORKERS="${NUM_WORKERS:-1}"
-HDF5_BLOCK_SIZE="${HDF5_BLOCK_SIZE:-${BATCH_SIZE}}"
+# 每张卡连续读取64个样本；四卡在同一物理超级块内读取相邻切片。
+HDF5_BLOCK_SIZE="${HDF5_BLOCK_SIZE:-64}"
 SWANLAB_LOG_EVERY_STEPS="${SWANLAB_LOG_EVERY_STEPS:-20}"
 SWANLAB_DETAIL_EVERY_STEPS="${SWANLAB_DETAIL_EVERY_STEPS:-200}"
 IO_NICE_CLASS="${IO_NICE_CLASS:-2}"
@@ -92,7 +93,7 @@ if [[ "${TRAINING_PHASE}" == "joint" ]]; then
   LOSS_SCALE_CALIBRATION_STEPS="${LOSS_SCALE_CALIBRATION_STEPS:-8}"
   ACTION_HEAD_STATUS="joint_trainable"
   CURRICULUM_ARGS=(--no-staged_training --no-unified_cosine_curriculum --domino_linear_curriculum)
-  RUN_NAME="${RUN_NAME:-dflash-joint-domino-${NUM_DRAFT_LAYERS}layer-b${BATCH_SIZE}x${GRAD_ACCUM_STEPS}-${NPROC_PER_NODE}gpu}"
+  RUN_NAME="${RUN_NAME:-dflash-joint-domino-packedv2-${NUM_DRAFT_LAYERS}layer-b${BATCH_SIZE}x${GRAD_ACCUM_STEPS}-${NPROC_PER_NODE}gpu}"
 elif [[ "${TRAINING_PHASE}" == "representation" ]]; then
   OUTPUT_DIR="${OUTPUT_DIR:-${STAGE1_OUTPUT_DIR}}"
   NUM_EPOCHS="${NUM_EPOCHS:-100}"
@@ -259,7 +260,7 @@ ionice -c "${IO_NICE_CLASS}" -n "${IO_NICE_LEVEL}" \
   --hdf5_block_size "${HDF5_BLOCK_SIZE}" \
   --dataloader_prefetch_factor 1 \
   --no-pin_memory \
-  --no-persistent_workers \
+  --persistent_workers \
   --swanlab_log_every_steps "${SWANLAB_LOG_EVERY_STEPS}" \
   --swanlab_detail_every_steps "${SWANLAB_DETAIL_EVERY_STEPS}" \
   --val_split 0

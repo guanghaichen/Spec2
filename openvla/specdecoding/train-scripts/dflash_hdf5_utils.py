@@ -17,18 +17,22 @@ import torch
 from torch.utils.data import Sampler
 
 HDF5_FORMAT = "dflash_hdf5_v1"
+PACKED_HDF5_FORMAT = "dflash_hdf5_packed_v2"
 HDF5_DATA_FORMAT = "full_prefix_plus_action_hidden_v4"
 DEFAULT_HDF5_NAMES = ("dflash_goal_dataset.h5", "dflash_dataset.h5")
 
 
 class DistributedBlockSampler(Sampler[int]):
-    """Shuffle contiguous sample blocks while keeping reads sequential inside each block.
+    """Shuffle contiguous super-blocks and keep all ranks physically adjacent.
 
     A regular ``DistributedSampler(shuffle=True)`` turns a large HDF5 file into many
-    concurrent random reads. This sampler changes only the sample order: every epoch
-    shuffles physical blocks, splits the resulting stream evenly across ranks, and
-    keeps indices inside each block contiguous. It therefore preserves epoch-level
-    stochasticity without making every sample a separate disk seek.
+    concurrent random reads.  The previous block sampler improved locality within
+    each rank, but independently assigned shuffled blocks to ranks, so four ranks
+    still sought to four unrelated disk regions at every step.  This implementation
+    groups ``num_replicas`` adjacent rank-blocks into one physical super-block,
+    shuffles super-blocks once per epoch, and lets every rank consume one adjacent
+    slice.  Samples remain globally shuffled at super-block granularity and every
+    sample is covered once before the small tail-padding region is repeated.
     """
 
     def __init__(
@@ -55,24 +59,29 @@ class DistributedBlockSampler(Sampler[int]):
         self.shuffle = bool(shuffle)
         self.seed = int(seed)
         self.epoch = 0
-        self.num_blocks = int(math.ceil(self.dataset_size / self.block_size))
-        self.blocks_per_replica = int(math.ceil(self.num_blocks / self.num_replicas))
-        self.num_samples = self.blocks_per_replica * self.block_size
+        self.super_block_size = self.block_size * self.num_replicas
+        self.num_super_blocks = int(math.ceil(self.dataset_size / self.super_block_size))
+        self.num_samples = self.num_super_blocks * self.block_size
 
     def __iter__(self):
-        blocks = [
-            list(range(start, min(start + self.block_size, self.dataset_size)))
-            for start in range(0, self.dataset_size, self.block_size)
+        super_blocks = [
+            list(range(start, min(start + self.super_block_size, self.dataset_size)))
+            for start in range(0, self.dataset_size, self.super_block_size)
         ]
-        if len(blocks[-1]) < self.block_size:
-            blocks[-1].extend(range(self.block_size - len(blocks[-1])))
+        missing = self.super_block_size - len(super_blocks[-1])
+        if missing > 0:
+            super_blocks[-1].extend(index % self.dataset_size for index in range(missing))
         if self.shuffle:
-            random.Random(self.seed + self.epoch).shuffle(blocks)
-        required_blocks = self.blocks_per_replica * self.num_replicas
-        if len(blocks) < required_blocks:
-            blocks.extend(blocks[: required_blocks - len(blocks)])
-        rank_blocks = blocks[self.rank : required_blocks : self.num_replicas]
-        return iter([index for block in rank_blocks for index in block])
+            random.Random(self.seed + self.epoch).shuffle(super_blocks)
+
+        # Rotate physical rank slices each epoch. This keeps simultaneous reads
+        # adjacent while avoiding a permanent sample-to-rank assignment.
+        rank_slot = (self.rank + self.epoch) % self.num_replicas
+        rank_start = rank_slot * self.block_size
+        rank_end = rank_start + self.block_size
+        return iter(
+            [index for super_block in super_blocks for index in super_block[rank_start:rank_end]]
+        )
 
     def __len__(self) -> int:
         return self.num_samples
@@ -101,6 +110,19 @@ def get_hdf5_sample_count(path: str | Path) -> int:
         if f.attrs.get("complete", False) is not True and str(f.attrs.get("complete", "False")) != "True":
             raise RuntimeError(f"{hdf5_path} is incomplete; wait until generation/packing finishes before training")
         return int(f.attrs["num_samples"])
+
+
+def get_hdf5_storage_format(path: str | Path) -> str:
+    """Return the physical HDF5 layout without changing its training semantics."""
+    hdf5_path = resolve_hdf5_path(path)
+    if hdf5_path is None:
+        raise FileNotFoundError(f"No DFlash HDF5 dataset found at {path}")
+    with h5py.File(hdf5_path, "r") as f:
+        return _normalise_attr(f.attrs.get("format", HDF5_FORMAT))
+
+
+def is_packed_hdf5(path: str | Path) -> bool:
+    return get_hdf5_storage_format(path) == PACKED_HDF5_FORMAT
 
 
 def init_hdf5_file(path: str | Path, source: str, overwrite: bool = False) -> h5py.File:

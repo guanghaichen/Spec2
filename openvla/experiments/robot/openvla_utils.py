@@ -12,7 +12,10 @@ from transformers import AutoConfig, AutoImageProcessor, AutoModelForVision2Seq,
 
 from openvla.prismatic.extern.hf.configuration_prismatic import OpenVLAConfig,SpecVLAConfig
 from openvla.prismatic.extern.hf.modeling_prismatic import OpenVLAForActionPrediction# 基本 VLM 模型
-from openvla.prismatic.extern.hf.modeling_speculation import SpecVLAforActionPrediction# 投机采样包装模型 （包裹基本模型 + 草稿模型）
+from openvla.prismatic.extern.hf.modeling_speculation import (
+    SpecVLAforActionPrediction,
+    normalize_dflash_tree_mode,
+)# 投机采样包装模型 （包裹基本模型 + 草稿模型）
 from openvla.prismatic.extern.hf.processing_prismatic import PrismaticImageProcessor, PrismaticProcessor# 图像处理器 + 通用处理器
 
 #import the speculative decoding dependency
@@ -47,6 +50,9 @@ def get_vla(cfg):
     # 使用transformers的from_pretrained加载模型
     print("[*] 使用本地OpenVLAForActionPrediction类并从预训练检查点加载")
     if cfg.use_spec:# 推理时是否用投机解码
+        cfg.dflash_tree_mode = normalize_dflash_tree_mode(
+            getattr(cfg, "dflash_tree_mode", "off")
+        )
         print('load the vla model')
         vla = OpenVLAForActionPrediction.from_pretrained(# 加载vla模型OpenVLAForActionPrediction
             cfg.pretrained_checkpoint,

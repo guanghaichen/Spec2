@@ -7,6 +7,7 @@ from transformers.models.llama.configuration_llama import LlamaConfig
 from openvla.prismatic.extern.hf.modeling_speculation import (
     LlamaSpecForCausalLM,
     SpecVLAforActionPrediction,
+    normalize_dflash_tree_mode,
 )
 
 
@@ -15,6 +16,13 @@ class DFlashVerificationTest(unittest.TestCase):
         self.verifier = SpecVLAforActionPrediction.__new__(SpecVLAforActionPrediction)
         torch.nn.Module.__init__(self.verifier)
         self.verifier.dflash_acceptance_mode = "token"
+
+    def test_tree_mode_normalizes_yaml_boolean_aliases(self):
+        for value in (False, None, "off", "false", "0", "none", "disabled"):
+            self.assertEqual(normalize_dflash_tree_mode(value), "off")
+        self.assertEqual(normalize_dflash_tree_mode("single_fork"), "single_fork")
+        with self.assertRaises(ValueError):
+            normalize_dflash_tree_mode(True)
 
     def test_single_fork_tree_has_two_isolated_causal_paths(self):
         token_paths = torch.tensor(

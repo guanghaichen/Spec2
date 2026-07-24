@@ -47,6 +47,18 @@ from transformers.cache_utils import Cache, DynamicCache, StaticCache
 
 logger = logging.get_logger(__name__)
 
+
+def normalize_dflash_tree_mode(value) -> str:
+    """Normalize CLI/YAML boolean aliases to the two internal tree modes."""
+    if value is False or value is None:
+        return "off"
+    normalized = str(value).strip().lower()
+    if normalized in {"off", "false", "0", "none", "disabled"}:
+        return "off"
+    if normalized == "single_fork":
+        return normalized
+    raise ValueError("dflash_tree_mode must be 'off' or 'single_fork'.")
+
 def rotate_half(x):
     """Rotates half the hidden dims of the input."""
     x1 = x[..., : x.shape[-1] // 2]
@@ -589,9 +601,7 @@ class SpecVLAforActionPrediction(nn.Module):
         self.dflash_acceptance_mode = str(dflash_acceptance_mode)
         if self.dflash_acceptance_mode not in {"token", "action_group"}:
             raise ValueError("dflash_acceptance_mode must be 'token' or 'action_group'.")
-        self.dflash_tree_mode = str(dflash_tree_mode)
-        if self.dflash_tree_mode not in {"off", "single_fork"}:
-            raise ValueError("dflash_tree_mode must be 'off' or 'single_fork'.")
+        self.dflash_tree_mode = normalize_dflash_tree_mode(dflash_tree_mode)
         self.dflash_tree_branch_position = int(dflash_tree_branch_position)
         if self.dflash_tree_branch_position not in {0, 2, 3, 4, 5}:
             raise ValueError("dflash_tree_branch_position must be 0 or one of 2, 3, 4, 5.")

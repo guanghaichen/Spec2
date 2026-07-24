@@ -517,7 +517,7 @@ token 精确校验；action-group relaxed 则以成功率约束换取更大的�
 | 旧统一余弦课程 Action-RNN | Soft/CE 从第 1 轮生效，Base/Final 连续交接 | 约 43 epoch 时 token acc 已接近 99%，hidden 尚未稳定 | token 监督入场过早，出现低维动作子空间捷径 |
 | Hidden-first 延迟余弦课程 | hidden/cos 全程；`g=s^4` 延迟 Soft/CE/跨 Anchor/RNN | 初期 raw token loss 抖动不影响梯度，但后程加权总 loss 的解释仍复杂 | 单次课程无法提供完全独立、干净的两种优化过程 |
 | 独立两阶段 | 100 epoch Hidden/Cos；再重置优化器做 Final/KL/CE/跨 Anchor/RNN | 阶段二初期 Draft hidden/连续前缀退化，RNN 大量增益用于补偿退化 | 突然切换优化目标会产生表示冲突，废弃为消融 |
-| 当前线性交接主实验 | 200 epoch；Soft/CE 同步 Base->Final；低维组自动固定为初始约 10% | 待训练 | 保留高维主线，同时平滑培养最终修正路径 |
+| 当前线性交接主实验 | 200 epoch；Soft/CE 同步 Base->Final；低维组自动固定为初始约 10% | 已完成；rollout acc 0.853，Final 前缀代理 3.576 | 高维主线没有退化，Action-RNN 得到稳定但有限的正增益，需由 4090 在线评测裁决 |
 
 Pure hidden、Residual-CAD、Markov-ACD 的代表性 anchor0 结果：
 
@@ -568,6 +568,29 @@ L1/Prefix 随 Final 比例进入。正式 step 0 前 8 个只读 batch 负责求
 3. Base连续前缀代理保持成长，Final相对Base的增益不是建立在Base下降之上。
 4. p2-p5、连续前缀成功率和在线接受长度同步提高，而不只是teacher-forced accuracy饱和。
 5. 最终仍以4090上的Success Rate、Length和端到端Speedup判断，不以训练代理宣布成功。
+
+本次训练于 2026-07-24 正常完成 200 epoch。后程没有发生两阶段实验中的表示退化；约 epoch 140 后进入
+平台，RNN 增益仍缓慢上升。以下是 epoch 200 的整轮均值，位置准确率为该轮所有记录 step 的均值：
+
+| 指标 | epoch 200 |
+| --- | ---: |
+| Total / Hidden / Cos loss | 0.80796 / 0.76437 / 0.41954 |
+| Base / Final soft loss | 1.48529 / 1.45862 |
+| Draft 跨 Anchor KL | 1.50708 |
+| Base / Final action CE | 0.52285 / 0.48891 |
+| Action L1 / Prefix Survival | 0.32810 / 0.29844 |
+| Base / Final teacher-forced accuracy | 0.86881 / 0.88343 |
+| Self-rollout accuracy | 0.85302 |
+| Self-rollout p1-p6 | 0.962 / 0.748 / 0.843 / 0.785 / 0.812 / 0.969 |
+| Base / Final 连续前缀长度代理 | 3.352 / 3.576 |
+| Base / Final 接受长度代理 | 2.725 / 2.828 |
+| Action-RNN 接受长度代理净增益 | +0.102 |
+| Hidden cosine similarity | 0.580 |
+
+与早期版本相比，p2-p5 和连续前缀显著提高，且 Final 的提升没有建立在 Base 退化之上；但这些仍是离线
+teacher/self-rollout 代理，不是 LIBERO 在线命中率。epoch 180 的连续前缀均值略高（3.577），epoch 200 的
+RNN 接受长度增益最高（约 +0.102），因此正式评测优先搬运 `epoch 180` 与 `epoch 200`，不根据训练集指标
+继续挑更多 checkpoint。
 
 ### 6.4 Markov-ACD 在线结果
 
@@ -710,18 +733,19 @@ CUDA_VISIBLE_DEVICES=2,3,4,6 \
 
 ### 7.3 把 checkpoint 搬到 4090
 
-在本地终端执行。下面以当前联合训练 epoch 200 为例：
+在本地终端执行。当前正式候选固定为 epoch 180 和 200：
 
 ```bash
-CKPT_3090=$(ssh 3090_wulin \
-  "find /data/wulin/c/specvla-data/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu_packedv2 \
-   -maxdepth 1 -type d -name 'epoch_200_step_*' | sort -V | tail -1")
-
 ssh 4090 \
   'mkdir -p /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu_packedv2'
 
-scp -3 -r "3090_wulin:${CKPT_3090}" \
-  '4090:/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu_packedv2/'
+for epoch in 180 200; do
+  CKPT_3090=$(ssh 3090_wulin \
+    "find /data/wulin/c/specvla-data/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu_packedv2 \
+     -maxdepth 1 -type d -name \"epoch_$(printf '%03d' ${epoch})_step_*\" | sort -V | tail -1")
+  scp -3 -r "3090_wulin:${CKPT_3090}" \
+    '4090:/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu_packedv2/'
+done
 ```
 
 ### 7.4 4090 复现 SpecVLA Goal baseline
@@ -765,16 +789,17 @@ bash openvla/specdecoding/decode-scripts/run_specvla_main_table_eval.sh
 
 ### 7.5 4090 评测当前 DFlash Goal
 
-当前 Goal 权重不能用于 Object、Spatial 或 Long。成对评测：
+当前 Goal 权重不能用于 Object、Spatial 或 Long。四路机制消融一键评测：
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 EVAL_EPOCH=200 \
 DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu_packedv2 \
-  bash openvla/specdecoding/decode-scripts/run_dflash_action_rnn_goal_pair_eval.sh
+  bash openvla/specdecoding/decode-scripts/run_dflash_action_rnn_goal_4way_eval.sh
 ```
 
-成对脚本先在 strict 中校准 `off/p2/p3/p4/p5`，再把选出的分叉位置用于 relaxed 动作组校验；若没有候选位置
-在完整动作延迟上显著优于 `off`，两次评测都自动退回线性验证。
+四路依次为 `RNN+strict`、`RNN+树+strict`、`RNN+动作组`、`RNN+树+动作组`。树版 strict 在真实
+observation 上校准 `off/p2/p3/p4/p5`，最后一组复用该位置；若没有候选位置在完整动作延迟上显著优于
+`off`，树分叉位置为 0，树版自动退化为线性验证。评测 epoch 180 时只需把上面的 `EVAL_EPOCH` 改为 180。
 
 单独执行：
 
@@ -862,7 +887,8 @@ AR、strict、relaxed 必须同机、同 GPU、串行执行。4090 是正式速�
 | `run_specvla_goal_upstream_compatible_eval.sh` | Goal AR+strict+relaxed 一键复现 |
 | `run_specvla_main_table_eval.sh` | 四 suite strict/relaxed 自动续跑与汇总 |
 | `run_dflash_goal_eval.sh` | 当前 Goal DFlash 单项 strict/relaxed |
-| `run_dflash_action_rnn_goal_pair_eval.sh` | 当前 Goal DFlash strict+relaxed |
+| `run_dflash_action_rnn_goal_4way_eval.sh` | 同一 Goal checkpoint 的 RNN/树 × strict/动作组四路消融 |
+| `run_dflash_action_rnn_goal_pair_eval.sh` | 兼容旧流程的树 strict+树动作组成对评测 |
 | `run_dflash_goal_repeat_eval.sh` | 多 seed 稳定性评测 |
 | `setup_3090_nvidia_egl_shim.sh` | 仅处理 3090 特定 EGL 驱动问题 |
 
@@ -930,8 +956,8 @@ git pull --ff-only origin main
 
 按优先级：
 
-1. 完成当前 Action-RNN 训练，检查 warmup 后 `accuracy-base_accuracy`、rollout p2-p5 和 prefix length。
-2. 在 4090 评测 epoch 100/150/200，联合报告 SR、Length、Speedup 和在线位置命中率。
+1. 当前 Action-RNN 训练已经完成；离线 p2-p5、连续前缀和 RNN 增益均有提高。
+2. 在 4090 优先评测 epoch 180/200 的四路机制组合，联合报告 SR、Length、Speedup 和在线位置命中率。
 3. 做 `main / no_prefix / no_anchor / three_layer` 消融，判断收益来自哪里。
 4. 分别消融 action-group acceptance 和 calibrated tree，报告净延迟而非只报 Length。
 5. 在多个 seed 和真实机械臂上验证稳定性。

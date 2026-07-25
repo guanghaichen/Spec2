@@ -112,6 +112,34 @@ class DFlashVerificationTest(unittest.TestCase):
         self.assertEqual(token_mask.tolist(), [[0, 1, 1, 1, 1, 1]])
         self.assertEqual(group_mask.tolist(), [[1, 1, 1, 1, 1, 0]])
 
+    def test_relaxed_ddtree_selects_longest_group_valid_leaf_and_correction(self):
+        # Virtual root -> token 100 -> token 101 is the longest group-valid
+        # branch. Token 110 is a shorter sibling branch.
+        child_maps = [
+            {100: 1, 110: 2},
+            {101: 3},
+            {},
+            {},
+        ]
+        verify_input_ids = torch.tensor([[100, 110, 101]])
+        node_posteriors = torch.tensor([[110, 130, 120]])
+
+        selected_nodes, correction, accept_length = (
+            self.verifier._select_relaxed_ddtree_path(
+                child_maps=child_maps,
+                verify_input_ids=verify_input_ids,
+                root_posterior_token=torch.tensor([[109]]),
+                node_posterior_tokens=node_posteriors,
+                action_start_position=0,
+                max_action_tokens=3,
+                accept_threshold=9,
+            )
+        )
+
+        self.assertEqual(selected_nodes.tolist(), [0, 2])
+        self.assertEqual(correction, 120)
+        self.assertEqual(accept_length, 2)
+
     def test_tree_cache_gather_commits_only_winning_nodes(self):
         key = torch.arange(7, dtype=torch.float32).view(1, 1, 7, 1)
         value = (100 + torch.arange(7, dtype=torch.float32)).view(1, 1, 7, 1)

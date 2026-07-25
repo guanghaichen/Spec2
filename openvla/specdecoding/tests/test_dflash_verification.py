@@ -24,25 +24,70 @@ class DFlashVerificationTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             normalize_dflash_tree_mode(True)
 
-    def test_single_fork_tree_has_two_isolated_causal_paths(self):
+    def test_ddtree_merges_prefix_and_exposes_only_ancestors(self):
         token_paths = torch.tensor(
             [
                 [11, 12, 13, 14, 15, 16],
                 [11, 22, 23, 24, 25, 26],
             ]
         )
-        flat_tokens, path_nodes, tree_mask, relative_positions = (
-            self.verifier._build_single_fork_tree(token_paths, branch_index=1)
+        flat_tokens, path_nodes, child_maps, tree_mask, relative_positions = (
+            self.verifier._build_ddtree_from_paths(token_paths)
         )
 
-        self.assertEqual(flat_tokens.tolist(), [[11, 12, 13, 14, 15, 22, 23, 24, 25]])
-        self.assertEqual(path_nodes.tolist(), [[0, 1, 2, 3, 4], [0, 5, 6, 7, 8]])
-        self.assertEqual(relative_positions.tolist(), [[0, 1, 2, 3, 4, 1, 2, 3, 4]])
+        self.assertEqual(
+            flat_tokens.tolist(),
+            [[11, 12, 13, 14, 15, 16, 22, 23, 24, 25, 26]],
+        )
+        self.assertEqual(
+            path_nodes.tolist(),
+            [[0, 1, 2, 3, 4, 5], [0, 6, 7, 8, 9, 10]],
+        )
+        self.assertEqual(
+            relative_positions.tolist(),
+            [[0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5]],
+        )
+        self.assertEqual(child_maps[0], {11: 1})
+        self.assertEqual(child_maps[1], {12: 2, 22: 7})
         mask = tree_mask[0, 0]
-        self.assertTrue(mask[8, 0])
-        self.assertTrue(mask[8, 5])
-        self.assertFalse(mask[8, 1])
-        self.assertFalse(mask[4, 5])
+        self.assertTrue(mask[10, 0])
+        self.assertTrue(mask[10, 6])
+        self.assertFalse(mask[10, 1])
+        self.assertFalse(mask[5, 6])
+
+    def test_ddtree_follows_target_tokens_instead_of_longest_path(self):
+        paths = torch.tensor(
+            [
+                [11, 12, 13, 14],
+                [11, 22, 23, 24],
+            ]
+        )
+        _, path_nodes, child_maps, _, _ = self.verifier._build_ddtree_from_paths(paths)
+        node_posteriors = torch.tensor([[22, 13, 14, 99, 23, 24, 77]])
+
+        accepted_nodes, next_token = self.verifier._follow_ddtree_target_path(
+            child_maps,
+            root_posterior_token=torch.tensor([[11]]),
+            node_posterior_tokens=node_posteriors,
+            max_accept_length=4,
+        )
+
+        self.assertEqual(accepted_nodes.tolist(), path_nodes[1].tolist())
+        self.assertEqual(next_token, 77)
+
+    def test_ddtree_uses_target_correction_when_root_has_no_child(self):
+        paths = torch.tensor([[11, 12, 13], [11, 22, 23]])
+        _, _, child_maps, _, _ = self.verifier._build_ddtree_from_paths(paths)
+
+        accepted_nodes, next_token = self.verifier._follow_ddtree_target_path(
+            child_maps,
+            root_posterior_token=torch.tensor([[31]]),
+            node_posterior_tokens=torch.zeros((1, 5), dtype=torch.long),
+            max_accept_length=3,
+        )
+
+        self.assertEqual(accepted_nodes.numel(), 0)
+        self.assertEqual(next_token, 31)
 
     def test_action_group_budget_extends_motion_but_not_gripper(self):
         proposed = torch.tensor([[100, 100, 100, 100, 100, 100]])
@@ -121,8 +166,8 @@ class DFlashVerificationTest(unittest.TestCase):
         )
         with torch.no_grad():
             prefix_outputs = target(input_ids=prefix, use_cache=True, return_dict=True)
-        flat_tokens, path_nodes, tree_mask, relative_positions = (
-            self.verifier._build_single_fork_tree(paths, branch_index=1)
+        flat_tokens, path_nodes, _, tree_mask, relative_positions = (
+            self.verifier._build_ddtree_from_paths(paths)
         )
 
         target.tree_mask = tree_mask
@@ -141,9 +186,9 @@ class DFlashVerificationTest(unittest.TestCase):
         for path_index in range(2):
             with torch.no_grad():
                 linear_outputs = target(
-                    input_ids=paths[path_index : path_index + 1, :-1],
+                    input_ids=paths[path_index : path_index + 1],
                     past_key_values=prefix_outputs.past_key_values,
-                    position_ids=torch.arange(3, 8).unsqueeze(0),
+                    position_ids=torch.arange(3, 9).unsqueeze(0),
                     use_cache=True,
                     return_dict=True,
                 )

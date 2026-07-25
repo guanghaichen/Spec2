@@ -4,7 +4,7 @@
 前提下，提高 LIBERO 动作解码速度。
 
 当前完整方案由三层组成：块并行 Draft 负责低成本提案；高维主导的 Base/Final 线性交接、跨 Anchor 蒸馏和
-DSpark/Domino 启发的 Action-RNN 负责提高弱路径命中；动作组级宽松校验与校准式稀疏多候选树负责在推理
+DSpark/Domino 启发的 Action-RNN 负责提高弱路径命中；动作组级宽松校验与 DDTree 式稀疏多候选树负责在推理
 阶段扩大可接受候选覆盖。它们最终都必须接受成功率、Length 和端到端 Speedup 的共同检验。
 
 代码基于 [SpecVLA](https://github.com/PineTreeWss/SpecVLA)，而 SpecVLA 又基于
@@ -118,7 +118,7 @@ parallel_draft=False
 | 跨 Anchor 长程因果迁移 | 本项目 | 同一目标位置上，让完整前缀强路径的 base 分布蒸馏短前缀弱路径 | 训练端主要自有设计 |
 | 高维主导的自动损失标定 | 本项目结合历史训练诊断形成 | 正式更新前只读少量 batch，固定缩放低维损失，使初始高维:低维约为 9:1 | 防止初始值 20-40 的 Soft KL 掩盖 Hidden 学习，标定后不动态追权 |
 | 动作组级宽松校验 | 本项目在 SpecVLA relaxed 上的结构化扩展 | 平移组、旋转组使用组内平方误差预算，夹爪保持精确 | 推理端自有设计之一 |
-| 校准式稀疏多候选树 | 本项目 | 一个 runner-up 单分叉形成双路径稀疏树，一次目标 forward 校验，实测无收益则关闭 | 推理端自有设计之二 |
+| DDTree 式稀疏多候选树 | [DDTree](https://arxiv.org/abs/2604.12989) 的标准验证语义 + 本项目低预算候选 | 一个 runner-up 单分叉形成双路径；共享前缀节点、祖先注意力、目标 token 驱动遍历、按接受节点提交缓存 | 推理端系统设计之二 |
 
 因此，论文主线应表述为：**块并行主干负责低成本长程预测，Action-RNN 补充显式短程因果，跨 Anchor 蒸馏
 补充训练时可获得的长前缀知识；动作组校验与稀疏候选树再把更高的候选覆盖率转化为在线接受长度和速度。**
@@ -468,20 +468,26 @@ sum(delta_i^2, i in G) <= |G_visible| * r^2
 | `action_group_rescued_blocks` | 组级规则比逐 token 规则接受更长前缀的块数 |
 | `action_group_extra_accepted` | 组级规则额外接受的 token 总数 |
 
-### 5.3 校准式稀疏多候选树校验
+### 5.3 DDTree 式稀疏多候选树校验
 
-当前实现是稀疏多候选树的最小固定预算版本：**单分叉、双路径**，并不是任意宽度的 beam search。流程如下：
+当前实现保留本项目的最小固定候选预算：**单分叉、双路径**，但验证与提交遵守标准 DDTree 语义，而不是
+把两条完整路径各自打分后挑最长。由于本项目的 Draft 依赖已经过目标模型解码的 anchor hidden，当前 anchor
+位于目标 KV cache 中并作为 DDTree 的虚拟根；这与 DDTree 把根放进同一次验证 forward 的工程位置不同，
+节点图、目标遍历和 cache 提交语义相同。流程如下：
 
 1. DFlash transformer 只执行一次，Action-RNN 从 Base logits 生成贪心主路径。
 2. 在一个固定分叉位置取主路径 logits 的第二候选 token。
 3. 复用该位置之前的前缀和 RNN state，只用轻量 Action-RNN 滚出第二候选的后缀，不再执行 DFlash forward。
-4. 主路径和备选路径共享分叉前节点；tree mask 保证两条后缀只能看见各自的因果祖先。
-5. 目标模型用一次 tree-attention forward 同时校验两条路径，选择可接受前缀更长的一条。
-6. 只把胜出路径中真正提交的 hidden 和 KV 节点写回缓存；拒绝点仍由目标模型 posterior 纠正。
+4. 两条路径编译成显式父子节点图；相同的 `(父节点, token)` 只保留一个节点，tree mask 只开放祖先。
+5. 目标模型一次 tree-attention forward 得到所有节点的 posterior。从虚拟根开始，每一步只沿目标模型
+   posterior 指定的子 token 前进；当前节点没有该子 token 时立即停止，并提交目标 token 作为纠正。
+6. 只按目标模型实际走过的节点索引压紧并提交 hidden/KV。候选树只能提高“正确连续 token 已在树中”的概率，
+   不能用未来接受长度替目标模型选择另一条答案。
 
-若块长为 `q`，线性校验输入 `q-1` 个节点；在索引 `b` 单分叉后，稀疏树只额外加入
-`q-1-b` 个备选后缀节点。它避免完整 top-k 树的指数膨胀，目标是用少量额外验证宽度覆盖主路径中高价值的
-runner-up，而不是盲目增加候选数。默认只在 anchor0 的首个最长块启用，后续短块不再支付树开销。
+若块长为 `q`，DDTree 节点图包含主路径的 `q` 个候选节点以及分叉后的备选后缀节点；共享前缀不重复。
+线性 DFlash 只需输入 `q-1` 个节点，因此树的新增开销会被 `tree_extra_verified_nodes` 完整记录。这个设计避免
+完整 top-k 树的指数膨胀，目标是用少量额外宽度覆盖主路径中高价值的 runner-up。默认只在 anchor0 的首个
+最长块启用，后续短块不再支付树开销。
 
 树是否提速不能由 top-2 命中率直接决定，因此 strict 评测先在真实 observation 上对
 `off/p2/p3/p4/p5` 做配对的完整动作延迟校准。候选位置必须同时满足：确实触发过分叉、相对 off 的中位延迟
@@ -491,7 +497,7 @@ runner-up，而不是盲目增加候选数。默认只在 anchor0 的首个最�
 | 指标 | 含义 |
 | --- | --- |
 | `tree_triggered_blocks` | 实际构造双路径树的块数 |
-| `tree_selected_alternate_blocks` | 最终选择备选路径的块数 |
+| `tree_selected_alternate_blocks` | 目标模型实际遍历离开主路径、进入备选子树的块数 |
 | `tree_extra_verified_nodes` | 相比线性校验额外送入目标模型的树节点数 |
 | `tree_extra_accepted` | 备选路径比主路径额外接受的 token 数 |
 | `tree_mean_branch_score` | runner-up 相对主候选的平均概率比代理 |
@@ -500,8 +506,9 @@ runner-up，而不是盲目增加候选数。默认只在 anchor0 的首个最�
 
 高维主导线性交接、跨 Anchor 和 Action-RNN 解决“候选能否覆盖目标 token”；动作组校验和稀疏候选树解决
 “已有候选怎样以有限验证成本转化为更长接受前缀”。两类推理机制彼此正交：树增加离散候选覆盖，动作组规则
-放宽连续运动误差；二者可以组合，但必须分别做 `off/on` 消融并计入完整动作延迟。strict + tree 仍保持目标
-token 精确校验；action-group relaxed 则以成功率约束换取更大的接受空间。
+放宽连续运动误差；二者可以组合，但必须分别做 `off/on` 消融并计入完整动作延迟。strict + tree 采用目标
+token 驱动的精确遍历；action-group relaxed 本身是有意近似的策略，仍保留完整路径上的组误差预算，因此不能
+宣称与 AR token 完全一致。
 
 ## 6. 实验历程与目前证据
 
@@ -609,7 +616,30 @@ RNN 接受长度增益最高（约 +0.102），因此正式评测优先搬运 `e
 `0.687/0.326/0.411/0.393/0.468/0.577`。这证明 exposure gap 是实质问题。另一方面，DFlash strict
 Length 高于 SpecVLA strict 却更慢，证明 Length 不包含 draft 自身成本，不能单独作为加速结论。
 
-### 6.5 已废弃的旧余弦课程早期快照
+### 6.5 2026-07-25 双路径验证器事故与 DDTree 修复
+
+旧双路径实现虽然构造了祖先 mask，却在校验后分别计算两条完整路径的接受长度，再选择“接受最长”的路径；
+hidden/KV 也依赖这个胜出路径索引提交。这不是标准 DDTree 的目标驱动遍历。实际 epoch 200 校准中，多个固定
+分叉位置相对 tree-off 改变了 7 维动作中的 2 维，严格安全检查将其全部淘汰，四路脚本因此退化为重复执行
+tree-off。该现象不能解释为“目标模型答案不唯一”，根因是验证与提交语义没有以目标 token 的逐节点选择为
+唯一真值。
+
+修复没有改 Draft、Action-RNN、checkpoint 或训练损失，只重写推理验证链：候选路径先合并成父子节点图，
+共享前缀去重；每个节点只看祖先；从 anchor 虚拟根开始沿目标 posterior 指定的 child map 遍历；走不到时
+立即写入目标 token；只提交实际接受节点的 KV/hidden。因而旧 epoch 180/200 权重可直接评测，无需重训。
+
+修复后的验证证据：
+
+| 检查 | 结果 |
+| --- | --- |
+| 节点图、祖先 mask、目标遍历、目标纠正、legacy/Dynamic KV 单元测试 | `12 passed` |
+| epoch 200、真实 Goal observation、`p2`、strict 配对安全检查 | 4/4 次树均实际触发，`rejected_positions={}`，完整动作与 tree-off 相同 |
+| 4 样本延迟校准 | 树中位数约慢 2.36 ms，因此保守选择 `off`；这只说明该极小样本未证明提速，不是树失效 |
+
+正式结论仍必须来自完整 50-trial 四路评测。strict 使用 DDTree 目标遍历；action-group relaxed 因定义上允许
+近似动作，继续使用整条路径的组误差预算，不能作为 lossless 结果报告。
+
+### 6.6 已废弃的旧余弦课程早期快照
 
 2026-07-15，旧 3090 主训练在 step 500、warmup 进行到一半时：
 

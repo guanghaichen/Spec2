@@ -2,6 +2,8 @@ import math
 import statistics
 from collections import Counter
 
+import numpy as np
+
 
 def parse_tree_calibration_positions(raw: str) -> list[int]:
     positions = []
@@ -19,6 +21,41 @@ def parse_tree_calibration_positions(raw: str) -> list[int]:
     if len(positions) < 2:
         raise ValueError("Tree auto-calibration needs the off baseline and at least one fork.")
     return positions
+
+
+def partition_strict_tree_calibration_results(calibration_results: dict[int, tuple]):
+    """Keep only tree candidates that reproduce the tree-off target action exactly."""
+    if 0 not in calibration_results:
+        raise ValueError("Strict tree calibration requires the tree-off baseline at position 0.")
+
+    baseline_action = np.asarray(calibration_results[0][0])
+    equivalent_results = {0: calibration_results[0]}
+    rejected_positions = {}
+    for position, result in calibration_results.items():
+        if position == 0:
+            continue
+        candidate_action = np.asarray(result[0])
+        if np.array_equal(candidate_action, baseline_action):
+            equivalent_results[position] = result
+            continue
+
+        same_shape = candidate_action.shape == baseline_action.shape
+        rejected_positions[position] = {
+            "reason": "changed_strict_target_action",
+            "candidate_shape": list(candidate_action.shape),
+            "baseline_shape": list(baseline_action.shape),
+            "mismatched_elements": (
+                int(np.count_nonzero(candidate_action != baseline_action))
+                if same_shape
+                else None
+            ),
+            "max_abs_delta": (
+                float(np.max(np.abs(candidate_action - baseline_action)))
+                if same_shape and candidate_action.size
+                else None
+            ),
+        }
+    return equivalent_results, rejected_positions
 
 
 def one_sided_sign_test_pvalue(paired_differences: list[float]) -> float:

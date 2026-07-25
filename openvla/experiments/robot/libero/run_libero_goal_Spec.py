@@ -49,6 +49,7 @@ from experiments.robot.libero.eval_metrics import (
     format_conditional_prefix,
     format_generation_summary,
     parse_tree_calibration_positions,
+    partition_strict_tree_calibration_results,
     select_tree_branch_position,
     summarize_generation_stats,
     write_eval_summary,
@@ -161,6 +162,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
     tree_calibration_remaining = 0
     tree_calibration_warmed_up = False
     tree_calibration_sample_index = 0
+    tree_calibration_rejected = {}
     if tree_calibration_enabled:
         if cfg.accept_threshold not in (None, 0) or cfg.dflash_acceptance_mode != "token":
             raise ValueError("Tree auto-calibration must run under strict token verification.")
@@ -176,6 +178,27 @@ def eval_libero(cfg: GenerateConfig) -> None:
         tree_calibration_remaining = int(cfg.dflash_tree_calibration_steps)
         model.set_dflash_tree_branch_position(0)
         cfg.dflash_tree_branch_position = 0
+
+    def select_safe_tree_branch_position():
+        safe_times = {
+            position: values
+            for position, values in tree_calibration_times.items()
+            if position not in tree_calibration_rejected
+        }
+        safe_triggered = {
+            position: value
+            for position, value in tree_calibration_triggered.items()
+            if position not in tree_calibration_rejected
+        }
+        selected_position, diagnostics = select_tree_branch_position(
+            safe_times,
+            safe_triggered,
+        )
+        diagnostics["rejected_positions"] = {
+            str(position): details
+            for position, details in sorted(tree_calibration_rejected.items())
+        }
+        return selected_position, diagnostics
 
     # Initialize local logging
     eval_family = "dflash_strict" if cfg.draft_backend == "dflash" else "specvla_strict"
@@ -282,16 +305,21 @@ def eval_libero(cfg: GenerateConfig) -> None:
                     }
 
                     # Tree calibration compares complete synchronized action latency on
-                    # identical observations. The strict verifier must return the exact
-                    # same action for every candidate fork; otherwise evaluation aborts.
+                    # identical observations. A fork that changes the strict target action
+                    # is permanently disqualified; safe candidates continue calibration.
                     record_action_metrics = True
                     if tree_calibration_enabled and tree_calibration_remaining > 0:
                         original_sync_cuda_timing = cfg.sync_cuda_timing
                         cfg.sync_cuda_timing = True
-                        shift = tree_calibration_sample_index % len(tree_calibration_positions)
+                        active_positions = [
+                            position
+                            for position in tree_calibration_positions
+                            if position not in tree_calibration_rejected
+                        ]
+                        shift = tree_calibration_sample_index % len(active_positions)
                         ordered_positions = (
-                            tree_calibration_positions[shift:]
-                            + tree_calibration_positions[:shift]
+                            active_positions[shift:]
+                            + active_positions[:shift]
                         )
                         calibration_results = {}
                         try:
@@ -315,13 +343,22 @@ def eval_libero(cfg: GenerateConfig) -> None:
                         finally:
                             cfg.sync_cuda_timing = original_sync_cuda_timing
 
+                        calibration_results, newly_rejected = (
+                            partition_strict_tree_calibration_results(calibration_results)
+                        )
+                        for branch_position, details in newly_rejected.items():
+                            tree_calibration_rejected[branch_position] = details
+                            tree_calibration_times[branch_position].clear()
+                            tree_calibration_triggered[branch_position] = 0
+                            rejection_line = (
+                                "DFlash tree calibration rejected unsafe position "
+                                f"p{branch_position}: {json.dumps(details, sort_keys=True)}"
+                            )
+                            print(rejection_line)
+                            log_file.write(rejection_line + "\n")
+                            log_file.flush()
+
                         baseline_action, baseline_time, baseline_stats = calibration_results[0]
-                        for branch_position, (candidate_action, _, _) in calibration_results.items():
-                            if not np.array_equal(candidate_action, baseline_action):
-                                raise RuntimeError(
-                                    "Strict two-path verification changed the target action at "
-                                    f"branch position p{branch_position}; refusing to continue."
-                                )
 
                         if tree_calibration_warmed_up:
                             for branch_position, (_, candidate_time, candidate_stats) in calibration_results.items():
@@ -335,14 +372,24 @@ def eval_libero(cfg: GenerateConfig) -> None:
                             tree_calibration_warmed_up = True
                         tree_calibration_sample_index += 1
 
+                        if not any(
+                            position != 0
+                            and position not in tree_calibration_rejected
+                            for position in tree_calibration_positions
+                        ):
+                            tree_calibration_remaining = 0
+
                         action, time, generation_stats = baseline_action, baseline_time, baseline_stats
                         record_action_metrics = False
                         if tree_calibration_remaining == 0:
-                            selected_position, calibration_diagnostics = select_tree_branch_position(
-                                tree_calibration_times,
-                                tree_calibration_triggered,
+                            selected_position, calibration_diagnostics = (
+                                select_safe_tree_branch_position()
                             )
-                            calibration_diagnostics["completed_requested_samples"] = True
+                            calibration_diagnostics["completed_requested_samples"] = not bool(
+                                tree_calibration_rejected
+                                and len(tree_calibration_rejected)
+                                == len(tree_calibration_positions) - 1
+                            )
                             calibration_diagnostics["remaining_samples"] = 0
                             model.set_dflash_tree_branch_position(selected_position)
                             cfg.dflash_tree_branch_position = selected_position
@@ -452,10 +499,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
     # of calibration observations. In that case make an explicit conservative
     # decision instead of leaving the model at whichever candidate ran last.
     if tree_calibration_enabled and tree_calibration_remaining > 0:
-        selected_position, calibration_diagnostics = select_tree_branch_position(
-            tree_calibration_times,
-            tree_calibration_triggered,
-        )
+        selected_position, calibration_diagnostics = select_safe_tree_branch_position()
         calibration_diagnostics["completed_requested_samples"] = False
         calibration_diagnostics["remaining_samples"] = tree_calibration_remaining
         model.set_dflash_tree_branch_position(selected_position)

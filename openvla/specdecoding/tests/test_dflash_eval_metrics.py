@@ -1,7 +1,10 @@
 import unittest
 
+import numpy as np
+
 from openvla.experiments.robot.libero.eval_metrics import (
     parse_tree_calibration_positions,
+    partition_strict_tree_calibration_results,
     select_tree_branch_position,
 )
 
@@ -30,6 +33,20 @@ class DFlashEvalMetricsTest(unittest.TestCase):
         triggered = {0: 0, 2: 0, 3: samples}
         selected, _ = select_tree_branch_position(times, triggered)
         self.assertEqual(selected, 0)
+
+    def test_non_equivalent_strict_tree_candidate_is_rejected(self):
+        baseline = (np.array([1.0, 2.0]), (2.0, 1.0), {})
+        equivalent = (np.array([1.0, 2.0]), (1.9, 1.0), {})
+        changed = (np.array([1.0, 3.0]), (1.8, 1.0), {})
+
+        safe, rejected = partition_strict_tree_calibration_results(
+            {0: baseline, 2: equivalent, 3: changed}
+        )
+
+        self.assertEqual(set(safe), {0, 2})
+        self.assertEqual(set(rejected), {3})
+        self.assertEqual(rejected[3]["mismatched_elements"], 1)
+        self.assertEqual(rejected[3]["max_abs_delta"], 1.0)
 
 
 if __name__ == "__main__":

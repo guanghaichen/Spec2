@@ -799,7 +799,17 @@ DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-d
 
 四路依次为 `RNN+strict`、`RNN+树+strict`、`RNN+动作组`、`RNN+树+动作组`。树版 strict 在真实
 observation 上校准 `off/p2/p3/p4/p5`，最后一组复用该位置；若没有候选位置在完整动作延迟上显著优于
-`off`，树分叉位置为 0，树版自动退化为线性验证。评测 epoch 180 时只需把上面的 `EVAL_EPOCH` 改为 180。
+`off`，树分叉位置为 0，树版自动退化为线性验证。任何改变 strict 目标动作的候选位置都会被永久淘汰，
+不会中断其它候选的校准。评测 epoch 180 时只需把上面的 `EVAL_EPOCH` 改为 180。
+
+如果前面的组已经完成，可用 `START_GROUP` 从指定组继续。例如第1组完成后，从第2组续跑：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 EVAL_EPOCH=200 START_GROUP=2 \
+  bash openvla/specdecoding/decode-scripts/run_dflash_action_rnn_goal_4way_eval.sh
+```
+
+脚本会复用相同 `RUN_ID_PREFIX` 下已完成组的 summary，最后仍统一汇总四组结果。
 
 单独执行：
 

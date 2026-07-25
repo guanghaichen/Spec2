@@ -23,6 +23,12 @@ export TIMING_SCOPE="${TIMING_SCOPE:-last_task}"
 export DFLASH_TREE_FIRST_ANCHOR_ONLY="${DFLASH_TREE_FIRST_ANCHOR_ONLY:-True}"
 export DFLASH_TREE_CALIBRATION_STEPS="${DFLASH_TREE_CALIBRATION_STEPS:-64}"
 export DFLASH_TREE_CALIBRATION_POSITIONS="${DFLASH_TREE_CALIBRATION_POSITIONS:-0,2,3,4,5}"
+START_GROUP="${START_GROUP:-1}"
+
+if [[ ! "${START_GROUP}" =~ ^[1-4]$ ]]; then
+  echo "START_GROUP 必须是 1、2、3 或 4；当前值为 ${START_GROUP}。" >&2
+  exit 1
+fi
 
 RELAXED_ACCEPT_THRESHOLD="${RELAXED_ACCEPT_THRESHOLD:-9}"
 RUN_ID_PREFIX="${RUN_ID_PREFIX:-dflash-action-rnn-4way-goal-e${EVAL_EPOCH}}"
@@ -31,17 +37,25 @@ TREE_STRICT_NOTE="${RUN_ID_PREFIX}-tree-strict-r0"
 GROUP_NOTE="${RUN_ID_PREFIX}-linear-action-group-r${RELAXED_ACCEPT_THRESHOLD}"
 TREE_GROUP_NOTE="${RUN_ID_PREFIX}-tree-action-group-r${RELAXED_ACCEPT_THRESHOLD}"
 
-echo "[1/4] Action-RNN + strict (tree off)"
-SPEC_CKPT="" ACCEPT_THRESHOLD=0 DFLASH_ACCEPTANCE_MODE=token \
-DFLASH_TREE_MODE=off DFLASH_TREE_AUTO_CALIBRATE=False \
-RUN_ID_NOTE="${LINEAR_STRICT_NOTE}" \
-  bash "${SCRIPT_DIR}/run_dflash_goal_eval.sh" strict
+if (( START_GROUP <= 1 )); then
+  echo "[1/4] Action-RNN + strict (tree off)"
+  SPEC_CKPT="" ACCEPT_THRESHOLD=0 DFLASH_ACCEPTANCE_MODE=token \
+  DFLASH_TREE_MODE=off DFLASH_TREE_AUTO_CALIBRATE=False \
+  RUN_ID_NOTE="${LINEAR_STRICT_NOTE}" \
+    bash "${SCRIPT_DIR}/run_dflash_goal_eval.sh" strict
+else
+  echo "[1/4] 已按 START_GROUP=${START_GROUP} 跳过；复用已有结果。"
+fi
 
-echo "[2/4] Action-RNN + sparse tree + strict (calibrate once)"
-SPEC_CKPT="" ACCEPT_THRESHOLD=0 DFLASH_ACCEPTANCE_MODE=token \
-DFLASH_TREE_MODE=single_fork DFLASH_TREE_BRANCH_POSITION=0 \
-DFLASH_TREE_AUTO_CALIBRATE=True RUN_ID_NOTE="${TREE_STRICT_NOTE}" \
-  bash "${SCRIPT_DIR}/run_dflash_goal_eval.sh" strict
+if (( START_GROUP <= 2 )); then
+  echo "[2/4] Action-RNN + sparse tree + strict (calibrate once)"
+  SPEC_CKPT="" ACCEPT_THRESHOLD=0 DFLASH_ACCEPTANCE_MODE=token \
+  DFLASH_TREE_MODE=single_fork DFLASH_TREE_BRANCH_POSITION=0 \
+  DFLASH_TREE_AUTO_CALIBRATE=True RUN_ID_NOTE="${TREE_STRICT_NOTE}" \
+    bash "${SCRIPT_DIR}/run_dflash_goal_eval.sh" strict
+else
+  echo "[2/4] 已按 START_GROUP=${START_GROUP} 跳过；从已有 summary 读取树位置。"
+fi
 
 if [[ "${DRY_RUN:-False}" == "True" ]]; then
   SELECTED_TREE_POSITION=0
@@ -64,11 +78,15 @@ PY
 fi
 echo "树校准选中的分叉位置: ${SELECTED_TREE_POSITION}（0 表示关闭）"
 
-echo "[3/4] Action-RNN + action-group acceptance (tree off)"
-SPEC_CKPT="" ACCEPT_THRESHOLD="${RELAXED_ACCEPT_THRESHOLD}" \
-DFLASH_ACCEPTANCE_MODE=action_group DFLASH_TREE_MODE=off \
-DFLASH_TREE_AUTO_CALIBRATE=False RUN_ID_NOTE="${GROUP_NOTE}" \
-  bash "${SCRIPT_DIR}/run_dflash_goal_eval.sh" relaxed
+if (( START_GROUP <= 3 )); then
+  echo "[3/4] Action-RNN + action-group acceptance (tree off)"
+  SPEC_CKPT="" ACCEPT_THRESHOLD="${RELAXED_ACCEPT_THRESHOLD}" \
+  DFLASH_ACCEPTANCE_MODE=action_group DFLASH_TREE_MODE=off \
+  DFLASH_TREE_AUTO_CALIBRATE=False RUN_ID_NOTE="${GROUP_NOTE}" \
+    bash "${SCRIPT_DIR}/run_dflash_goal_eval.sh" relaxed
+else
+  echo "[3/4] 已按 START_GROUP=${START_GROUP} 跳过；复用已有结果。"
+fi
 
 echo "[4/4] Action-RNN + sparse tree + action-group acceptance"
 SPEC_CKPT="" ACCEPT_THRESHOLD="${RELAXED_ACCEPT_THRESHOLD}" \

@@ -399,40 +399,6 @@ class DFlashActionHeadTest(unittest.TestCase):
         self.assertTrue(torch.all(sampled_tokens >= 96))
         self.assertTrue(torch.all(sampled_tokens < 128))
 
-    def test_single_fork_reuses_main_path_and_rolls_alternate_suffix(self):
-        torch.manual_seed(11)
-        model = DFlashDraftModel(tiny_config())
-        block_len = 6
-        base_logits = torch.randn(1, block_len, 128)
-        hidden = torch.randn(1, block_len, 32)
-        first_token = torch.tensor([[101]])
-        action_positions = torch.arange(block_len).unsqueeze(0)
-
-        main_tokens, main_logits, _ = model.sample_action_block(
-            base_logits,
-            hidden,
-            first_token,
-            action_positions,
-        )
-        proposal = model.sample_action_tree(
-            base_logits,
-            hidden,
-            first_token,
-            action_positions,
-            branch_index=2,
-        )
-
-        self.assertEqual(proposal.token_paths.shape, (2, block_len))
-        self.assertTrue(torch.equal(proposal.token_paths[0], main_tokens[0]))
-        self.assertTrue(torch.equal(proposal.main_logits, main_logits))
-        self.assertTrue(torch.equal(proposal.token_paths[1, :2], main_tokens[0, :2]))
-        self.assertNotEqual(
-            proposal.token_paths[1, 2].item(),
-            main_tokens[0, 2].item(),
-        )
-        self.assertEqual(proposal.branch_index, 2)
-        self.assertIsNotNone(proposal.branch_score)
-
     def test_new_even_layer_sample_does_not_require_duplicate_prompt_last(self):
         train_module = load_training_module()
         parser = train_module.OfflineDFlashSampleMixin()

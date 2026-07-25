@@ -20,74 +20,74 @@ class DFlashVerificationTest(unittest.TestCase):
     def test_tree_mode_normalizes_yaml_boolean_aliases(self):
         for value in (False, None, "off", "false", "0", "none", "disabled"):
             self.assertEqual(normalize_dflash_tree_mode(value), "off")
-        self.assertEqual(normalize_dflash_tree_mode("single_fork"), "single_fork")
+        self.assertEqual(normalize_dflash_tree_mode("ddtree"), "ddtree")
+        self.assertEqual(normalize_dflash_tree_mode("single_fork"), "ddtree")
         with self.assertRaises(ValueError):
             normalize_dflash_tree_mode(True)
 
-    def test_ddtree_merges_prefix_and_exposes_only_ancestors(self):
-        token_paths = torch.tensor(
+    @staticmethod
+    def _tree_logits():
+        return torch.tensor(
             [
-                [11, 12, 13, 14, 15, 16],
-                [11, 22, 23, 24, 25, 26],
-            ]
-        )
-        flat_tokens, path_nodes, child_maps, tree_mask, relative_positions = (
-            self.verifier._build_ddtree_from_paths(token_paths)
+                [4.0, 3.0, -4.0, -5.0],
+                [0.0, 0.0, 0.0, -5.0],
+                [5.0, 0.0, -2.0, -5.0],
+                [5.0, 0.0, -2.0, -5.0],
+            ],
+            dtype=torch.float32,
         )
 
-        self.assertEqual(
-            flat_tokens.tolist(),
-            [[11, 12, 13, 14, 15, 16, 22, 23, 24, 25, 26]],
+    def test_ddtree_best_first_builder_obeys_budget_and_ancestor_visibility(self):
+        flat_tokens, child_maps, tree_mask, relative_positions, greedy_tokens = (
+            self.verifier._build_ddtree_from_logits(
+                self._tree_logits(), node_budget=5, token_id_offset=100
+            )
         )
-        self.assertEqual(
-            path_nodes.tolist(),
-            [[0, 1, 2, 3, 4, 5], [0, 6, 7, 8, 9, 10]],
-        )
-        self.assertEqual(
-            relative_positions.tolist(),
-            [[0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5]],
-        )
-        self.assertEqual(child_maps[0], {11: 1})
-        self.assertEqual(child_maps[1], {12: 2, 22: 7})
+
+        self.assertEqual(flat_tokens.shape, (1, 5))
+        self.assertEqual(len(child_maps), 6)
+        self.assertEqual(greedy_tokens.tolist(), [[100, 100, 100, 100]])
+        self.assertIn(100, child_maps[0])
+        self.assertIn(101, child_maps[0])
+        self.assertTrue(torch.all(relative_positions >= 0))
+        self.assertTrue(torch.all(relative_positions < 4))
         mask = tree_mask[0, 0]
-        self.assertTrue(mask[10, 0])
-        self.assertTrue(mask[10, 6])
-        self.assertFalse(mask[10, 1])
-        self.assertFalse(mask[5, 6])
+        self.assertTrue(torch.all(mask.diagonal()))
+        root_children = list(child_maps[0].values())
+        self.assertFalse(mask[root_children[0] - 1, root_children[1] - 1])
+        self.assertFalse(mask[root_children[1] - 1, root_children[0] - 1])
 
     def test_ddtree_follows_target_tokens_instead_of_longest_path(self):
-        paths = torch.tensor(
-            [
-                [11, 12, 13, 14],
-                [11, 22, 23, 24],
-            ]
+        _, child_maps, _, _, _ = self.verifier._build_ddtree_from_logits(
+            self._tree_logits(), node_budget=5, token_id_offset=100
         )
-        _, path_nodes, child_maps, _, _ = self.verifier._build_ddtree_from_paths(paths)
-        node_posteriors = torch.tensor([[22, 13, 14, 99, 23, 24, 77]])
+        alternate_index = child_maps[0][101]
+        node_posteriors = torch.full((1, 5), 177, dtype=torch.long)
 
         accepted_nodes, next_token = self.verifier._follow_ddtree_target_path(
             child_maps,
-            root_posterior_token=torch.tensor([[11]]),
+            root_posterior_token=torch.tensor([[101]]),
             node_posterior_tokens=node_posteriors,
             max_accept_length=4,
         )
 
-        self.assertEqual(accepted_nodes.tolist(), path_nodes[1].tolist())
-        self.assertEqual(next_token, 77)
+        self.assertEqual(accepted_nodes.tolist(), [alternate_index - 1])
+        self.assertEqual(next_token, 177)
 
     def test_ddtree_uses_target_correction_when_root_has_no_child(self):
-        paths = torch.tensor([[11, 12, 13], [11, 22, 23]])
-        _, _, child_maps, _, _ = self.verifier._build_ddtree_from_paths(paths)
+        _, child_maps, _, _, _ = self.verifier._build_ddtree_from_logits(
+            self._tree_logits(), node_budget=5, token_id_offset=100
+        )
 
         accepted_nodes, next_token = self.verifier._follow_ddtree_target_path(
             child_maps,
-            root_posterior_token=torch.tensor([[31]]),
+            root_posterior_token=torch.tensor([[131]]),
             node_posterior_tokens=torch.zeros((1, 5), dtype=torch.long),
             max_accept_length=3,
         )
 
         self.assertEqual(accepted_nodes.numel(), 0)
-        self.assertEqual(next_token, 31)
+        self.assertEqual(next_token, 131)
 
     def test_action_group_budget_extends_motion_but_not_gripper(self):
         proposed = torch.tensor([[100, 100, 100, 100, 100, 100]])
@@ -144,7 +144,7 @@ class DFlashVerificationTest(unittest.TestCase):
         )
         self.assertEqual(self.verifier._past_key_values_length(selected), 4)
 
-    def test_tree_target_logits_match_two_linear_verifications(self):
+    def test_tree_target_logits_match_every_linear_leaf_path(self):
         torch.manual_seed(17)
         config = LlamaConfig(
             vocab_size=64,
@@ -158,16 +158,12 @@ class DFlashVerificationTest(unittest.TestCase):
         config._attn_implementation = "eager"
         target = LlamaSpecForCausalLM(config, "eager").eval()
         prefix = torch.tensor([[1, 2, 3]])
-        paths = torch.tensor(
-            [
-                [11, 12, 13, 14, 15, 16],
-                [11, 22, 23, 24, 25, 26],
-            ]
-        )
         with torch.no_grad():
             prefix_outputs = target(input_ids=prefix, use_cache=True, return_dict=True)
-        flat_tokens, path_nodes, _, tree_mask, relative_positions = (
-            self.verifier._build_ddtree_from_paths(paths)
+        flat_tokens, child_maps, tree_mask, relative_positions, _ = (
+            self.verifier._build_ddtree_from_logits(
+                self._tree_logits(), node_budget=6, token_id_offset=10
+            )
         )
 
         target.tree_mask = tree_mask
@@ -183,18 +179,22 @@ class DFlashVerificationTest(unittest.TestCase):
         finally:
             target.tree_mask = None
 
-        for path_index in range(2):
+        for path in self.verifier._enumerate_ddtree_leaf_paths(child_maps):
+            tensor_indices = torch.tensor([node - 1 for node in path])
+            path_tokens = flat_tokens.index_select(1, tensor_indices)
             with torch.no_grad():
                 linear_outputs = target(
-                    input_ids=paths[path_index : path_index + 1],
+                    input_ids=path_tokens,
                     past_key_values=prefix_outputs.past_key_values,
-                    position_ids=torch.arange(3, 9).unsqueeze(0),
+                    position_ids=torch.arange(
+                        prefix.shape[1], prefix.shape[1] + len(path)
+                    ).unsqueeze(0),
                     use_cache=True,
                     return_dict=True,
                 )
             tree_path_logits = tree_outputs.logits[0].index_select(
                 0,
-                path_nodes[path_index],
+                tensor_indices,
             )
             torch.testing.assert_close(
                 tree_path_logits,

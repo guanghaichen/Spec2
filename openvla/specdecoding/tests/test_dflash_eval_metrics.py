@@ -1,52 +1,56 @@
 import unittest
 
-import numpy as np
-
-from openvla.experiments.robot.libero.eval_metrics import (
-    parse_tree_calibration_positions,
-    partition_strict_tree_calibration_results,
-    select_tree_branch_position,
-)
+from openvla.experiments.robot.libero.eval_metrics import summarize_generation_stats
 
 
 class DFlashEvalMetricsTest(unittest.TestCase):
-    def test_calibration_positions_are_unique_and_include_off(self):
-        self.assertEqual(parse_tree_calibration_positions("3,2,3,5"), [0, 3, 2, 5])
+    def test_dynamic_tree_metrics_are_aggregated_by_block_count(self):
+        stats = [
+            {
+                "backend": "dflash",
+                "block_size": 7,
+                "num_blocks": 2,
+                "generated_tokens": 7,
+                "progressed_tokens": 5,
+                "accept_lengths": [2, 1],
+                "main_path_accept_lengths": [1, 1],
+                "progress_lengths": [3, 2],
+                "tree_mode": "ddtree",
+                "tree_budget": 0,
+                "tree_triggered_blocks": 2,
+                "tree_selected_alternate_blocks": 1,
+                "tree_extra_verified_nodes": 0,
+                "tree_extra_accepted": 1,
+                "tree_average_verified_nodes": 5.0,
+                "tree_average_max_depth": 3.0,
+            },
+            {
+                "backend": "dflash",
+                "block_size": 7,
+                "num_blocks": 1,
+                "generated_tokens": 7,
+                "progressed_tokens": 4,
+                "accept_lengths": [3],
+                "main_path_accept_lengths": [2],
+                "progress_lengths": [4],
+                "tree_mode": "ddtree",
+                "tree_budget": 0,
+                "tree_triggered_blocks": 1,
+                "tree_selected_alternate_blocks": 1,
+                "tree_extra_verified_nodes": 0,
+                "tree_extra_accepted": 1,
+                "tree_average_verified_nodes": 6.0,
+                "tree_average_max_depth": 4.0,
+            },
+        ]
 
-    def test_significant_full_action_speedup_selects_fastest_fork(self):
-        samples = 64
-        times = {
-            0: [1.0] * samples,
-            2: [0.91] * samples,
-            3: [0.96] * samples,
-            4: [1.02] * samples,
-            5: [1.05] * samples,
-        }
-        triggered = {0: 0, 2: samples, 3: samples, 4: samples, 5: samples}
-        selected, diagnostics = select_tree_branch_position(times, triggered)
-        self.assertEqual(selected, 2)
-        self.assertLess(diagnostics["candidates"]["2"]["sign_test_pvalue"], 0.0125)
+        summary = summarize_generation_stats(stats)
 
-    def test_untriggered_or_slower_forks_fall_back_to_off(self):
-        samples = 64
-        times = {0: [1.0] * samples, 2: [0.9] * samples, 3: [1.1] * samples}
-        triggered = {0: 0, 2: 0, 3: samples}
-        selected, _ = select_tree_branch_position(times, triggered)
-        self.assertEqual(selected, 0)
-
-    def test_non_equivalent_strict_tree_candidate_is_rejected(self):
-        baseline = (np.array([1.0, 2.0]), (2.0, 1.0), {})
-        equivalent = (np.array([1.0, 2.0]), (1.9, 1.0), {})
-        changed = (np.array([1.0, 3.0]), (1.8, 1.0), {})
-
-        safe, rejected = partition_strict_tree_calibration_results(
-            {0: baseline, 2: equivalent, 3: changed}
-        )
-
-        self.assertEqual(set(safe), {0, 2})
-        self.assertEqual(set(rejected), {3})
-        self.assertEqual(rejected[3]["mismatched_elements"], 1)
-        self.assertEqual(rejected[3]["max_abs_delta"], 1.0)
+        self.assertEqual(summary["tree_mode"], "ddtree")
+        self.assertEqual(summary["tree_triggered_blocks"], 3)
+        self.assertEqual(summary["tree_selected_alternate_blocks"], 2)
+        self.assertAlmostEqual(summary["tree_average_verified_nodes"], 16.0 / 3.0)
+        self.assertAlmostEqual(summary["tree_average_max_depth"], 10.0 / 3.0)
 
 
 if __name__ == "__main__":

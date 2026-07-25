@@ -16,49 +16,27 @@ export DFLASH_NUM_DRAFT_LAYERS=1
 export DFLASH_USE_CAUSAL_RESIDUAL_SAMPLING=True
 export SYNC_CUDA_TIMING="${SYNC_CUDA_TIMING:-False}"
 export TIMING_SCOPE="${TIMING_SCOPE:-last_task}"
-export DFLASH_TREE_MODE="${DFLASH_TREE_MODE:-single_fork}"
-export DFLASH_TREE_FIRST_ANCHOR_ONLY="${DFLASH_TREE_FIRST_ANCHOR_ONLY:-True}"
-export DFLASH_TREE_AUTO_CALIBRATE="${DFLASH_TREE_AUTO_CALIBRATE:-True}"
-export DFLASH_TREE_CALIBRATION_STEPS="${DFLASH_TREE_CALIBRATION_STEPS:-64}"
-export DFLASH_TREE_CALIBRATION_POSITIONS="${DFLASH_TREE_CALIBRATION_POSITIONS:-0,2,3,4,5}"
+export DFLASH_TREE_MODE="${DFLASH_TREE_MODE:-ddtree}"
+export DFLASH_TREE_BUDGET="${DFLASH_TREE_BUDGET:-0}"
 
-STRICT_RUN_NOTE="${STRICT_RUN_NOTE:-dflash-action-rnn-tree-strict-goal-e${EVAL_EPOCH}}"
-RELAXED_RUN_NOTE="${RELAXED_RUN_NOTE:-dflash-action-rnn-tree-group-relaxed-goal-e${EVAL_EPOCH}-r${RELAXED_ACCEPT_THRESHOLD:-9}}"
+STRICT_RUN_NOTE="${STRICT_RUN_NOTE:-dflash-action-rnn-ddtree-strict-goal-e${EVAL_EPOCH}}"
+RELAXED_RUN_NOTE="${RELAXED_RUN_NOTE:-dflash-action-rnn-ddtree-group-relaxed-goal-e${EVAL_EPOCH}-r${RELAXED_ACCEPT_THRESHOLD:-9}}"
 
 echo "[Action-RNN strict] suite=libero_goal epoch=${EVAL_EPOCH} r=0"
 SPEC_CKPT="" ACCEPT_THRESHOLD=0 DFLASH_ACCEPTANCE_MODE=token \
-DFLASH_TREE_BRANCH_POSITION=0 DFLASH_TREE_AUTO_CALIBRATE="${DFLASH_TREE_AUTO_CALIBRATE}" \
 RUN_ID_NOTE="${STRICT_RUN_NOTE}" \
   bash "${SCRIPT_DIR}/run_dflash_goal_eval.sh" strict
 
 if [[ "${DRY_RUN:-False}" == "True" ]]; then
-  echo "DRY_RUN=True：strict 已通过；relaxed 使用占位分叉位置 0 继续检查。"
+  echo "DRY_RUN=True：strict 已通过；relaxed 使用同一固定预算 DDTree 继续检查。"
   SPEC_CKPT="" ACCEPT_THRESHOLD="${RELAXED_ACCEPT_THRESHOLD:-9}" \
-  DFLASH_ACCEPTANCE_MODE=action_group DFLASH_TREE_BRANCH_POSITION=0 \
-  DFLASH_TREE_AUTO_CALIBRATE=False RUN_ID_NOTE="${RELAXED_RUN_NOTE}" \
+  DFLASH_ACCEPTANCE_MODE=action_group RUN_ID_NOTE="${RELAXED_RUN_NOTE}" \
     bash "${SCRIPT_DIR}/run_dflash_goal_eval.sh" relaxed
   exit 0
 fi
 
-STRICT_SUMMARY="$(find "${LOG_DIR}/dflash_strict" -maxdepth 1 -type f \
-  -name "*--${STRICT_RUN_NOTE}-dflash_strict_summary.json" -print | sort | tail -n 1)"
-if [[ -z "${STRICT_SUMMARY}" ]]; then
-  echo "Cannot find strict summary for run note: ${STRICT_RUN_NOTE}" >&2
-  exit 1
-fi
-SELECTED_TREE_POSITION="$(python - "${STRICT_SUMMARY}" <<'PY'
-import json
-import sys
-
-with open(sys.argv[1], "r", encoding="utf-8") as handle:
-    payload = json.load(handle)
-print(int(payload.get("dflash_tree_branch_position") or 0))
-PY
-)"
-echo "[Action-RNN tree] strict calibration selected position=${SELECTED_TREE_POSITION}"
-
 echo "[Action-RNN relaxed] suite=libero_goal epoch=${EVAL_EPOCH} r=${RELAXED_ACCEPT_THRESHOLD:-9}"
 SPEC_CKPT="" ACCEPT_THRESHOLD="${RELAXED_ACCEPT_THRESHOLD:-9}" \
-DFLASH_ACCEPTANCE_MODE=action_group DFLASH_TREE_BRANCH_POSITION="${SELECTED_TREE_POSITION}" \
+DFLASH_ACCEPTANCE_MODE=action_group \
 RUN_ID_NOTE="${RELAXED_RUN_NOTE}" \
   bash "${SCRIPT_DIR}/run_dflash_goal_eval.sh" relaxed

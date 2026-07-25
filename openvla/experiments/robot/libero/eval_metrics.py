@@ -1,115 +1,5 @@
-import math
 import statistics
 from collections import Counter
-
-import numpy as np
-
-
-def parse_tree_calibration_positions(raw: str) -> list[int]:
-    positions = []
-    for item in raw.split(","):
-        item = item.strip()
-        if not item:
-            continue
-        position = int(item)
-        if position not in {0, 2, 3, 4, 5}:
-            raise ValueError("Tree calibration positions must be drawn from 0,2,3,4,5.")
-        if position not in positions:
-            positions.append(position)
-    if 0 not in positions:
-        positions.insert(0, 0)
-    if len(positions) < 2:
-        raise ValueError("Tree auto-calibration needs the off baseline and at least one fork.")
-    return positions
-
-
-def partition_strict_tree_calibration_results(calibration_results: dict[int, tuple]):
-    """Keep only tree candidates that reproduce the tree-off target action exactly."""
-    if 0 not in calibration_results:
-        raise ValueError("Strict tree calibration requires the tree-off baseline at position 0.")
-
-    baseline_action = np.asarray(calibration_results[0][0])
-    equivalent_results = {0: calibration_results[0]}
-    rejected_positions = {}
-    for position, result in calibration_results.items():
-        if position == 0:
-            continue
-        candidate_action = np.asarray(result[0])
-        if np.array_equal(candidate_action, baseline_action):
-            equivalent_results[position] = result
-            continue
-
-        same_shape = candidate_action.shape == baseline_action.shape
-        rejected_positions[position] = {
-            "reason": "changed_strict_target_action",
-            "candidate_shape": list(candidate_action.shape),
-            "baseline_shape": list(baseline_action.shape),
-            "mismatched_elements": (
-                int(np.count_nonzero(candidate_action != baseline_action))
-                if same_shape
-                else None
-            ),
-            "max_abs_delta": (
-                float(np.max(np.abs(candidate_action - baseline_action)))
-                if same_shape and candidate_action.size
-                else None
-            ),
-        }
-    return equivalent_results, rejected_positions
-
-
-def one_sided_sign_test_pvalue(paired_differences: list[float]) -> float:
-    nonzero = [value for value in paired_differences if value != 0.0]
-    if not nonzero:
-        return 1.0
-    faster_count = sum(value < 0.0 for value in nonzero)
-    sample_count = len(nonzero)
-    return sum(
-        math.comb(sample_count, count) for count in range(faster_count, sample_count + 1)
-    ) / (2 ** sample_count)
-
-
-def select_tree_branch_position(
-    times_by_position: dict[int, list[float]],
-    triggered_blocks: dict[int, int],
-) -> tuple[int, dict]:
-    """Choose a fork only when paired full-action timings beat tree-off."""
-    baseline_times = times_by_position[0]
-    candidate_count = max(len(times_by_position) - 1, 1)
-    corrected_alpha = 0.05 / candidate_count
-    diagnostics = {
-        "baseline_position": 0,
-        "samples": len(baseline_times),
-        "corrected_alpha": corrected_alpha,
-        "candidates": {},
-    }
-    eligible = []
-    for position, candidate_times in times_by_position.items():
-        if position == 0:
-            continue
-        paired = [candidate - baseline for candidate, baseline in zip(candidate_times, baseline_times)]
-        median_delta = statistics.median(paired) if paired else float("inf")
-        pvalue = one_sided_sign_test_pvalue(paired)
-        diagnostics["candidates"][str(position)] = {
-            "median_seconds": statistics.median(candidate_times) if candidate_times else None,
-            "median_delta_seconds": median_delta,
-            "sign_test_pvalue": pvalue,
-            "triggered_blocks": int(triggered_blocks.get(position, 0)),
-        }
-        if (
-            paired
-            and median_delta < 0.0
-            and pvalue < corrected_alpha
-            and triggered_blocks.get(position, 0) > 0
-        ):
-            eligible.append((median_delta, position))
-
-    selected = min(eligible)[1] if eligible else 0
-    diagnostics["selected_position"] = selected
-    diagnostics["baseline_median_seconds"] = (
-        statistics.median(baseline_times) if baseline_times else None
-    )
-    return selected, diagnostics
 
 
 def _flatten_step_times(episode_times):
@@ -203,8 +93,13 @@ def summarize_generation_stats(step_stats_list):
     tree_extra_accepted = sum(
         int(item.get("tree_extra_accepted", 0)) for item in valid_stats
     )
-    weighted_branch_score = sum(
-        float(item.get("tree_mean_branch_score", 0.0) or 0.0)
+    weighted_verified_nodes = sum(
+        float(item.get("tree_average_verified_nodes", 0.0) or 0.0)
+        * int(item.get("tree_triggered_blocks", 0))
+        for item in valid_stats
+    )
+    weighted_max_depth = sum(
+        float(item.get("tree_average_max_depth", 0.0) or 0.0)
         * int(item.get("tree_triggered_blocks", 0))
         for item in valid_stats
     )
@@ -275,8 +170,7 @@ def summarize_generation_stats(step_stats_list):
         "action_head_type": valid_stats[0].get("action_head_type"),
         "acceptance_mode": valid_stats[0].get("acceptance_mode"),
         "tree_mode": valid_stats[0].get("tree_mode"),
-        "tree_branch_position": valid_stats[-1].get("tree_branch_position"),
-        "tree_first_anchor_only": valid_stats[0].get("tree_first_anchor_only"),
+        "tree_budget": valid_stats[0].get("tree_budget"),
         "confidence_threshold": valid_stats[0].get("confidence_threshold"),
         "confidence_min_tokens": valid_stats[0].get("confidence_min_tokens"),
         "confidence_truncated_blocks": confidence_truncated_blocks,
@@ -303,8 +197,13 @@ def summarize_generation_stats(step_stats_list):
         "tree_selected_alternate_blocks": tree_selected_alternate_blocks,
         "tree_extra_verified_nodes": tree_extra_verified_nodes,
         "tree_extra_accepted": tree_extra_accepted,
-        "tree_mean_branch_score": (
-            weighted_branch_score / tree_triggered_blocks
+        "tree_average_verified_nodes": (
+            weighted_verified_nodes / tree_triggered_blocks
+            if tree_triggered_blocks > 0
+            else None
+        ),
+        "tree_average_max_depth": (
+            weighted_max_depth / tree_triggered_blocks
             if tree_triggered_blocks > 0
             else None
         ),
@@ -352,12 +251,7 @@ def write_eval_summary(
         "dflash_confidence_min_tokens": getattr(cfg, "dflash_confidence_min_tokens", None),
         "dflash_acceptance_mode": getattr(cfg, "dflash_acceptance_mode", None),
         "dflash_tree_mode": getattr(cfg, "dflash_tree_mode", None),
-        "dflash_tree_branch_position": getattr(cfg, "dflash_tree_branch_position", None),
-        "dflash_tree_first_anchor_only": getattr(cfg, "dflash_tree_first_anchor_only", None),
-        "dflash_tree_auto_calibrate": getattr(cfg, "dflash_tree_auto_calibrate", None),
-        "dflash_tree_calibration_result": getattr(
-            cfg, "dflash_tree_calibration_result", None
-        ),
+        "dflash_tree_budget": getattr(cfg, "dflash_tree_budget", None),
         "pretrained_checkpoint": str(cfg.pretrained_checkpoint),
         "spec_checkpoint": str(getattr(cfg, "spec_checkpoint", "")),
         "num_trials_per_task": cfg.num_trials_per_task,
@@ -398,6 +292,10 @@ def format_generation_summary(summary, prefix="Speculative stats"):
         parts.append(f"tree_blocks={summary['tree_triggered_blocks']}")
         parts.append(f"tree_alt_wins={summary['tree_selected_alternate_blocks']}")
         parts.append(f"tree_extra_tokens={summary['tree_extra_accepted']}")
+        if summary.get("tree_average_verified_nodes") is not None:
+            parts.append(f"tree_nodes={summary['tree_average_verified_nodes']:.2f}")
+        if summary.get("tree_average_max_depth") is not None:
+            parts.append(f"tree_depth={summary['tree_average_max_depth']:.2f}")
         if summary.get("avg_main_path_accept_length") is not None:
             parts.append(f"main_accept={summary['avg_main_path_accept_length']:.3f}")
     return f"{prefix}: " + ", ".join(parts)

@@ -134,8 +134,7 @@ class GenerateConfig:
     dflash_confidence_min_tokens: int = 1
     dflash_acceptance_mode: str = "action_group"
     dflash_tree_mode: str = "off"
-    dflash_tree_branch_position: int = 0
-    dflash_tree_first_anchor_only: bool = True
+    dflash_tree_budget: int = 0
     #################################################################################################################
     # LIBERO environment-specific parameters
     #################################################################################################################

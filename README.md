@@ -29,7 +29,7 @@ DSpark/Domino 启发的 Action-RNN 负责提高弱路径命中；动作组级宽
 | 数据无损打包 | `openvla/specdecoding/train-scripts/pack_dflash_hdf5.py` | 把每样本 group 的 HDF5 v1 重排为连续 packed v2 |
 | DFlash 训练 | `openvla/specdecoding/train-scripts/train_dflash_libero_goal.py` | multi-anchor、loss、DDP、checkpoint、SwanLab |
 | 训练入口 | `openvla/specdecoding/train-scripts/run_dflash_train.sh` | 当前 Action-RNN 主实验及少量结构消融 |
-| Draft 模型 | `openvla/specdecoding/model/dflash.py` | 块并行主干、动作位置 embedding、Action-RNN、双路径候选 |
+| Draft 模型 | `openvla/specdecoding/model/dflash.py` | 块并行主干、动作位置 embedding、Action-RNN |
 | 在线推测解码 | `openvla/prismatic/extern/hf/modeling_speculation.py` | draft 提案、目标模型校验、partial accept/correction、树验证 |
 | LIBERO strict | `openvla/experiments/robot/libero/run_libero_goal_Spec.py` | strict token 校验与在线指标 |
 | LIBERO relaxed | `openvla/experiments/robot/libero/run_libero_goal_Spec_Relaxed.py` | relaxed 动作接受与在线指标 |
@@ -99,7 +99,7 @@ parallel_draft=False
               ↓
  Action-RNN 注入块内短程因果关系
               ↓
- 主路径 + 可选单分叉 runner-up 路径
+ 按联合概率和固定预算动态构造 DDTree
               ↓
  目标模型一次线性/树形并行校验
               ↓
@@ -118,7 +118,7 @@ parallel_draft=False
 | 跨 Anchor 长程因果迁移 | 本项目 | 同一目标位置上，让完整前缀强路径的 base 分布蒸馏短前缀弱路径 | 训练端主要自有设计 |
 | 高维主导的自动损失标定 | 本项目结合历史训练诊断形成 | 正式更新前只读少量 batch，固定缩放低维损失，使初始高维:低维约为 9:1 | 防止初始值 20-40 的 Soft KL 掩盖 Hidden 学习，标定后不动态追权 |
 | 动作组级宽松校验 | 本项目在 SpecVLA relaxed 上的结构化扩展 | 平移组、旋转组使用组内平方误差预算，夹爪保持精确 | 推理端自有设计之一 |
-| DDTree 式稀疏多候选树 | [DDTree](https://arxiv.org/abs/2604.12989) 的标准验证语义 + 本项目低预算候选 | 一个 runner-up 单分叉形成双路径；共享前缀节点、祖先注意力、目标 token 驱动遍历、按接受节点提交缓存 | 推理端系统设计之二 |
+| DDTree 动态多候选树 | [DDTree](https://arxiv.org/abs/2604.12989) | 用累计对数概率最佳优先扩展固定预算节点；共享前缀、祖先注意力、一次目标校验、目标 token 驱动遍历和缓存压紧 | 推理端系统设计之二 |
 
 因此，论文主线应表述为：**块并行主干负责低成本长程预测，Action-RNN 补充显式短程因果，跨 Anchor 蒸馏
 补充训练时可获得的长前缀知识；动作组校验与稀疏候选树再把更高的候选覆盖率转化为在线接受长度和速度。**
@@ -381,7 +381,7 @@ component = raw_loss * 配置权重
 | `rollout_accuracy` | anchor0 使用自身预测前缀回滚时的 top-1 命中率 |
 | `rollout_exposure_gap` | `accuracy-rollout_accuracy`；衡量 teacher forcing 到自回滚的分布差距 |
 | `rollout_top2_accuracy` | 正确 token 是否进入 self-rollout top-2 |
-| `rollout_runner_up_rescue_rate` | `rollout_top2_accuracy-rollout_accuracy`；正确 token 恰好是第二候选的位置占全部位置的比例，是单分叉的潜力而非真实接受率 |
+| `rollout_runner_up_rescue_rate` | `rollout_top2_accuracy-rollout_accuracy`；正确 token 恰好是第二候选的位置占全部位置的比例，是动态树增加宽度的潜力而非真实接受率 |
 | `rollout_conditional_runner_up_rescue_rate` | 仅在 top-1 错误位置中，正确 token 位于第二候选的比例 |
 | `base_rollout_expected_prefix_length` | anchor0 的并行 Draft base logits 连续猜对长度 |
 | `rollout_expected_prefix_length` | anchor0 实际连续猜对的平均前缀长度，范围 0 到 6 |
@@ -468,39 +468,35 @@ sum(delta_i^2, i in G) <= |G_visible| * r^2
 | `action_group_rescued_blocks` | 组级规则比逐 token 规则接受更长前缀的块数 |
 | `action_group_extra_accepted` | 组级规则额外接受的 token 总数 |
 
-### 5.3 DDTree 式稀疏多候选树校验
+### 5.3 DDTree 动态多候选树校验
 
-当前实现保留本项目的最小固定候选预算：**单分叉、双路径**，但验证与提交遵守标准 DDTree 语义，而不是
-把两条完整路径各自打分后挑最长。由于本项目的 Draft 依赖已经过目标模型解码的 anchor hidden，当前 anchor
-位于目标 KV cache 中并作为 DDTree 的虚拟根；这与 DDTree 把根放进同一次验证 forward 的工程位置不同，
-节点图、目标遍历和 cache 提交语义相同。流程如下：
+2026-07-25 的第二次修订已删除“固定位置单分叉、双路径、在线延迟校准”整套旧实现，改为与 DDTree 核心
+算法一致的动态树。树不会在评测中偷偷切回 `off`，也不会为不同分叉反复调用目标模型。流程如下：
 
-1. DFlash transformer 只执行一次，Action-RNN 从 Base logits 生成贪心主路径。
-2. 在一个固定分叉位置取主路径 logits 的第二候选 token。
-3. 复用该位置之前的前缀和 RNN state，只用轻量 Action-RNN 滚出第二候选的后缀，不再执行 DFlash forward。
-4. 两条路径编译成显式父子节点图；相同的 `(父节点, token)` 只保留一个节点，tree mask 只开放祖先。
-5. 目标模型一次 tree-attention forward 得到所有节点的 posterior。从虚拟根开始，每一步只沿目标模型
-   posterior 指定的子 token 前进；当前节点没有该子 token 时立即停止，并提交目标 token 作为纠正。
-6. 只按目标模型实际走过的节点索引压紧并提交 hidden/KV。候选树只能提高“正确连续 token 已在树中”的概率，
-   不能用未来接受长度替目标模型选择另一条答案。
+1. DFlash transformer 只执行一次，Action-RNN 得到各 slot 的动作分布和贪心主路径。
+2. 将每个候选节点的分数定义为从根到该节点的累计对数概率，用优先队列每次弹出联合概率最高的节点；
+   同时把它的同层次候选和下一深度候选放回队列，直到用完固定节点预算。高置信路径自然长得更深，
+   不确定位置自然保留多个分支，不再手工指定 `p2/p3/p4/p5`。
+3. 候选被编译为父子节点图和祖先可见 mask。由于本项目先用目标模型解码 anchor hidden，anchor 已在 KV
+   cache 中并作为虚拟根；候选节点在同一次 target tree-attention forward 中并行校验。
+4. strict 从虚拟根开始，只沿目标模型 posterior 指定的 child 前进；树中没有该 token 时立刻停止，并把
+   目标 token 作为纠正。它不会比较整条候选的未来接受长度，也不会改变目标模型答案。
+5. 只把真实走过的节点按索引压紧并提交 hidden/KV。action-group 模式则在每条叶路径上使用同一组级预算，
+   选择最长合法近似前缀，因此仍属于 relaxed 结果。
 
-若块长为 `q`，DDTree 节点图包含主路径的 `q` 个候选节点以及分叉后的备选后缀节点；共享前缀不重复。
-线性 DFlash 只需输入 `q-1` 个节点，因此树的新增开销会被 `tree_extra_verified_nodes` 完整记录。这个设计避免
-完整 top-k 树的指数膨胀，目标是用少量额外宽度覆盖主路径中高价值的 runner-up。默认只在 anchor0 的首个
-最长块启用，后续短块不再支付树开销。
-
-树是否提速不能由 top-2 命中率直接决定，因此 strict 评测先在真实 observation 上对
-`off/p2/p3/p4/p5` 做配对的完整动作延迟校准。候选位置必须同时满足：确实触发过分叉、相对 off 的中位延迟
-更低、经过多重比较修正的单侧符号检验显著；否则自动选择 `off`。这使树成为“有实测净收益才打开”的系统
-机制，而不是固定增加开销的启发式补丁。代码记录：
+默认 `DFLASH_TREE_BUDGET=0` 表示当前块自动使用 `q-1` 个候选节点。连同已经单独解码的 anchor，这与线性
+验证送入目标模型的节点总数相同；DDTree 做的是重新分配这些节点的深度和宽度，而不是额外增加目标模型
+forward。显式设为正整数可以研究更宽的树，但会增加 target 验证宽度，必须单独做开销消融。构树需要一次
+很小的 GPU 到 CPU 的 top-k 分布复制和优先队列操作，这是 DDTree 本身的开销，不能从计时中排除。代码记录：
 
 | 指标 | 含义 |
 | --- | --- |
-| `tree_triggered_blocks` | 实际构造双路径树的块数 |
-| `tree_selected_alternate_blocks` | 目标模型实际遍历离开主路径、进入备选子树的块数 |
+| `tree_triggered_blocks` | 实际构造动态树的块数 |
+| `tree_selected_alternate_blocks` | 动态树相对贪心路径额外挽救连续 token 的块数 |
 | `tree_extra_verified_nodes` | 相比线性校验额外送入目标模型的树节点数 |
-| `tree_extra_accepted` | 备选路径比主路径额外接受的 token 数 |
-| `tree_mean_branch_score` | runner-up 相对主候选的平均概率比代理 |
+| `tree_extra_accepted` | 动态树比贪心路径额外接受的 token 数 |
+| `tree_average_verified_nodes` | 每个触发块的平均候选节点数 |
+| `tree_average_max_depth` | 每棵动态树的平均最大深度 |
 
 ### 5.4 训练创新与推理创新怎样闭环
 
@@ -616,7 +612,7 @@ RNN 接受长度增益最高（约 +0.102），因此正式评测优先搬运 `e
 `0.687/0.326/0.411/0.393/0.468/0.577`。这证明 exposure gap 是实质问题。另一方面，DFlash strict
 Length 高于 SpecVLA strict 却更慢，证明 Length 不包含 draft 自身成本，不能单独作为加速结论。
 
-### 6.5 2026-07-25 双路径验证器事故与 DDTree 修复
+### 6.5 2026-07-25 双路径验证器事故与完整 DDTree 替换
 
 旧双路径实现虽然构造了祖先 mask，却在校验后分别计算两条完整路径的接受长度，再选择“接受最长”的路径；
 hidden/KV 也依赖这个胜出路径索引提交。这不是标准 DDTree 的目标驱动遍历。实际 epoch 200 校准中，多个固定
@@ -624,17 +620,22 @@ hidden/KV 也依赖这个胜出路径索引提交。这不是标准 DDTree 的�
 tree-off。该现象不能解释为“目标模型答案不唯一”，根因是验证与提交语义没有以目标 token 的逐节点选择为
 唯一真值。
 
-修复没有改 Draft、Action-RNN、checkpoint 或训练损失，只重写推理验证链：候选路径先合并成父子节点图，
-共享前缀去重；每个节点只看祖先；从 anchor 虚拟根开始沿目标 posterior 指定的 child map 遍历；走不到时
-立即写入目标 token；只提交实际接受节点的 KV/hidden。因而旧 epoch 180/200 权重可直接评测，无需重训。
+第一轮修复只把验证改成目标驱动遍历，候选生成仍是固定位置单分叉，并用 4 个真实 observation 在线比较
+`off/p2/p3/p4/p5` 的延迟。它虽然恢复了 strict 正确性，却把一个很小、很可能无收益的树外加校准开销带进
+评测；校准选择 `off` 后，所谓树实验实际仍是线性验证。因此该版本不作为最终实现。
 
-修复后的验证证据：
+第二轮修复完整替换候选生成、验证和脚本：累计概率最佳优先扩树、固定节点预算、一次树校验、目标驱动遍历、
+按接受节点压紧 KV；同时删除固定分叉参数、首块限定、在线校准和自动关树。默认预算与线性校验等成本。
+它没有改 Draft、Action-RNN、checkpoint 或训练损失，epoch 180/200 权重可直接评测，无需重训。
+
+完整替换后的验证证据：
 
 | 检查 | 结果 |
 | --- | --- |
-| 节点图、祖先 mask、目标遍历、目标纠正、legacy/Dynamic KV 单元测试 | `12 passed` |
-| epoch 200、真实 Goal observation、`p2`、strict 配对安全检查 | 4/4 次树均实际触发，`rejected_positions={}`，完整动作与 tree-off 相同 |
-| 4 样本延迟校准 | 树中位数约慢 2.36 ms，因此保守选择 `off`；这只说明该极小样本未证明提速，不是树失效 |
+| 最佳优先预算、动态祖先 mask、目标遍历/纠正、树与逐路径 target logits 一致性 | `8 passed` |
+| DDTree 指标聚合 | `1 passed` |
+| Action-RNN 与训练回归测试 | `15 passed` |
+| epoch 200 真实 Goal smoke（每任务 1 次，仅查功能） | 最后 task：516 个树块、57 个备选分支挽救、额外接受 59 token、额外 target 节点为 0；SR/速度不作正式结论 |
 
 正式结论仍必须来自完整 50-trial 四路评测。strict 使用 DDTree 目标遍历；action-group relaxed 因定义上允许
 近似动作，继续使用整条路径的组误差预算，不能作为 lossless 结果报告。
@@ -827,10 +828,9 @@ DFLASH_OUTPUT_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-d
   bash openvla/specdecoding/decode-scripts/run_dflash_action_rnn_goal_4way_eval.sh
 ```
 
-四路依次为 `RNN+strict`、`RNN+树+strict`、`RNN+动作组`、`RNN+树+动作组`。树版 strict 在真实
-observation 上校准 `off/p2/p3/p4/p5`，最后一组复用该位置；若没有候选位置在完整动作延迟上显著优于
-`off`，树分叉位置为 0，树版自动退化为线性验证。任何改变 strict 目标动作的候选位置都会被永久淘汰，
-不会中断其它候选的校准。评测 epoch 180 时只需把上面的 `EVAL_EPOCH` 改为 180。
+四路依次为 `RNN+strict`、`RNN+DDTree+strict`、`RNN+动作组`、`RNN+DDTree+动作组`。默认
+`DFLASH_TREE_BUDGET=0`，即每个块使用与线性验证相同的 `q-1` 个候选节点；树始终启用，不做在线校准，
+也不会自动退化成 `off`。评测 epoch 180 时只需把上面的 `EVAL_EPOCH` 改为 180。
 
 如果前面的组已经完成，可用 `START_GROUP` 从指定组继续。例如第1组完成后，从第2组续跑：
 
@@ -839,7 +839,7 @@ CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 EVAL_EPOCH=200 START_GROUP=2 \
   bash openvla/specdecoding/decode-scripts/run_dflash_action_rnn_goal_4way_eval.sh
 ```
 
-脚本会复用相同 `RUN_ID_PREFIX` 下已完成组的 summary，最后仍统一汇总四组结果。
+脚本会复用前面已完成的结果，并在第四组结束后统一汇总四组结果。
 
 单独执行：
 
@@ -852,7 +852,11 @@ EVAL_EPOCH=100 bash openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh 
 
 ```bash
 # 线性 strict：关闭候选树
-DFLASH_TREE_MODE=off DFLASH_TREE_AUTO_CALIBRATE=False \
+DFLASH_TREE_MODE=off \
+  EVAL_EPOCH=100 bash openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh strict
+
+# 固定预算动态 DDTree strict；0 表示每块 q-1 节点，不额外增加 target 节点数
+DFLASH_TREE_MODE=ddtree DFLASH_TREE_BUDGET=0 \
   EVAL_EPOCH=100 bash openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh strict
 
 # 原逐 token relaxed：关闭动作组规则与候选树

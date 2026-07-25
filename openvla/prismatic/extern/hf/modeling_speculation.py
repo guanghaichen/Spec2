@@ -1,5 +1,6 @@
 """包装了LlamaForCausalLM以及SpecVLAforActionPrediction（包在VLA上），添加了dflash的generate方法（草稿、验证）"""
 import copy
+import heapq
 import json
 import time
 
@@ -49,15 +50,15 @@ logger = logging.get_logger(__name__)
 
 
 def normalize_dflash_tree_mode(value) -> str:
-    """Normalize CLI/YAML boolean aliases to the two internal tree modes."""
+    """Normalize CLI/YAML aliases to off or the dynamic DDTree mode."""
     if value is False or value is None:
         return "off"
     normalized = str(value).strip().lower()
     if normalized in {"off", "false", "0", "none", "disabled"}:
         return "off"
-    if normalized == "single_fork":
-        return normalized
-    raise ValueError("dflash_tree_mode must be 'off' or 'single_fork'.")
+    if normalized in {"ddtree", "single_fork"}:
+        return "ddtree"
+    raise ValueError("dflash_tree_mode must be 'off' or 'ddtree'.")
 
 def rotate_half(x):
     """Rotates half the hidden dims of the input."""
@@ -578,9 +579,8 @@ class SpecVLAforActionPrediction(nn.Module):
             dflash_confidence_threshold=0.0,# 动作顺序头低于该置信度时缩短草稿块；0 表示关闭
             dflash_confidence_min_tokens=1,# 置信截断前至少生成多少个草稿 token
             dflash_acceptance_mode="token",# token | action_group；后者用于动作组级 relaxed 接受
-            dflash_tree_mode="off",# off | single_fork；单分叉双路径树
-            dflash_tree_branch_position=0,# 0=关闭；2..5 表示在对应预测动作位置分叉
-            dflash_tree_first_anchor_only=True,# 树只用于最薄弱、收益最大的 anchor=0 首轮
+            dflash_tree_mode="off",# off | ddtree；固定预算动态候选树
+            dflash_tree_budget=0,# 0=每块使用与线性校验相同的 q-1 个目标节点
     ):
 
         super().__init__()
@@ -602,10 +602,9 @@ class SpecVLAforActionPrediction(nn.Module):
         if self.dflash_acceptance_mode not in {"token", "action_group"}:
             raise ValueError("dflash_acceptance_mode must be 'token' or 'action_group'.")
         self.dflash_tree_mode = normalize_dflash_tree_mode(dflash_tree_mode)
-        self.dflash_tree_branch_position = int(dflash_tree_branch_position)
-        if self.dflash_tree_branch_position not in {0, 2, 3, 4, 5}:
-            raise ValueError("dflash_tree_branch_position must be 0 or one of 2, 3, 4, 5.")
-        self.dflash_tree_first_anchor_only = bool(dflash_tree_first_anchor_only)
+        self.dflash_tree_budget = int(dflash_tree_budget)
+        if self.dflash_tree_budget < 0:
+            raise ValueError("dflash_tree_budget must be >= 0; 0 selects the cost-neutral q-1 budget.")
         self.dflash_causal_residual_type = "none"
         self.dflash_causal_residual_rank = 256
         self.dflash_causal_residual_scale = 1.0
@@ -759,30 +758,10 @@ class SpecVLAforActionPrediction(nn.Module):
         #exit()
         #self.base_model.language_model = LlamaSpecForCausalLM(language_model)
 
-    def set_dflash_tree_branch_position(self, position: int) -> None:
-        """Select a static p2--p5 fork, or 0 to disable it.
-
-        Evaluation calibrates this value before the paper-style timed task. A
-        static choice keeps the timed path free of GPU-to-CPU confidence reads.
-        """
-        position = int(position)
-        if position not in {0, 2, 3, 4, 5}:
-            raise ValueError("DFlash tree branch position must be 0 or one of 2, 3, 4, 5.")
-        self.dflash_tree_branch_position = position
-
     def get_generation_stats(self):
         """Return generation metrics without adding CUDA scalar reads to decoding."""
         pending = self._pending_generation_stats
         if pending is None:
-            if self.last_generation_stats is not None and torch.is_tensor(
-                self.last_generation_stats.get("tree_mean_branch_score")
-            ):
-                # This diagnostic is not needed for decoding control flow. Convert it
-                # only after get_vla_action has stopped the paper-style action timer.
-                self.last_generation_stats = dict(self.last_generation_stats)
-                self.last_generation_stats["tree_mean_branch_score"] = float(
-                    self.last_generation_stats["tree_mean_branch_score"].detach().item()
-                )
             return self.last_generation_stats
 
         if pending.get("backend") != "eagle":
@@ -941,63 +920,100 @@ class SpecVLAforActionPrediction(nn.Module):
         return tuple(selected_layers)
 
     @staticmethod
-    def _build_ddtree_from_paths(
-        token_paths: torch.LongTensor,
+    def _build_ddtree_from_logits(
+        draft_logits: torch.Tensor,
+        *,
+        node_budget: int,
+        token_id_offset: int,
     ) -> tuple[
-        torch.LongTensor,
         torch.LongTensor,
         list[dict[int, int]],
         torch.Tensor,
         torch.LongTensor,
+        torch.LongTensor,
     ]:
-        """Compile proposal paths into a prefix-sharing DDTree node graph.
+        """Build the highest-joint-probability DDTree under a fixed node budget.
 
-        ``child_maps`` uses the same convention as DDTree: index 0 is a virtual
-        root whose target posterior has already been computed by decoding the
-        current anchor. Candidate nodes are one-based in ``child_maps`` and
-        zero-based in tensors returned by this helper.
+        This is the DDTree best-first heap construction adapted to OpenVLA's
+        contiguous action-token vocabulary. Index 0 in ``child_maps`` is the
+        already-decoded anchor (the virtual root); candidate nodes are one-based
+        in ``child_maps`` and zero-based in returned tensors.
         """
-        if token_paths.ndim != 2 or token_paths.shape[0] < 1:
-            raise ValueError("DDTree verification expects token_paths with shape [paths, q].")
-        if token_paths.shape[1] < 1:
-            raise ValueError("A DDTree verification path must contain at least one proposal.")
+        if draft_logits.ndim != 2:
+            raise ValueError("DDTree draft_logits must have shape [depth, action_vocab].")
+        depth_limit, vocab_size = draft_logits.shape
+        node_budget = max(0, min(int(node_budget), int(depth_limit * vocab_size)))
+        if depth_limit == 0 or vocab_size == 0 or node_budget == 0:
+            raise ValueError("DDTree requires non-empty logits and a positive node budget.")
 
+        top_k = min(node_budget, int(vocab_size))
+        logits = draft_logits.float()
+        top_logits, top_local_ids = torch.topk(logits, k=top_k, dim=-1)
+        top_log_probs = (
+            top_logits - torch.logsumexp(logits, dim=-1, keepdim=True)
+        ).to(device="cpu", dtype=torch.float32).numpy()
+        top_local_ids_cpu = top_local_ids.to(device="cpu", dtype=torch.long).numpy()
+
+        first_log_weight = float(top_log_probs[0, 0])
+        heap: list[tuple[float, tuple[int, ...], int, int, int, float]] = [
+            (-first_log_weight, (0,), 0, 0, 0, first_log_weight)
+        ]
         node_token_ids: list[int] = []
         node_depths: list[int] = []
         parents = [-1]
         child_maps: list[dict[int, int]] = [dict()]
-        path_node_lists: list[list[int]] = []
 
-        token_paths_cpu = token_paths.detach().to(device="cpu", dtype=torch.long).tolist()
-        for path in token_paths_cpu:
-            parent_index = 0
-            path_nodes: list[int] = []
-            for depth, token_value in enumerate(path):
-                token_id = int(token_value)
-                child_index = child_maps[parent_index].get(token_id)
-                if child_index is None:
-                    child_index = len(child_maps)
-                    child_maps[parent_index][token_id] = child_index
-                    child_maps.append(dict())
-                    parents.append(parent_index)
-                    node_token_ids.append(token_id)
-                    node_depths.append(depth)
-                elif node_depths[child_index - 1] != depth:
-                    raise AssertionError("A DDTree node was reused at an inconsistent depth.")
-                path_nodes.append(child_index - 1)
-                parent_index = child_index
-            path_node_lists.append(path_nodes)
+        while heap and len(node_token_ids) < node_budget:
+            _, ranks, parent_index, depth, rank, log_weight = heapq.heappop(heap)
+            token_id = int(top_local_ids_cpu[depth, rank]) + int(token_id_offset)
+            current_index = len(child_maps)
+            child_maps[parent_index][token_id] = current_index
+            child_maps.append(dict())
+            parents.append(parent_index)
+            node_token_ids.append(token_id)
+            node_depths.append(depth)
 
-        device = token_paths.device
-        flat_tokens = torch.tensor(
-            node_token_ids, device=device, dtype=torch.long
-        ).unsqueeze(0)
-        path_node_indices = torch.tensor(
-            path_node_lists, device=device, dtype=torch.long
-        )
+            if rank + 1 < top_k:
+                sibling_ranks = ranks[:-1] + (rank + 1,)
+                sibling_log_weight = (
+                    log_weight
+                    - float(top_log_probs[depth, rank])
+                    + float(top_log_probs[depth, rank + 1])
+                )
+                heapq.heappush(
+                    heap,
+                    (
+                        -sibling_log_weight,
+                        sibling_ranks,
+                        parent_index,
+                        depth,
+                        rank + 1,
+                        sibling_log_weight,
+                    ),
+                )
+
+            if depth + 1 < depth_limit:
+                child_ranks = ranks + (0,)
+                child_log_weight = log_weight + float(top_log_probs[depth + 1, 0])
+                heapq.heappush(
+                    heap,
+                    (
+                        -child_log_weight,
+                        child_ranks,
+                        current_index,
+                        depth + 1,
+                        0,
+                        child_log_weight,
+                    ),
+                )
+
+        device = draft_logits.device
+        flat_tokens = torch.tensor(node_token_ids, device=device, dtype=torch.long).unsqueeze(0)
         relative_position_ids = torch.tensor(
             node_depths, device=device, dtype=torch.long
         ).unsqueeze(0)
+        greedy_tokens = torch.argmax(draft_logits, dim=-1).to(dtype=torch.long)
+        greedy_tokens = (greedy_tokens + int(token_id_offset)).unsqueeze(0)
 
         node_count = len(node_token_ids)
         tree_mask = torch.zeros(
@@ -1010,10 +1026,10 @@ class SpecVLAforActionPrediction(nn.Module):
                 ancestor_index = parents[ancestor_index]
         return (
             flat_tokens,
-            path_node_indices,
             child_maps,
             tree_mask.unsqueeze(0).unsqueeze(0),
             relative_position_ids,
+            greedy_tokens,
         )
 
     @staticmethod
@@ -1050,6 +1066,101 @@ class SpecVLAforActionPrediction(nn.Module):
                 dtype=torch.long,
             ),
             next_token,
+        )
+
+    @staticmethod
+    def _enumerate_ddtree_leaf_paths(
+        child_maps: list[dict[int, int]],
+    ) -> list[list[int]]:
+        """Return root-to-leaf paths as one-based DDTree node indices."""
+        paths: list[list[int]] = []
+        stack: list[tuple[int, list[int]]] = [(0, [])]
+        while stack:
+            node_index, prefix = stack.pop()
+            children = list(child_maps[node_index].values())
+            if not children:
+                if prefix:
+                    paths.append(prefix)
+                continue
+            for child_index in reversed(children):
+                stack.append((child_index, prefix + [child_index]))
+        return paths
+
+    def _select_relaxed_ddtree_path(
+        self,
+        *,
+        child_maps: list[dict[int, int]],
+        verify_input_ids: torch.LongTensor,
+        root_posterior_token: torch.LongTensor,
+        node_posterior_tokens: torch.LongTensor,
+        action_start_position: int,
+        max_action_tokens: int,
+        accept_threshold: int,
+    ) -> tuple[torch.LongTensor, int, int]:
+        """Select the longest action-group-valid DDTree prefix.
+
+        Relaxed verification is intentionally approximate and therefore cannot
+        use the exact-token child traversal. It evaluates each tiny DDTree leaf
+        path under the existing joint action-group budget and returns committed
+        node indices plus the target correction token.
+        """
+        leaf_paths = self._enumerate_ddtree_leaf_paths(child_maps)
+        if not leaf_paths:
+            return (
+                torch.empty(0, device=verify_input_ids.device, dtype=torch.long),
+                int(root_posterior_token.item()),
+                0,
+            )
+
+        best_nodes: list[int] = []
+        best_accept_length = -1
+        best_correction = int(root_posterior_token.item())
+        for path in leaf_paths:
+            tensor_indices = torch.tensor(
+                [node_index - 1 for node_index in path],
+                device=verify_input_ids.device,
+                dtype=torch.long,
+            )
+            proposed = verify_input_ids.index_select(1, tensor_indices)
+            parent_indices = tensor_indices[:-1]
+            posterior_tail = node_posterior_tokens.index_select(1, parent_indices)
+            posterior = torch.cat([root_posterior_token, posterior_tail], dim=1)
+            positions = torch.arange(
+                action_start_position,
+                action_start_position + proposed.shape[1],
+                device=verify_input_ids.device,
+                dtype=torch.long,
+            ).unsqueeze(0)
+            accept_mask = self._compute_dflash_accept_mask(
+                proposed,
+                posterior,
+                accept_threshold=accept_threshold,
+                action_position_ids=positions,
+                acceptance_mode="action_group",
+            )
+            accept_length = min(
+                int(accept_mask.cumprod(dim=1).sum().item()),
+                int(max_action_tokens),
+            )
+            if accept_length <= best_accept_length:
+                continue
+            best_accept_length = accept_length
+            best_nodes = [node_index - 1 for node_index in path[:accept_length]]
+            if accept_length < len(path):
+                best_correction = int(posterior[0, accept_length].item())
+            else:
+                best_correction = int(
+                    node_posterior_tokens[0, path[-1] - 1].item()
+                )
+
+        return (
+            torch.tensor(
+                best_nodes,
+                device=verify_input_ids.device,
+                dtype=torch.long,
+            ),
+            best_correction,
+            max(best_accept_length, 0),
         )
 
     def _compute_dflash_accept_mask(
@@ -1375,8 +1486,7 @@ class SpecVLAforActionPrediction(nn.Module):
             "action_head_type": getattr(self.ea_layer, "action_head_type", "none"),
             "acceptance_mode": self.dflash_acceptance_mode,
             "tree_mode": self.dflash_tree_mode,
-            "tree_branch_position": self.dflash_tree_branch_position,
-            "tree_first_anchor_only": self.dflash_tree_first_anchor_only,
+            "tree_budget": self.dflash_tree_budget,
             "confidence_threshold": self.dflash_confidence_threshold,
             "confidence_min_tokens": self.dflash_confidence_min_tokens,
             "confidence_truncated_blocks": confidence_truncated_blocks,
@@ -1471,9 +1581,8 @@ class SpecVLAforActionPrediction(nn.Module):
         tree_selected_alternate_blocks = 0
         tree_extra_verified_nodes = 0
         tree_extra_accepted = 0
-        tree_branch_score_sum = torch.zeros(
-            (), device=input_ids.device, dtype=torch.float32
-        )
+        tree_total_verified_nodes = 0
+        tree_max_depth_sum = 0
 
         anchor_idx = 0
         while anchor_idx < max_new_tokens - 1:
@@ -1552,9 +1661,6 @@ class SpecVLAforActionPrediction(nn.Module):
                 ctx_attention_mask=None,
                 action_position_ids=action_position_ids,
             )
-            proposed_paths = None
-            tree_branch_index = None
-            tree_branch_score = None
             if (
                 self.dflash_use_causal_residual_sampling
                 and getattr(self.ea_layer, "action_sequential_enabled", False)
@@ -1563,43 +1669,18 @@ class SpecVLAforActionPrediction(nn.Module):
                     draft_hidden,
                     self.base_model.language_model.lm_head,
                 )
-                tree_enabled_for_block = (
-                    self.dflash_tree_mode == "single_fork"
-                    and self.dflash_tree_branch_position > 0
-                    and (not self.dflash_tree_first_anchor_only or anchor_idx == 0)
+                proposed_tokens, draft_logits, _ = self.ea_layer.sample_action_block(
+                    base_logits=base_draft_logits,
+                    hidden_states=draft_hidden,
+                    first_prev_token_ids=anchor_input_ids,
+                    action_position_ids=action_position_ids,
+                    temperature=0.0,
+                    confidence_threshold=self.dflash_confidence_threshold,
+                    confidence_min_tokens=self.dflash_confidence_min_tokens,
                 )
-                if tree_enabled_for_block:
-                    candidate_branch_index = (
-                        self.dflash_tree_branch_position - (anchor_idx + 1)
-                    )
-                    if 0 <= candidate_branch_index < q_len - 1:
-                        tree_branch_index = candidate_branch_index
-                    tree_proposal = self.ea_layer.sample_action_tree(
-                        base_logits=base_draft_logits,
-                        hidden_states=draft_hidden,
-                        first_prev_token_ids=anchor_input_ids,
-                        action_position_ids=action_position_ids,
-                        branch_index=tree_branch_index,
-                        temperature=0.0,
-                    )
-                    proposed_paths = tree_proposal.token_paths
-                    proposed_tokens = proposed_paths[:1]
-                    draft_logits = tree_proposal.main_logits
-                    tree_branch_index = tree_proposal.branch_index
-                    tree_branch_score = tree_proposal.branch_score
-                else:
-                    proposed_tokens, draft_logits, _ = self.ea_layer.sample_action_block(
-                        base_logits=base_draft_logits,
-                        hidden_states=draft_hidden,
-                        first_prev_token_ids=anchor_input_ids,
-                        action_position_ids=action_position_ids,
-                        temperature=0.0,
-                        confidence_threshold=self.dflash_confidence_threshold,
-                        confidence_min_tokens=self.dflash_confidence_min_tokens,
-                    )
-                    if proposed_tokens.shape[1] < q_len:
-                        confidence_truncated_blocks += 1
-                        q_len = proposed_tokens.shape[1]
+                if proposed_tokens.shape[1] < q_len:
+                    confidence_truncated_blocks += 1
+                    q_len = proposed_tokens.shape[1]
             elif (
                 self.dflash_use_causal_residual_sampling
                 and (
@@ -1619,40 +1700,40 @@ class SpecVLAforActionPrediction(nn.Module):
                 draft_logits = base_draft_logits
                 proposed_tokens = dflash_sample(draft_logits, temperature=0.0)
 
-            if proposed_paths is None:
-                proposed_paths = proposed_tokens
-
             # 当前 anchor 已在目标模型 cache 中，因此它等价于 DDTree 的虚拟根；
-            # target_next_token 是根节点的 posterior，后续节点一次并行校验。
+            # DDTree 在与线性校验相同的节点预算内动态分配深度和分支。
             verify_outputs = None
-            path_count = int(proposed_paths.shape[0])
-            tree_used = path_count == 2
-            path_node_indices = None
+            tree_used = self.dflash_tree_mode == "ddtree" and q_len > 1
             tree_child_maps = None
             target_selected_tree_nodes = None
             verify_node_count = 0
             anchor_cache_length = self._past_key_values_length(anchor_outputs.past_key_values)
             if q_len > 1:
                 if tree_used:
-                    if tree_branch_index is None:
-                        raise AssertionError("Two proposal paths require a concrete branch index.")
+                    action_draft_logits = self.ea_layer.action_logits_from_full(draft_logits)[
+                        0, :q_len
+                    ]
+                    node_budget = (
+                        self.dflash_tree_budget
+                        if self.dflash_tree_budget > 0
+                        else q_len - 1
+                    )
                     (
                         verify_input_ids,
-                        path_node_indices,
                         tree_child_maps,
                         verify_tree_mask,
                         relative_verify_positions,
-                    ) = self._build_ddtree_from_paths(proposed_paths)
+                        greedy_tree_tokens,
+                    ) = self._build_ddtree_from_logits(
+                        action_draft_logits,
+                        node_budget=node_budget,
+                        token_id_offset=self.ea_layer.action_token_start,
+                    )
                     verify_position_ids = (
                         action_base_position + anchor_idx + 1 + relative_verify_positions
                     )
                 else:
-                    verify_input_ids = proposed_paths[:1, :-1]
-                    path_node_indices = torch.arange(
-                        q_len - 1,
-                        device=input_ids.device,
-                        dtype=torch.long,
-                    ).unsqueeze(0)
+                    verify_input_ids = proposed_tokens[:1, :-1]
                     verify_tree_mask = None
                     verify_position_ids = torch.arange(
                         action_base_position + anchor_idx + 1,
@@ -1669,7 +1750,7 @@ class SpecVLAforActionPrediction(nn.Module):
                     None,
                 ) == "flash_attention_2":
                     raise RuntimeError(
-                        "DFlash single-fork verification needs an explicit 4D tree mask and "
+                        "DFlash DDTree verification needs an explicit 4D tree mask and "
                         "is not compatible with flash_attention_2. Use eager/SDPA or disable the tree."
                     )
                 previous_tree_mask = getattr(language_model, "tree_mask", None)
@@ -1689,70 +1770,41 @@ class SpecVLAforActionPrediction(nn.Module):
 
                 if tree_used:
                     node_posterior_tokens = dflash_sample(verify_logits, temperature=0.0)
-                    gathered_logits = verify_logits[0].index_select(
-                        0, path_node_indices[:, :-1].reshape(-1)
-                    ).view(path_count, q_len - 1, -1)
-                    posterior_tail = dflash_sample(gathered_logits, temperature=0.0)
                 else:
                     posterior_tail = dflash_sample(verify_logits, temperature=0.0)
-                posterior_paths = torch.cat(
-                    [target_next_token.expand(path_count, -1), posterior_tail],
-                    dim=1,
-                )
+                    posterior_tokens = torch.cat([target_next_token, posterior_tail], dim=1)
             else:
-                posterior_paths = target_next_token.expand(path_count, -1)
+                posterior_tokens = target_next_token
 
-            predicted_action_positions = torch.arange(
-                anchor_idx + 1,
-                anchor_idx + q_len + 1,
-                device=input_ids.device,
-                dtype=torch.long,
-            ).unsqueeze(0)
-            token_accept_mask = self._compute_dflash_accept_mask(
-                proposed_paths,
-                posterior_paths,
-                accept_threshold=accept_threshold,
-                action_position_ids=predicted_action_positions,
-                acceptance_mode="token",
-            )
-            accept_mask = self._compute_dflash_accept_mask(
-                proposed_paths,
-                posterior_paths,
-                accept_threshold=accept_threshold,
-                action_position_ids=predicted_action_positions,
-                acceptance_mode=self.dflash_acceptance_mode,
-            )
-            candidate_accept_lengths = [
-                min(int(value), q_len)
-                for value in accept_mask.cumprod(dim=1).sum(dim=1).tolist()
-            ]
-            token_candidate_accept_lengths = [
-                min(int(value), q_len)
-                for value in token_accept_mask.cumprod(dim=1).sum(dim=1).tolist()
-            ]
-            main_path_accept_length = candidate_accept_lengths[0]
-            token_best_accept_length = max(token_candidate_accept_lengths)
-
-            # DDTree strict verification never chooses the path with the largest
-            # acceptance length. It follows the unique child named by the target
-            # posterior at every node. This preserves greedy target semantics.
-            strict_tree_traversal = tree_used and (
-                accept_threshold is None or int(accept_threshold) <= 0
-            )
-            selected_alternate_path = False
             selected_correction_token = None
-            if strict_tree_traversal:
+            if tree_used:
                 if tree_child_maps is None or verify_outputs is None:
                     raise AssertionError("DDTree traversal requires a compiled and verified node graph.")
-                target_selected_tree_nodes, correction_token_id = (
-                    self._follow_ddtree_target_path(
-                        tree_child_maps,
-                        target_next_token,
-                        node_posterior_tokens,
-                        q_len,
-                    )
+                exact_tree_nodes, exact_correction_token = self._follow_ddtree_target_path(
+                    tree_child_maps,
+                    target_next_token,
+                    node_posterior_tokens,
+                    q_len,
                 )
-                effective_accept_length = int(target_selected_tree_nodes.numel())
+                token_best_accept_length = int(exact_tree_nodes.numel())
+                if accept_threshold is None or int(accept_threshold) <= 0:
+                    target_selected_tree_nodes = exact_tree_nodes
+                    effective_accept_length = token_best_accept_length
+                    correction_token_id = exact_correction_token
+                else:
+                    (
+                        target_selected_tree_nodes,
+                        correction_token_id,
+                        effective_accept_length,
+                    ) = self._select_relaxed_ddtree_path(
+                        child_maps=tree_child_maps,
+                        verify_input_ids=verify_input_ids,
+                        root_posterior_token=target_next_token,
+                        node_posterior_tokens=node_posterior_tokens,
+                        action_start_position=anchor_idx + 1,
+                        max_action_tokens=q_len,
+                        accept_threshold=int(accept_threshold),
+                    )
                 selected_proposed_tokens = verify_input_ids.index_select(
                     1, target_selected_tree_nodes
                 )
@@ -1761,33 +1813,57 @@ class SpecVLAforActionPrediction(nn.Module):
                     device=input_ids.device,
                     dtype=torch.long,
                 )
-                if effective_accept_length > 0:
-                    selected_alternate_path = not torch.equal(
-                        target_selected_tree_nodes,
-                        path_node_indices[0, :effective_accept_length],
-                    )
-                token_best_accept_length = effective_accept_length
-            else:
-                # Relaxed action-group verification is intentionally approximate
-                # and keeps its path-level group budget. Strict mode above is the
-                # target-equivalent DDTree path.
-                best_candidate_index = max(
-                    range(path_count), key=lambda index: candidate_accept_lengths[index]
+
+                target_prefix = torch.cat(
+                    [selected_proposed_tokens, selected_correction_token], dim=1
                 )
-                effective_accept_length = candidate_accept_lengths[best_candidate_index]
-                selected_proposed_tokens = proposed_paths[
-                    best_candidate_index : best_candidate_index + 1
-                ]
+                compare_length = min(
+                    effective_accept_length, int(target_prefix.shape[1])
+                )
+                main_matches = (
+                    greedy_tree_tokens[:, :compare_length]
+                    == target_prefix[:, :compare_length]
+                ).int()
+                main_path_accept_length = int(
+                    main_matches.cumprod(dim=1).sum(dim=1)[0].item()
+                )
+                selected_alternate_path = (
+                    effective_accept_length > main_path_accept_length
+                )
+            else:
+                predicted_action_positions = torch.arange(
+                    anchor_idx + 1,
+                    anchor_idx + q_len + 1,
+                    device=input_ids.device,
+                    dtype=torch.long,
+                ).unsqueeze(0)
+                token_accept_mask = self._compute_dflash_accept_mask(
+                    proposed_tokens,
+                    posterior_tokens,
+                    accept_threshold=accept_threshold,
+                    action_position_ids=predicted_action_positions,
+                    acceptance_mode="token",
+                )
+                accept_mask = self._compute_dflash_accept_mask(
+                    proposed_tokens,
+                    posterior_tokens,
+                    accept_threshold=accept_threshold,
+                    action_position_ids=predicted_action_positions,
+                    acceptance_mode=self.dflash_acceptance_mode,
+                )
+                effective_accept_length = min(
+                    int(accept_mask.cumprod(dim=1).sum(dim=1)[0].item()), q_len
+                )
+                token_best_accept_length = min(
+                    int(token_accept_mask.cumprod(dim=1).sum(dim=1)[0].item()), q_len
+                )
+                main_path_accept_length = effective_accept_length
+                selected_proposed_tokens = proposed_tokens
+                selected_alternate_path = False
                 if effective_accept_length < q_len:
-                    selected_correction_token = posterior_paths[
-                        best_candidate_index : best_candidate_index + 1,
-                        effective_accept_length : effective_accept_length + 1,
+                    selected_correction_token = posterior_tokens[
+                        :, effective_accept_length : effective_accept_length + 1
                     ]
-                if tree_used:
-                    target_selected_tree_nodes = path_node_indices[
-                        best_candidate_index, :effective_accept_length
-                    ]
-                    selected_alternate_path = best_candidate_index == 1
 
             if q_len > 0:
                 current_hits = [1] * effective_accept_length + [0] * (
@@ -1808,10 +1884,8 @@ class SpecVLAforActionPrediction(nn.Module):
                 tree_selected_alternate_blocks += int(selected_alternate_path)
                 tree_extra_verified_nodes += max(verify_node_count - (q_len - 1), 0)
                 tree_extra_accepted += max(effective_accept_length - main_path_accept_length, 0)
-                if tree_branch_score is not None:
-                    tree_branch_score_sum = (
-                        tree_branch_score_sum + tree_branch_score.detach().float().mean()
-                    )
+                tree_total_verified_nodes += verify_node_count
+                tree_max_depth_sum += int(relative_verify_positions.max().item()) + 1
 
             proposed_start_pos = token_prefix_len + anchor_idx + 1
             if effective_accept_length > 0:
@@ -1907,8 +1981,7 @@ class SpecVLAforActionPrediction(nn.Module):
             "action_head_type": getattr(self.ea_layer, "action_head_type", "none"),
             "acceptance_mode": self.dflash_acceptance_mode,
             "tree_mode": self.dflash_tree_mode,
-            "tree_branch_position": self.dflash_tree_branch_position,
-            "tree_first_anchor_only": self.dflash_tree_first_anchor_only,
+            "tree_budget": self.dflash_tree_budget,
             "confidence_threshold": self.dflash_confidence_threshold,
             "confidence_min_tokens": self.dflash_confidence_min_tokens,
             "confidence_truncated_blocks": confidence_truncated_blocks,
@@ -1934,8 +2007,13 @@ class SpecVLAforActionPrediction(nn.Module):
             "tree_selected_alternate_blocks": tree_selected_alternate_blocks,
             "tree_extra_verified_nodes": tree_extra_verified_nodes,
             "tree_extra_accepted": tree_extra_accepted,
-            "tree_mean_branch_score": (
-                tree_branch_score_sum / tree_triggered_blocks
+            "tree_average_verified_nodes": (
+                tree_total_verified_nodes / tree_triggered_blocks
+                if tree_triggered_blocks > 0
+                else None
+            ),
+            "tree_average_max_depth": (
+                tree_max_depth_sum / tree_triggered_blocks
                 if tree_triggered_blocks > 0
                 else None
             ),

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
 
 import torch
 import torch.nn.functional as F
@@ -11,22 +10,6 @@ from torch import nn
 导入Llama中的基础组件，LlamaMLP即前馈层，LlamaRMSNorm即RMS层归一化，LlamaRotaryEmbedding即RoPE位置编码，repeat_kv即GQA (Grouped Query Attention) 中扩展 KV head，rotate_half是RoPE的辅助函数
 """
 from .cnets import LlamaMLP, LlamaRMSNorm, LlamaRotaryEmbedding, repeat_kv, rotate_half
-
-
-@dataclass
-class ActionTreeProposal:
-    """One greedy action path and, optionally, one top-2 forked path.
-
-    ``token_paths`` is [num_paths, block_len]. Path 0 is always the normal
-    greedy Action-RNN result. A second path shares the prefix before
-    ``branch_index`` and starts with the runner-up token at that position.
-    """
-
-    token_paths: torch.LongTensor
-    main_logits: torch.Tensor
-    confidence: torch.Tensor | None
-    branch_index: int | None
-    branch_score: torch.Tensor | None
 
 
 def sample(logits: torch.Tensor, temperature: float = 0.0) -> torch.Tensor:
@@ -701,87 +684,6 @@ class DFlashDraftModel(nn.Module):
         if sampled_tokens.shape[1] == 0:
             raise RuntimeError("DFlash action head produced an empty proposal.")
         return sampled_tokens, corrected_logits, confidence_probs
-
-    def sample_action_tree(
-        self,
-        base_logits: torch.Tensor,
-        hidden_states: torch.Tensor,
-        first_prev_token_ids: torch.LongTensor,
-        action_position_ids: torch.LongTensor,
-        *,
-        branch_index: int | None,
-        temperature: float = 0.0,
-    ) -> ActionTreeProposal:
-        """Create a fixed-budget two-path proposal without another Draft forward.
-
-        Runtime calibration chooses one fixed ``branch_index`` (p2--p5) or
-        disables branching. Keeping that choice static avoids a GPU-to-CPU
-        confidence synchronization in the timed inference path.
-        """
-        if not self.action_sequential_enabled:
-            raise RuntimeError("sample_action_tree requires dflash_action_head_type='slot_rnn'.")
-        if hidden_states.shape[0] != 1:
-            raise ValueError("DFlash tree inference currently requires batch size 1.")
-        if temperature >= 1e-5:
-            raise ValueError("DFlash two-path tree currently supports greedy decoding only.")
-
-        base_action_logits = self.action_logits_from_full(base_logits)
-        hidden_features = self.action_head_hidden(self.action_head_norm(hidden_states))
-        slot_features = self.action_head_slot(action_position_ids.long())
-        main_tokens, main_logits, confidence, main_states = self._roll_action_path(
-            base_action_logits,
-            hidden_features,
-            slot_features,
-            first_prev_token_ids,
-            temperature=temperature,
-        )
-        if main_tokens.shape[1] == 0:
-            raise RuntimeError("DFlash action head produced an empty proposal.")
-
-        token_paths = main_tokens
-        branch_score = None
-        valid_branch = (
-            branch_index is not None
-            and 0 <= branch_index < main_tokens.shape[1] - 1
-            and main_logits.shape[-1] >= 2
-        )
-        if valid_branch:
-            branch_top2 = torch.topk(main_logits[:, branch_index, :], k=2, dim=-1)
-            alternative_local = branch_top2.indices[:, 1]
-            alternative_token = self.action_local_ids_to_token(alternative_local)
-            branch_score = torch.exp(branch_top2.values[:, 1] - branch_top2.values[:, 0])
-
-            suffix_tokens, _, _, _ = self._roll_action_path(
-                base_action_logits,
-                hidden_features,
-                slot_features,
-                alternative_token,
-                start_index=branch_index + 1,
-                initial_state=main_states[:, branch_index, :],
-                temperature=temperature,
-            )
-            alternative_path = torch.cat(
-                [
-                    main_tokens[:, :branch_index],
-                    alternative_token.unsqueeze(1),
-                    suffix_tokens,
-                ],
-                dim=1,
-            )
-            if alternative_path.shape != main_tokens.shape:
-                raise AssertionError(
-                    "Two-path Action-RNN rollout changed the action block length: "
-                    f"main={tuple(main_tokens.shape)} alt={tuple(alternative_path.shape)}"
-                )
-            token_paths = torch.cat([main_tokens, alternative_path], dim=0)
-
-        return ActionTreeProposal(
-            token_paths=token_paths,
-            main_logits=main_logits,
-            confidence=confidence,
-            branch_index=branch_index if valid_branch else None,
-            branch_score=branch_score,
-        )
 
     def apply_causal_residual(
         self,

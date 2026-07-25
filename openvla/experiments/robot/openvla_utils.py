@@ -81,8 +81,7 @@ def get_vla(cfg):
             dflash_confidence_min_tokens=getattr(cfg, "dflash_confidence_min_tokens", 1),
             dflash_acceptance_mode=getattr(cfg, "dflash_acceptance_mode", "token"),
             dflash_tree_mode=getattr(cfg, "dflash_tree_mode", "off"),
-            dflash_tree_branch_position=getattr(cfg, "dflash_tree_branch_position", 0),
-            dflash_tree_first_anchor_only=getattr(cfg, "dflash_tree_first_anchor_only", True),
+            dflash_tree_budget=getattr(cfg, "dflash_tree_budget", 0),
         )
         # 投机采样外层包装（先让基础模型 prefill 处理输入序列，再用草稿模型快速生成候选 token，最后用基础模型验证并接受/拒绝）
         vla = SpecVLAforActionPrediction(**spec_kwargs)

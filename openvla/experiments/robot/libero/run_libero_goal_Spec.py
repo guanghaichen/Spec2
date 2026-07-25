@@ -48,9 +48,6 @@ from experiments.robot.libero.libero_utils import (
 from experiments.robot.libero.eval_metrics import (
     format_conditional_prefix,
     format_generation_summary,
-    parse_tree_calibration_positions,
-    partition_strict_tree_calibration_results,
-    select_tree_branch_position,
     summarize_generation_stats,
     write_eval_summary,
 )
@@ -92,11 +89,7 @@ class GenerateConfig:
     dflash_confidence_min_tokens: int = 1
     dflash_acceptance_mode: str = "token"
     dflash_tree_mode: str = "off"
-    dflash_tree_branch_position: int = 0
-    dflash_tree_first_anchor_only: bool = True
-    dflash_tree_auto_calibrate: bool = False
-    dflash_tree_calibration_steps: int = 64
-    dflash_tree_calibration_positions: str = "0,2,3,4,5"
+    dflash_tree_budget: int = 0
     #################################################################################################################
     # LIBERO environment-specific parameters
     #################################################################################################################
@@ -152,53 +145,6 @@ def eval_libero(cfg: GenerateConfig) -> None:
     processor = None
     if cfg.model_family == "openvla":
         processor = get_processor(cfg)
-
-    tree_calibration_enabled = bool(
-        cfg.draft_backend == "dflash" and cfg.dflash_tree_auto_calibrate
-    )
-    tree_calibration_positions = []
-    tree_calibration_times = {}
-    tree_calibration_triggered = {}
-    tree_calibration_remaining = 0
-    tree_calibration_warmed_up = False
-    tree_calibration_sample_index = 0
-    tree_calibration_rejected = {}
-    if tree_calibration_enabled:
-        if cfg.accept_threshold not in (None, 0) or cfg.dflash_acceptance_mode != "token":
-            raise ValueError("Tree auto-calibration must run under strict token verification.")
-        if cfg.dflash_tree_mode != "single_fork":
-            raise ValueError("Tree auto-calibration requires dflash_tree_mode='single_fork'.")
-        if cfg.dflash_tree_calibration_steps <= 0:
-            raise ValueError("dflash_tree_calibration_steps must be positive.")
-        tree_calibration_positions = parse_tree_calibration_positions(
-            cfg.dflash_tree_calibration_positions
-        )
-        tree_calibration_times = {position: [] for position in tree_calibration_positions}
-        tree_calibration_triggered = {position: 0 for position in tree_calibration_positions}
-        tree_calibration_remaining = int(cfg.dflash_tree_calibration_steps)
-        model.set_dflash_tree_branch_position(0)
-        cfg.dflash_tree_branch_position = 0
-
-    def select_safe_tree_branch_position():
-        safe_times = {
-            position: values
-            for position, values in tree_calibration_times.items()
-            if position not in tree_calibration_rejected
-        }
-        safe_triggered = {
-            position: value
-            for position, value in tree_calibration_triggered.items()
-            if position not in tree_calibration_rejected
-        }
-        selected_position, diagnostics = select_tree_branch_position(
-            safe_times,
-            safe_triggered,
-        )
-        diagnostics["rejected_positions"] = {
-            str(position): details
-            for position, details in sorted(tree_calibration_rejected.items())
-        }
-        return selected_position, diagnostics
 
     # Initialize local logging
     eval_family = "dflash_strict" if cfg.draft_backend == "dflash" else "specvla_strict"
@@ -304,119 +250,17 @@ def eval_libero(cfg: GenerateConfig) -> None:
                         ),
                     }
 
-                    # Tree calibration compares complete synchronized action latency on
-                    # identical observations. A fork that changes the strict target action
-                    # is permanently disqualified; safe candidates continue calibration.
-                    record_action_metrics = True
-                    if tree_calibration_enabled and tree_calibration_remaining > 0:
-                        original_sync_cuda_timing = cfg.sync_cuda_timing
-                        cfg.sync_cuda_timing = True
-                        active_positions = [
-                            position
-                            for position in tree_calibration_positions
-                            if position not in tree_calibration_rejected
-                        ]
-                        shift = tree_calibration_sample_index % len(active_positions)
-                        ordered_positions = (
-                            active_positions[shift:]
-                            + active_positions[:shift]
-                        )
-                        calibration_results = {}
-                        try:
-                            for branch_position in ordered_positions:
-                                model.set_dflash_tree_branch_position(branch_position)
-                                candidate_action, candidate_time, candidate_stats = get_action(
-                                    cfg,
-                                    model,
-                                    observation,
-                                    task_description,
-                                    processor=processor,
-                                    return_time=True,
-                                    return_generation_stats=True,
-                                    generate_mode="dflash",
-                                )
-                                calibration_results[branch_position] = (
-                                    candidate_action,
-                                    candidate_time,
-                                    candidate_stats,
-                                )
-                        finally:
-                            cfg.sync_cuda_timing = original_sync_cuda_timing
-
-                        calibration_results, newly_rejected = (
-                            partition_strict_tree_calibration_results(calibration_results)
-                        )
-                        for branch_position, details in newly_rejected.items():
-                            tree_calibration_rejected[branch_position] = details
-                            tree_calibration_times[branch_position].clear()
-                            tree_calibration_triggered[branch_position] = 0
-                            rejection_line = (
-                                "DFlash tree calibration rejected unsafe position "
-                                f"p{branch_position}: {json.dumps(details, sort_keys=True)}"
-                            )
-                            print(rejection_line)
-                            log_file.write(rejection_line + "\n")
-                            log_file.flush()
-
-                        baseline_action, baseline_time, baseline_stats = calibration_results[0]
-
-                        if tree_calibration_warmed_up:
-                            for branch_position, (_, candidate_time, candidate_stats) in calibration_results.items():
-                                elapsed = float(candidate_time[0]) - float(candidate_time[1])
-                                tree_calibration_times[branch_position].append(elapsed)
-                                tree_calibration_triggered[branch_position] += int(
-                                    (candidate_stats or {}).get("tree_triggered_blocks", 0)
-                                )
-                            tree_calibration_remaining -= 1
-                        else:
-                            tree_calibration_warmed_up = True
-                        tree_calibration_sample_index += 1
-
-                        if not any(
-                            position != 0
-                            and position not in tree_calibration_rejected
-                            for position in tree_calibration_positions
-                        ):
-                            tree_calibration_remaining = 0
-
-                        action, time, generation_stats = baseline_action, baseline_time, baseline_stats
-                        record_action_metrics = False
-                        if tree_calibration_remaining == 0:
-                            selected_position, calibration_diagnostics = (
-                                select_safe_tree_branch_position()
-                            )
-                            calibration_diagnostics["completed_requested_samples"] = not bool(
-                                tree_calibration_rejected
-                                and len(tree_calibration_rejected)
-                                == len(tree_calibration_positions) - 1
-                            )
-                            calibration_diagnostics["remaining_samples"] = 0
-                            model.set_dflash_tree_branch_position(selected_position)
-                            cfg.dflash_tree_branch_position = selected_position
-                            cfg.dflash_tree_calibration_result = calibration_diagnostics
-                            calibration_line = (
-                                "DFlash tree calibration selected "
-                                f"p{selected_position if selected_position else 'off'}: "
-                                f"{json.dumps(calibration_diagnostics, sort_keys=True)}"
-                            )
-                            print(calibration_line)
-                            log_file.write(calibration_line + "\n")
-                            log_file.flush()
-                        else:
-                            model.set_dflash_tree_branch_position(0)
-                    else:
-                        action,time,generation_stats = get_action(
-                            cfg,
-                            model,
-                            observation,
-                            task_description,
-                            processor=processor,
-                            return_time=True,
-                            return_generation_stats=True,
-                            generate_mode = ("dflash" if cfg.draft_backend == "dflash" else "speculative")
-                        )
-                    if record_action_metrics:
-                        episode_generation_stats.append(generation_stats)
+                    action,time,generation_stats = get_action(
+                        cfg,
+                        model,
+                        observation,
+                        task_description,
+                        processor=processor,
+                        return_time=True,
+                        return_generation_stats=True,
+                        generate_mode = ("dflash" if cfg.draft_backend == "dflash" else "speculative")
+                    )
+                    episode_generation_stats.append(generation_stats)
                     # Normalize gripper action [0,1] -> [-1,+1] because the environment expects the latter
                     action = normalize_gripper_action(action, binarize=True)
 
@@ -434,15 +278,11 @@ def eval_libero(cfg: GenerateConfig) -> None:
                     t += 1
                     # Match upstream SpecVLA timing: successful terminal
                     # actions are not included in the timing JSON.
-                    if record_action_metrics:
-                        total_time.append(time)
+                    total_time.append(time)
 
                 except Exception as e:
                     print(f"Caught exception: {e}")
                     log_file.write(f"Caught exception: {e}\n")
-                    if tree_calibration_enabled and tree_calibration_remaining > 0:
-                        log_file.flush()
-                        raise
                     break
             #exit()
             task_episodes += 1
@@ -494,25 +334,6 @@ def eval_libero(cfg: GenerateConfig) -> None:
         #exit()
         last_task_episode_time = task_episode_time
         last_task_generation_step_stats = task_generation_step_stats
-
-    # Smoke tests or unusually short suites may end before the requested number
-    # of calibration observations. In that case make an explicit conservative
-    # decision instead of leaving the model at whichever candidate ran last.
-    if tree_calibration_enabled and tree_calibration_remaining > 0:
-        selected_position, calibration_diagnostics = select_safe_tree_branch_position()
-        calibration_diagnostics["completed_requested_samples"] = False
-        calibration_diagnostics["remaining_samples"] = tree_calibration_remaining
-        model.set_dflash_tree_branch_position(selected_position)
-        cfg.dflash_tree_branch_position = selected_position
-        cfg.dflash_tree_calibration_result = calibration_diagnostics
-        calibration_line = (
-            "DFlash tree calibration ended with partial samples; selected "
-            f"p{selected_position if selected_position else 'off'}: "
-            f"{json.dumps(calibration_diagnostics, sort_keys=True)}"
-        )
-        print(calibration_line)
-        log_file.write(calibration_line + "\n")
-        log_file.flush()
 
     timing_episode_time = last_task_episode_time if cfg.timing_scope == "last_task" else total_episode_time
     timing_generation_stats = (

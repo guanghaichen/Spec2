@@ -82,6 +82,45 @@ def get_vla(cfg):
             dflash_acceptance_mode=getattr(cfg, "dflash_acceptance_mode", "token"),
             dflash_tree_mode=getattr(cfg, "dflash_tree_mode", "off"),
             dflash_tree_budget=getattr(cfg, "dflash_tree_budget", 0),
+            dflash_target_logits_mode=getattr(cfg, "dflash_target_logits_mode", "full"),
+            dflash_verify_skip_mode=getattr(cfg, "dflash_verify_skip_mode", "off"),
+            dflash_verify_skip_min_top1_prob=getattr(
+                cfg, "dflash_verify_skip_min_top1_prob", 1.0
+            ),
+            dflash_verify_skip_min_margin=getattr(
+                cfg, "dflash_verify_skip_min_margin", 1.0
+            ),
+            dflash_verify_skip_min_base_agreement=getattr(
+                cfg, "dflash_verify_skip_min_base_agreement", 1.0
+            ),
+            dflash_temporal_route_min_cosine=getattr(
+                cfg, "dflash_temporal_route_min_cosine", 1.0
+            ),
+            dflash_temporal_route_stop_on_reject=getattr(
+                cfg, "dflash_temporal_route_stop_on_reject", True
+            ),
+            dflash_temporal_fuse_verify=getattr(
+                cfg, "dflash_temporal_fuse_verify", True
+            ),
+            dflash_temporal_prefill_fusion=getattr(
+                cfg, "dflash_temporal_prefill_fusion", False
+            ),
+            dflash_temporal_prefill_min_stable_actions=getattr(
+                cfg, "dflash_temporal_prefill_min_stable_actions", 3
+            ),
+            dflash_verify_skip_min_temporal_cosine=getattr(
+                cfg, "dflash_verify_skip_min_temporal_cosine", 1.0
+            ),
+            dflash_verify_skip_min_stable_actions=getattr(
+                cfg, "dflash_verify_skip_min_stable_actions", 4
+            ),
+            dflash_verify_skip_max_consecutive=getattr(
+                cfg, "dflash_verify_skip_max_consecutive", 1
+            ),
+            dflash_profile_stages=getattr(cfg, "dflash_profile_stages", False),
+            dflash_debug_compare_target_ar=getattr(
+                cfg, "dflash_debug_compare_target_ar", False
+            ),
         )
         # 投机采样外层包装（先让基础模型 prefill 处理输入序列，再用草稿模型快速生成候选 token，最后用基础模型验证并接受/拒绝）
         vla = SpecVLAforActionPrediction(**spec_kwargs)

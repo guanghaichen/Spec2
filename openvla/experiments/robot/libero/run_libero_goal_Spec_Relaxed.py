@@ -135,6 +135,21 @@ class GenerateConfig:
     dflash_acceptance_mode: str = "action_group"
     dflash_tree_mode: str = "off"
     dflash_tree_budget: int = 0
+    dflash_target_logits_mode: str = "full"
+    dflash_verify_skip_mode: str = "off"
+    dflash_verify_skip_min_top1_prob: float = 1.0
+    dflash_verify_skip_min_margin: float = 1.0
+    dflash_verify_skip_min_base_agreement: float = 1.0
+    dflash_temporal_route_min_cosine: float = 1.0
+    dflash_temporal_route_stop_on_reject: bool = True
+    dflash_temporal_fuse_verify: bool = True
+    dflash_temporal_prefill_fusion: bool = False
+    dflash_temporal_prefill_min_stable_actions: int = 3
+    dflash_verify_skip_min_temporal_cosine: float = 1.0
+    dflash_verify_skip_min_stable_actions: int = 4
+    dflash_verify_skip_max_consecutive: int = 1
+    dflash_profile_stages: bool = False
+    dflash_debug_compare_target_ar: bool = False
     #################################################################################################################
     # LIBERO environment-specific parameters
     #################################################################################################################
@@ -142,6 +157,7 @@ class GenerateConfig:
     task_suite_name: str = "libero_goal"          # Task suite. Options: libero_spatial, libero_object, libero_goal, libero_10, libero_90
     num_steps_wait: int = 10                         # Number of steps to wait for objects to stabilize in sim
     num_trials_per_task: int = 50                    # Number of rollouts per task
+    max_eval_tasks: Optional[int] = None              # Diagnostic smoke limit; None evaluates all tasks.
 
     #################################################################################################################
     # Utils
@@ -217,6 +233,10 @@ def eval_libero(cfg: GenerateConfig) -> None:
     benchmark_dict = benchmark.get_benchmark_dict()
     task_suite = benchmark_dict[cfg.task_suite_name]()
     num_tasks_in_suite = task_suite.n_tasks
+    if cfg.max_eval_tasks is not None:
+        if cfg.max_eval_tasks <= 0:
+            raise ValueError("max_eval_tasks must be positive when provided.")
+        num_tasks_in_suite = min(num_tasks_in_suite, cfg.max_eval_tasks)
     print(f"Task suite: {cfg.task_suite_name}")
     log_file.write(f"Task suite: {cfg.task_suite_name}\n")
 
@@ -250,6 +270,9 @@ def eval_libero(cfg: GenerateConfig) -> None:
             log_file.write(f"\nTask: {task_description}\n")
 
             # Reset environment
+            reset_runtime_state = getattr(model, "reset_dflash_runtime_state", None)
+            if reset_runtime_state is not None:
+                reset_runtime_state()
             env.reset()
 
             # Set initial states

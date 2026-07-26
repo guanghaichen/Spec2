@@ -3,9 +3,11 @@
 本仓库研究一个具体问题：能否把 DFlash 式块并行草稿模型迁移到 OpenVLA，在保持目标模型校验可靠性的
 前提下，提高 LIBERO 动作解码速度。
 
-当前完整方案由三层组成：块并行 Draft 负责低成本提案；高维主导的 Base/Final 线性交接、跨 Anchor 蒸馏和
-DSpark/Domino 启发的 Action-RNN 负责提高弱路径命中；动作组级宽松校验与 DDTree 式稀疏多候选树负责在推理
-阶段扩大可接受候选覆盖。它们最终都必须接受成功率、Length 和端到端 Speedup 的共同检验。
+当前主线由三层组成：块并行 Draft 与 Action-RNN 产生动作 proposal；动作词表投影、首 token 早拒绝与
+历史块融合校验降低每块固定成本；首 token 哨兵时序级联在稳定段把上一条已验证动作直接并入当前多模态
+prefill 严格校验，其余时刻再由 target 哨兵选择历史 proposal 或 DFlash，target 一旦拒绝便用真实纠正前缀
+切回 DFlash。动作组宽松校验与 DDTree 已完成实现和消融，但当前完整评测没有证明它们优于
+SpecVLA relaxed，因此不再作为默认最佳方案。所有模块仍必须同时接受成功率、Length 和端到端 Speedup 检验。
 
 代码基于 [SpecVLA](https://github.com/PineTreeWss/SpecVLA)，而 SpecVLA 又基于
 [OpenVLA](https://github.com/openvla/openvla)。当前仓库仍是研究代码，不是已经定稿的公开复现包。
@@ -18,7 +20,8 @@ DSpark/Domino 启发的 Action-RNN 负责提高弱路径命中；动作组级宽
 1. 先理解 OpenVLA 为什么把一个动作表示为 7 个离散 token。
 2. 再理解 SpecVLA 如何用小草稿模型逐 token 提案，并让 OpenVLA 校验。
 3. 然后理解本项目为什么改用 DFlash 式块并行 hidden 生成。
-4. 最后沿着实验历程看清楚：完整上下文、multi-anchor、跨 anchor 蒸馏、Action-RNN，以及动作组级宽松校验和稀疏多候选树为什么逐步形成。
+4. 最后沿着实验历程看清楚：完整上下文、multi-anchor、跨 anchor 蒸馏、Action-RNN、失败的树/动作组尝试，
+   以及为什么研究重点转向固定成本和选择性免校验。
 
 当前核心文件：
 
@@ -34,6 +37,8 @@ DSpark/Domino 启发的 Action-RNN 负责提高弱路径命中；动作组级宽
 | LIBERO strict | `openvla/experiments/robot/libero/run_libero_goal_Spec.py` | strict token 校验与在线指标 |
 | LIBERO relaxed | `openvla/experiments/robot/libero/run_libero_goal_Spec_Relaxed.py` | relaxed 动作接受与在线指标 |
 | 推理公共配置 | `openvla/specdecoding/decode-scripts/libero_eval_common.sh` | 两台机器路径、suite 权重、计时口径和 checkpoint 解析 |
+| 时序级联入口 | `openvla/specdecoding/decode-scripts/run_dflash_temporal_cascade_goal_eval.sh` | shadow、严格路由、prefill 融合和稳定段免校验 |
+| 时序门校准 | `openvla/specdecoding/test-speed/analyze_dflash_temporal_shadow.py` | 从 shadow summary 统计覆盖、错误和 95% 风险上界 |
 
 正式 shell 入口已经收敛。`train-scripts` 只保留数据生成和当前训练两个入口；`decode-scripts` 只保留
 通用单项评测和少数一键工作流。旧 wrapper 已从工作树删除，需要回溯时使用 Git 历史。
@@ -91,21 +96,26 @@ parallel_draft=False
 当前方法不是单一训练技巧，而是一条从“产生更好的草稿”到“用更低代价校验草稿”的完整链：
 
 ```text
-完整 prompt + 已验证 action hidden
-              ↓
-     一次 DFlash 块并行 forward
-              ↓
-   frozen lm_head 得到 Base logits
-              ↓
- Action-RNN 注入块内短程因果关系
-              ↓
- 按联合概率和固定预算动态构造 DDTree
-              ↓
- 目标模型一次线性/树形并行校验
-              ↓
- strict 精确接受 或 action-group 宽松接受
-              ↓
- 提交最长合法前缀；拒绝点由目标模型纠正
+当前多模态 prompt + 上一条 target 已验证动作
+                       ↓
+        稳定至少 3 次？──是──→ 历史动作附入 prompt
+                       │                ↓
+                       │       必做 prefill 同时严格校验
+                       │                ↓
+                       │       接受前缀 / target 纠正 / 裁 KV
+                       ↓ 否             ↓ 未完成
+              target 首 token 哨兵与时序路由
+                       ↓
+          历史 proposal 可用？──是──→ 融合 target 校验
+                       │                         ↓ 拒绝
+                       ↓ 否                 target 纠正前缀
+              一次 DFlash 块并行 forward ←──────┘
+                       ↓
+        frozen lm_head → Action-RNN 因果修正
+                       ↓
+                  target 块校验
+                       ↓
+ strict 精确接受 / action-group 宽松接受 / 独立免校验消融
 ```
 
 各部分的来源和本项目的增量必须区分清楚：
@@ -119,11 +129,15 @@ parallel_draft=False
 | 高维主导的自动损失标定 | 本项目结合历史训练诊断形成 | 正式更新前只读少量 batch，固定缩放低维损失，使初始高维:低维约为 9:1 | 防止初始值 20-40 的 Soft KL 掩盖 Hidden 学习，标定后不动态追权 |
 | 动作组级宽松校验 | 本项目在 SpecVLA relaxed 上的结构化扩展 | 平移组、旋转组使用组内平方误差预算，夹爪保持精确 | 推理端自有设计之一 |
 | DDTree 动态多候选树 | [DDTree](https://arxiv.org/abs/2604.12989) | 用累计对数概率最佳优先扩展固定预算节点；共享前缀、祖先注意力、一次目标校验、目标 token 驱动遍历和缓存压紧 | 推理端系统设计之二 |
+| 首 token 哨兵时序级联 | 本项目，受 HeiSD 时序相似性分析启发但不使用离线轨迹库 | 普通路径由当前 `t0` 和 prompt hidden 判断是否复用上一动作；target 首次拒绝后立刻切回带真实纠正前缀的 DFlash | 当前推理端主线 |
+| 验证式时序 Prefill 融合（VTPF） | 本项目 | 连续 3 次 target 确认相同动作后，把历史 `c0..c5` 附在当前 prompt 后；一次必做的多模态 prefill 同时严格校验 `c0..c6`，拒绝后裁掉错误 KV 并回退 DFlash | 降低 target 固定调用数的结构性增量 |
+| 固定成本无损优化 | 本项目的实现诊断 | 目标 `lm_head` 仅投影 256 个动作 token；首 proposal 已被 anchor 判错时不再验证无效后缀；已知历史 proposal 时把 anchor 与整块校验融合为一次 target forward | 当前默认开启 |
 
-因此，论文主线应表述为：**块并行主干负责低成本长程预测，Action-RNN 补充显式短程因果，跨 Anchor 蒸馏
-补充训练时可获得的长前缀知识；动作组校验与稀疏候选树再把更高的候选覆盖率转化为在线接受长度和速度。**
-其中 Domino 与 DSpark 是清晰标注的机制启发，跨 Anchor、自动损失标定及两项推理机制是当前拟通过
-消融证明的自有增量。最终的新颖性表述仍应以完整文献检索和实验结果为准。
+因此，当前论文主线应表述为：**块并行主干、Action-RNN 和跨 Anchor 蒸馏学习动作候选；目标首 token
+既是严格校验的第一个 posterior，也是低成本时序哨兵；VTPF 进一步把高置信历史 proposal 的校验并入当前
+必做 prefill，而普通时序路由负责其余动作。** Domino 与 DSpark 是清晰标注的训练启发，VTPF、target
+反馈切源、融合校验、首 token 早拒绝和动作词表投影是当前推理端增量。最终新颖性仍须结合 HeiSD、缓存类工作与完整
+消融审慎表述。
 
 与 Domino 的关系需要准确表述：当前训练骨架与其核心思想高度一致，都是在同一次训练中令 Base 任务权重
 线性下降、Final 任务权重线性上升，并让 Final 梯度继续穿过修正头更新 Draft；但本项目不是原样复现。
@@ -498,13 +512,54 @@ forward。显式设为正整数可以研究更宽的树，但会增加 target �
 | `tree_average_verified_nodes` | 每个触发块的平均候选节点数 |
 | `tree_average_max_depth` | 每棵动态树的平均最大深度 |
 
-### 5.4 训练创新与推理创新怎样闭环
+### 5.4 首 token 哨兵时序级联
 
-高维主导线性交接、跨 Anchor 和 Action-RNN 解决“候选能否覆盖目标 token”；动作组校验和稀疏候选树解决
-“已有候选怎样以有限验证成本转化为更长接受前缀”。两类推理机制彼此正交：树增加离散候选覆盖，动作组规则
-放宽连续运动误差；二者可以组合，但必须分别做 `off/on` 消融并计入完整动作延迟。strict + tree 采用目标
-token 驱动的精确遍历；action-group relaxed 本身是有意近似的策略，仍保留完整路径上的组误差预算，因此不能
-宣称与 AR token 完全一致。
+一次动作的目标模型 prefill 无论如何都要执行，因为它负责融合当前图像和指令，并给出绝对可信的第一个动作
+token `t0`。本项目不再把这一步只当作启动 token，而把它作为时序候选的低成本哨兵：
+
+1. **验证式时序 Prefill 融合（Verified Temporal Prefill Fusion, VTPF）。** 当同一动作已被 target 连续确认
+   至少 3 次时，上一动作的 7-token proposal 在当前图像进入 LLM 前就已知。实现把历史 `c0..c5` 附在当前
+   prompt 后，使本来就必须执行的多模态 prefill 在最后 7 个 logits 上同时校验 `c0..c6`。只提交 target
+   连续接受的候选；首个拒绝位置写入 target correction，未接受候选的 KV 立即裁掉，余下位置切回 DFlash。
+   它不跳过 target，也不增加 target forward，而是让 prefill 同时承担第一块严格验证。
+2. **严格时序路由。** 未进入 VTPF 时，若当前 `t0` 与上一条已验证动作的 `t0` 相同，且最后层 prompt hidden cosine 不低于
+   路由阈值，则优先用上一动作的 `t1..t6` 作为 proposal。目标模型仍按原 strict 规则验证，因此候选错误时
+   仍会 partial accept/correction；这层只改变 proposal 来源，不主动放宽目标答案。
+3. **融合哨兵验证。** 历史 proposal 在 anchor 解码前已经存在，因此把
+   `[当前 anchor, 历史 proposal[:-1]]` 一次送入 target；这一 causal forward 的各位置 logits 恰好校验整块
+   proposal，同时产出后续回退需要的 target hidden/KV。它把旧实现每个历史块的“anchor forward + verify
+   forward”合并为一次，不改变 target 驱动的 prefix accept/correction。
+4. **Target 反馈切源。** 历史 proposal 一旦在任意位置被 target 拒绝，本动作剩余位置立即切回 DFlash。
+   DFlash 此时读到的不是猜测前缀，而是刚被 target 接受或纠正的真实前缀；这避免对已经失效的历史尾部重复
+   做 target 校验，也把训练时 multi-anchor 覆盖真正用于在线修补。
+5. **稳定段免校验。** 只有上一动作已连续至少 4 次被目标模型确认完全相同、当前 `t0` 仍相同、hidden
+   cosine 不低于 0.998 时，才复用动作尾部并跳过本次 anchor、Draft、Action-RNN 和 target verify。
+6. **强制刷新。** `max_consecutive=1`，任何一次免校验后下一步必须重新经过目标模型严格校验，不能让缓存
+   错误沿控制轨迹连续传播。
+7. **先 shadow 后 active。** `shadow` 完整执行目标校验，仅记录“假如跳过是否正确”。门槛必须在当前
+   checkpoint、模型环境和 suite 上重新校准；训练集准确率不能替代这一步。
+
+这形成一个由便宜到昂贵的级联：长期稳定段先由 VTPF 在必做 prefill 内完成严格历史校验；中等相似段在
+prefill 后严格验证历史 proposal；其余位置回退到 DFlash/Action-RNN；approximate 分支才允许单步免校验。
+它与 HeiSD 的共同点是利用时序冗余；区别是本项目不检索离线轨迹数据库，而用在线 target 已确认动作、
+prefill 内嵌因果校验和拒绝后 KV 裁剪形成局部闭环。当前仍应把这种
+差异写成实现与机制差异，而不能在缺少完整文献/消融前夸大原创性。
+
+此外有两项严格不改变接受规则的固定成本优化：
+
+- `action_only` 只计算目标 `lm_head` 的 256 个动作词表行；4,434 次 shadow argmax 检查中与全词表为零差异。
+- anchor 已判错首 proposal 时，strict 前缀长度必为 0，因此直接提交目标 correction，不再运行无意义的
+  proposal 后缀 target forward。DDTree 模式不使用此捷径，因为其它根分支仍可能命中。
+
+阶段 profiler 给出的直接依据是：4090 上 target anchor 约 `17.9 ms`、target verify 约 `18.8 ms`，而
+1 层 Draft+Action-RNN 约 `1.9 ms`。因此融合历史块的 target forward 比继续压缩 Draft 更能降低当前固定成本。
+
+### 5.5 训练创新与推理创新怎样闭环
+
+高维主导线性交接、跨 Anchor 和 Action-RNN 解决“模型能否产生有用候选”；时序级联解决“当前最值得验证的
+候选究竟来自 Draft 还是最近一条目标模型已验证动作”；首 token 早拒绝和稳定段免校验则减少无效目标计算。
+动作组与 DDTree 仍作为独立消融保留，但 2026-07-26 的完整结果表明它们没有成为当前最佳路径。任何 relaxed
+或 verify-skip 结果都必须与 strict 路由分栏报告，不能用更长 Length 掩盖成功率或固定开销。
 
 ## 6. 实验历程与目前证据
 
@@ -640,7 +695,73 @@ tree-off。该现象不能解释为“目标模型答案不唯一”，根因是
 正式结论仍必须来自完整 50-trial 四路评测。strict 使用 DDTree 目标遍历；action-group relaxed 因定义上允许
 近似动作，继续使用整条路径的组误差预算，不能作为 lossless 结果报告。
 
-### 6.6 已废弃的旧余弦课程早期快照
+### 6.6 2026-07-26 完整四路结果与研究转向
+
+epoch 200 在 Goal 上的 50 trials/task 完整结果如下。Speedup 均使用同一套 paper wrapped AR
+`0.182718 s/action` 作为分母：
+
+| 方法 | SR | mean step | Length | Speedup |
+| --- | ---: | ---: | ---: | ---: |
+| Paper wrapped AR | 0.742 | 0.182718s | - | 1.000x |
+| SpecVLA strict | 0.768 | 0.178764s | 1.631 | 1.022x |
+| SpecVLA relaxed | 0.734 | 0.141228s | 2.361 | 1.294x |
+| DFlash 线性 strict | 0.776 | 0.175287s | 2.159 | 1.042x |
+| DFlash + DDTree strict | 0.776 | 0.172794s | 2.221 | 1.057x |
+| DFlash + action-group | 0.734 | 0.158771s | 2.530 | 1.151x |
+| DFlash + DDTree + action-group | 0.720 | 0.156579s | 2.632 | 1.167x |
+
+该表给出三个明确结论：当前 Draft 在 strict 下比 SpecVLA 略快且 SR 不低，但优势很小；DDTree 在固定节点
+预算下只带来约 1.4% 相对加速；action-group 与树能增加 Length，却没有超过 SpecVLA relaxed，并伴随 SR
+下降。因此继续大规模重训 Draft 的边际收益不划算，推理研究转向“降低每块固定 target 成本”和“经 shadow
+校准的选择性免校验”。
+
+### 6.7 首 token 哨兵时序级联小实验
+
+以下均为 2026-07-26 的小规模机理实验，不是论文主表。10-task 实验每个 task 仅 1 个 episode；计时仍只取
+最后一个 task，以保持与正式脚本一致：
+
+| 版本 | SR（10 episodes） | 最后 task mean | Length | blocks | 结论 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| 原始 DFlash shadow 路径 | 0.60 | 0.165500s | 2.339 | 898 | 对照 |
+| cosine 0.990 历史 proposal，严格校验 | 0.60 | 0.135403s | 2.861 | 734 | 历史 proposal 是有效候选源 |
+| 拒绝后切回 DFlash | 0.60 | 0.135415s | 2.905 | 723 | 块数改善，单独计时收益很小 |
+| 再加融合哨兵验证 | 0.60 | 0.127002s | 2.941 | 714 | 相对原始路径快 23.3% |
+| 每步都做 VTPF（stable=1） | 0.60 | 0.133787s | 1.981 | 1060 | 弱历史候选挤掉 Draft，否决 |
+| 哨兵路由 + VTPF（stable=2） | 0.80 | 0.155863s | 2.147 | 551 | 仅 29 次融合中 9 次全中，平均接受 3.138；触发过早，否决 |
+| 哨兵路由 + VTPF（stable=3） | 0.60 | **0.113715s** | **3.079** | **682** | 相对原始路径快 31.3%，当前最佳 strict 小实验 |
+
+同一首 task 的 profiler 显示，融合前 target anchor/verify 分别约 `17.9/18.8 ms`，融合历史块一次约
+`18.8 ms`；正式无 profiler 均时从原始 DFlash `0.161748s` 降到 `0.123104s`。只要求 `t0` 相同、取消
+cosine 筛选时，均时退化到 `0.132906s` 且 blocks 增至 860，故当前 0.990 阈值有实际消融依据。
+
+VTPF 的 1-task profiler 进一步显示：普通 prefill 约 `55.3 ms`，在 prompt 后附 6 个历史 action token 的
+融合 prefill 约 `54.9 ms`，没有可测的额外 target 成本。现有 1,805 条跨任务 shadow 中，历史动作在只确认
+1 次时整条复现率为 28.2%，连续确认 2/3/4 次后升至 69.2%/88.0%/93.4%；`stable=2` 邻域消融在最后
+计时 task 也只有 `9/29` 次完整融合命中，而 `stable=3` 达到 `111/129`，故默认三次确认来自 shadow 精度
+跃迁和在线消融的共同证据，不是逐位置手调。VTPF 把 prefill 计作一个实际推进 action token 的验证块，所以其 Length 保持
+不超过 7；最终论文仍应以同环境端到端 mean/speedup 和 SR 为主，不能只凭该 Length 宣称加速。
+
+严格性边界也已显式检查：两次普通 DFlash 运行的 300 条 token trace 完全一致；普通 DFlash、未融合时序路由、
+融合路由相对同调用内逐 token AR 参考分别有约 `18/20/30` 条动作差异。这些差异来自 BF16 在单 token 与块
+forward 形状下的近临界 argmax 数值变化；每条实际输出仍来自当前 target 块 posterior 的接受或纠正。论文中
+应称其为 target-verified strict，而不能宣称 bitwise 等同逐 token AR。另一方面，`action_only` 在 4,434 个
+shadow logits 位置与全词表 argmax 为 `0` 差异，可以作为无损工程优化报告。
+
+稳定段免校验仍是 approximate 分支。已有 1,805 条跨 10-task shadow 标签中，
+`stable>=4 + t0相同 + cosine>=0.998` 选中 105 条、观测错误为 0，但样本集中在两个 task，零错误的 95%
+Wilson 风险上界仍约 3.5%。因此它默认最多连续跳过一次，并必须与 strict 融合路由分栏报告；在更大 shadow
+校准前不能用这 105 条样本宣称可靠性已经得到统计证明。
+
+视觉 prefill-skip 也做过否定性 shadow：`stable>=2 + pixel relative-L2<=0.0006` 虽有 117/117 条观测正确，
+却全部集中在单个 episode；放宽到可跨 3 个 episode 的门槛后出现 1-2% 错误。因此当前只保留诊断记录，
+不允许视觉相似度直接跳过 target prefill。另两项工程 A/B 也被否决：只返回 5 层 hidden 与原生
+`DynamicCache` 分别仅有噪声级和约 0.14% 收益，均未进入主线。
+
+正式 `route/prefill` 还移除了只供 shadow 使用的多层 cosine、pooled hidden 和动作分布逐项 CPU 同步；同一
+首 task 的轨迹与 `684` 个块完全不变，均时从 `0.112812s` 到 `0.112446s`。该差异只有约 0.3%，按工程
+清理保留，但不作为论文加速贡献单独宣称。
+
+### 6.8 已废弃的旧余弦课程早期快照
 
 2026-07-15，旧 3090 主训练在 step 500、warmup 进行到一半时：
 
@@ -820,7 +941,38 @@ bash openvla/specdecoding/decode-scripts/run_specvla_main_table_eval.sh
 
 ### 7.5 4090 评测当前 DFlash Goal
 
-当前 Goal 权重不能用于 Object、Spatial 或 Long。四路机制消融一键评测：
+当前 Goal 权重不能用于 Object、Spatial 或 Long。当前推荐先做时序级联 shadow，再运行严格 VTPF 主线：
+
+```bash
+# 10-task 小规模 shadow：不跳过 target，只收集门控标签
+CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=200 NUM_TRIALS_PER_TASK=1 MAX_EVAL_TASKS=10 \
+TIMING_SCOPE=full_suite \
+  bash openvla/specdecoding/decode-scripts/run_dflash_temporal_cascade_goal_eval.sh shadow
+
+# 把上一条命令生成的 *_summary.json 传给校准器
+python openvla/specdecoding/test-speed/analyze_dflash_temporal_shadow.py \
+  /绝对路径/EVAL-...-dflash_strict_summary.json
+
+# 50 trials/task 严格主实验：stable>=3 时并入 prefill，其余动作走哨兵路由；全程 target 校验
+CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=200 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_dflash_temporal_cascade_goal_eval.sh prefill
+
+# 严格消融：关闭 VTPF，只保留 prefill 后的历史 proposal 融合校验
+CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=200 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_dflash_temporal_cascade_goal_eval.sh route
+
+# approximate 消融：在严格路由上增加已校准的单步稳定段免校验
+CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=200 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_dflash_temporal_cascade_goal_eval.sh cascade
+```
+
+`prefill` 默认使用 `stable_actions>=3`，未进入 VTPF 的动作继续使用 `route`；`route` 默认使用
+`cosine=0.990`、`stop_on_reject=True`、`fuse_verify=True`。两者的所有历史 proposal 均由 target 逐位置
+判定，并在配置层使用独立的 `verify_skip_mode=route`，因此不会因门槛取值或浮点饱和误触发免校验。
+`cascade` 才使用 `verify_skip_mode=active`，额外加入 `cosine=0.998`、`stable_actions>=4`、`max_consecutive=1` 的 approximate
+免校验门，不能与 strict route 混成一个结果。
+
+旧四路树/动作组机制消融一键评测：
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 EVAL_EPOCH=200 \
@@ -931,6 +1083,8 @@ AR、strict、relaxed 必须同机、同 GPU、串行执行。4090 是正式速�
 | `run_specvla_goal_upstream_compatible_eval.sh` | Goal AR+strict+relaxed 一键复现 |
 | `run_specvla_main_table_eval.sh` | 四 suite strict/relaxed 自动续跑与汇总 |
 | `run_dflash_goal_eval.sh` | 当前 Goal DFlash 单项 strict/relaxed |
+| `run_dflash_temporal_cascade_goal_eval.sh` | 当前主线：`shadow`、严格 `route`、严格 `prefill`、approximate `cascade` |
+| `analyze_dflash_temporal_shadow.py` | 汇总时序门覆盖率、错误率和 Wilson 风险上界 |
 | `run_dflash_action_rnn_goal_4way_eval.sh` | 同一 Goal checkpoint 的 RNN/树 × strict/动作组四路消融 |
 | `run_dflash_action_rnn_goal_pair_eval.sh` | 兼容旧流程的树 strict+树动作组成对评测 |
 | `run_dflash_goal_repeat_eval.sh` | 多 seed 稳定性评测 |

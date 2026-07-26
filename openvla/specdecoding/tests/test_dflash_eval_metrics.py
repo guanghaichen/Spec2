@@ -52,6 +52,45 @@ class DFlashEvalMetricsTest(unittest.TestCase):
         self.assertAlmostEqual(summary["tree_average_verified_nodes"], 16.0 / 3.0)
         self.assertAlmostEqual(summary["tree_average_max_depth"], 10.0 / 3.0)
 
+    def test_temporal_prefill_fusion_metrics_keep_each_action_record(self):
+        stats = [
+            {
+                "backend": "dflash",
+                "block_size": 7,
+                "num_blocks": 1,
+                "generated_tokens": 7,
+                "progressed_tokens": 7,
+                "accept_lengths": [7],
+                "progress_lengths": [7],
+                "temporal_prefill_fusion_record": {
+                    "accept_length": 7,
+                    "progress_length": 7,
+                    "full_match": True,
+                },
+            },
+            {
+                "backend": "dflash",
+                "block_size": 7,
+                "num_blocks": 2,
+                "generated_tokens": 7,
+                "progressed_tokens": 7,
+                "accept_lengths": [2, 3],
+                "progress_lengths": [3, 4],
+                "temporal_prefill_fusion_record": {
+                    "accept_length": 2,
+                    "progress_length": 3,
+                    "full_match": False,
+                },
+            },
+        ]
+
+        summary = summarize_generation_stats(stats)
+
+        self.assertEqual(summary["temporal_prefill_fused_actions"], 2)
+        self.assertEqual(summary["temporal_prefill_full_match_actions"], 1)
+        self.assertAlmostEqual(summary["temporal_prefill_avg_accept_length"], 4.5)
+        self.assertEqual(summary["temporal_prefill_accept_histogram"], {2: 1, 7: 1})
+
 
 if __name__ == "__main__":
     unittest.main()

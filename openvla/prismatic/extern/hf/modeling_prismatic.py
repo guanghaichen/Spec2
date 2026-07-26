@@ -318,7 +318,9 @@ class PrismaticForConditionalGeneration(PrismaticPreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         output_projector_features: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-        position_ids: Optional[torch.LongTensor] = None
+        position_ids: Optional[torch.LongTensor] = None,
+        num_logits_to_keep: int = 0,
+        logit_token_range: Optional[Tuple[int, int]] = None,
     ) -> Union[Tuple, PrismaticCausalLMOutputWithPast]:
         """Run a forward pass through the VLM, returning a PrismaticCausalLMOutputWithPast instance."""
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
@@ -362,6 +364,8 @@ class PrismaticForConditionalGeneration(PrismaticPreTrainedModel):
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict,
+                num_logits_to_keep=num_logits_to_keep,
+                logit_token_range=logit_token_range,
             )
 
             return_attention_mask = attention_mask
@@ -384,6 +388,8 @@ class PrismaticForConditionalGeneration(PrismaticPreTrainedModel):
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict,
+                num_logits_to_keep=num_logits_to_keep,
+                logit_token_range=logit_token_range,
             )
             return_attention_mask = attention_mask
         # === 纯文本前向 ===
@@ -403,6 +409,8 @@ class PrismaticForConditionalGeneration(PrismaticPreTrainedModel):
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict,
+                num_logits_to_keep=num_logits_to_keep,
+                logit_token_range=logit_token_range,
             )
             return_attention_mask = attention_mask
         # === 多模态前向（有图像输入） ===
@@ -462,6 +470,8 @@ class PrismaticForConditionalGeneration(PrismaticPreTrainedModel):
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict,
+                num_logits_to_keep=num_logits_to_keep,
+                logit_token_range=logit_token_range,
             )
             return_attention_mask = multimodal_attention_mask
             return_multimodal_labels = multimodal_labels

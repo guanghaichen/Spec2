@@ -71,6 +71,10 @@ def summarize_generation_stats(step_stats_list):
 
     total_accept_length = sum(accept_lengths)
     total_accepted = sum(int(item.get("accepted_tokens", 0)) for item in valid_stats)
+    total_verified_accepted = sum(
+        int(item.get("verified_accepted_tokens", item.get("accepted_tokens", 0)))
+        for item in valid_stats
+    )
     total_compared = sum(int(item.get("compared_tokens", 0)) for item in valid_stats)
     confidence_truncated_blocks = sum(
         int(item.get("confidence_truncated_blocks", 0)) for item in valid_stats
@@ -103,6 +107,510 @@ def summarize_generation_stats(step_stats_list):
         * int(item.get("tree_triggered_blocks", 0))
         for item in valid_stats
     )
+    target_logit_shadow_checks = sum(
+        int(item.get("target_logit_shadow_checks", 0)) for item in valid_stats
+    )
+    target_logit_shadow_mismatches = sum(
+        int(item.get("target_logit_shadow_mismatches", 0)) for item in valid_stats
+    )
+    verify_skipped_blocks = sum(
+        int(item.get("verify_skipped_blocks", 0)) for item in valid_stats
+    )
+    verify_skipped_tokens = sum(
+        int(item.get("verify_skipped_tokens", 0)) for item in valid_stats
+    )
+    verify_skipped_actions = sum(
+        int(item.get("verify_skipped_actions", 0)) for item in valid_stats
+    )
+    first_token_early_reject_blocks = sum(
+        int(item.get("first_token_early_reject_blocks", 0))
+        for item in valid_stats
+    )
+    temporal_proposal_routed_actions = sum(
+        int(item.get("temporal_proposal_routed_actions", 0))
+        for item in valid_stats
+    )
+    temporal_proposal_routed_blocks = sum(
+        int(item.get("temporal_proposal_routed_blocks", 0))
+        for item in valid_stats
+    )
+    temporal_proposal_rejected_blocks = sum(
+        int(item.get("temporal_proposal_rejected_blocks", 0))
+        for item in valid_stats
+    )
+    temporal_fallback_draft_blocks = sum(
+        int(item.get("temporal_fallback_draft_blocks", 0))
+        for item in valid_stats
+    )
+    temporal_fused_verify_blocks = sum(
+        int(item.get("temporal_fused_verify_blocks", 0))
+        for item in valid_stats
+    )
+    temporal_prefill_fusion_records = [
+        item["temporal_prefill_fusion_record"]
+        for item in valid_stats
+        if item.get("temporal_prefill_fusion_record") is not None
+    ]
+    temporal_prefill_accept_lengths = [
+        int(record.get("accept_length", 0))
+        for record in temporal_prefill_fusion_records
+    ]
+
+    stage_profile_totals = {}
+    stage_profile_calls = {}
+    for item in valid_stats:
+        for stage_name, stage_values in (item.get("stage_profile") or {}).items():
+            stage_profile_totals[stage_name] = stage_profile_totals.get(stage_name, 0.0) + float(
+                stage_values.get("total_ms", 0.0)
+            )
+            stage_profile_calls[stage_name] = stage_profile_calls.get(stage_name, 0) + int(
+                stage_values.get("calls", 0)
+            )
+    stage_profile = {
+        stage_name: {
+            "total_ms": total_ms,
+            "calls": stage_profile_calls[stage_name],
+            "mean_ms": (
+                total_ms / stage_profile_calls[stage_name]
+                if stage_profile_calls[stage_name] > 0
+                else None
+            ),
+        }
+        for stage_name, total_ms in stage_profile_totals.items()
+    }
+
+    verify_skip_records = []
+    for item in valid_stats:
+        verify_skip_records.extend(item.get("verify_skip_records", []))
+
+    def percentile(values, fraction):
+        values = sorted(float(value) for value in values)
+        if not values:
+            return None
+        rank = (len(values) - 1) * float(fraction)
+        lower = int(rank)
+        upper = min(lower + 1, len(values) - 1)
+        weight = rank - lower
+        return values[lower] * (1.0 - weight) + values[upper] * weight
+
+    labeled_skip_records = [
+        record for record in verify_skip_records if record.get("full_exact_match") is not None
+    ]
+
+    def gate_result(name, predicate, records=None):
+        source_records = labeled_skip_records if records is None else records
+        selected = [record for record in source_records if predicate(record)]
+        exact = sum(bool(record["full_exact_match"]) for record in selected)
+        result = {
+            "name": name,
+            "selected_blocks": len(selected),
+            "coverage": (
+                len(selected) / len(source_records) if source_records else None
+            ),
+            "full_exact_blocks": exact,
+            "full_exact_precision": (exact / len(selected)) if selected else None,
+            "unsafe_blocks": len(selected) - exact,
+            "mean_exact_accept_length": (
+                sum(int(record["exact_accept_length"]) for record in selected) / len(selected)
+                if selected
+                else None
+            ),
+        }
+        for threshold in (3, 5, 9):
+            label_name = f"full_action_group_match_r{threshold}"
+            relaxed_selected = [
+                record for record in selected if record.get(label_name) is not None
+            ]
+            relaxed_matches = sum(
+                bool(record[label_name]) for record in relaxed_selected
+            )
+            result[f"action_group_r{threshold}_precision"] = (
+                relaxed_matches / len(relaxed_selected) if relaxed_selected else None
+            )
+        return result
+
+    verify_skip_shadow = None
+    if verify_skip_records:
+        gate_summaries = [
+            gate_result("configured_gate", lambda record: bool(record.get("gate_selected"))),
+            gate_result("sentinel_exact", lambda record: bool(record.get("sentinel_match"))),
+            gate_result(
+                "sentinel+base_agreement_1.0",
+                lambda record: bool(record.get("sentinel_match"))
+                and float(record.get("base_agreement", 0.0)) >= 1.0 - 1e-6,
+            ),
+        ]
+        for threshold in (0.25, 0.5, 0.7, 0.8, 0.9):
+            gate_summaries.append(
+                gate_result(
+                    f"sentinel+min_top1_prob_{threshold:.2f}",
+                    lambda record, threshold=threshold: bool(record.get("sentinel_match"))
+                    and float(record.get("min_top1_prob", 0.0)) >= threshold,
+                )
+            )
+        temporal_gate_specs = (
+            ("temporal_cos_0.990_delta_9", 0.990, 9.0, 0.0),
+            ("temporal_cos_0.995_delta_9", 0.995, 9.0, 0.0),
+            ("temporal_cos_0.995_delta_5", 0.995, 5.0, 0.0),
+            ("temporal_cos_0.995_delta_9_prob_0.5", 0.995, 9.0, 0.5),
+        )
+        for name, min_cosine, max_delta, min_probability in temporal_gate_specs:
+            gate_summaries.append(
+                gate_result(
+                    name,
+                    lambda record, min_cosine=min_cosine, max_delta=max_delta, min_probability=min_probability: (
+                        bool(record.get("sentinel_match"))
+                        and record.get("temporal_hidden_cosine") is not None
+                        and float(record["temporal_hidden_cosine"]) >= min_cosine
+                        and record.get("previous_action_max_token_delta") is not None
+                        and float(record["previous_action_max_token_delta"]) <= max_delta
+                        and float(record.get("min_top1_prob", 0.0)) >= min_probability
+                    ),
+                )
+            )
+        feature_names = (
+            "min_top1_prob",
+            "mean_top1_prob",
+            "min_margin",
+            "max_normalized_entropy",
+            "base_agreement",
+            "temporal_hidden_cosine",
+            "previous_action_max_token_delta",
+            "previous_action_mean_token_delta",
+            "target_tail_max_token_delta",
+            "target_tail_mean_token_delta",
+        )
+        by_q_len = {}
+        for q_len in sorted({int(record["q_len"]) for record in labeled_skip_records}):
+            q_records = [
+                record for record in labeled_skip_records if int(record["q_len"]) == q_len
+            ]
+            q_gates = [
+                gate_result(
+                    "sentinel_exact",
+                    lambda record: bool(record.get("sentinel_match")),
+                    q_records,
+                )
+            ]
+            for threshold in (0.5, 0.7, 0.9):
+                q_gates.append(
+                    gate_result(
+                        f"sentinel+min_top1_prob_{threshold:.2f}",
+                        lambda record, threshold=threshold: bool(record.get("sentinel_match"))
+                        and float(record.get("min_top1_prob", 0.0)) >= threshold,
+                        q_records,
+                    )
+                )
+            by_q_len[str(q_len)] = {
+                "num_records": len(q_records),
+                "full_exact_base_rate": (
+                    sum(bool(record["full_exact_match"]) for record in q_records)
+                    / len(q_records)
+                    if q_records
+                    else None
+                ),
+                "action_group_base_rates": {
+                    f"r{threshold}": (
+                        sum(
+                            bool(record[f"full_action_group_match_r{threshold}"])
+                            for record in q_records
+                            if record.get(f"full_action_group_match_r{threshold}") is not None
+                        )
+                        / sum(
+                            record.get(f"full_action_group_match_r{threshold}") is not None
+                            for record in q_records
+                        )
+                        if any(
+                            record.get(f"full_action_group_match_r{threshold}") is not None
+                            for record in q_records
+                        )
+                        else None
+                    )
+                    for threshold in (3, 5, 9)
+                },
+                "gates": q_gates,
+            }
+        verify_skip_shadow = {
+            "mode": valid_stats[0].get("verify_skip_mode"),
+            "num_records": len(verify_skip_records),
+            "num_labeled_records": len(labeled_skip_records),
+            "full_exact_base_rate": (
+                sum(bool(record["full_exact_match"]) for record in labeled_skip_records)
+                / len(labeled_skip_records)
+                if labeled_skip_records
+                else None
+            ),
+            "feature_quantiles": {
+                name: {
+                    "p10": percentile(
+                        [
+                            record[name]
+                            for record in labeled_skip_records
+                            if record.get(name) is not None
+                        ],
+                        0.10,
+                    ),
+                    "p50": percentile(
+                        [
+                            record[name]
+                            for record in labeled_skip_records
+                            if record.get(name) is not None
+                        ],
+                        0.50,
+                    ),
+                    "p90": percentile(
+                        [
+                            record[name]
+                            for record in labeled_skip_records
+                            if record.get(name) is not None
+                        ],
+                        0.90,
+                    ),
+                }
+                for name in feature_names
+            },
+            "gates": gate_summaries,
+            "by_q_len": by_q_len,
+        }
+
+    temporal_action_records = [
+        item["temporal_action_skip_record"]
+        for item in valid_stats
+        if item.get("temporal_action_skip_record") is not None
+    ]
+    labeled_temporal_records = [
+        record
+        for record in temporal_action_records
+        if record.get("full_exact_match") is not None
+    ]
+
+    def temporal_gate_result(name, predicate):
+        selected = [record for record in labeled_temporal_records if predicate(record)]
+        result = {
+            "name": name,
+            "selected_actions": len(selected),
+            "coverage": (
+                len(selected) / len(labeled_temporal_records)
+                if labeled_temporal_records
+                else None
+            ),
+            "full_exact_precision": (
+                sum(bool(record["full_exact_match"]) for record in selected) / len(selected)
+                if selected
+                else None
+            ),
+            "mean_tail_exact_accept_length": (
+                sum(int(record.get("tail_exact_accept_length", 0)) for record in selected)
+                / len(selected)
+                if selected
+                else None
+            ),
+        }
+        for threshold in (3, 5, 9):
+            label_name = f"full_action_group_match_r{threshold}"
+            result[f"action_group_r{threshold}_precision"] = (
+                sum(bool(record[label_name]) for record in selected) / len(selected)
+                if selected
+                else None
+            )
+            result[f"mean_tail_action_group_accept_length_r{threshold}"] = (
+                sum(
+                    int(
+                        record.get(
+                            f"tail_action_group_accept_length_r{threshold}", 0
+                        )
+                    )
+                    for record in selected
+                )
+                / len(selected)
+                if selected
+                else None
+            )
+        return result
+
+    temporal_action_skip = None
+    if temporal_action_records:
+        temporal_feature_names = (
+            "prompt_temporal_cosine",
+            "prompt_temporal_min_layer_cosine",
+            "prompt_temporal_mean_layer_cosine",
+            "prompt_temporal_relative_l2",
+            "prompt_pooled_min_layer_cosine",
+            "prompt_pooled_mean_layer_cosine",
+            "prompt_pooled_relative_l2",
+            "first_action_prob_cosine",
+            "first_action_prob_total_variation",
+            "pixel_temporal_cosine",
+            "pixel_temporal_relative_l2",
+        )
+
+        def temporal_feature_quantiles(records):
+            return {
+                name: {
+                    "p01": percentile(
+                        [record[name] for record in records if record.get(name) is not None],
+                        0.01,
+                    ),
+                    "p10": percentile(
+                        [record[name] for record in records if record.get(name) is not None],
+                        0.10,
+                    ),
+                    "p50": percentile(
+                        [record[name] for record in records if record.get(name) is not None],
+                        0.50,
+                    ),
+                    "p90": percentile(
+                        [record[name] for record in records if record.get(name) is not None],
+                        0.90,
+                    ),
+                    "p99": percentile(
+                        [record[name] for record in records if record.get(name) is not None],
+                        0.99,
+                    ),
+                }
+                for name in temporal_feature_names
+            }
+
+        configured_cosine = float(
+            valid_stats[0].get("verify_skip_min_temporal_cosine", 1.0)
+        )
+        configured_stable_actions = int(
+            valid_stats[0].get("verify_skip_min_stable_actions", 4)
+        )
+        temporal_gates = [
+            temporal_gate_result(
+                "configured_route_gate",
+                lambda record: bool(record.get("first_token_matches_previous"))
+                and record.get("prompt_temporal_cosine") is not None
+                and float(record["prompt_temporal_cosine"])
+                >= float(valid_stats[0].get("temporal_route_min_cosine", 1.0)),
+            ),
+            temporal_gate_result(
+                "configured_gate",
+                lambda record: bool(record.get("first_token_matches_previous"))
+                and record.get("prompt_temporal_cosine") is not None
+                and float(record["prompt_temporal_cosine"]) >= configured_cosine
+                and int(record.get("previous_verified_action_run_length", 0))
+                >= configured_stable_actions,
+            )
+        ]
+        for threshold in (0.990, 0.995, 0.997, 0.998, 0.999):
+            temporal_gates.append(
+                temporal_gate_result(
+                    f"t0_exact+prompt_cos_{threshold:.3f}",
+                    lambda record, threshold=threshold: bool(
+                        record.get("first_token_matches_previous")
+                    )
+                    and record.get("prompt_temporal_cosine") is not None
+                    and float(record["prompt_temporal_cosine"]) >= threshold,
+                )
+            )
+            temporal_gates.append(
+                temporal_gate_result(
+                    f"stable4+t0_exact+prompt_cos_{threshold:.3f}",
+                    lambda record, threshold=threshold: bool(
+                        record.get("first_token_matches_previous")
+                    )
+                    and int(
+                        record.get("previous_verified_action_run_length", 0)
+                    )
+                    >= 4
+                    and record.get("prompt_temporal_cosine") is not None
+                    and float(record["prompt_temporal_cosine"]) >= threshold,
+                )
+            )
+        temporal_action_skip = {
+            "num_records": len(temporal_action_records),
+            "num_labeled_records": len(labeled_temporal_records),
+            "prompt_cosine_quantiles": {
+                "p10": percentile(
+                    [
+                        record["prompt_temporal_cosine"]
+                        for record in labeled_temporal_records
+                        if record.get("prompt_temporal_cosine") is not None
+                    ],
+                    0.10,
+                ),
+                "p50": percentile(
+                    [
+                        record["prompt_temporal_cosine"]
+                        for record in labeled_temporal_records
+                        if record.get("prompt_temporal_cosine") is not None
+                    ],
+                    0.50,
+                ),
+                "p90": percentile(
+                    [
+                        record["prompt_temporal_cosine"]
+                        for record in labeled_temporal_records
+                        if record.get("prompt_temporal_cosine") is not None
+                    ],
+                    0.90,
+                ),
+            },
+            "previous_action_base_rates": {
+                "exact": (
+                    sum(
+                        bool(record["full_exact_match"])
+                        for record in labeled_temporal_records
+                    )
+                    / len(labeled_temporal_records)
+                    if labeled_temporal_records
+                    else None
+                ),
+                **{
+                    f"action_group_r{threshold}": (
+                        sum(
+                            bool(record[f"full_action_group_match_r{threshold}"])
+                            for record in labeled_temporal_records
+                        )
+                        / len(labeled_temporal_records)
+                        if labeled_temporal_records
+                        else None
+                    )
+                    for threshold in (3, 5, 9)
+                },
+            },
+            "feature_quantiles": {
+                "all": temporal_feature_quantiles(labeled_temporal_records),
+                "exact": temporal_feature_quantiles(
+                    [
+                        record
+                        for record in labeled_temporal_records
+                        if bool(record["full_exact_match"])
+                    ]
+                ),
+                "mismatch": temporal_feature_quantiles(
+                    [
+                        record
+                        for record in labeled_temporal_records
+                        if not bool(record["full_exact_match"])
+                    ]
+                ),
+            },
+            "gates": temporal_gates,
+            # Shadow mode is explicitly diagnostic. Keeping its compact rows in
+            # the summary enables threshold sweeps without rerunning LIBERO.
+            "records": (
+                temporal_action_records
+                if (
+                    valid_stats[0].get("verify_skip_mode") == "shadow"
+                    or bool(valid_stats[0].get("debug_compare_target_ar"))
+                )
+                else None
+            ),
+        }
+
+    action_token_trace = [
+        item["final_action_tokens"]
+        for item in valid_stats
+        if item.get("final_action_tokens") is not None
+    ]
+    target_ar_reference_trace = [
+        item["target_ar_reference_tokens"]
+        for item in valid_stats
+        if item.get("target_ar_reference_tokens") is not None
+    ]
 
     position_hits = {}
     position_counts = {}
@@ -171,6 +679,44 @@ def summarize_generation_stats(step_stats_list):
         "acceptance_mode": valid_stats[0].get("acceptance_mode"),
         "tree_mode": valid_stats[0].get("tree_mode"),
         "tree_budget": valid_stats[0].get("tree_budget"),
+        "target_logits_mode": valid_stats[0].get("target_logits_mode"),
+        "target_logit_shadow_checks": target_logit_shadow_checks,
+        "target_logit_shadow_mismatches": target_logit_shadow_mismatches,
+        "target_logit_shadow_mismatch_rate": (
+            target_logit_shadow_mismatches / target_logit_shadow_checks
+            if target_logit_shadow_checks > 0
+            else None
+        ),
+        "verify_skip_mode": valid_stats[0].get("verify_skip_mode"),
+        "verify_skipped_blocks": verify_skipped_blocks,
+        "verify_skipped_tokens": verify_skipped_tokens,
+        "verify_skipped_actions": verify_skipped_actions,
+        "first_token_early_reject_blocks": first_token_early_reject_blocks,
+        "temporal_proposal_routed_actions": temporal_proposal_routed_actions,
+        "temporal_proposal_routed_blocks": temporal_proposal_routed_blocks,
+        "temporal_proposal_rejected_blocks": temporal_proposal_rejected_blocks,
+        "temporal_fallback_draft_blocks": temporal_fallback_draft_blocks,
+        "temporal_fused_verify_blocks": temporal_fused_verify_blocks,
+        "temporal_prefill_fused_actions": len(temporal_prefill_fusion_records),
+        "temporal_prefill_full_match_actions": sum(
+            int(bool(record.get("full_match", False)))
+            for record in temporal_prefill_fusion_records
+        ),
+        "temporal_prefill_avg_accept_length": (
+            sum(temporal_prefill_accept_lengths)
+            / len(temporal_prefill_accept_lengths)
+            if temporal_prefill_accept_lengths
+            else None
+        ),
+        "temporal_prefill_accept_histogram": dict(
+            sorted(Counter(temporal_prefill_accept_lengths).items())
+        ),
+        "temporal_prefill_fusion_records": temporal_prefill_fusion_records,
+        "verify_skip_shadow": verify_skip_shadow,
+        "temporal_action_skip": temporal_action_skip,
+        "action_token_trace": action_token_trace or None,
+        "target_ar_reference_trace": target_ar_reference_trace or None,
+        "stage_profile": stage_profile or None,
         "confidence_threshold": valid_stats[0].get("confidence_threshold"),
         "confidence_min_tokens": valid_stats[0].get("confidence_min_tokens"),
         "confidence_truncated_blocks": confidence_truncated_blocks,
@@ -190,7 +736,10 @@ def summarize_generation_stats(step_stats_list):
         ),
         "accepted_tokens": total_accepted,
         "compared_tokens": total_compared,
-        "overall_hit_rate": (total_accepted / total_compared) if total_compared > 0 else None,
+        "verified_accepted_tokens": total_verified_accepted,
+        "overall_hit_rate": (
+            total_verified_accepted / total_compared if total_compared > 0 else None
+        ),
         "action_group_rescued_blocks": action_group_rescued_blocks,
         "action_group_extra_accepted": action_group_extra_accepted,
         "tree_triggered_blocks": tree_triggered_blocks,
@@ -252,6 +801,42 @@ def write_eval_summary(
         "dflash_acceptance_mode": getattr(cfg, "dflash_acceptance_mode", None),
         "dflash_tree_mode": getattr(cfg, "dflash_tree_mode", None),
         "dflash_tree_budget": getattr(cfg, "dflash_tree_budget", None),
+        "dflash_target_logits_mode": getattr(cfg, "dflash_target_logits_mode", None),
+        "dflash_verify_skip_mode": getattr(cfg, "dflash_verify_skip_mode", None),
+        "dflash_verify_skip_min_top1_prob": getattr(
+            cfg, "dflash_verify_skip_min_top1_prob", None
+        ),
+        "dflash_verify_skip_min_margin": getattr(
+            cfg, "dflash_verify_skip_min_margin", None
+        ),
+        "dflash_verify_skip_min_base_agreement": getattr(
+            cfg, "dflash_verify_skip_min_base_agreement", None
+        ),
+        "dflash_temporal_route_min_cosine": getattr(
+            cfg, "dflash_temporal_route_min_cosine", None
+        ),
+        "dflash_temporal_route_stop_on_reject": getattr(
+            cfg, "dflash_temporal_route_stop_on_reject", None
+        ),
+        "dflash_temporal_fuse_verify": getattr(
+            cfg, "dflash_temporal_fuse_verify", None
+        ),
+        "dflash_temporal_prefill_fusion": getattr(
+            cfg, "dflash_temporal_prefill_fusion", None
+        ),
+        "dflash_temporal_prefill_min_stable_actions": getattr(
+            cfg, "dflash_temporal_prefill_min_stable_actions", None
+        ),
+        "dflash_verify_skip_min_temporal_cosine": getattr(
+            cfg, "dflash_verify_skip_min_temporal_cosine", None
+        ),
+        "dflash_verify_skip_min_stable_actions": getattr(
+            cfg, "dflash_verify_skip_min_stable_actions", None
+        ),
+        "dflash_verify_skip_max_consecutive": getattr(
+            cfg, "dflash_verify_skip_max_consecutive", None
+        ),
+        "dflash_profile_stages": getattr(cfg, "dflash_profile_stages", None),
         "pretrained_checkpoint": str(cfg.pretrained_checkpoint),
         "spec_checkpoint": str(getattr(cfg, "spec_checkpoint", "")),
         "num_trials_per_task": cfg.num_trials_per_task,
@@ -298,6 +883,56 @@ def format_generation_summary(summary, prefix="Speculative stats"):
             parts.append(f"tree_depth={summary['tree_average_max_depth']:.2f}")
         if summary.get("avg_main_path_accept_length") is not None:
             parts.append(f"main_accept={summary['avg_main_path_accept_length']:.3f}")
+    if summary.get("target_logit_shadow_checks"):
+        parts.append(
+            "action_vocab_mismatch="
+            f"{summary['target_logit_shadow_mismatches']}/"
+            f"{summary['target_logit_shadow_checks']}"
+        )
+    if summary.get("verify_skipped_blocks"):
+        parts.append(f"verify_skipped_blocks={summary['verify_skipped_blocks']}")
+        parts.append(f"verify_skipped_tokens={summary['verify_skipped_tokens']}")
+    if summary.get("temporal_proposal_rejected_blocks"):
+        parts.append(
+            "temporal_route_rejects="
+            f"{summary['temporal_proposal_rejected_blocks']}"
+        )
+        parts.append(
+            "temporal_fallback_blocks="
+            f"{summary['temporal_fallback_draft_blocks']}"
+        )
+    if summary.get("temporal_fused_verify_blocks"):
+        parts.append(
+            "temporal_fused_blocks="
+            f"{summary['temporal_fused_verify_blocks']}"
+        )
+    if summary.get("temporal_prefill_fused_actions"):
+        parts.append(
+            "prefill_fused_actions="
+            f"{summary['temporal_prefill_fused_actions']}"
+        )
+        parts.append(
+            "prefill_full_matches="
+            f"{summary['temporal_prefill_full_match_actions']}"
+        )
+        parts.append(
+            "prefill_accept="
+            f"{summary['temporal_prefill_avg_accept_length']:.3f}"
+        )
+    shadow = summary.get("verify_skip_shadow") or {}
+    if shadow:
+        sentinel = next(
+            (item for item in shadow.get("gates", []) if item.get("name") == "sentinel_exact"),
+            None,
+        )
+        if sentinel is not None:
+            coverage = sentinel.get("coverage")
+            precision = sentinel.get("full_exact_precision")
+            coverage_text = f"{coverage:.3f}" if coverage is not None else "None"
+            precision_text = f"{precision:.3f}" if precision is not None else "None"
+            parts.append(
+                f"shadow_sentinel=coverage={coverage_text}/precision={precision_text}"
+            )
     return f"{prefix}: " + ", ".join(parts)
 
 

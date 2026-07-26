@@ -8,6 +8,7 @@ from openvla.prismatic.extern.hf.modeling_speculation import (
     LlamaSpecForCausalLM,
     SpecVLAforActionPrediction,
     normalize_dflash_tree_mode,
+    normalize_dflash_verify_skip_mode,
 )
 
 
@@ -24,6 +25,12 @@ class DFlashVerificationTest(unittest.TestCase):
         self.assertEqual(normalize_dflash_tree_mode("single_fork"), "ddtree")
         with self.assertRaises(ValueError):
             normalize_dflash_tree_mode(True)
+
+    def test_verify_skip_mode_distinguishes_route_from_active(self):
+        self.assertEqual(normalize_dflash_verify_skip_mode("route"), "route")
+        self.assertEqual(normalize_dflash_verify_skip_mode("active"), "active")
+        with self.assertRaises(ValueError):
+            normalize_dflash_verify_skip_mode("unsafe")
 
     @staticmethod
     def _tree_logits():

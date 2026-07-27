@@ -137,6 +137,15 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--minimal_draft_training",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            "启用独立的简化 Draft 配方：保留 multi-anchor hidden/cos/soft 蒸馏，"
+            "禁用 Action-RNN、跨 Anchor、Domino 与其它 token 辅助项"
+        ),
+    )
+    parser.add_argument(
         "--init_model_checkpoint",
         type=str,
         default=None,
@@ -252,8 +261,11 @@ def parse_args():
         "--action_head_type",
         type=str,
         default="none",
-        choices=["none", "slot_rnn"],
-        help="动作专用顺序头；slot_rnn 只在 256 个动作 token 上递推前缀状态，避免每个 slot 重跑完整 lm_head",
+        choices=["none", "action_only", "slot_rnn"],
+        help=(
+            "动作投影模式：none=完整 lm_head；action_only=冻结 lm_head 的 256 个动作行，"
+            "不创建修正头；slot_rnn=动作行投影后再用顺序修正头"
+        ),
     )
     parser.add_argument("--action_head_rank", type=int, default=256, help="动作顺序头的低秩状态维度")
     parser.add_argument(
@@ -1074,7 +1086,11 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "mask_token_id": args.mask_token_id,
         "loss_design": (
             "specvla_anchor_hidden_main"
-            + ("+backbone_teacher_soft_ce" if args.soft_w > 0 else "")
+            + (
+                f"+backbone_teacher_soft_{args.soft_loss_type}"
+                if args.soft_w > 0
+                else ""
+            )
             + (
                 "+backbone_anchor_logit_distill"
                 if args.backbone_anchor_logit_distill_w > 0
@@ -1085,7 +1101,8 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
             + ("+anchor_logit_distill" if args.anchor_logit_distill_w > 0 else "")
             + ("+weak_path_refined_hidden" if args.refined_hidden_w > 0 else "")
             + ("+residual_token_ce" if args.residual_token_ce_w > 0 else "")
-            + ("+action_slot_rnn" if args.action_head_type != "none" else "")
+            + ("+action_only_projection" if args.action_head_type == "action_only" else "")
+            + ("+action_slot_rnn" if args.action_head_type == "slot_rnn" else "")
             + ("+action_distribution_l1" if args.action_distill_l1_w > 0 else "")
             + ("+prefix_survival" if args.prefix_survival_w > 0 else "")
             + ("+confidence" if args.action_confidence_w > 0 else "")
@@ -1150,6 +1167,7 @@ def build_dflash_config_dict(args) -> Dict[str, Any]:
         "lr": args.lr,
         "action_head_lr": args.action_head_lr,
         "training_phase": args.training_phase,
+        "minimal_draft_training": args.minimal_draft_training,
         "init_model_checkpoint": args.init_model_checkpoint,
         "staged_training": args.staged_training,
         "unified_cosine_curriculum": args.unified_cosine_curriculum,
@@ -1728,6 +1746,21 @@ def build_training_control(
     """返回当前 step 的损失权重与 Base/Final 交接比例。"""
     training_phase = getattr(args, "training_phase", "legacy")
     progress = min(1.0, float(global_step) / float(max(1, total_optimizer_steps)))
+    if bool(getattr(args, "minimal_draft_training", False)):
+        return {
+            "id": 6,
+            "name": "minimal_hidden_soft",
+            "stage2_scale": 1.0,
+            "stage3_scale": 0.0,
+            "progress": progress,
+            "base_scale": 1.0,
+            "final_scale": 0.0,
+            "token_envelope": 1.0,
+            "low_dim_scale": 1.0,
+            "weights": {
+                name: float(getattr(args, name)) for name in STAGED_LOSS_WEIGHT_NAMES
+            },
+        }
     if training_phase == "representation":
         weights = {name: float(getattr(args, name)) for name in STAGED_LOSS_WEIGHT_NAMES}
         for name in STAGED_LOSS_WEIGHT_NAMES:
@@ -2152,12 +2185,12 @@ def compute_loss_and_accuracy(
         action_head_forward_enabled = (
             draft_model.action_sequential_enabled and training_phase != "representation"
         )
-        if draft_model.action_sequential_enabled:
+        if draft_model.action_projection_enabled:
             backbone_student_logits = draft_model.project_action_logits(
                 student_hidden.to(torch.bfloat16),
                 lm_head,
             ).float()
-            if action_head_forward_enabled:
+            if draft_model.action_sequential_enabled and action_head_forward_enabled:
                 action_base_logits = backbone_student_logits
                 action_head_hidden = pred_hidden[:, :max_block_len, :]
                 use_joint_final_training = (
@@ -2256,13 +2289,13 @@ def compute_loss_and_accuracy(
             or active_loss_weights["action_distill_l1_w"] > 0
             or active_loss_weights["prefix_survival_w"] > 0
             or active_loss_weights["action_confidence_w"] > 0
-            or (draft_model.action_sequential_enabled and anchor == 0)
+            or (draft_model.action_projection_enabled and anchor == 0)
         )
         teacher_logits = None
         teacher_probs = None
         if need_teacher_logits:
             with torch.no_grad():
-                if draft_model.action_sequential_enabled:
+                if draft_model.action_projection_enabled:
                     teacher_logits = draft_model.project_action_logits(
                         teacher_hidden.to(torch.bfloat16),
                         lm_head,
@@ -2303,7 +2336,7 @@ def compute_loss_and_accuracy(
             base_soft_sum += (base_soft_ce * loss_weight).sum()
             final_soft_sum += (final_soft_ce * loss_weight).sum()
 
-        if draft_model.action_sequential_enabled:
+        if draft_model.action_projection_enabled:
             local_target_tokens = draft_model.action_token_ids_to_local(target_tokens)
             if active_loss_weights["action_token_ce_w"] > 0:
                 base_action_ce = F.cross_entropy(
@@ -2319,7 +2352,7 @@ def compute_loss_and_accuracy(
                 base_action_token_ce_sum += (base_action_ce * loss_weight).sum()
                 action_token_ce_sum += (action_ce * loss_weight).sum()
 
-            if (
+            if draft_model.action_sequential_enabled and (
                 active_loss_weights["action_distill_l1_w"] > 0
                 or active_loss_weights["prefix_survival_w"] > 0
                 or active_loss_weights["action_confidence_w"] > 0
@@ -2381,11 +2414,11 @@ def compute_loss_and_accuracy(
         cos_sum += (cos_reg * loss_weight).sum()
 
         base_pred_tokens = base_metric_logits.argmax(dim=-1)
-        if draft_model.action_sequential_enabled:
+        if draft_model.action_projection_enabled:
             base_pred_tokens = draft_model.action_local_ids_to_token(base_pred_tokens)
         base_correct_mask = (base_pred_tokens == target_tokens) & valid_mask.bool()
         pred_tokens = student_logits.argmax(dim=-1)# 草稿模型走贪婪解码
-        if draft_model.action_sequential_enabled:
+        if draft_model.action_projection_enabled:
             pred_tokens = draft_model.action_local_ids_to_token(pred_tokens)
         correct_mask = (pred_tokens == target_tokens) & valid_mask.bool()
 
@@ -2393,7 +2426,7 @@ def compute_loss_and_accuracy(
         # 的真实推理。这里仅复用已经算好的 DFlash hidden，让轻量 Action-RNN
         # 自己回滚一次，不增加任何 Draft Transformer forward；top-2 覆盖率也直接
         # 衡量单分叉验证树是否有可利用的 runner-up 候选。
-        if draft_model.action_sequential_enabled and anchor == 0:
+        if draft_model.action_projection_enabled and anchor == 0:
             with torch.no_grad():
                 if action_head_forward_enabled:
                     rollout_tokens, rollout_logits, _ = draft_model.sample_action_block(
@@ -3319,8 +3352,45 @@ def main():
             "独立两阶段模式不能叠加旧的 staged/unified curriculum；"
             "请关闭 staged、unified cosine 和 Domino linear curriculum。"
         )
-    if args.training_phase == "joint" and not args.domino_linear_curriculum:
-        raise ValueError("--training_phase joint requires --domino_linear_curriculum.")
+    if args.training_phase == "joint" and not (
+        args.domino_linear_curriculum or args.minimal_draft_training
+    ):
+        raise ValueError(
+            "--training_phase joint requires --domino_linear_curriculum, "
+            "unless --minimal_draft_training is enabled."
+        )
+    if args.minimal_draft_training:
+        if args.training_phase != "joint":
+            raise ValueError("--minimal_draft_training requires --training_phase joint.")
+        if args.action_head_type != "action_only":
+            raise ValueError(
+                "简化配方要求 --action_head_type action_only，不能创建 Action-RNN。"
+            )
+        forbidden_minimal_weights = {
+            "anchor_consistency_w": args.anchor_consistency_w,
+            "causal_residual_cad_w": args.causal_residual_cad_w,
+            "refined_hidden_w": args.refined_hidden_w,
+            "residual_token_ce_w": args.residual_token_ce_w,
+            "anchor_logit_distill_w": args.anchor_logit_distill_w,
+            "backbone_anchor_logit_distill_w": args.backbone_anchor_logit_distill_w,
+            "action_token_ce_w": args.action_token_ce_w,
+            "action_distill_l1_w": args.action_distill_l1_w,
+            "prefix_survival_w": args.prefix_survival_w,
+            "action_confidence_w": args.action_confidence_w,
+        }
+        enabled_forbidden = [
+            name for name, value in forbidden_minimal_weights.items() if value > 0
+        ]
+        if enabled_forbidden:
+            raise ValueError(
+                "简化配方禁止以下辅助损失: " + ", ".join(enabled_forbidden)
+            )
+        if args.causal_residual_type != "none" or args.logit_markov_type != "none":
+            raise ValueError(
+                "简化配方要求 --causal_residual_type none 和 --logit_markov_type none。"
+            )
+        if args.staged_training or args.unified_cosine_curriculum or args.domino_linear_curriculum:
+            raise ValueError("简化配方不允许叠加 staged/unified/Domino 课程。")
     if args.training_phase == "representation":
         if args.init_model_checkpoint is not None:
             raise ValueError("阶段一必须从头训练，不能设置 --init_model_checkpoint。")
@@ -3369,7 +3439,16 @@ def main():
         )
     )
     if action_loss_enabled and args.action_head_type == "none":
-        raise ValueError("动作子词表损失要求 --action_head_type slot_rnn.")
+        raise ValueError("动作子词表损失要求 --action_head_type action_only 或 slot_rnn.")
+    if (
+        args.action_head_type != "slot_rnn"
+        and (
+            args.action_distill_l1_w > 0
+            or args.prefix_survival_w > 0
+            or args.action_confidence_w > 0
+        )
+    ):
+        raise ValueError("L1/Prefix/置信度辅助项只适用于 --action_head_type slot_rnn.")
     if args.action_confidence_w > 0 and not args.action_confidence_enabled:
         raise ValueError("--action_confidence_w > 0 requires --action_confidence_enabled.")
     if args.action_head_type != "none" and (

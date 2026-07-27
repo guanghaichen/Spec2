@@ -412,15 +412,13 @@ class DFlashDraftModel(nn.Module):
         self.action_confidence_enabled = bool(
             getattr(config, "dflash_action_confidence_enabled", False)
         )
-        if self.action_head_type not in ("none", "slot_rnn"):
+        if self.action_head_type not in ("none", "action_only", "slot_rnn"):
             raise ValueError(
                 f"Unsupported dflash_action_head_type={self.action_head_type!r}; "
-                "expected 'none' or 'slot_rnn'."
+                "expected 'none', 'action_only', or 'slot_rnn'."
             )
-        if self.action_head_type == "slot_rnn":
+        if self.action_head_type in ("action_only", "slot_rnn"):
             vocab_size = int(getattr(config, "vocab_size", 0))
-            if self.action_head_rank <= 0:
-                raise ValueError("dflash_action_head_rank must be > 0.")
             if self.action_vocab_size <= 0:
                 raise ValueError("dflash_action_vocab_size must be > 0.")
             if self.action_token_start < 0 or self.action_token_end > vocab_size:
@@ -428,6 +426,9 @@ class DFlashDraftModel(nn.Module):
                     "DFlash action-token range must lie inside the target vocabulary: "
                     f"[{self.action_token_start}, {self.action_token_end}) vs vocab_size={vocab_size}."
                 )
+        if self.action_head_type == "slot_rnn":
+            if self.action_head_rank <= 0:
+                raise ValueError("dflash_action_head_rank must be > 0.")
             rank = self.action_head_rank
             self.action_head_norm = LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
             self.action_head_hidden = nn.Linear(config.hidden_size, rank, bias=False)
@@ -468,6 +469,11 @@ class DFlashDraftModel(nn.Module):
     @property
     def action_sequential_enabled(self) -> bool:
         return self.action_head_type == "slot_rnn"
+
+    @property
+    def action_projection_enabled(self) -> bool:
+        """Whether logits are restricted to the frozen lm_head action rows."""
+        return self.action_head_type in ("action_only", "slot_rnn")
 
     def action_logits_from_full(self, logits: torch.Tensor) -> torch.Tensor:
         """只取 OpenVLA 动作 token 对应的连续词表区间。"""

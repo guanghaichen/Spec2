@@ -640,6 +640,9 @@ class SpecVLAforActionPrediction(nn.Module):
             dflash_temporal_fuse_verify=True,
             dflash_temporal_prefill_fusion=False,
             dflash_temporal_prefill_min_stable_actions=3,
+            dflash_temporal_prefill_tree=False,
+            dflash_temporal_prefill_tree_max_candidates=3,
+            dflash_temporal_prefill_tree_min_history=2,
             dflash_verify_skip_min_temporal_cosine=1.0,
             dflash_verify_skip_min_stable_actions=4,
             dflash_verify_skip_max_consecutive=1,
@@ -698,6 +701,21 @@ class SpecVLAforActionPrediction(nn.Module):
         if self.dflash_temporal_prefill_min_stable_actions < 1:
             raise ValueError(
                 "dflash_temporal_prefill_min_stable_actions must be >= 1."
+            )
+        self.dflash_temporal_prefill_tree = bool(dflash_temporal_prefill_tree)
+        self.dflash_temporal_prefill_tree_max_candidates = int(
+            dflash_temporal_prefill_tree_max_candidates
+        )
+        self.dflash_temporal_prefill_tree_min_history = int(
+            dflash_temporal_prefill_tree_min_history
+        )
+        if self.dflash_temporal_prefill_tree_max_candidates < 1:
+            raise ValueError(
+                "dflash_temporal_prefill_tree_max_candidates must be >= 1."
+            )
+        if self.dflash_temporal_prefill_tree_min_history not in (1, 2):
+            raise ValueError(
+                "dflash_temporal_prefill_tree_min_history must be 1 or 2."
             )
         self.dflash_verify_skip_min_temporal_cosine = float(
             dflash_verify_skip_min_temporal_cosine
@@ -828,6 +846,7 @@ class SpecVLAforActionPrediction(nn.Module):
         self._dflash_previous_first_action_probs = None
         self._dflash_previous_pixel_signature = None
         self._dflash_previous_action_tokens = None
+        self._dflash_action_history_cpu = []
         self._dflash_previous_verified_action_tokens = None
         self._dflash_verified_action_run_length = 0
         self._dflash_consecutive_verify_skips = 0
@@ -1039,9 +1058,17 @@ class SpecVLAforActionPrediction(nn.Module):
         self._dflash_previous_first_action_probs = None
         self._dflash_previous_pixel_signature = None
         self._dflash_previous_action_tokens = None
+        self._dflash_action_history_cpu = []
         self._dflash_previous_verified_action_tokens = None
         self._dflash_verified_action_run_length = 0
         self._dflash_consecutive_verify_skips = 0
+
+    def _record_dflash_action_history(self, action_tokens: torch.LongTensor) -> None:
+        """Keep two tiny CPU action records for the next temporal prefill."""
+        action_cpu = action_tokens[0].detach().to(device="cpu", dtype=torch.long)
+        self._dflash_action_history_cpu.append(action_cpu)
+        if len(self._dflash_action_history_cpu) > 2:
+            self._dflash_action_history_cpu.pop(0)
 
     @staticmethod
     def _dflash_pixel_signature(pixel_values) -> Optional[torch.Tensor]:
@@ -1179,6 +1206,202 @@ class SpecVLAforActionPrediction(nn.Module):
                     selected_layer.append(tensor)
             selected_layers.append(tuple(selected_layer))
         return tuple(selected_layers)
+
+    def _build_temporal_prefill_candidates(
+        self,
+        max_new_tokens: int,
+    ) -> tuple[Optional[torch.LongTensor], list[str]]:
+        """Build unique whole-action proposals from already executed actions.
+
+        Candidate 0 repeats the latest action. With two history entries, the
+        remaining candidates are a constant-velocity extrapolation in OpenVLA's
+        normalized action space and the second-latest action. Gripper remains a
+        categorical hold value during extrapolation.
+        """
+        history = self._dflash_action_history_cpu
+        if len(history) < self.dflash_temporal_prefill_tree_min_history:
+            return None, []
+        latest = history[-1][:max_new_tokens].clone().long()
+        if latest.numel() < max_new_tokens:
+            return None, []
+
+        raw_candidates: list[tuple[str, torch.LongTensor]] = [("hold", latest)]
+        if len(history) >= 2:
+            previous = history[-2][:max_new_tokens].clone().long()
+            if previous.numel() >= max_new_tokens:
+                centers = torch.as_tensor(self.bin_centers, dtype=torch.float32)
+
+                def decode(tokens: torch.LongTensor) -> torch.Tensor:
+                    indices = (int(self.vocab_size) - tokens - 1).clamp(
+                        min=0,
+                        max=centers.numel() - 1,
+                    )
+                    return centers.index_select(0, indices)
+
+                latest_values = decode(latest)
+                previous_values = decode(previous)
+                extrapolated_values = (
+                    latest_values + (latest_values - previous_values)
+                ).clamp(min=-1.0, max=1.0)
+                if max_new_tokens > 6:
+                    extrapolated_values[6] = latest_values[6]
+                nearest_indices = torch.argmin(
+                    torch.abs(extrapolated_values.unsqueeze(-1) - centers),
+                    dim=-1,
+                )
+                extrapolated_tokens = (
+                    int(self.vocab_size) - nearest_indices - 1
+                ).long()
+                raw_candidates.extend(
+                    [
+                        ("constant_velocity", extrapolated_tokens),
+                        ("recent", previous),
+                    ]
+                )
+
+        unique_candidates = []
+        sources = []
+        seen = set()
+        for source, candidate in raw_candidates:
+            key = tuple(int(token) for token in candidate.tolist())
+            if key in seen:
+                continue
+            seen.add(key)
+            unique_candidates.append(candidate)
+            sources.append(source)
+            if len(unique_candidates) >= self.dflash_temporal_prefill_tree_max_candidates:
+                break
+        if not unique_candidates:
+            return None, []
+        return torch.stack(unique_candidates, dim=0), sources
+
+    @staticmethod
+    def _build_temporal_prefill_trie(
+        candidate_tokens: torch.LongTensor,
+    ) -> tuple[
+        torch.LongTensor,
+        list[dict[int, int]],
+        torch.Tensor,
+        torch.LongTensor,
+        torch.LongTensor,
+    ]:
+        """Compile whole-action proposals into a shared-prefix verification trie."""
+        if candidate_tokens.ndim != 2 or candidate_tokens.shape[1] < 2:
+            raise ValueError(
+                "Temporal prefill candidates must have shape [candidates, action_dim>=2]."
+            )
+        input_depth = int(candidate_tokens.shape[1]) - 1
+        parents = [-1]
+        child_maps: list[dict[int, int]] = [dict()]
+        node_tokens: list[int] = []
+        node_depths: list[int] = []
+        candidate_paths: list[list[int]] = []
+
+        for candidate in candidate_tokens:
+            parent_index = 0
+            path = []
+            for depth, token in enumerate(candidate[:input_depth].tolist()):
+                token = int(token)
+                child_index = child_maps[parent_index].get(token)
+                if child_index is None:
+                    child_index = len(child_maps)
+                    child_maps[parent_index][token] = child_index
+                    child_maps.append(dict())
+                    parents.append(parent_index)
+                    node_tokens.append(token)
+                    node_depths.append(depth)
+                path.append(child_index - 1)
+                parent_index = child_index
+            candidate_paths.append(path)
+
+        node_count = len(node_tokens)
+        tree_mask = torch.zeros((node_count, node_count), dtype=torch.bool)
+        for node_index in range(1, node_count + 1):
+            ancestor_index = node_index
+            while ancestor_index > 0:
+                tree_mask[node_index - 1, ancestor_index - 1] = True
+                ancestor_index = parents[ancestor_index]
+
+        return (
+            torch.tensor(node_tokens, dtype=torch.long).unsqueeze(0),
+            child_maps,
+            tree_mask.unsqueeze(0).unsqueeze(0),
+            torch.tensor(node_depths, dtype=torch.long).unsqueeze(0),
+            torch.tensor(candidate_paths, dtype=torch.long),
+        )
+
+    def _select_temporal_prefill_path(
+        self,
+        *,
+        candidate_tokens: torch.LongTensor,
+        candidate_paths: torch.LongTensor,
+        root_posterior_token: torch.LongTensor,
+        node_posterior_tokens: torch.LongTensor,
+        accept_threshold: Optional[int],
+    ) -> dict:
+        """Choose the longest valid temporal proposal, then the most exact one."""
+        action_dim = int(candidate_tokens.shape[1])
+        action_positions = torch.arange(
+            action_dim,
+            device=candidate_tokens.device,
+            dtype=torch.long,
+        ).unsqueeze(0)
+        best = None
+        candidate_accept_lengths = []
+        candidate_exact_lengths = []
+        for candidate_index in range(candidate_tokens.shape[0]):
+            path_nodes = candidate_paths[candidate_index]
+            path_posteriors = node_posterior_tokens.index_select(1, path_nodes)
+            posterior_tokens = torch.cat(
+                [root_posterior_token, path_posteriors],
+                dim=1,
+            )
+            proposed = candidate_tokens[candidate_index : candidate_index + 1]
+            accept_mask = self._compute_dflash_accept_mask(
+                proposed,
+                posterior_tokens,
+                accept_threshold=accept_threshold,
+                action_position_ids=action_positions,
+                acceptance_mode=self.dflash_acceptance_mode,
+            )
+            exact_mask = proposed.eq(posterior_tokens)
+            accept_length = int(accept_mask.cumprod(dim=1).sum().item())
+            exact_length = int(exact_mask.int().cumprod(dim=1).sum().item())
+            accepted_distance = int(
+                torch.abs(proposed[:, :accept_length] - posterior_tokens[:, :accept_length])
+                .sum()
+                .item()
+            )
+            candidate_accept_lengths.append(accept_length)
+            candidate_exact_lengths.append(exact_length)
+            score = (
+                accept_length,
+                exact_length,
+                -accepted_distance,
+                -candidate_index,
+            )
+            if best is None or score > best["score"]:
+                correction = (
+                    posterior_tokens[:, accept_length : accept_length + 1]
+                    if accept_length < action_dim
+                    else None
+                )
+                best = {
+                    "score": score,
+                    "candidate_index": candidate_index,
+                    "accept_length": accept_length,
+                    "exact_accept_length": exact_length,
+                    "proposed_tokens": proposed,
+                    "posterior_tokens": posterior_tokens,
+                    "path_nodes": path_nodes,
+                    "correction_token": correction,
+                }
+        if best is None:
+            raise AssertionError("Temporal prefill path selection received no candidates.")
+        best["candidate_accept_lengths"] = candidate_accept_lengths
+        best["candidate_exact_lengths"] = candidate_exact_lengths
+        best.pop("score")
+        return best
 
     @staticmethod
     def _build_ddtree_from_logits(
@@ -1654,9 +1877,20 @@ class SpecVLAforActionPrediction(nn.Module):
                     start_index=self.dflash_causal_residual_start_index,
                 )
             else:
-                base_draft_logits = self.base_model.language_model.lm_head(draft_hidden)
-                draft_logits = base_draft_logits
-                proposed_tokens = dflash_sample(draft_logits, temperature=0.0)
+                if getattr(self.ea_layer, "action_projection_enabled", False):
+                    base_draft_logits = self.ea_layer.project_action_logits(
+                        draft_hidden,
+                        self.base_model.language_model.lm_head,
+                    )
+                    draft_logits = base_draft_logits
+                    proposed_tokens = (
+                        dflash_sample(draft_logits, temperature=0.0)
+                        + self.ea_layer.action_token_start
+                    )
+                else:
+                    base_draft_logits = self.base_model.language_model.lm_head(draft_hidden)
+                    draft_logits = base_draft_logits
+                    proposed_tokens = dflash_sample(draft_logits, temperature=0.0)
             
             # 目标模型验证
             verify_input_ids = torch.cat([block_input_ids[:, :1], proposed_tokens[:, :-1]], dim=1)
@@ -1823,8 +2057,43 @@ class SpecVLAforActionPrediction(nn.Module):
 
         model_inputs = self.base_model.prepare_inputs_for_generation(input_ids, **kwargs)
         prefill_fusion_candidate = None
+        prefill_tree_candidates = None
+        prefill_tree_candidate_sources = []
+        prefill_tree_candidate_paths = None
+        prefill_tree_mask = None
+        prefill_tree_relative_positions = None
         prefill_fusion_input_count = 0
         if (
+            self.dflash_temporal_prefill_tree
+            and self.dflash_tree_mode == "off"
+            and max_new_tokens > 1
+            and model_inputs.get("input_ids") is not None
+        ):
+            candidate_tokens_cpu, prefill_tree_candidate_sources = (
+                self._build_temporal_prefill_candidates(max_new_tokens)
+            )
+            if candidate_tokens_cpu is not None:
+                (
+                    prefill_verify_inputs,
+                    _,
+                    prefill_tree_mask,
+                    prefill_tree_relative_positions,
+                    prefill_tree_candidate_paths,
+                ) = self._build_temporal_prefill_trie(candidate_tokens_cpu)
+                prefill_tree_candidates = candidate_tokens_cpu.to(input_ids.device)
+                prefill_verify_inputs = prefill_verify_inputs.to(input_ids.device)
+                prefill_tree_mask = prefill_tree_mask.to(input_ids.device)
+                prefill_tree_relative_positions = prefill_tree_relative_positions.to(
+                    input_ids.device
+                )
+                prefill_tree_candidate_paths = prefill_tree_candidate_paths.to(
+                    input_ids.device
+                )
+                prefill_fusion_input_count = int(prefill_verify_inputs.shape[1])
+                model_inputs["input_ids"] = torch.cat(
+                    [model_inputs["input_ids"], prefill_verify_inputs], dim=1
+                )
+        elif (
             self.dflash_temporal_prefill_fusion
             and self.dflash_tree_mode == "off"
             and max_new_tokens > 1
@@ -1857,6 +2126,21 @@ class SpecVLAforActionPrediction(nn.Module):
                 model_inputs["attention_mask"] = torch.cat(
                     [model_inputs["attention_mask"], attention_extension], dim=1
                 )
+        if (
+            prefill_tree_candidates is not None
+            and model_inputs.get("attention_mask") is not None
+        ):
+            attention_extension = torch.ones(
+                (
+                    model_inputs["attention_mask"].shape[0],
+                    prefill_fusion_input_count,
+                ),
+                dtype=model_inputs["attention_mask"].dtype,
+                device=model_inputs["attention_mask"].device,
+            )
+            model_inputs["attention_mask"] = torch.cat(
+                [model_inputs["attention_mask"], attention_extension], dim=1
+            )
         current_pixel_signature = (
             self._dflash_pixel_signature(model_inputs.get("pixel_values"))
             if self.dflash_verify_skip_mode == "shadow"
@@ -1891,23 +2175,45 @@ class SpecVLAforActionPrediction(nn.Module):
             )
 
         stage_started = profile_start()
-        prefill_logit_count = (
-            max_new_tokens if prefill_fusion_candidate is not None else 1
+        prefill_active = (
+            prefill_fusion_candidate is not None
+            or prefill_tree_candidates is not None
         )
-        outputs, orig, _, _ = self(
-            **model_inputs,
-            return_dict=True,
-            output_attentions=False,
-            output_hidden_states=True,
-            output_orig=True,
-            **self._dflash_target_logit_kwargs(
-                num_logits_to_keep=prefill_logit_count
-            ),
-        )
+        prefill_logit_count = prefill_fusion_input_count + 1 if prefill_active else 1
+        language_model = self.base_model.language_model
+        if (
+            prefill_tree_candidates is not None
+            and getattr(language_model.config, "_attn_implementation", None)
+            == "flash_attention_2"
+        ):
+            raise RuntimeError(
+                "Temporal prefill trees require an explicit ancestor mask and are "
+                "not compatible with flash_attention_2. Use eager/SDPA."
+            )
+        previous_tree_mask = getattr(language_model, "tree_mask", None)
+        language_model.tree_mask = prefill_tree_mask
+        try:
+            outputs, orig, _, _ = self(
+                **model_inputs,
+                return_dict=True,
+                output_attentions=False,
+                output_hidden_states=True,
+                output_orig=True,
+                multimodal_tree_position_ids=prefill_tree_relative_positions,
+                **self._dflash_target_logit_kwargs(
+                    num_logits_to_keep=prefill_logit_count
+                ),
+            )
+        finally:
+            language_model.tree_mask = previous_tree_mask
         profile_end(
-            "target_prefill_fused"
-            if prefill_fusion_candidate is not None
-            else "target_prefill",
+            (
+                "target_prefill_temporal_tree"
+                if prefill_tree_candidates is not None
+                else "target_prefill_fused"
+                if prefill_fusion_candidate is not None
+                else "target_prefill"
+            ),
             stage_started,
         )
 
@@ -1936,12 +2242,105 @@ class SpecVLAforActionPrediction(nn.Module):
         action_context = prompt_context[:, :0, :]
 
         prefill_fusion_record = None
+        prefill_selected_hidden = None
         initial_anchor_idx = 0
-        if prefill_fusion_candidate is None:
+        if prefill_fusion_candidate is None and prefill_tree_candidates is None:
             first_token_logits = orig[:, -1:, :]
             first_token = self._sample_dflash_target_logits(first_token_logits)
             output_ids[:, token_prefix_len : token_prefix_len + 1] = first_token
             past_key_values = outputs.past_key_values
+        elif prefill_tree_candidates is not None:
+            root_posterior_token = self._sample_dflash_target_logits(orig[:, :1, :])
+            node_posterior_tokens = self._sample_dflash_target_logits(orig[:, 1:, :])
+            selected_prefill = self._select_temporal_prefill_path(
+                candidate_tokens=prefill_tree_candidates,
+                candidate_paths=prefill_tree_candidate_paths,
+                root_posterior_token=root_posterior_token,
+                node_posterior_tokens=node_posterior_tokens,
+                accept_threshold=accept_threshold,
+            )
+            selected_candidate_index = int(selected_prefill["candidate_index"])
+            selected_candidate = selected_prefill["proposed_tokens"]
+            selected_path_nodes = selected_prefill["path_nodes"]
+            prefill_accept_length = min(
+                int(selected_prefill["accept_length"]),
+                max_new_tokens,
+            )
+            if prefill_accept_length > 0:
+                output_ids[
+                    :,
+                    token_prefix_len : token_prefix_len + prefill_accept_length,
+                ] = selected_candidate[:, :prefill_accept_length]
+            if prefill_accept_length < max_new_tokens:
+                output_ids[:, token_prefix_len + prefill_accept_length] = (
+                    selected_prefill["correction_token"][:, 0]
+                )
+            prefill_progress_length = (
+                max_new_tokens
+                if prefill_accept_length == max_new_tokens
+                else prefill_accept_length + 1
+            )
+            initial_anchor_idx = prefill_progress_length - 1
+            accepted_cached_inputs = min(
+                prefill_accept_length,
+                max_new_tokens - 1,
+            )
+            if prefill_progress_length < max_new_tokens:
+                past_key_values = self._select_tree_past_key_values(
+                    outputs.past_key_values,
+                    base_length=action_base_position,
+                    tree_node_indices=selected_path_nodes[:accepted_cached_inputs],
+                )
+            else:
+                # A complete action returns immediately; avoid gathering 32-layer KV.
+                past_key_values = None
+            if accepted_cached_inputs > 0:
+                selected_hidden_indices = (
+                    action_base_position
+                    + selected_path_nodes[:accepted_cached_inputs]
+                )
+                action_context = full_prefill_hidden.index_select(
+                    1,
+                    selected_hidden_indices,
+                )
+                prefill_selected_hidden = action_context
+            first_token_logits = orig[:, :1, :]
+            first_token = output_ids[
+                :, token_prefix_len : token_prefix_len + 1
+            ]
+            hold_accept_length = int(
+                selected_prefill["candidate_accept_lengths"][0]
+            )
+            prefill_fusion_record = {
+                "mode": "temporal_tree",
+                "accept_length": prefill_accept_length,
+                "exact_accept_length": int(
+                    selected_prefill["exact_accept_length"]
+                ),
+                "progress_length": prefill_progress_length,
+                "full_match": prefill_accept_length == max_new_tokens,
+                "full_exact_match": int(selected_prefill["exact_accept_length"])
+                == max_new_tokens,
+                "candidate_count": int(prefill_tree_candidates.shape[0]),
+                "verified_node_count": prefill_fusion_input_count,
+                "candidate_sources": prefill_tree_candidate_sources,
+                "candidate_accept_lengths": selected_prefill[
+                    "candidate_accept_lengths"
+                ],
+                "candidate_exact_lengths": selected_prefill[
+                    "candidate_exact_lengths"
+                ],
+                "selected_candidate_index": selected_candidate_index,
+                "selected_candidate_source": prefill_tree_candidate_sources[
+                    selected_candidate_index
+                ],
+                "selected_alternate": selected_candidate_index != 0,
+                "hold_accept_length": hold_accept_length,
+                "extra_accepted_over_hold": max(
+                    prefill_accept_length - hold_accept_length,
+                    0,
+                ),
+            }
         else:
             prefill_posterior_tokens = self._sample_dflash_target_logits(orig)
             prefill_action_positions = torch.arange(
@@ -1990,11 +2389,13 @@ class SpecVLAforActionPrediction(nn.Module):
                     ),
                     :,
                 ]
+                prefill_selected_hidden = action_context
             first_token_logits = orig[:, :1, :]
             first_token = output_ids[
                 :, token_prefix_len : token_prefix_len + 1
             ]
             prefill_fusion_record = {
+                "mode": "single_hold",
                 "accept_length": prefill_accept_length,
                 "progress_length": prefill_progress_length,
                 "full_match": prefill_accept_length == max_new_tokens,
@@ -2319,6 +2720,13 @@ class SpecVLAforActionPrediction(nn.Module):
                 "temporal_prefill_min_stable_actions": (
                     self.dflash_temporal_prefill_min_stable_actions
                 ),
+                "temporal_prefill_tree": self.dflash_temporal_prefill_tree,
+                "temporal_prefill_tree_max_candidates": (
+                    self.dflash_temporal_prefill_tree_max_candidates
+                ),
+                "temporal_prefill_tree_min_history": (
+                    self.dflash_temporal_prefill_tree_min_history
+                ),
                 "temporal_prefill_fusion_record": None,
                 "verify_skip_min_temporal_cosine": self.dflash_verify_skip_min_temporal_cosine,
                 "verify_skip_min_stable_actions": self.dflash_verify_skip_min_stable_actions,
@@ -2378,6 +2786,9 @@ class SpecVLAforActionPrediction(nn.Module):
                     else None
                 ),
             }
+            self._record_dflash_action_history(
+                output_ids[:, token_prefix_len : token_prefix_len + max_new_tokens]
+            )
             self.last_dflash_stats = generation_stats
             self.last_generation_stats = generation_stats
             return output_ids[:, token_prefix_len:max_length]
@@ -2396,7 +2807,14 @@ class SpecVLAforActionPrediction(nn.Module):
             prefill_accept_length = int(prefill_fusion_record["accept_length"])
             prefill_progress_length = int(prefill_fusion_record["progress_length"])
             accept_lengths = [prefill_accept_length]
-            main_path_accept_lengths = [prefill_accept_length]
+            main_path_accept_lengths = [
+                int(
+                    prefill_fusion_record.get(
+                        "hold_accept_length",
+                        prefill_accept_length,
+                    )
+                )
+            ]
             progress_lengths = [prefill_progress_length]
             total_accepted = prefill_accept_length
             total_compared = max_new_tokens
@@ -2427,9 +2845,10 @@ class SpecVLAforActionPrediction(nn.Module):
         if (
             prefill_fusion_record is not None
             and int(prefill_fusion_record["accept_length"]) > 0
+            and prefill_selected_hidden is not None
         ):
-            current_anchor_signature = full_prefill_hidden[
-                :, action_base_position, -self.hidden_size :
+            current_anchor_signature = prefill_selected_hidden[
+                :, 0, -self.hidden_size :
             ].detach()
             if self._dflash_previous_anchor_signature is not None:
                 temporal_hidden_cosine = F.cosine_similarity(
@@ -2641,11 +3060,22 @@ class SpecVLAforActionPrediction(nn.Module):
                         )
                     )
                 else:
-                    base_draft_logits = self.base_model.language_model.lm_head(
-                        draft_hidden
-                    )
-                    draft_logits = base_draft_logits
-                    proposed_tokens = dflash_sample(draft_logits, temperature=0.0)
+                    if getattr(self.ea_layer, "action_projection_enabled", False):
+                        base_draft_logits = self.ea_layer.project_action_logits(
+                            draft_hidden,
+                            self.base_model.language_model.lm_head,
+                        )
+                        draft_logits = base_draft_logits
+                        proposed_tokens = (
+                            dflash_sample(draft_logits, temperature=0.0)
+                            + self.ea_layer.action_token_start
+                        )
+                    else:
+                        base_draft_logits = self.base_model.language_model.lm_head(
+                            draft_hidden
+                        )
+                        draft_logits = base_draft_logits
+                        proposed_tokens = dflash_sample(draft_logits, temperature=0.0)
                 profile_end("action_head", stage_started)
 
             skip_features = None
@@ -3200,6 +3630,7 @@ class SpecVLAforActionPrediction(nn.Module):
             final_action_tokens.detach().clone()
         )
         self._dflash_previous_action_tokens = final_action_tokens.detach().clone()
+        self._record_dflash_action_history(final_action_tokens)
         self._dflash_consecutive_verify_skips = 0
 
         per_position_stats = []
@@ -3243,6 +3674,13 @@ class SpecVLAforActionPrediction(nn.Module):
             "temporal_prefill_fusion": self.dflash_temporal_prefill_fusion,
             "temporal_prefill_min_stable_actions": (
                 self.dflash_temporal_prefill_min_stable_actions
+            ),
+            "temporal_prefill_tree": self.dflash_temporal_prefill_tree,
+            "temporal_prefill_tree_max_candidates": (
+                self.dflash_temporal_prefill_tree_max_candidates
+            ),
+            "temporal_prefill_tree_min_history": (
+                self.dflash_temporal_prefill_tree_min_history
             ),
             "temporal_prefill_fusion_record": prefill_fusion_record,
             "verify_skip_min_temporal_cosine": self.dflash_verify_skip_min_temporal_cosine,
@@ -3341,6 +3779,7 @@ class SpecVLAforActionPrediction(nn.Module):
         output_projector_features: Optional[bool] = None,
         return_dict: Optional[bool] = None,
         position_ids: Optional[torch.LongTensor] = None,
+        multimodal_tree_position_ids: Optional[torch.LongTensor] = None,
         num_logits_to_keep: int = 0,
         logit_token_range: Optional[Tuple[int, int]] = None,
     ):
@@ -3363,6 +3802,7 @@ class SpecVLAforActionPrediction(nn.Module):
                 output_projector_features=output_projector_features,
                 return_dict=return_dict,
                 position_ids=position_ids,
+                multimodal_tree_position_ids=multimodal_tree_position_ids,
                 num_logits_to_keep=num_logits_to_keep,
                 logit_token_range=logit_token_range,
             )

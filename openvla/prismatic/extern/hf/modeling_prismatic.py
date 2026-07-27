@@ -319,6 +319,7 @@ class PrismaticForConditionalGeneration(PrismaticPreTrainedModel):
         output_projector_features: Optional[bool] = None,
         return_dict: Optional[bool] = None,
         position_ids: Optional[torch.LongTensor] = None,
+        multimodal_tree_position_ids: Optional[torch.LongTensor] = None,
         num_logits_to_keep: int = 0,
         logit_token_range: Optional[Tuple[int, int]] = None,
     ) -> Union[Tuple, PrismaticCausalLMOutputWithPast]:
@@ -448,6 +449,32 @@ class PrismaticForConditionalGeneration(PrismaticPreTrainedModel):
                     [attention_mask[:, :1], projected_patch_attention_mask, attention_mask[:, 1:]], dim=1
                 )
 
+            multimodal_position_ids = None
+            if multimodal_tree_position_ids is not None:
+                tree_len = int(multimodal_tree_position_ids.shape[1])
+                prefix_len = int(multimodal_embeddings.shape[1]) - tree_len
+                if tree_len <= 0 or prefix_len <= 0:
+                    raise ValueError(
+                        "multimodal_tree_position_ids must describe a non-empty suffix "
+                        "after a non-empty multimodal prefix."
+                    )
+                prefix_position_ids = torch.arange(
+                    prefix_len,
+                    device=multimodal_embeddings.device,
+                    dtype=torch.long,
+                ).unsqueeze(0)
+                multimodal_position_ids = torch.cat(
+                    [
+                        prefix_position_ids,
+                        prefix_len
+                        + multimodal_tree_position_ids.to(
+                            device=multimodal_embeddings.device,
+                            dtype=torch.long,
+                        ),
+                    ],
+                    dim=1,
+                )
+
             # 构建 labels（训练时）
             multimodal_labels = None
             if labels is not None:
@@ -462,7 +489,7 @@ class PrismaticForConditionalGeneration(PrismaticPreTrainedModel):
             language_model_output = self.language_model(
                 input_ids=None,
                 attention_mask=multimodal_attention_mask,
-                position_ids=None,
+                position_ids=multimodal_position_ids,
                 past_key_values=past_key_values,
                 inputs_embeds=multimodal_embeddings,# 传入 inputs_embeds （而非 input_ids ），因为输入已经是拼接好的 embedding
                 labels=multimodal_labels,# 传入 labels （训练时）

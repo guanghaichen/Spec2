@@ -47,6 +47,57 @@ def tiny_config():
 
 
 class DFlashActionHeadTest(unittest.TestCase):
+    def test_action_only_projection_uses_frozen_lm_head_rows_without_rnn(self):
+        config = tiny_config()
+        config.dflash_action_head_type = "action_only"
+        config.dflash_action_confidence_enabled = False
+        model = DFlashDraftModel(config)
+        lm_head = torch.nn.Linear(config.hidden_size, config.vocab_size, bias=False)
+        hidden = torch.randn(2, 3, config.hidden_size)
+
+        projected = model.project_action_logits(hidden, lm_head)
+        expected = lm_head(hidden)[
+            ...,
+            config.dflash_action_token_start : (
+                config.dflash_action_token_start + config.dflash_action_vocab_size
+            ),
+        ]
+
+        self.assertTrue(model.action_projection_enabled)
+        self.assertFalse(model.action_sequential_enabled)
+        torch.testing.assert_close(projected, expected)
+        self.assertFalse(
+            any(name.startswith("action_head_") for name, _ in model.named_parameters())
+        )
+
+    def test_minimal_training_control_is_fixed_base_only(self):
+        train_module = load_training_module()
+        args = SimpleNamespace(
+            training_phase="joint",
+            minimal_draft_training=True,
+            hidden_w=1.0,
+            cos_w=0.05,
+            soft_w=0.05,
+            backbone_anchor_logit_distill_w=0.0,
+            action_token_ce_w=0.0,
+            action_distill_l1_w=0.0,
+            prefix_survival_w=0.0,
+            action_confidence_w=0.0,
+            anchor_logit_distill_w=0.0,
+        )
+
+        control = train_module.build_training_control(
+            args,
+            epoch=100,
+            global_step=500,
+            total_optimizer_steps=1000,
+        )
+
+        self.assertEqual(control["name"], "minimal_hidden_soft")
+        self.assertEqual(control["base_scale"], 1.0)
+        self.assertEqual(control["final_scale"], 0.0)
+        self.assertEqual(control["weights"]["soft_w"], 0.05)
+
     def test_stage2_model_initialization_needs_no_training_state(self):
         train_module = load_training_module()
         source_model = DFlashDraftModel(tiny_config())

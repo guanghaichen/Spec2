@@ -160,6 +160,57 @@ class DFlashVerificationTest(unittest.TestCase):
         self.assertEqual(selected[0][1].flatten().tolist(), [100.0, 101.0, 102.0, 105.0])
         self.assertEqual(self.verifier._past_key_values_length(selected), 4)
 
+    def test_temporal_prefill_trie_shares_prefix_and_selects_better_branch(self):
+        candidates = torch.tensor(
+            [
+                [100, 101, 102],
+                [100, 101, 103],
+                [100, 104, 105],
+            ],
+            dtype=torch.long,
+        )
+        flat_tokens, _, tree_mask, _, candidate_paths = (
+            self.verifier._build_temporal_prefill_trie(candidates)
+        )
+        self.assertEqual(flat_tokens.shape[1], 3)
+        self.assertEqual(candidate_paths[0].tolist(), candidate_paths[1].tolist())
+        self.assertNotEqual(candidate_paths[0].tolist(), candidate_paths[2].tolist())
+        self.assertTrue(torch.all(tree_mask[0, 0].diagonal()))
+
+        node_posteriors = torch.zeros((1, flat_tokens.shape[1]), dtype=torch.long)
+        shared_path = candidate_paths[0]
+        node_posteriors[0, shared_path[0]] = 101
+        node_posteriors[0, shared_path[1]] = 103
+        selected = self.verifier._select_temporal_prefill_path(
+            candidate_tokens=candidates,
+            candidate_paths=candidate_paths,
+            root_posterior_token=torch.tensor([[100]]),
+            node_posterior_tokens=node_posteriors,
+            accept_threshold=0,
+        )
+
+        self.assertEqual(selected["candidate_index"], 1)
+        self.assertEqual(selected["accept_length"], 3)
+        self.assertEqual(selected["candidate_accept_lengths"], [2, 3, 1])
+
+    def test_temporal_prefill_candidates_use_continuous_velocity_and_deduplicate(self):
+        self.verifier.dflash_temporal_prefill_tree_min_history = 2
+        self.verifier.dflash_temporal_prefill_tree_max_candidates = 3
+        self.verifier.vocab_size = 1000
+        self.verifier.bin_centers = torch.linspace(-1.0, 1.0, 9).numpy()
+        previous_indices = torch.tensor([2, 2, 2, 2, 2, 2, 0])
+        latest_indices = torch.tensor([3, 3, 3, 3, 3, 3, 8])
+        self.verifier._dflash_action_history_cpu = [
+            1000 - previous_indices - 1,
+            1000 - latest_indices - 1,
+        ]
+
+        candidates, sources = self.verifier._build_temporal_prefill_candidates(7)
+
+        self.assertEqual(sources, ["hold", "constant_velocity", "recent"])
+        expected_velocity_indices = torch.tensor([4, 4, 4, 4, 4, 4, 8])
+        torch.testing.assert_close(candidates[1], 1000 - expected_velocity_indices - 1)
+
     def test_dynamic_tree_cache_gather_commits_only_winning_nodes(self):
         cache = DynamicCache()
         key = torch.arange(7, dtype=torch.float32).view(1, 1, 7, 1)

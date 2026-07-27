@@ -155,6 +155,11 @@ def summarize_generation_stats(step_stats_list):
         int(record.get("accept_length", 0))
         for record in temporal_prefill_fusion_records
     ]
+    temporal_prefill_tree_records = [
+        record
+        for record in temporal_prefill_fusion_records
+        if record.get("mode") == "temporal_tree"
+    ]
 
     stage_profile_totals = {}
     stage_profile_calls = {}
@@ -711,6 +716,34 @@ def summarize_generation_stats(step_stats_list):
         "temporal_prefill_accept_histogram": dict(
             sorted(Counter(temporal_prefill_accept_lengths).items())
         ),
+        "temporal_prefill_tree_actions": len(temporal_prefill_tree_records),
+        "temporal_prefill_tree_full_exact_actions": sum(
+            int(bool(record.get("full_exact_match", False)))
+            for record in temporal_prefill_tree_records
+        ),
+        "temporal_prefill_tree_selected_alternate_actions": sum(
+            int(bool(record.get("selected_alternate", False)))
+            for record in temporal_prefill_tree_records
+        ),
+        "temporal_prefill_tree_extra_accepted": sum(
+            int(record.get("extra_accepted_over_hold", 0))
+            for record in temporal_prefill_tree_records
+        ),
+        "temporal_prefill_tree_avg_candidates": (
+            sum(int(record.get("candidate_count", 0)) for record in temporal_prefill_tree_records)
+            / len(temporal_prefill_tree_records)
+            if temporal_prefill_tree_records
+            else None
+        ),
+        "temporal_prefill_tree_avg_verified_nodes": (
+            sum(
+                int(record.get("verified_node_count", 0))
+                for record in temporal_prefill_tree_records
+            )
+            / len(temporal_prefill_tree_records)
+            if temporal_prefill_tree_records
+            else None
+        ),
         "temporal_prefill_fusion_records": temporal_prefill_fusion_records,
         "verify_skip_shadow": verify_skip_shadow,
         "temporal_action_skip": temporal_action_skip,
@@ -827,6 +860,15 @@ def write_eval_summary(
         "dflash_temporal_prefill_min_stable_actions": getattr(
             cfg, "dflash_temporal_prefill_min_stable_actions", None
         ),
+        "dflash_temporal_prefill_tree": getattr(
+            cfg, "dflash_temporal_prefill_tree", None
+        ),
+        "dflash_temporal_prefill_tree_max_candidates": getattr(
+            cfg, "dflash_temporal_prefill_tree_max_candidates", None
+        ),
+        "dflash_temporal_prefill_tree_min_history": getattr(
+            cfg, "dflash_temporal_prefill_tree_min_history", None
+        ),
         "dflash_verify_skip_min_temporal_cosine": getattr(
             cfg, "dflash_verify_skip_min_temporal_cosine", None
         ),
@@ -918,6 +960,13 @@ def format_generation_summary(summary, prefix="Speculative stats"):
         parts.append(
             "prefill_accept="
             f"{summary['temporal_prefill_avg_accept_length']:.3f}"
+        )
+    if summary.get("temporal_prefill_tree_actions"):
+        parts.append(
+            "prefill_tree="
+            f"actions={summary['temporal_prefill_tree_actions']}"
+            f"/alternate={summary['temporal_prefill_tree_selected_alternate_actions']}"
+            f"/extra={summary['temporal_prefill_tree_extra_accepted']}"
         )
     shadow = summary.get("verify_skip_shadow") or {}
     if shadow:

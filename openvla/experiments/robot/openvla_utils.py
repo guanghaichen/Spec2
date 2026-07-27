@@ -108,6 +108,15 @@ def get_vla(cfg):
             dflash_temporal_prefill_min_stable_actions=getattr(
                 cfg, "dflash_temporal_prefill_min_stable_actions", 3
             ),
+            dflash_temporal_prefill_tree=getattr(
+                cfg, "dflash_temporal_prefill_tree", False
+            ),
+            dflash_temporal_prefill_tree_max_candidates=getattr(
+                cfg, "dflash_temporal_prefill_tree_max_candidates", 3
+            ),
+            dflash_temporal_prefill_tree_min_history=getattr(
+                cfg, "dflash_temporal_prefill_tree_min_history", 2
+            ),
             dflash_verify_skip_min_temporal_cosine=getattr(
                 cfg, "dflash_verify_skip_min_temporal_cosine", 1.0
             ),

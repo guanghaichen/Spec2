@@ -4,14 +4,21 @@ set -euo pipefail
 # DFlash 主训练的唯一入口。
 #
 #   bash openvla/specdecoding/train-scripts/run_dflash_train.sh joint
+#   bash openvla/specdecoding/train-scripts/run_dflash_train.sh minimal
 #
 # joint 是当前主实验：Hidden/Cos 始终训练 Draft；Soft 与 hard CE 按 Domino 式
 # Base->Final 线性交接；跨 Anchor 直接约束 Draft；Action-RNN 辅助项随 Final 渐入。
+# minimal 是与主实验完全隔离的简化对照：只保留一层并行 Draft、完整目标上下文、
+# multi-anchor 覆盖、Hidden/Cos 与轻量 Soft-KL；不创建 Action-RNN，也不启用跨
+# Anchor 蒸馏、Domino 交接、hard CE、L1 或 Prefix Survival。
 # stage1/stage2 仅保留用于复现实验历程，不再是推荐主线。
 
 PHASE="${1:-joint}"
 case "${PHASE}" in
   joint)
+    TRAINING_PHASE=joint
+    ;;
+  minimal)
     TRAINING_PHASE=joint
     ;;
   stage1|representation)
@@ -21,7 +28,7 @@ case "${PHASE}" in
     TRAINING_PHASE=refinement
     ;;
   *)
-    echo "用法: bash $0 [joint|stage1|stage2]" >&2
+    echo "用法: bash $0 [joint|minimal|stage1|stage2]" >&2
     exit 1
     ;;
 esac
@@ -51,6 +58,7 @@ TWO_STAGE_ROOT="${TWO_STAGE_ROOT:-${MACHINE_DATA_ROOT}/ckpt_goal_dflash_two_stag
 STAGE1_OUTPUT_DIR="${STAGE1_OUTPUT_DIR:-${TWO_STAGE_ROOT}/stage1_representation}"
 STAGE2_OUTPUT_DIR="${STAGE2_OUTPUT_DIR:-${TWO_STAGE_ROOT}/stage2_refinement}"
 JOINT_OUTPUT_DIR="${JOINT_OUTPUT_DIR:-${MACHINE_DATA_ROOT}/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu_packedv2}"
+MINIMAL_OUTPUT_DIR="${MINIMAL_OUTPUT_DIR:-${MACHINE_DATA_ROOT}/ckpt_goal_dflash_minimal_1layer_hidden_soft_b16x1_4gpu_packedv2}"
 
 CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3}"
 NPROC_PER_NODE="${NPROC_PER_NODE:-4}"
@@ -76,7 +84,28 @@ HIDDEN_NOISE="${HIDDEN_NOISE:-0.03}"
 
 INIT_ARGS=()
 CURRICULUM_ARGS=(--no-staged_training --no-unified_cosine_curriculum --no-domino_linear_curriculum)
-if [[ "${TRAINING_PHASE}" == "joint" ]]; then
+ACTION_HEAD_TYPE="slot_rnn"
+MINIMAL_RECIPE_ARGS=(--no-minimal_draft_training)
+if [[ "${PHASE}" == "minimal" ]]; then
+  OUTPUT_DIR="${OUTPUT_DIR:-${MINIMAL_OUTPUT_DIR}}"
+  NUM_EPOCHS="${NUM_EPOCHS:-200}"
+  LR="${LR:-2e-5}"
+  ACTION_HEAD_LR="${ACTION_HEAD_LR:-${LR}}"
+  WARMUP_STEPS="${WARMUP_STEPS:-1000}"
+  ACTION_HEAD_WARMUP_STEPS=0
+  SOFT_W="${SOFT_W:-0.05}"
+  ACTION_TOKEN_CE_W=0
+  BACKBONE_ANCHOR_LOGIT_DISTILL_W=0
+  ACTION_DISTILL_L1_W=0
+  PREFIX_SURVIVAL_W=0
+  LOW_DIM_BUDGET_RATIO=0
+  LOW_DIM_SCALE=1
+  LOSS_SCALE_CALIBRATION_STEPS=1
+  ACTION_HEAD_TYPE="action_only"
+  MINIMAL_RECIPE_ARGS=(--minimal_draft_training)
+  ACTION_HEAD_STATUS="disabled; frozen lm_head action rows only"
+  RUN_NAME="${RUN_NAME:-dflash-minimal-hidden-soft-packedv2-${NUM_DRAFT_LAYERS}layer-b${BATCH_SIZE}x${GRAD_ACCUM_STEPS}-${NPROC_PER_NODE}gpu}"
+elif [[ "${TRAINING_PHASE}" == "joint" ]]; then
   OUTPUT_DIR="${OUTPUT_DIR:-${JOINT_OUTPUT_DIR}}"
   NUM_EPOCHS="${NUM_EPOCHS:-200}"
   LR="${LR:-2e-5}"
@@ -169,6 +198,7 @@ TWO_STAGE_ROOT=${TWO_STAGE_ROOT}
 NUM_EPOCHS=${NUM_EPOCHS}
 LR=${LR}
 ACTION_HEAD_LR=${ACTION_HEAD_LR} (${ACTION_HEAD_STATUS})
+ACTION_HEAD_TYPE=${ACTION_HEAD_TYPE}
 HIDDEN_W=${HIDDEN_W}
 COS_W=${COS_W}
 SOFT_KL_W=${SOFT_W}
@@ -199,6 +229,7 @@ ionice -c "${IO_NICE_CLASS}" -n "${IO_NICE_LEVEL}" \
   torchrun --standalone --nnodes 1 --nproc_per_node "${NPROC_PER_NODE}" \
   openvla/specdecoding/train-scripts/train_dflash_libero_goal.py \
   --training_phase "${TRAINING_PHASE}" \
+  "${MINIMAL_RECIPE_ARGS[@]}" \
   "${INIT_ARGS[@]}" \
   --run_name "${RUN_NAME}" \
   --vla_path "${VLA_PATH}" \
@@ -210,7 +241,7 @@ ionice -c "${IO_NICE_CLASS}" -n "${IO_NICE_LEVEL}" \
   --num_target_feature_layers 5 \
   --selected_hidden_variant target_layers \
   --include_anchor_hidden \
-  --action_head_type slot_rnn \
+  --action_head_type "${ACTION_HEAD_TYPE}" \
   --action_head_rank 256 \
   --no-detach_action_head_inputs \
   --action_vocab_size 256 \

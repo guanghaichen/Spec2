@@ -7,7 +7,8 @@ set -euo pipefail
 #   bash .../run_dflash_data_goal.sh full    # 生成原始 HDF5，再无损打包为训练用 packed v2
 #
 # 常用覆盖：GPU_ID、VLA_PATH、RLDS_ROOT、RAW_OUT_FILE、OUT_FILE、SEED、MAX_SAMPLES。
-# OUT_FILE 始终表示最终训练文件；KEEP_RAW=False 可在打包成功后删除中间 v1 文件。
+# OUT_FILE 始终表示最终训练文件；默认在打包成功后删除中间 v1 文件，最终只保留
+# 一个 packed v2。调试数据格式时可显式设置 KEEP_RAW=True 保留中间文件。
 
 MODE="${1:-smoke}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -62,7 +63,7 @@ for path in "${VLA_PATH}" "${RLDS_ROOT}"; do
   fi
 done
 mkdir -p "$(dirname "${OUT_FILE}")"
-KEEP_RAW="${KEEP_RAW:-True}"
+KEEP_RAW="${KEEP_RAW:-False}"
 PACK_COPY_BATCH_SIZE="${PACK_COPY_BATCH_SIZE:-16}"
 
 echo "========== DFlash Goal 数据生成 =========="

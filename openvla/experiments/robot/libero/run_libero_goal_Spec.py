@@ -100,6 +100,9 @@ class GenerateConfig:
     dflash_temporal_fuse_verify: bool = True
     dflash_temporal_prefill_fusion: bool = False
     dflash_temporal_prefill_min_stable_actions: int = 3
+    dflash_temporal_prefill_tree: bool = False
+    dflash_temporal_prefill_tree_max_candidates: int = 3
+    dflash_temporal_prefill_tree_min_history: int = 2
     dflash_verify_skip_min_temporal_cosine: float = 1.0
     dflash_verify_skip_min_stable_actions: int = 4
     dflash_verify_skip_max_consecutive: int = 1

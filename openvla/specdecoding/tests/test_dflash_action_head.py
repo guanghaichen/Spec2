@@ -98,6 +98,22 @@ class DFlashActionHeadTest(unittest.TestCase):
         self.assertEqual(control["final_scale"], 0.0)
         self.assertEqual(control["weights"]["soft_w"], 0.05)
 
+    def test_zero_low_dim_budget_is_allowed_only_for_minimal_recipe(self):
+        train_module = load_training_module()
+        train_module.validate_low_dim_budget_ratio(
+            SimpleNamespace(
+                minimal_draft_training=True,
+                low_dim_budget_ratio=0.0,
+            )
+        )
+        with self.assertRaises(ValueError):
+            train_module.validate_low_dim_budget_ratio(
+                SimpleNamespace(
+                    minimal_draft_training=False,
+                    low_dim_budget_ratio=0.0,
+                )
+            )
+
     def test_stage2_model_initialization_needs_no_training_state(self):
         train_module = load_training_module()
         source_model = DFlashDraftModel(tiny_config())

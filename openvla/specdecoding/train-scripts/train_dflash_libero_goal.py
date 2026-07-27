@@ -3296,6 +3296,19 @@ def evaluate(
     return result
 
 
+def validate_low_dim_budget_ratio(args) -> None:
+    """Allow zero only when the minimal recipe bypasses loss-scale calibration."""
+    ratio = float(args.low_dim_budget_ratio)
+    if bool(getattr(args, "minimal_draft_training", False)):
+        if not 0 <= ratio < 1:
+            raise ValueError(
+                "--low_dim_budget_ratio must be in [0, 1) for minimal training."
+            )
+        return
+    if not 0 < ratio < 1:
+        raise ValueError("--low_dim_budget_ratio must be in (0, 1).")
+
+
 def main():
     args = parse_args()
     ddp_info = init_distributed_if_needed()
@@ -3308,8 +3321,7 @@ def main():
         raise ValueError("--soft_temperature must be > 0.")
     if args.token_curriculum_power <= 0:
         raise ValueError("--token_curriculum_power must be > 0.")
-    if not 0 < args.low_dim_budget_ratio < 1:
-        raise ValueError("--low_dim_budget_ratio must be in (0, 1).")
+    validate_low_dim_budget_ratio(args)
     if args.loss_scale_calibration_steps <= 0:
         raise ValueError("--loss_scale_calibration_steps must be > 0.")
     if args.hdf5_block_size < 0:

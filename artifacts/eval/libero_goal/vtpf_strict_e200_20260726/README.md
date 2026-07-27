@@ -52,6 +52,18 @@ analysis, and success/failure-conditioned diagnosis.
 - `summary.json`: complete configuration and aggregated metrics.
 - `timing.json`: raw per-action `(end_time, start_time)` pairs for the last task.
 - `eval.txt`: all 500 episode outcomes and per-episode speculative statistics.
+- `dflash_config.json`: the evaluated Draft checkpoint configuration.
+
+The 550 MiB `pytorch_model.bin` exceeds GitHub's normal file limit and is not
+stored in this directory. Its immutable identity is:
+
+```text
+e10127daa030ab5d7fbe639090078d3380c91a6d98b9302b31cf4d2f9dc5dac8  pytorch_model.bin
+0b9026527183971e68c0199b1a9067dfa34a1307fc7863b8c52c2805e4915a18  dflash_config.json
+```
+
+Archive the weight separately with Git LFS or a private model registry before
+removing it from the evaluation server.
 
 SHA-256:
 

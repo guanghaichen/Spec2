@@ -695,7 +695,7 @@ tree-off。该现象不能解释为“目标模型答案不唯一”，根因是
 正式结论仍必须来自完整 50-trial 四路评测。strict 使用 DDTree 目标遍历；action-group relaxed 因定义上允许
 近似动作，继续使用整条路径的组误差预算，不能作为 lossless 结果报告。
 
-### 6.6 2026-07-26 完整四路结果与研究转向
+### 6.6 Goal 完整基线、四路结果与研究转向
 
 epoch 200 在 Goal 上的 50 trials/task 完整结果如下。Speedup 均使用同一套 paper wrapped AR
 `0.182718 s/action` 作为分母：
@@ -709,11 +709,13 @@ epoch 200 在 Goal 上的 50 trials/task 完整结果如下。Speedup 均使用�
 | DFlash + DDTree strict | 0.776 | 0.172794s | 2.221 | 1.057x |
 | DFlash + action-group | 0.734 | 0.158771s | 2.530 | 1.151x |
 | DFlash + DDTree + action-group | 0.720 | 0.156579s | 2.632 | 1.167x |
+| **DFlash + VTPF strict（2026-07-27）** | **0.790** | **0.142036s** | **2.422** | **1.286x** |
 
-该表给出三个明确结论：当前 Draft 在 strict 下比 SpecVLA 略快且 SR 不低，但优势很小；DDTree 在固定节点
+前七行给出三个明确结论：当时的 Draft 在 strict 下比 SpecVLA 略快且 SR 不低，但优势很小；DDTree 在固定节点
 预算下只带来约 1.4% 相对加速；action-group 与树能增加 Length，却没有超过 SpecVLA relaxed，并伴随 SR
 下降。因此继续大规模重训 Draft 的边际收益不划算，推理研究转向“降低每块固定 target 成本”和“经 shadow
-校准的选择性免校验”。
+校准的选择性免校验”。最后一行是该研究转向形成 VTPF 后的正式结果：在不使用 relaxed 或免校验的前提下，
+速度基本追平 SpecVLA relaxed，同时取得本表最高 SR。完整诊断见 6.8。
 
 ### 6.7 首 token 哨兵时序级联小实验
 
@@ -761,7 +763,44 @@ Wilson 风险上界仍约 3.5%。因此它默认最多连续跳过一次，并�
 首 task 的轨迹与 `684` 个块完全不变，均时从 `0.112812s` 到 `0.112446s`。该差异只有约 0.3%，按工程
 清理保留，但不作为论文加速贡献单独宣称。
 
-### 6.8 已废弃的旧余弦课程早期快照
+### 6.8 2026-07-27 VTPF 正式 50-trial 结果
+
+正式命令使用 `prefill` strict 模式、epoch 200、Goal 每任务 50 次，共 500 episodes。它采用精确 token
+接受、`tree=off`、`verify_skip_mode=route`，日志确认 `verify_skipped_blocks=0`，不存在 action-group、树或
+免校验带来的精度放宽。
+
+| 指标 | 正式结果 |
+| --- | ---: |
+| 成功数 / 总数 | 395 / 500 |
+| SR | **0.790** |
+| mean / median step time | **0.142036s / 0.171017s** |
+| AR-relative Speedup | **1.286x** |
+| Length / avg accept length | **2.422 / 1.466** |
+| blocks / action | **2.890** |
+
+按上游口径，速度与生成统计取最后一个 task。其 10,322 个动作中，VTPF 触发 2,255 次，完整 token 匹配
+1,927 次，触发后的平均接受长度为 6.273；另有历史 proposal 融合校验 393 次。实际 timing 中 2,195 个动作
+低于 `80 ms`，占 21.3%，平均仅 `58.7 ms`；其余大部分动作仍处于 `149–172 ms`。因此 mean 的下降来自一批
+真实消除了 Draft/后续 target verify 的快速动作，而不是计时噪声。相同 50 个 episode 的重采样给出 Speedup
+95% 区间约 `[1.212, 1.373]`。
+
+| 对照 | SR | mean step | Speedup | VTPF 相对结论 |
+| --- | ---: | ---: | ---: | --- |
+| Paper wrapped AR | 0.742 | 0.182718s | 1.000x | 延迟下降 22.3% |
+| SpecVLA strict | 0.768 | 0.178764s | 1.022x | VTPF 相对快 1.259x |
+| SpecVLA relaxed | 0.734 | 0.141228s | 1.294x | VTPF 仅慢 0.57%，但保持 strict |
+| 旧 DFlash strict | 0.776 | 0.175287s | 1.042x | VTPF 相对快 1.234x |
+
+结果也存在必须如实记录的边界。500 episodes 中，成功轨迹平均每条触发 VTPF 6.47 次、完整命中率 66.4%；
+失败轨迹平均触发 92.2 次、完整命中率 89.6%，说明停滞重复动作显著放大总体收益。但最后 task 只看成功轨迹时，
+VTPF 仍为 `0.155723s`，对应成功轨迹 AR 的 `0.183081s`，仍有 **1.176x** 加速；失败轨迹加速为 1.407x。
+所以收益并非只存在于失败轨迹，只是整体 1.286x 被失败停滞段进一步放大。
+
+SR 的 95% Wilson 区间约为 `[0.752, 0.823]`。相同初始状态的配对结果相对 SpecVLA strict 的 McNemar
+`p=0.320`，不能宣称 VTPF 显著提高成功率；当前严谨表述应是“未观察到成功率退化，并取得最佳点估计”。
+该结果验证了 VTPF 的结构性加速价值，但后续仍需多 seed 或不同 suite/权重验证其泛化。
+
+### 6.9 已废弃的旧余弦课程早期快照
 
 2026-07-15，旧 3090 主训练在 step 500、warmup 进行到一半时：
 

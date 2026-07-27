@@ -765,6 +765,10 @@ Wilson 风险上界仍约 3.5%。因此它默认最多连续跳过一次，并�
 
 ### 6.8 2026-07-27 VTPF 正式 50-trial 结果
 
+原始 `summary.json`、逐动作 timing 和 500-episode 文本日志已固化在
+[`artifacts/eval/libero_goal/vtpf_strict_e200_20260726`](artifacts/eval/libero_goal/vtpf_strict_e200_20260726)，
+并附运行 commit、命令和 SHA-256；后续不得覆盖该目录。
+
 正式命令使用 `prefill` strict 模式、epoch 200、Goal 每任务 50 次，共 500 episodes。它采用精确 token
 接受、`tree=off`、`verify_skip_mode=route`，日志确认 `verify_skipped_blocks=0`，不存在 action-group、树或
 免校验带来的精度放宽。

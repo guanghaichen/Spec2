@@ -24,8 +24,8 @@
   出来前不能替代 golden。
 - **VTPF-TD relaxed**：只改推理，直接复用任意可用 DFlash checkpoint，不需要重训。保护档使用当前图像
   变化门控；速度档固定执行 `target -> hold -> target`。任何 hold 都不增加“已验证历史”，且下一步强制
-  回到 target，避免误差连续传播。当前 50 条轨迹确认结果为 SR `0.72`、最后 task 口径约 `2.29x`；正式
-  500-episode 结果仍待运行。
+  回到 target，避免误差连续传播。Goal 正式 500-episode 结果为 SR `0.754`、最后 task 口径 `2.608x`；
+  相对 VTPF strict 的 SR 下降 3.6 个百分点、速度提高约 2.03 倍。
 
 ## 1. 阅读顺序和项目地图
 
@@ -950,8 +950,8 @@ SR 的 95% Wilson 区间约为 `[0.752, 0.823]`。相同初始状态的配对结
 ### 6.10 2026-07-28 VTPF-TD relaxed 快速研发
 
 本轮全部复用 golden e200，关闭 Action-RNN、DDTree 和动作组规则，不做任何重训。先用 1 trial/task 快速
-筛选机制，再对候选点做 3 或 5 trials/task 确认。下表的 `mean` 是全 suite 动作均值；`last-task mean` 才与
-本仓库论文口径一致。小样本只用于选型，不能替代 50 trials/task 的正式 500-episode 结果。
+筛选机制，再对候选点做 3 或 5 trials/task 确认，最后运行 50 trials/task。下表的 `mean` 是全 suite 动作
+均值；`last-task mean` 才与本仓库论文口径一致。前六行小样本只用于选型，最后一行为正式 500-episode 结果。
 
 | 配置 | 轨迹 | SR | full-suite mean | last-task mean | Length | bypass |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -962,6 +962,7 @@ SR 的 95% Wilson 区间约为 `[0.752, 0.823]`。相同初始状态的配对结
 | **TD-Fast 确认** | **50** | **0.72** | **0.076206s** | **0.079781s** | **3.473** | **4,225** |
 | **TD-Guard `pixel<=0.03, history=1`** | **30** | **0.80** | **0.112370s** | **0.117607s** | **2.786** | **1,311** |
 | TD-Fast 去视觉门优化复测 | 10 | 0.80 | 0.077829s | 0.082550s | 3.400 | 761 |
+| **TD-Fast 正式评测** | **500** | **0.754** | 未记录 | **0.070050s** | **3.653** | **5,575** |
 
 关键结论：
 
@@ -973,11 +974,17 @@ SR 的 95% Wilson 区间约为 `[0.752, 0.823]`。相同初始状态的配对结
   结果 `41/50=0.82` 相比则下降 10 个百分点，两种参照必须同时披露。
 - 去掉视觉门的 GPU 池化和标量同步后，10 条轨迹的动作、SR、Length、bypass 数完全一致，速度差很小；说明
   TD-Fast 的收益来自真正跳过约一半 target prefill，而不是门控计算优化。
+- 正式 500-episode 结果为 `377/500=0.754`，VTPF strict 为 `395/500=0.790`，paper AR 为
+  `371/500=0.742`。VTPF-TD 相对 VTPF 少 18 个成功，绝对下降 3.6 个百分点；同初始状态配对中两者共同
+  成功 319 条、VTPF 独赢 76 条、TD 独赢 58 条、共同失败 47 条，McNemar 精确检验 `p=0.142`。
+- 正式最后 task mean 为 `0.070050s`，相对 paper AR 为 **2.608x**，相对 VTPF 的 `0.142036s` 快
+  **2.028x**。即使只看成功轨迹，TD/VTPF 仍为 `0.079353s/0.155723s`，加速约 1.96 倍，因此收益不是
+  失败轨迹停滞造成的假象。该 task 共 11,137 个动作，其中 5,575 次绕过 target prefill，跳过率 50.06%。
 
-原始 50-trajectory summary、timing 和文本日志固化在
+原始 pilot、Guard 和正式 500-episode summary、timing、文本日志固化在
 [`artifacts/eval/libero_goal/vtpf_temporal_decimation_e200_20260728`](artifacts/eval/libero_goal/vtpf_temporal_decimation_e200_20260728)。
-当前结果已经达到“少量成功率代价、显著加速”的研发目标，但论文主表前必须跑完 500 episodes，并给出与
-AR/VTPF 的相同初始状态配对统计。
+当前结果已经达到“少量成功率代价、显著加速”的研发目标。后续需要多 seed、其它 suite 的独立 draft 和
+真机实验验证泛化，不能把单个 Goal seed 直接外推为全场景结论。
 
 ### 6.11 已废弃的旧余弦课程早期快照
 
@@ -1227,13 +1234,13 @@ CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=200 NUM_TRIALS_PER_TASK=50 \
 CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=200 NUM_TRIALS_PER_TASK=50 \
   bash openvla/specdecoding/decode-scripts/run_dflash_vtpf_guarded_bypass_goal_eval.sh
 
-# 速度档：target -> hold -> target；50-trajectory 确认为 36/50、约 2.29x
+# 速度档：target -> hold -> target；正式 Goal 结果为 377/500、2.608x
 CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=200 NUM_TRIALS_PER_TASK=50 \
   bash openvla/specdecoding/decode-scripts/run_dflash_vtpf_temporal_decimation_goal_eval.sh
 ```
 
-两者都必须在同机 paper AR 下计算 Speedup。速度档的正式主表仍需完整跑 50 trials/task；保护档可作为
-SR-Speed Pareto 对照。PrefixCert 仅用于固定成本消融：
+两者都必须在同机 paper AR 下计算 Speedup。速度档已完成 50 trials/task；保护档可作为 SR-Speed Pareto
+对照，尚未跑满 500 episodes。PrefixCert 仅用于固定成本消融：
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=200 NUM_TRIALS_PER_TASK=10 \
@@ -1430,9 +1437,9 @@ git pull --ff-only origin main
 1. 3090 继续训练 Minimal Draft；Action-RNN 在线消融未显示净收益，不再重启复杂 joint 训练。
 2. 比较相同推理配置下 golden/minimal 的 SR、Length、Speedup；若相当，后续
    训练消融以 minimal 为干净基线，若明显退化则直接回退 golden。
-3. 在 4090 对 VTPF-TD-Fast 和 Guard 各完成 50 trials/task，报告同状态配对 SR、target 跳过率和净延迟。
+3. VTPF-TD-Fast 已完成 50 trials/task；下一步补 Guard 正式结果与至少两个额外 seed。
 4. 消融 hold 深度、视觉门、PrefixCert 与 strict VTPF，明确收益来自整次 prefill 省略而非 Length 记账。
-5. 在多个 seed、其它 suite 的各自权重和真实机械臂上验证短时保持的稳定性。
+5. 在其它 suite 的各自权重和真实机械臂上验证短时保持的稳定性。
 
 ### 11.2 论文需要的完整证据
 
@@ -1460,7 +1467,7 @@ OpenVLA-OFT 已经并行输出动作，不适合直接套用 action-token specul
 - Length 高不保证 Speedup 高；必须计算草稿头和校验树开销。
 - relaxed acceptance 不是 strict lossless，必须报告阈值与成功率。
 - Golden Action-RNN 引入轻量顺序步骤；Minimal 和默认 RNN-off 推理才保持纯块并行 proposal。
-- VTPF-TD 当前只有 50 条轨迹确认，不能在 500-episode 正式评测前宣称稳定超过 SpecVLA/HeiSD。
+- VTPF-TD 已完成 Goal 单 seed 500-episode 正式评测；跨论文比较 HeiSD 前仍需严格统一硬件、计时和 AL 定义。
 
 ## 13. 参考文献
 

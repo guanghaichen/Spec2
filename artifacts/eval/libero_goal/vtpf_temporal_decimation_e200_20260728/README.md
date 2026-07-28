@@ -1,7 +1,7 @@
 # VTPF-TD relaxed 研发证据（2026-07-28）
 
-该目录固化 Goal、golden epoch 200 上的目标锚定时序降采样（VTPF-TD）原始结果。实现基于仓库
-`34b09a2` 之后的同一次研发提交；checkpoint 为：
+该目录固化 Goal、golden epoch 200 上的目标锚定时序降采样（VTPF-TD）原始结果。正式实现对应仓库
+commit `5626cb6`；checkpoint 为：
 
 ```text
 ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu_packedv2/epoch_200_step_089600
@@ -9,6 +9,41 @@ ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu_packedv2/epoch_200_step_089600
 
 共同配置：RTX 4090、seed 7、Action-RNN off、tree off、exact-token fallback、`max_consecutive=1`。
 任何保持帧之后都强制执行 target 关键帧；保持帧不会增加 target-verified history。
+
+## Fast 正式评测（50 trials/task，共 500 条轨迹）
+
+原始文件为 `formal_fast_50x10_summary.json`、`formal_fast_50x10_timing.json` 和
+`formal_fast_50x10_eval.txt`。评测使用 `TIMING_SCOPE=last_task`，与 paper AR 和 VTPF strict 正式结果一致。
+
+| 指标 | VTPF strict | VTPF-TD Fast |
+| --- | ---: | ---: |
+| 成功数 / 轨迹数 | 395 / 500 | 377 / 500 |
+| SR | 0.790 | 0.754 |
+| last-task mean | 0.142036s | 0.070050s |
+| AR-relative Speedup | 1.286x | 2.608x |
+| Length | 2.422 | 3.653 |
+| verified avg accept length | 1.466 | 1.119 |
+| blocks / action | 2.899 | 1.921 |
+| target-prefill bypass | 0 | 5,575 / 11,137（50.06%） |
+
+相同 seed/初始状态配对为：共同成功 319、VTPF 独赢 76、TD 独赢 58、共同失败 47；McNemar 精确检验
+`p=0.142`。TD 的 SR 相对 VTPF 下降 3.6 个百分点，但仍高于 paper AR 的 0.742 点估计。只看最后 task 的
+成功轨迹，TD/VTPF mean 分别为 `0.079353s/0.155723s`，TD 仍快 1.96 倍，排除了“仅失败轨迹更快”的解释。
+
+逐任务成功数（每项 50 次）：
+
+| Task | VTPF | VTPF-TD | 差值 |
+| --- | ---: | ---: | ---: |
+| open middle drawer | 31 | 29 | -2 |
+| bowl on stove | 45 | 47 | +2 |
+| wine bottle on cabinet | 42 | 42 | 0 |
+| open top drawer and put bowl inside | 30 | 19 | -11 |
+| bowl on cabinet | 44 | 48 | +4 |
+| push plate | 40 | 40 | 0 |
+| cream cheese in bowl | 41 | 36 | -5 |
+| turn on stove | 48 | 48 | 0 |
+| bowl on plate | 42 | 40 | -2 |
+| wine bottle on rack | 32 | 28 | -4 |
 
 ## Fast 确认（5 trials/task，共 50 条轨迹）
 
@@ -29,7 +64,7 @@ ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu_packedv2/epoch_200_step_089600
 
 Paper AR 的正式 SR 为 0.742，点估计相差 -2.2 个百分点；相同 seed 下 golden VTPF strict 的前 5 个
 初始状态为 41/50=0.82，差值为 -10 个百分点。前者不是 50 条轨迹的配对比较，后者才是同状态小样本；
-两种参照都必须披露。正式论文结论仍需 50 trials/task（500 episodes）。
+两种参照都必须披露。该 pilot 已被上面的 500-episode 正式结果取代。
 
 ## Guard 确认（3 trials/task，共 30 条轨迹）
 

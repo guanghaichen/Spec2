@@ -1,0 +1,48 @@
+Archive date: 2026-07-28 Asia/Shanghai
+Evaluation host: 4090
+GPU: NVIDIA GeForce RTX 4090, 24564 MiB
+Driver: 595.84
+
+Evaluation protocol:
+  CUDA_VISIBLE_DEVICES=0
+  SEED=7
+  NUM_TRIALS_PER_TASK=50
+  SYNC_CUDA_TIMING=False
+  TIMING_SCOPE=last_task
+
+Software:
+  Python=3.10.20
+  torch=2.2.0+cu121
+  torch CUDA runtime=12.1
+  transformers=4.40.1
+  numpy=1.26.4
+  mujoco=3.3.2
+  robosuite=1.4.1
+  LIBERO commit=8f1084e3132a39270c3a13ebe37270a43ece2a01
+
+Repository identity:
+  VTPF mechanism commit=d60c555
+  VTPF formal evidence commit=359564b
+  Golden reproduction tag=golden-vtpf-e200-20260726 (ea7bcbb)
+  VTPF-TD implementation commit=5626cb6
+  VTPF-TD formal evidence commit=208482a
+
+Golden DFlash checkpoint:
+  path=ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu_packedv2/epoch_200_step_089600
+  pytorch_model.bin sha256=e10127daa030ab5d7fbe639090078d3380c91a6d98b9302b31cf4d2f9dc5dac8
+  dflash_config.json sha256=0b9026527183971e68c0199b1a9067dfa34a1307fc7863b8c52c2805e4915a18
+
+OpenVLA Goal target model:
+  repository=openvla/openvla-7b-finetuned-libero-goal
+  model-00001-of-00004.safetensors sha256=aded5b398d491b5d69f2801e0f7bab358eb035f96efcf4e44c1ac2a25db65daf
+  model-00002-of-00004.safetensors sha256=ceccfcc5d5772af96ac45b1060a86d64ee3d4b2dbace8ad0a36997a74c92b8ab
+  model-00003-of-00004.safetensors sha256=f53f1760b83eb4a0587e15fd2b6b4448a56cb5aad578669c18be0df8ea6b01c6
+  model-00004-of-00004.safetensors sha256=4ef38bd0942ee946aaa7648ff48f60f85608d70f9f93acda06414ec7acf78b3f
+  config.json sha256=06135f79f1010f85837ec4b8373bdda3a9387ab4937bc959e91a0ef4208ed237
+  dataset_statistics.json sha256=5ea8e0815367f6d684736050d6635e1327ed19d011b002f68a56fae1ab980a6a
+
+SpecVLA baseline checkpoints:
+  goal/pytorch_model.bin sha256=d3f62ae500f27b356083f997b24fa7a67e5dda86e5083fa15985f45250009aae
+  object/pytorch_model.bin sha256=7cde4afe589ce3b7e83fe6ce8e850fcffcad041a04aa394618c3ef634705aad3
+  spatial/pytorch_model.bin sha256=f049d0d99fcf4acff240037f196ec4aed9a587879e16a88026d30ecf51497c0e
+  10/pytorch_model.bin sha256=0ef36b94183c3e97c15fc9a8b73c8c551c2c359c4b9d42f80174f36cde82a084

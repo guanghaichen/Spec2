@@ -1,0 +1,116 @@
+{
+  "run_id": "EVAL-libero_object-openvla-2026_07_21-22_35_09--specvla-strict-object-r0",
+  "eval_family": "specvla_strict",
+  "task_suite_name": "libero_object",
+  "model_family": "openvla",
+  "draft_backend": "eagle",
+  "use_spec": true,
+  "parallel_draft": false,
+  "ar_baseline": null,
+  "accept_threshold": 0,
+  "dflash_block_size": 4,
+  "dflash_num_draft_layers": 1,
+  "dflash_use_causal_residual_sampling": false,
+  "dflash_confidence_threshold": 0.0,
+  "dflash_confidence_min_tokens": 1,
+  "dflash_acceptance_mode": "token",
+  "dflash_tree_mode": "off",
+  "dflash_tree_branch_position": 0,
+  "dflash_tree_first_anchor_only": true,
+  "dflash_tree_auto_calibrate": false,
+  "dflash_tree_calibration_result": null,
+  "pretrained_checkpoint": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-object",
+  "spec_checkpoint": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/specvla_checkpoint/object",
+  "num_trials_per_task": 50,
+  "seed": 7,
+  "timing_scope": "last_task",
+  "sync_cuda_timing": false,
+  "total_episodes": 500,
+  "total_successes": 438,
+  "success_rate": 0.876,
+  "timing": {
+    "steps": 7048,
+    "mean": 0.16730958571769594,
+    "median": 0.17047154903411865,
+    "min": 0.11362004280090332,
+    "max": 0.22943925857543945,
+    "p95": 0.1998730421066284,
+    "p99": 0.22714518070220946,
+    "total": 1179.197960138321
+  },
+  "generation": {
+    "backend": "eagle",
+    "use_causal_residual_sampling": null,
+    "action_head_type": null,
+    "acceptance_mode": null,
+    "tree_mode": null,
+    "tree_branch_position": null,
+    "tree_first_anchor_only": null,
+    "confidence_threshold": null,
+    "confidence_min_tokens": null,
+    "confidence_truncated_blocks": 0,
+    "num_steps": 7093,
+    "num_blocks": 27496,
+    "generated_tokens": 49651,
+    "progressed_tokens": 49651,
+    "avg_generated_length": 1.8057535641547862,
+    "length": 1.8057535641547862,
+    "table1_length": 1.8057535641547862,
+    "avg_progress_length": 1.8057535641547862,
+    "avg_accept_length": 0.8057535641547862,
+    "avg_main_path_accept_length": null,
+    "accepted_tokens": 22155,
+    "compared_tokens": 0,
+    "overall_hit_rate": null,
+    "action_group_rescued_blocks": 0,
+    "action_group_extra_accepted": 0,
+    "tree_triggered_blocks": 0,
+    "tree_selected_alternate_blocks": 0,
+    "tree_extra_verified_nodes": 0,
+    "tree_extra_accepted": 0,
+    "tree_mean_branch_score": null,
+    "accept_length_histogram": {
+      "1": 236,
+      "2": 1301,
+      "3": 3048,
+      "4": 2367,
+      "5": 141
+    },
+    "progress_length_histogram": {
+      "7": 7093
+    },
+    "per_position": [],
+    "conditional_prefix": [
+      {
+        "position": 1,
+        "eligible_blocks": 27496,
+        "survived_blocks": 7093,
+        "conditional_hit_rate": 0.25796479487925517
+      },
+      {
+        "position": 2,
+        "eligible_blocks": 7093,
+        "survived_blocks": 6857,
+        "conditional_hit_rate": 0.9667277597631467
+      },
+      {
+        "position": 3,
+        "eligible_blocks": 6857,
+        "survived_blocks": 5556,
+        "conditional_hit_rate": 0.8102668805600116
+      },
+      {
+        "position": 4,
+        "eligible_blocks": 5556,
+        "survived_blocks": 2508,
+        "conditional_hit_rate": 0.4514038876889849
+      },
+      {
+        "position": 5,
+        "eligible_blocks": 2508,
+        "survived_blocks": 141,
+        "conditional_hit_rate": 0.056220095693779906
+      }
+    ]
+  }
+}

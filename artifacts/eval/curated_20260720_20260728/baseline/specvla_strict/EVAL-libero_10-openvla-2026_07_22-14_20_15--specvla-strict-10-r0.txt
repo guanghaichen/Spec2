@@ -1,0 +1,3534 @@
+Task suite: libero_10
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 1...
+Success: False
+# episodes completed so far: 1
+# successes: 0 (0.0%)
+Speculative stats: length=1.866, avg_accept_length=0.866, num_blocks=1951
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 2...
+Success: True
+# episodes completed so far: 2
+# successes: 1 (50.0%)
+Speculative stats: length=1.670, avg_accept_length=0.670, num_blocks=1048
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 3...
+Success: False
+# episodes completed so far: 3
+# successes: 1 (33.3%)
+Speculative stats: length=2.302, avg_accept_length=1.302, num_blocks=1581
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 4...
+Success: True
+# episodes completed so far: 4
+# successes: 2 (50.0%)
+Speculative stats: length=1.459, avg_accept_length=0.459, num_blocks=1406
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 5...
+Success: True
+# episodes completed so far: 5
+# successes: 3 (60.0%)
+Speculative stats: length=1.810, avg_accept_length=0.810, num_blocks=1791
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 6...
+Success: True
+# episodes completed so far: 6
+# successes: 4 (66.7%)
+Speculative stats: length=1.699, avg_accept_length=0.699, num_blocks=1751
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 7...
+Success: True
+# episodes completed so far: 7
+# successes: 5 (71.4%)
+Speculative stats: length=1.692, avg_accept_length=0.692, num_blocks=1514
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 8...
+Success: True
+# episodes completed so far: 8
+# successes: 6 (75.0%)
+Speculative stats: length=1.619, avg_accept_length=0.619, num_blocks=1098
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 9...
+Success: True
+# episodes completed so far: 9
+# successes: 7 (77.8%)
+Speculative stats: length=1.720, avg_accept_length=0.720, num_blocks=1400
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 10...
+Success: True
+# episodes completed so far: 10
+# successes: 8 (80.0%)
+Speculative stats: length=1.647, avg_accept_length=0.647, num_blocks=1207
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 11...
+Success: False
+# episodes completed so far: 11
+# successes: 8 (72.7%)
+Speculative stats: length=1.815, avg_accept_length=0.815, num_blocks=2005
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 12...
+Success: True
+# episodes completed so far: 12
+# successes: 9 (75.0%)
+Speculative stats: length=1.579, avg_accept_length=0.579, num_blocks=1139
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 13...
+Success: True
+# episodes completed so far: 13
+# successes: 10 (76.9%)
+Speculative stats: length=1.726, avg_accept_length=0.726, num_blocks=1659
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 14...
+Success: True
+# episodes completed so far: 14
+# successes: 11 (78.6%)
+Speculative stats: length=1.632, avg_accept_length=0.632, num_blocks=1124
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 15...
+Success: False
+# episodes completed so far: 15
+# successes: 11 (73.3%)
+Speculative stats: length=1.711, avg_accept_length=0.711, num_blocks=2127
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 16...
+Success: False
+# episodes completed so far: 16
+# successes: 11 (68.8%)
+Speculative stats: length=1.695, avg_accept_length=0.695, num_blocks=2148
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 17...
+Success: True
+# episodes completed so far: 17
+# successes: 12 (70.6%)
+Speculative stats: length=1.698, avg_accept_length=0.698, num_blocks=2107
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 18...
+Success: True
+# episodes completed so far: 18
+# successes: 13 (72.2%)
+Speculative stats: length=1.533, avg_accept_length=0.533, num_blocks=2251
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 19...
+Success: True
+# episodes completed so far: 19
+# successes: 14 (73.7%)
+Speculative stats: length=1.579, avg_accept_length=0.579, num_blocks=1503
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 20...
+Success: False
+# episodes completed so far: 20
+# successes: 14 (70.0%)
+Speculative stats: length=1.631, avg_accept_length=0.631, num_blocks=2232
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 21...
+Success: False
+# episodes completed so far: 21
+# successes: 14 (66.7%)
+Speculative stats: length=1.897, avg_accept_length=0.897, num_blocks=1919
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 22...
+Success: True
+# episodes completed so far: 22
+# successes: 15 (68.2%)
+Speculative stats: length=1.598, avg_accept_length=0.598, num_blocks=1774
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 23...
+Success: False
+# episodes completed so far: 23
+# successes: 15 (65.2%)
+Speculative stats: length=1.704, avg_accept_length=0.704, num_blocks=2136
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 24...
+Success: True
+# episodes completed so far: 24
+# successes: 16 (66.7%)
+Speculative stats: length=1.672, avg_accept_length=0.672, num_blocks=1051
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 25...
+Success: False
+# episodes completed so far: 25
+# successes: 16 (64.0%)
+Speculative stats: length=1.918, avg_accept_length=0.918, num_blocks=1898
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 26...
+Success: False
+# episodes completed so far: 26
+# successes: 16 (61.5%)
+Speculative stats: length=1.625, avg_accept_length=0.625, num_blocks=2240
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 27...
+Success: False
+# episodes completed so far: 27
+# successes: 16 (59.3%)
+Speculative stats: length=1.695, avg_accept_length=0.695, num_blocks=2148
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 28...
+Success: True
+# episodes completed so far: 28
+# successes: 17 (60.7%)
+Speculative stats: length=1.618, avg_accept_length=0.618, num_blocks=1190
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 29...
+Success: False
+# episodes completed so far: 29
+# successes: 17 (58.6%)
+Speculative stats: length=1.963, avg_accept_length=0.963, num_blocks=1854
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 30...
+Success: True
+# episodes completed so far: 30
+# successes: 18 (60.0%)
+Speculative stats: length=1.639, avg_accept_length=0.639, num_blocks=1038
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 31...
+Success: False
+# episodes completed so far: 31
+# successes: 18 (58.1%)
+Speculative stats: length=1.953, avg_accept_length=0.953, num_blocks=1864
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 32...
+Success: False
+# episodes completed so far: 32
+# successes: 18 (56.2%)
+Speculative stats: length=1.618, avg_accept_length=0.618, num_blocks=2250
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 33...
+Success: False
+# episodes completed so far: 33
+# successes: 18 (54.5%)
+Speculative stats: length=1.596, avg_accept_length=0.596, num_blocks=2280
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 34...
+Success: True
+# episodes completed so far: 34
+# successes: 19 (55.9%)
+Speculative stats: length=1.654, avg_accept_length=0.654, num_blocks=1380
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 35...
+Success: True
+# episodes completed so far: 35
+# successes: 20 (57.1%)
+Speculative stats: length=1.687, avg_accept_length=0.687, num_blocks=1029
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 36...
+Success: False
+# episodes completed so far: 36
+# successes: 20 (55.6%)
+Speculative stats: length=1.631, avg_accept_length=0.631, num_blocks=2232
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 37...
+Success: True
+# episodes completed so far: 37
+# successes: 21 (56.8%)
+Speculative stats: length=1.633, avg_accept_length=0.633, num_blocks=1419
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 38...
+Success: True
+# episodes completed so far: 38
+# successes: 22 (57.9%)
+Speculative stats: length=1.646, avg_accept_length=0.646, num_blocks=1284
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 39...
+Success: False
+# episodes completed so far: 39
+# successes: 22 (56.4%)
+Speculative stats: length=3.003, avg_accept_length=2.003, num_blocks=1212
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 40...
+Success: False
+# episodes completed so far: 40
+# successes: 22 (55.0%)
+Speculative stats: length=1.798, avg_accept_length=0.798, num_blocks=2025
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 41...
+Success: True
+# episodes completed so far: 41
+# successes: 23 (56.1%)
+Speculative stats: length=1.527, avg_accept_length=0.527, num_blocks=1256
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 42...
+Success: True
+# episodes completed so far: 42
+# successes: 24 (57.1%)
+Speculative stats: length=1.578, avg_accept_length=0.578, num_blocks=1198
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 43...
+Success: False
+# episodes completed so far: 43
+# successes: 24 (55.8%)
+Speculative stats: length=1.658, avg_accept_length=0.658, num_blocks=2196
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 44...
+Success: False
+# episodes completed so far: 44
+# successes: 24 (54.5%)
+Speculative stats: length=1.688, avg_accept_length=0.688, num_blocks=2156
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 45...
+Success: True
+# episodes completed so far: 45
+# successes: 25 (55.6%)
+Speculative stats: length=1.709, avg_accept_length=0.709, num_blocks=1962
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 46...
+Success: True
+# episodes completed so far: 46
+# successes: 26 (56.5%)
+Speculative stats: length=1.584, avg_accept_length=0.584, num_blocks=2086
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 47...
+Success: True
+# episodes completed so far: 47
+# successes: 27 (57.4%)
+Speculative stats: length=1.634, avg_accept_length=0.634, num_blocks=1195
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 48...
+Success: True
+# episodes completed so far: 48
+# successes: 28 (58.3%)
+Speculative stats: length=1.671, avg_accept_length=0.671, num_blocks=1219
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 49...
+Success: False
+# episodes completed so far: 49
+# successes: 28 (57.1%)
+Speculative stats: length=1.827, avg_accept_length=0.827, num_blocks=1992
+
+Task: put both the alphabet soup and the tomato sauce in the basket
+Starting episode 50...
+Success: False
+# episodes completed so far: 50
+# successes: 28 (56.0%)
+Speculative stats: length=1.712, avg_accept_length=0.712, num_blocks=2126
+Current task success rate: 0.56
+Current total success rate: 0.56
+Current task speculative stats: length=1.723, avg_accept_length=0.723, num_blocks=84651
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 1...
+Success: True
+# episodes completed so far: 51
+# successes: 29 (56.9%)
+Speculative stats: length=1.566, avg_accept_length=0.566, num_blocks=1131
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 2...
+Success: False
+# episodes completed so far: 52
+# successes: 29 (55.8%)
+Speculative stats: length=2.097, avg_accept_length=1.097, num_blocks=1736
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 3...
+Success: True
+# episodes completed so far: 53
+# successes: 30 (56.6%)
+Speculative stats: length=1.608, avg_accept_length=0.608, num_blocks=984
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 4...
+Success: True
+# episodes completed so far: 54
+# successes: 31 (57.4%)
+Speculative stats: length=1.584, avg_accept_length=0.584, num_blocks=1268
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 5...
+Success: False
+# episodes completed so far: 55
+# successes: 31 (56.4%)
+Speculative stats: length=1.648, avg_accept_length=0.648, num_blocks=2209
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 6...
+Success: False
+# episodes completed so far: 56
+# successes: 31 (55.4%)
+Speculative stats: length=1.882, avg_accept_length=0.882, num_blocks=1934
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 7...
+Success: True
+# episodes completed so far: 57
+# successes: 32 (56.1%)
+Speculative stats: length=1.735, avg_accept_length=0.735, num_blocks=1565
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 8...
+Success: True
+# episodes completed so far: 58
+# successes: 33 (56.9%)
+Speculative stats: length=1.575, avg_accept_length=0.575, num_blocks=1160
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 9...
+Success: True
+# episodes completed so far: 59
+# successes: 34 (57.6%)
+Speculative stats: length=1.546, avg_accept_length=0.546, num_blocks=1091
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 10...
+Success: True
+# episodes completed so far: 60
+# successes: 35 (58.3%)
+Speculative stats: length=1.570, avg_accept_length=0.570, num_blocks=1052
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 11...
+Success: True
+# episodes completed so far: 61
+# successes: 36 (59.0%)
+Speculative stats: length=1.580, avg_accept_length=0.580, num_blocks=1595
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 12...
+Success: True
+# episodes completed so far: 62
+# successes: 37 (59.7%)
+Speculative stats: length=1.641, avg_accept_length=0.641, num_blocks=1207
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 13...
+Success: True
+# episodes completed so far: 63
+# successes: 38 (60.3%)
+Speculative stats: length=1.579, avg_accept_length=0.579, num_blocks=1627
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 14...
+Success: False
+# episodes completed so far: 64
+# successes: 38 (59.4%)
+Speculative stats: length=1.433, avg_accept_length=0.433, num_blocks=2540
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 15...
+Success: True
+# episodes completed so far: 65
+# successes: 39 (60.0%)
+Speculative stats: length=1.547, avg_accept_length=0.547, num_blocks=1489
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 16...
+Success: True
+# episodes completed so far: 66
+# successes: 40 (60.6%)
+Speculative stats: length=1.486, avg_accept_length=0.486, num_blocks=2195
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 17...
+Success: False
+# episodes completed so far: 67
+# successes: 40 (59.7%)
+Speculative stats: length=1.717, avg_accept_length=0.717, num_blocks=2120
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 18...
+Success: True
+# episodes completed so far: 68
+# successes: 41 (60.3%)
+Speculative stats: length=1.630, avg_accept_length=0.630, num_blocks=1241
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 19...
+Success: True
+# episodes completed so far: 69
+# successes: 42 (60.9%)
+Speculative stats: length=1.644, avg_accept_length=0.644, num_blocks=1103
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 20...
+Success: True
+# episodes completed so far: 70
+# successes: 43 (61.4%)
+Speculative stats: length=1.568, avg_accept_length=0.568, num_blocks=1107
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 21...
+Success: False
+# episodes completed so far: 71
+# successes: 43 (60.6%)
+Speculative stats: length=1.921, avg_accept_length=0.921, num_blocks=1895
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 22...
+Success: True
+# episodes completed so far: 72
+# successes: 44 (61.1%)
+Speculative stats: length=1.563, avg_accept_length=0.563, num_blocks=1057
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 23...
+Success: True
+# episodes completed so far: 73
+# successes: 45 (61.6%)
+Speculative stats: length=1.593, avg_accept_length=0.593, num_blocks=1621
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 24...
+Success: True
+# episodes completed so far: 74
+# successes: 46 (62.2%)
+Speculative stats: length=1.539, avg_accept_length=0.539, num_blocks=1110
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 25...
+Success: False
+# episodes completed so far: 75
+# successes: 46 (61.3%)
+Speculative stats: length=1.537, avg_accept_length=0.537, num_blocks=2369
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 26...
+Success: False
+# episodes completed so far: 76
+# successes: 46 (60.5%)
+Speculative stats: length=1.936, avg_accept_length=0.936, num_blocks=1880
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 27...
+Success: True
+# episodes completed so far: 77
+# successes: 47 (61.0%)
+Speculative stats: length=1.575, avg_accept_length=0.575, num_blocks=1089
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 28...
+Success: True
+# episodes completed so far: 78
+# successes: 48 (61.5%)
+Speculative stats: length=1.614, avg_accept_length=0.614, num_blocks=980
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 29...
+Success: False
+# episodes completed so far: 79
+# successes: 48 (60.8%)
+Speculative stats: length=1.788, avg_accept_length=0.788, num_blocks=2036
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 30...
+Success: True
+# episodes completed so far: 80
+# successes: 49 (61.3%)
+Speculative stats: length=1.609, avg_accept_length=0.609, num_blocks=1131
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 31...
+Success: True
+# episodes completed so far: 81
+# successes: 50 (61.7%)
+Speculative stats: length=1.767, avg_accept_length=0.767, num_blocks=1371
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 32...
+Success: True
+# episodes completed so far: 82
+# successes: 51 (62.2%)
+Speculative stats: length=1.464, avg_accept_length=0.464, num_blocks=1210
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 33...
+Success: False
+# episodes completed so far: 83
+# successes: 51 (61.4%)
+Speculative stats: length=3.149, avg_accept_length=2.149, num_blocks=1156
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 34...
+Success: False
+# episodes completed so far: 84
+# successes: 51 (60.7%)
+Speculative stats: length=1.661, avg_accept_length=0.661, num_blocks=2191
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 35...
+Success: True
+# episodes completed so far: 85
+# successes: 52 (61.2%)
+Speculative stats: length=1.512, avg_accept_length=0.512, num_blocks=1620
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 36...
+Success: True
+# episodes completed so far: 86
+# successes: 53 (61.6%)
+Speculative stats: length=1.552, avg_accept_length=0.552, num_blocks=1164
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 37...
+Success: True
+# episodes completed so far: 87
+# successes: 54 (62.1%)
+Speculative stats: length=1.608, avg_accept_length=0.608, num_blocks=1354
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 38...
+Success: True
+# episodes completed so far: 88
+# successes: 55 (62.5%)
+Speculative stats: length=1.633, avg_accept_length=0.633, num_blocks=1162
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 39...
+Success: True
+# episodes completed so far: 89
+# successes: 56 (62.9%)
+Speculative stats: length=1.563, avg_accept_length=0.563, num_blocks=1182
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 40...
+Success: True
+# episodes completed so far: 90
+# successes: 57 (63.3%)
+Speculative stats: length=1.763, avg_accept_length=0.763, num_blocks=1533
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 41...
+Success: False
+# episodes completed so far: 91
+# successes: 57 (62.6%)
+Speculative stats: length=1.509, avg_accept_length=0.509, num_blocks=2412
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 42...
+Success: False
+# episodes completed so far: 92
+# successes: 57 (62.0%)
+Speculative stats: length=1.758, avg_accept_length=0.758, num_blocks=2071
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 43...
+Success: True
+# episodes completed so far: 93
+# successes: 58 (62.4%)
+Speculative stats: length=1.556, avg_accept_length=0.556, num_blocks=1026
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 44...
+Success: False
+# episodes completed so far: 94
+# successes: 58 (61.7%)
+Speculative stats: length=1.572, avg_accept_length=0.572, num_blocks=2315
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 45...
+Success: True
+# episodes completed so far: 95
+# successes: 59 (62.1%)
+Speculative stats: length=1.563, avg_accept_length=0.563, num_blocks=1106
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 46...
+Success: False
+# episodes completed so far: 96
+# successes: 59 (61.5%)
+Speculative stats: length=1.846, avg_accept_length=0.846, num_blocks=1972
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 47...
+Success: False
+# episodes completed so far: 97
+# successes: 59 (60.8%)
+Speculative stats: length=1.531, avg_accept_length=0.531, num_blocks=2378
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 48...
+Success: True
+# episodes completed so far: 98
+# successes: 60 (61.2%)
+Speculative stats: length=1.573, avg_accept_length=0.573, num_blocks=1197
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 49...
+Success: True
+# episodes completed so far: 99
+# successes: 61 (61.6%)
+Speculative stats: length=1.746, avg_accept_length=0.746, num_blocks=1219
+
+Task: put both the cream cheese box and the butter in the basket
+Starting episode 50...
+Success: True
+# episodes completed so far: 100
+# successes: 62 (62.0%)
+Speculative stats: length=1.533, avg_accept_length=0.533, num_blocks=1283
+Current task success rate: 0.68
+Current total success rate: 0.62
+Current task speculative stats: length=1.663, avg_accept_length=0.663, num_blocks=76444
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 1...
+Success: False
+# episodes completed so far: 101
+# successes: 62 (61.4%)
+Speculative stats: length=1.728, avg_accept_length=0.728, num_blocks=2106
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 2...
+Success: True
+# episodes completed so far: 102
+# successes: 63 (61.8%)
+Speculative stats: length=1.499, avg_accept_length=0.499, num_blocks=1340
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 3...
+Success: True
+# episodes completed so far: 103
+# successes: 64 (62.1%)
+Speculative stats: length=1.578, avg_accept_length=0.578, num_blocks=1459
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 4...
+Success: True
+# episodes completed so far: 104
+# successes: 65 (62.5%)
+Speculative stats: length=1.551, avg_accept_length=0.551, num_blocks=1259
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 5...
+Success: True
+# episodes completed so far: 105
+# successes: 66 (62.9%)
+Speculative stats: length=1.518, avg_accept_length=0.518, num_blocks=1065
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 6...
+Success: False
+# episodes completed so far: 106
+# successes: 66 (62.3%)
+Speculative stats: length=2.062, avg_accept_length=1.062, num_blocks=1765
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 7...
+Success: False
+# episodes completed so far: 107
+# successes: 66 (61.7%)
+Speculative stats: length=1.743, avg_accept_length=0.743, num_blocks=2088
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 8...
+Success: False
+# episodes completed so far: 108
+# successes: 66 (61.1%)
+Speculative stats: length=2.898, avg_accept_length=1.898, num_blocks=1256
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 9...
+Success: True
+# episodes completed so far: 109
+# successes: 67 (61.5%)
+Speculative stats: length=1.549, avg_accept_length=0.549, num_blocks=1279
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 10...
+Success: False
+# episodes completed so far: 110
+# successes: 67 (60.9%)
+Speculative stats: length=1.699, avg_accept_length=0.699, num_blocks=2142
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 11...
+Success: True
+# episodes completed so far: 111
+# successes: 68 (61.3%)
+Speculative stats: length=1.406, avg_accept_length=0.406, num_blocks=1245
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 12...
+Success: False
+# episodes completed so far: 112
+# successes: 68 (60.7%)
+Speculative stats: length=1.624, avg_accept_length=0.624, num_blocks=2241
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 13...
+Success: True
+# episodes completed so far: 113
+# successes: 69 (61.1%)
+Speculative stats: length=1.507, avg_accept_length=0.507, num_blocks=1505
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 14...
+Success: True
+# episodes completed so far: 114
+# successes: 70 (61.4%)
+Speculative stats: length=1.443, avg_accept_length=0.443, num_blocks=1266
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 15...
+Success: False
+# episodes completed so far: 115
+# successes: 70 (60.9%)
+Speculative stats: length=2.031, avg_accept_length=1.031, num_blocks=1792
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 16...
+Success: True
+# episodes completed so far: 116
+# successes: 71 (61.2%)
+Speculative stats: length=1.467, avg_accept_length=0.467, num_blocks=1193
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 17...
+Success: False
+# episodes completed so far: 117
+# successes: 71 (60.7%)
+Speculative stats: length=1.704, avg_accept_length=0.704, num_blocks=2136
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 18...
+Success: False
+# episodes completed so far: 118
+# successes: 71 (60.2%)
+Speculative stats: length=1.777, avg_accept_length=0.777, num_blocks=2048
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 19...
+Success: True
+# episodes completed so far: 119
+# successes: 72 (60.5%)
+Speculative stats: length=1.461, avg_accept_length=0.461, num_blocks=1131
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 20...
+Success: True
+# episodes completed so far: 120
+# successes: 73 (60.8%)
+Speculative stats: length=1.531, avg_accept_length=0.531, num_blocks=1056
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 21...
+Success: True
+# episodes completed so far: 121
+# successes: 74 (61.2%)
+Speculative stats: length=1.605, avg_accept_length=0.605, num_blocks=1570
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 22...
+Success: True
+# episodes completed so far: 122
+# successes: 75 (61.5%)
+Speculative stats: length=1.525, avg_accept_length=0.525, num_blocks=1120
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 23...
+Success: True
+# episodes completed so far: 123
+# successes: 76 (61.8%)
+Speculative stats: length=1.555, avg_accept_length=0.555, num_blocks=1130
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 24...
+Success: False
+# episodes completed so far: 124
+# successes: 76 (61.3%)
+Speculative stats: length=2.039, avg_accept_length=1.039, num_blocks=1785
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 25...
+Success: True
+# episodes completed so far: 125
+# successes: 77 (61.6%)
+Speculative stats: length=1.531, avg_accept_length=0.531, num_blocks=1166
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 26...
+Success: False
+# episodes completed so far: 126
+# successes: 77 (61.1%)
+Speculative stats: length=1.772, avg_accept_length=0.772, num_blocks=2054
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 27...
+Success: True
+# episodes completed so far: 127
+# successes: 78 (61.4%)
+Speculative stats: length=1.667, avg_accept_length=0.667, num_blocks=1999
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 28...
+Success: True
+# episodes completed so far: 128
+# successes: 79 (61.7%)
+Speculative stats: length=1.519, avg_accept_length=0.519, num_blocks=1442
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 29...
+Success: True
+# episodes completed so far: 129
+# successes: 80 (62.0%)
+Speculative stats: length=1.574, avg_accept_length=0.574, num_blocks=1299
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 30...
+Success: False
+# episodes completed so far: 130
+# successes: 80 (61.5%)
+Speculative stats: length=1.637, avg_accept_length=0.637, num_blocks=2224
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 31...
+Success: False
+# episodes completed so far: 131
+# successes: 80 (61.1%)
+Speculative stats: length=1.743, avg_accept_length=0.743, num_blocks=2088
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 32...
+Success: True
+# episodes completed so far: 132
+# successes: 81 (61.4%)
+Speculative stats: length=1.482, avg_accept_length=0.482, num_blocks=1219
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 33...
+Success: True
+# episodes completed so far: 133
+# successes: 82 (61.7%)
+Speculative stats: length=1.551, avg_accept_length=0.551, num_blocks=1029
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 34...
+Success: True
+# episodes completed so far: 134
+# successes: 83 (61.9%)
+Speculative stats: length=1.603, avg_accept_length=0.603, num_blocks=1568
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 35...
+Success: False
+# episodes completed so far: 135
+# successes: 83 (61.5%)
+Speculative stats: length=1.516, avg_accept_length=0.516, num_blocks=2401
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 36...
+Success: True
+# episodes completed so far: 136
+# successes: 84 (61.8%)
+Speculative stats: length=1.575, avg_accept_length=0.575, num_blocks=1844
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 37...
+Success: True
+# episodes completed so far: 137
+# successes: 85 (62.0%)
+Speculative stats: length=1.615, avg_accept_length=0.615, num_blocks=1170
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 38...
+Success: False
+# episodes completed so far: 138
+# successes: 85 (61.6%)
+Speculative stats: length=1.886, avg_accept_length=0.886, num_blocks=1930
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 39...
+Success: False
+# episodes completed so far: 139
+# successes: 85 (61.2%)
+Speculative stats: length=1.643, avg_accept_length=0.643, num_blocks=2216
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 40...
+Success: True
+# episodes completed so far: 140
+# successes: 86 (61.4%)
+Speculative stats: length=1.512, avg_accept_length=0.512, num_blocks=1449
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 41...
+Success: False
+# episodes completed so far: 141
+# successes: 86 (61.0%)
+Speculative stats: length=1.838, avg_accept_length=0.838, num_blocks=1980
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 42...
+Success: True
+# episodes completed so far: 142
+# successes: 87 (61.3%)
+Speculative stats: length=1.387, avg_accept_length=0.387, num_blocks=1358
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 43...
+Success: True
+# episodes completed so far: 143
+# successes: 88 (61.5%)
+Speculative stats: length=1.536, avg_accept_length=0.536, num_blocks=1094
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 44...
+Success: False
+# episodes completed so far: 144
+# successes: 88 (61.1%)
+Speculative stats: length=2.146, avg_accept_length=1.146, num_blocks=1696
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 45...
+Success: False
+# episodes completed so far: 145
+# successes: 88 (60.7%)
+Speculative stats: length=1.728, avg_accept_length=0.728, num_blocks=2107
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 46...
+Success: True
+# episodes completed so far: 146
+# successes: 89 (61.0%)
+Speculative stats: length=1.569, avg_accept_length=0.569, num_blocks=1035
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 47...
+Success: False
+# episodes completed so far: 147
+# successes: 89 (60.5%)
+Speculative stats: length=1.853, avg_accept_length=0.853, num_blocks=1964
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 48...
+Success: True
+# episodes completed so far: 148
+# successes: 90 (60.8%)
+Speculative stats: length=1.536, avg_accept_length=0.536, num_blocks=1869
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 49...
+Success: True
+# episodes completed so far: 149
+# successes: 91 (61.1%)
+Speculative stats: length=1.514, avg_accept_length=0.514, num_blocks=1341
+
+Task: turn on the stove and put the moka pot on it
+Starting episode 50...
+Success: False
+# episodes completed so far: 150
+# successes: 91 (60.7%)
+Speculative stats: length=2.611, avg_accept_length=1.611, num_blocks=1394
+Current task success rate: 0.58
+Current total success rate: 0.6066666666666667
+Current task speculative stats: length=1.695, avg_accept_length=0.695, num_blocks=79913
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 1...
+Success: True
+# episodes completed so far: 151
+# successes: 92 (60.9%)
+Speculative stats: length=1.472, avg_accept_length=0.472, num_blocks=1160
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 2...
+Success: True
+# episodes completed so far: 152
+# successes: 93 (61.2%)
+Speculative stats: length=1.443, avg_accept_length=0.443, num_blocks=1218
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 3...
+Success: False
+# episodes completed so far: 153
+# successes: 93 (60.8%)
+Speculative stats: length=1.840, avg_accept_length=0.840, num_blocks=1978
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 4...
+Success: False
+# episodes completed so far: 154
+# successes: 93 (60.4%)
+Speculative stats: length=2.052, avg_accept_length=1.052, num_blocks=1774
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 5...
+Success: True
+# episodes completed so far: 155
+# successes: 94 (60.6%)
+Speculative stats: length=1.455, avg_accept_length=0.455, num_blocks=1145
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 6...
+Success: False
+# episodes completed so far: 156
+# successes: 94 (60.3%)
+Speculative stats: length=2.068, avg_accept_length=1.068, num_blocks=1760
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 7...
+Success: False
+# episodes completed so far: 157
+# successes: 94 (59.9%)
+Speculative stats: length=1.594, avg_accept_length=0.594, num_blocks=2283
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 8...
+Success: True
+# episodes completed so far: 158
+# successes: 95 (60.1%)
+Speculative stats: length=1.539, avg_accept_length=0.539, num_blocks=1596
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 9...
+Success: True
+# episodes completed so far: 159
+# successes: 96 (60.4%)
+Speculative stats: length=1.469, avg_accept_length=0.469, num_blocks=1506
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 10...
+Success: False
+# episodes completed so far: 160
+# successes: 96 (60.0%)
+Speculative stats: length=2.010, avg_accept_length=1.010, num_blocks=1811
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 11...
+Success: False
+# episodes completed so far: 161
+# successes: 96 (59.6%)
+Speculative stats: length=1.286, avg_accept_length=0.286, num_blocks=2830
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 12...
+Success: False
+# episodes completed so far: 162
+# successes: 96 (59.3%)
+Speculative stats: length=1.442, avg_accept_length=0.442, num_blocks=2525
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 13...
+Success: False
+# episodes completed so far: 163
+# successes: 96 (58.9%)
+Speculative stats: length=1.616, avg_accept_length=0.616, num_blocks=2252
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 14...
+Success: False
+# episodes completed so far: 164
+# successes: 96 (58.5%)
+Speculative stats: length=1.582, avg_accept_length=0.582, num_blocks=2301
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 15...
+Success: True
+# episodes completed so far: 165
+# successes: 97 (58.8%)
+Speculative stats: length=1.576, avg_accept_length=0.576, num_blocks=1355
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 16...
+Success: True
+# episodes completed so far: 166
+# successes: 98 (59.0%)
+Speculative stats: length=1.521, avg_accept_length=0.521, num_blocks=1307
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 17...
+Success: False
+# episodes completed so far: 167
+# successes: 98 (58.7%)
+Speculative stats: length=1.761, avg_accept_length=0.761, num_blocks=2067
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 18...
+Success: False
+# episodes completed so far: 168
+# successes: 98 (58.3%)
+Speculative stats: length=2.142, avg_accept_length=1.142, num_blocks=1699
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 19...
+Success: False
+# episodes completed so far: 169
+# successes: 98 (58.0%)
+Speculative stats: length=1.925, avg_accept_length=0.925, num_blocks=1891
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 20...
+Success: True
+# episodes completed so far: 170
+# successes: 99 (58.2%)
+Speculative stats: length=1.503, avg_accept_length=0.503, num_blocks=1341
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 21...
+Success: False
+# episodes completed so far: 171
+# successes: 99 (57.9%)
+Speculative stats: length=2.129, avg_accept_length=1.129, num_blocks=1710
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 22...
+Success: False
+# episodes completed so far: 172
+# successes: 99 (57.6%)
+Speculative stats: length=1.687, avg_accept_length=0.687, num_blocks=2158
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 23...
+Success: False
+# episodes completed so far: 173
+# successes: 99 (57.2%)
+Speculative stats: length=2.113, avg_accept_length=1.113, num_blocks=1723
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 24...
+Success: False
+# episodes completed so far: 174
+# successes: 99 (56.9%)
+Speculative stats: length=2.090, avg_accept_length=1.090, num_blocks=1742
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 25...
+Success: True
+# episodes completed so far: 175
+# successes: 100 (57.1%)
+Speculative stats: length=1.475, avg_accept_length=0.475, num_blocks=1296
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 26...
+Success: True
+# episodes completed so far: 176
+# successes: 101 (57.4%)
+Speculative stats: length=1.460, avg_accept_length=0.460, num_blocks=1127
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 27...
+Success: True
+# episodes completed so far: 177
+# successes: 102 (57.6%)
+Speculative stats: length=1.417, avg_accept_length=0.417, num_blocks=1156
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 28...
+Success: True
+# episodes completed so far: 178
+# successes: 103 (57.9%)
+Speculative stats: length=1.472, avg_accept_length=0.472, num_blocks=1389
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 29...
+Success: False
+# episodes completed so far: 179
+# successes: 103 (57.5%)
+Speculative stats: length=1.915, avg_accept_length=0.915, num_blocks=1901
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 30...
+Success: True
+# episodes completed so far: 180
+# successes: 104 (57.8%)
+Speculative stats: length=1.515, avg_accept_length=0.515, num_blocks=1636
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 31...
+Success: True
+# episodes completed so far: 181
+# successes: 105 (58.0%)
+Speculative stats: length=1.412, avg_accept_length=0.412, num_blocks=1086
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 32...
+Success: False
+# episodes completed so far: 182
+# successes: 105 (57.7%)
+Speculative stats: length=2.100, avg_accept_length=1.100, num_blocks=1733
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 33...
+Success: True
+# episodes completed so far: 183
+# successes: 106 (57.9%)
+Speculative stats: length=1.358, avg_accept_length=0.358, num_blocks=2180
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 34...
+Success: True
+# episodes completed so far: 184
+# successes: 107 (58.2%)
+Speculative stats: length=1.532, avg_accept_length=0.532, num_blocks=1677
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 35...
+Success: False
+# episodes completed so far: 185
+# successes: 107 (57.8%)
+Speculative stats: length=2.099, avg_accept_length=1.099, num_blocks=1734
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 36...
+Success: True
+# episodes completed so far: 186
+# successes: 108 (58.1%)
+Speculative stats: length=1.492, avg_accept_length=0.492, num_blocks=1417
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 37...
+Success: False
+# episodes completed so far: 187
+# successes: 108 (57.8%)
+Speculative stats: length=1.529, avg_accept_length=0.529, num_blocks=2380
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 38...
+Success: True
+# episodes completed so far: 188
+# successes: 109 (58.0%)
+Speculative stats: length=1.447, avg_accept_length=0.447, num_blocks=1345
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 39...
+Success: False
+# episodes completed so far: 189
+# successes: 109 (57.7%)
+Speculative stats: length=2.361, avg_accept_length=1.361, num_blocks=1542
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 40...
+Success: False
+# episodes completed so far: 190
+# successes: 109 (57.4%)
+Speculative stats: length=1.505, avg_accept_length=0.505, num_blocks=2419
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 41...
+Success: False
+# episodes completed so far: 191
+# successes: 109 (57.1%)
+Speculative stats: length=1.633, avg_accept_length=0.633, num_blocks=2229
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 42...
+Success: True
+# episodes completed so far: 192
+# successes: 110 (57.3%)
+Speculative stats: length=1.541, avg_accept_length=0.541, num_blocks=1331
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 43...
+Success: False
+# episodes completed so far: 193
+# successes: 110 (57.0%)
+Speculative stats: length=1.643, avg_accept_length=0.643, num_blocks=2216
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 44...
+Success: True
+# episodes completed so far: 194
+# successes: 111 (57.2%)
+Speculative stats: length=1.487, avg_accept_length=0.487, num_blocks=1125
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 45...
+Success: False
+# episodes completed so far: 195
+# successes: 111 (56.9%)
+Speculative stats: length=2.092, avg_accept_length=1.092, num_blocks=1740
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 46...
+Success: False
+# episodes completed so far: 196
+# successes: 111 (56.6%)
+Speculative stats: length=2.153, avg_accept_length=1.153, num_blocks=1691
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 47...
+Success: False
+# episodes completed so far: 197
+# successes: 111 (56.3%)
+Speculative stats: length=1.448, avg_accept_length=0.448, num_blocks=2514
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 48...
+Success: False
+# episodes completed so far: 198
+# successes: 111 (56.1%)
+Speculative stats: length=2.136, avg_accept_length=1.136, num_blocks=1704
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 49...
+Success: True
+# episodes completed so far: 199
+# successes: 112 (56.3%)
+Speculative stats: length=1.406, avg_accept_length=0.406, num_blocks=1090
+
+Task: put the black bowl in the bottom drawer of the cabinet and close it
+Starting episode 50...
+Success: True
+# episodes completed so far: 200
+# successes: 113 (56.5%)
+Speculative stats: length=1.540, avg_accept_length=0.540, num_blocks=1400
+Current task success rate: 0.44
+Current total success rate: 0.565
+Current task speculative stats: length=1.695, avg_accept_length=0.695, num_blocks=86190
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 1...
+Success: False
+# episodes completed so far: 201
+# successes: 113 (56.2%)
+Speculative stats: length=1.855, avg_accept_length=0.855, num_blocks=1962
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 2...
+Success: False
+# episodes completed so far: 202
+# successes: 113 (55.9%)
+Speculative stats: length=2.010, avg_accept_length=1.010, num_blocks=1811
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 3...
+Success: True
+# episodes completed so far: 203
+# successes: 114 (56.2%)
+Speculative stats: length=1.522, avg_accept_length=0.522, num_blocks=1021
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 4...
+Success: True
+# episodes completed so far: 204
+# successes: 115 (56.4%)
+Speculative stats: length=1.654, avg_accept_length=0.654, num_blocks=1024
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 5...
+Success: True
+# episodes completed so far: 205
+# successes: 116 (56.6%)
+Speculative stats: length=1.557, avg_accept_length=0.557, num_blocks=1034
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 6...
+Success: False
+# episodes completed so far: 206
+# successes: 116 (56.3%)
+Speculative stats: length=1.937, avg_accept_length=0.937, num_blocks=1879
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 7...
+Success: False
+# episodes completed so far: 207
+# successes: 116 (56.0%)
+Speculative stats: length=2.017, avg_accept_length=1.017, num_blocks=1805
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 8...
+Success: False
+# episodes completed so far: 208
+# successes: 116 (55.8%)
+Speculative stats: length=1.811, avg_accept_length=0.811, num_blocks=2010
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 9...
+Success: True
+# episodes completed so far: 209
+# successes: 117 (56.0%)
+Speculative stats: length=1.549, avg_accept_length=0.549, num_blocks=1012
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 10...
+Success: True
+# episodes completed so far: 210
+# successes: 118 (56.2%)
+Speculative stats: length=1.617, avg_accept_length=0.617, num_blocks=1078
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 11...
+Success: False
+# episodes completed so far: 211
+# successes: 118 (55.9%)
+Speculative stats: length=1.853, avg_accept_length=0.853, num_blocks=1964
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 12...
+Success: False
+# episodes completed so far: 212
+# successes: 118 (55.7%)
+Speculative stats: length=1.790, avg_accept_length=0.790, num_blocks=2034
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 13...
+Success: True
+# episodes completed so far: 213
+# successes: 119 (55.9%)
+Speculative stats: length=1.625, avg_accept_length=0.625, num_blocks=1189
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 14...
+Success: True
+# episodes completed so far: 214
+# successes: 120 (56.1%)
+Speculative stats: length=1.455, avg_accept_length=0.455, num_blocks=1188
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 15...
+Success: True
+# episodes completed so far: 215
+# successes: 121 (56.3%)
+Speculative stats: length=1.619, avg_accept_length=0.619, num_blocks=1042
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 16...
+Success: False
+# episodes completed so far: 216
+# successes: 121 (56.0%)
+Speculative stats: length=1.663, avg_accept_length=0.663, num_blocks=2189
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 17...
+Success: False
+# episodes completed so far: 217
+# successes: 121 (55.8%)
+Speculative stats: length=1.685, avg_accept_length=0.685, num_blocks=2160
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 18...
+Success: False
+# episodes completed so far: 218
+# successes: 121 (55.5%)
+Speculative stats: length=1.764, avg_accept_length=0.764, num_blocks=2063
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 19...
+Success: False
+# episodes completed so far: 219
+# successes: 121 (55.3%)
+Speculative stats: length=1.699, avg_accept_length=0.699, num_blocks=2142
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 20...
+Success: False
+# episodes completed so far: 220
+# successes: 121 (55.0%)
+Speculative stats: length=1.728, avg_accept_length=0.728, num_blocks=2107
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 21...
+Success: False
+# episodes completed so far: 221
+# successes: 121 (54.8%)
+Speculative stats: length=1.825, avg_accept_length=0.825, num_blocks=1994
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 22...
+Success: False
+# episodes completed so far: 222
+# successes: 121 (54.5%)
+Speculative stats: length=2.150, avg_accept_length=1.150, num_blocks=1693
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 23...
+Success: True
+# episodes completed so far: 223
+# successes: 122 (54.7%)
+Speculative stats: length=1.681, avg_accept_length=0.681, num_blocks=1145
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 24...
+Success: True
+# episodes completed so far: 224
+# successes: 123 (54.9%)
+Speculative stats: length=1.612, avg_accept_length=0.612, num_blocks=1042
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 25...
+Success: False
+# episodes completed so far: 225
+# successes: 123 (54.7%)
+Speculative stats: length=1.727, avg_accept_length=0.727, num_blocks=2108
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 26...
+Success: False
+# episodes completed so far: 226
+# successes: 123 (54.4%)
+Speculative stats: length=1.795, avg_accept_length=0.795, num_blocks=2028
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 27...
+Success: True
+# episodes completed so far: 227
+# successes: 124 (54.6%)
+Speculative stats: length=1.647, avg_accept_length=0.647, num_blocks=1564
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 28...
+Success: False
+# episodes completed so far: 228
+# successes: 124 (54.4%)
+Speculative stats: length=1.762, avg_accept_length=0.762, num_blocks=2066
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 29...
+Success: True
+# episodes completed so far: 229
+# successes: 125 (54.6%)
+Speculative stats: length=1.575, avg_accept_length=0.575, num_blocks=1093
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 30...
+Success: False
+# episodes completed so far: 230
+# successes: 125 (54.3%)
+Speculative stats: length=1.830, avg_accept_length=0.830, num_blocks=1989
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 31...
+Success: True
+# episodes completed so far: 231
+# successes: 126 (54.5%)
+Speculative stats: length=1.554, avg_accept_length=0.554, num_blocks=1297
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 32...
+Success: False
+# episodes completed so far: 232
+# successes: 126 (54.3%)
+Speculative stats: length=1.788, avg_accept_length=0.788, num_blocks=2036
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 33...
+Success: True
+# episodes completed so far: 233
+# successes: 127 (54.5%)
+Speculative stats: length=1.671, avg_accept_length=0.671, num_blocks=1114
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 34...
+Success: False
+# episodes completed so far: 234
+# successes: 127 (54.3%)
+Speculative stats: length=2.540, avg_accept_length=1.540, num_blocks=1433
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 35...
+Success: True
+# episodes completed so far: 235
+# successes: 128 (54.5%)
+Speculative stats: length=1.550, avg_accept_length=0.550, num_blocks=1219
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 36...
+Success: False
+# episodes completed so far: 236
+# successes: 128 (54.2%)
+Speculative stats: length=1.818, avg_accept_length=0.818, num_blocks=2002
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 37...
+Success: False
+# episodes completed so far: 237
+# successes: 128 (54.0%)
+Speculative stats: length=1.694, avg_accept_length=0.694, num_blocks=2149
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 38...
+Success: False
+# episodes completed so far: 238
+# successes: 128 (53.8%)
+Speculative stats: length=1.727, avg_accept_length=0.727, num_blocks=2108
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 39...
+Success: True
+# episodes completed so far: 239
+# successes: 129 (54.0%)
+Speculative stats: length=1.632, avg_accept_length=0.632, num_blocks=1081
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 40...
+Success: False
+# episodes completed so far: 240
+# successes: 129 (53.8%)
+Speculative stats: length=1.949, avg_accept_length=0.949, num_blocks=1868
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 41...
+Success: False
+# episodes completed so far: 241
+# successes: 129 (53.5%)
+Speculative stats: length=1.871, avg_accept_length=0.871, num_blocks=1945
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 42...
+Success: False
+# episodes completed so far: 242
+# successes: 129 (53.3%)
+Speculative stats: length=1.759, avg_accept_length=0.759, num_blocks=2069
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 43...
+Success: False
+# episodes completed so far: 243
+# successes: 129 (53.1%)
+Speculative stats: length=2.422, avg_accept_length=1.422, num_blocks=1503
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 44...
+Success: False
+# episodes completed so far: 244
+# successes: 129 (52.9%)
+Speculative stats: length=1.652, avg_accept_length=0.652, num_blocks=2203
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 45...
+Success: True
+# episodes completed so far: 245
+# successes: 130 (53.1%)
+Speculative stats: length=1.668, avg_accept_length=0.668, num_blocks=919
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 46...
+Success: True
+# episodes completed so far: 246
+# successes: 131 (53.3%)
+Speculative stats: length=1.607, avg_accept_length=0.607, num_blocks=1015
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 47...
+Success: True
+# episodes completed so far: 247
+# successes: 132 (53.4%)
+Speculative stats: length=1.576, avg_accept_length=0.576, num_blocks=1013
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 48...
+Success: False
+# episodes completed so far: 248
+# successes: 132 (53.2%)
+Speculative stats: length=1.857, avg_accept_length=0.857, num_blocks=1960
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 49...
+Success: True
+# episodes completed so far: 249
+# successes: 133 (53.4%)
+Speculative stats: length=1.585, avg_accept_length=0.585, num_blocks=1051
+
+Task: put the white mug on the left plate and put the yellow and white mug on the right plate
+Starting episode 50...
+Success: True
+# episodes completed so far: 250
+# successes: 134 (53.6%)
+Speculative stats: length=1.663, avg_accept_length=0.663, num_blocks=989
+Current task success rate: 0.42
+Current total success rate: 0.536
+Current task speculative stats: length=1.773, avg_accept_length=0.773, num_blocks=80410
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 1...
+Success: True
+# episodes completed so far: 251
+# successes: 135 (53.8%)
+Speculative stats: length=1.516, avg_accept_length=0.516, num_blocks=771
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 2...
+Success: True
+# episodes completed so far: 252
+# successes: 136 (54.0%)
+Speculative stats: length=1.543, avg_accept_length=0.543, num_blocks=753
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 3...
+Success: False
+# episodes completed so far: 253
+# successes: 136 (53.8%)
+Speculative stats: length=1.613, avg_accept_length=0.613, num_blocks=2257
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 4...
+Success: False
+# episodes completed so far: 254
+# successes: 136 (53.5%)
+Speculative stats: length=1.620, avg_accept_length=0.620, num_blocks=2247
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 5...
+Success: True
+# episodes completed so far: 255
+# successes: 137 (53.7%)
+Speculative stats: length=1.491, avg_accept_length=0.491, num_blocks=892
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 6...
+Success: True
+# episodes completed so far: 256
+# successes: 138 (53.9%)
+Speculative stats: length=1.489, avg_accept_length=0.489, num_blocks=865
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 7...
+Success: True
+# episodes completed so far: 257
+# successes: 139 (54.1%)
+Speculative stats: length=1.603, avg_accept_length=0.603, num_blocks=725
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 8...
+Success: True
+# episodes completed so far: 258
+# successes: 140 (54.3%)
+Speculative stats: length=1.568, avg_accept_length=0.568, num_blocks=991
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 9...
+Success: True
+# episodes completed so far: 259
+# successes: 141 (54.4%)
+Speculative stats: length=1.541, avg_accept_length=0.541, num_blocks=654
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 10...
+Success: True
+# episodes completed so far: 260
+# successes: 142 (54.6%)
+Speculative stats: length=1.644, avg_accept_length=0.644, num_blocks=1448
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 11...
+Success: True
+# episodes completed so far: 261
+# successes: 143 (54.8%)
+Speculative stats: length=1.542, avg_accept_length=0.542, num_blocks=1276
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 12...
+Success: True
+# episodes completed so far: 262
+# successes: 144 (55.0%)
+Speculative stats: length=1.557, avg_accept_length=0.557, num_blocks=814
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 13...
+Success: True
+# episodes completed so far: 263
+# successes: 145 (55.1%)
+Speculative stats: length=1.612, avg_accept_length=0.612, num_blocks=1164
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 14...
+Success: True
+# episodes completed so far: 264
+# successes: 146 (55.3%)
+Speculative stats: length=1.562, avg_accept_length=0.562, num_blocks=717
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 15...
+Success: True
+# episodes completed so far: 265
+# successes: 147 (55.5%)
+Speculative stats: length=1.602, avg_accept_length=0.602, num_blocks=1368
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 16...
+Success: True
+# episodes completed so far: 266
+# successes: 148 (55.6%)
+Speculative stats: length=1.703, avg_accept_length=0.703, num_blocks=785
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 17...
+Success: True
+# episodes completed so far: 267
+# successes: 149 (55.8%)
+Speculative stats: length=1.509, avg_accept_length=0.509, num_blocks=821
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 18...
+Success: True
+# episodes completed so far: 268
+# successes: 150 (56.0%)
+Speculative stats: length=1.589, avg_accept_length=0.589, num_blocks=793
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 19...
+Success: False
+# episodes completed so far: 269
+# successes: 150 (55.8%)
+Speculative stats: length=1.581, avg_accept_length=0.581, num_blocks=2303
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 20...
+Success: False
+# episodes completed so far: 270
+# successes: 150 (55.6%)
+Speculative stats: length=1.589, avg_accept_length=0.589, num_blocks=2291
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 21...
+Success: True
+# episodes completed so far: 271
+# successes: 151 (55.7%)
+Speculative stats: length=1.628, avg_accept_length=0.628, num_blocks=1049
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 22...
+Success: True
+# episodes completed so far: 272
+# successes: 152 (55.9%)
+Speculative stats: length=1.488, avg_accept_length=0.488, num_blocks=781
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 23...
+Success: True
+# episodes completed so far: 273
+# successes: 153 (56.0%)
+Speculative stats: length=1.551, avg_accept_length=0.551, num_blocks=799
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 24...
+Success: True
+# episodes completed so far: 274
+# successes: 154 (56.2%)
+Speculative stats: length=1.574, avg_accept_length=0.574, num_blocks=836
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 25...
+Success: True
+# episodes completed so far: 275
+# successes: 155 (56.4%)
+Speculative stats: length=1.543, avg_accept_length=0.543, num_blocks=762
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 26...
+Success: True
+# episodes completed so far: 276
+# successes: 156 (56.5%)
+Speculative stats: length=1.549, avg_accept_length=0.549, num_blocks=1740
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 27...
+Success: False
+# episodes completed so far: 277
+# successes: 156 (56.3%)
+Speculative stats: length=1.608, avg_accept_length=0.608, num_blocks=2264
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 28...
+Success: True
+# episodes completed so far: 278
+# successes: 157 (56.5%)
+Speculative stats: length=1.625, avg_accept_length=0.625, num_blocks=1318
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 29...
+Success: False
+# episodes completed so far: 279
+# successes: 157 (56.3%)
+Speculative stats: length=1.598, avg_accept_length=0.598, num_blocks=2278
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 30...
+Success: True
+# episodes completed so far: 280
+# successes: 158 (56.4%)
+Speculative stats: length=1.471, avg_accept_length=0.471, num_blocks=747
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 31...
+Success: False
+# episodes completed so far: 281
+# successes: 158 (56.2%)
+Speculative stats: length=1.556, avg_accept_length=0.556, num_blocks=2340
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 32...
+Success: False
+# episodes completed so far: 282
+# successes: 158 (56.0%)
+Speculative stats: length=1.752, avg_accept_length=0.752, num_blocks=2078
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 33...
+Success: True
+# episodes completed so far: 283
+# successes: 159 (56.2%)
+Speculative stats: length=1.457, avg_accept_length=0.457, num_blocks=956
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 34...
+Success: False
+# episodes completed so far: 284
+# successes: 159 (56.0%)
+Speculative stats: length=1.592, avg_accept_length=0.592, num_blocks=2287
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 35...
+Success: True
+# episodes completed so far: 285
+# successes: 160 (56.1%)
+Speculative stats: length=1.610, avg_accept_length=0.610, num_blocks=835
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 36...
+Success: True
+# episodes completed so far: 286
+# successes: 161 (56.3%)
+Speculative stats: length=1.532, avg_accept_length=0.532, num_blocks=809
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 37...
+Success: False
+# episodes completed so far: 287
+# successes: 161 (56.1%)
+Speculative stats: length=1.668, avg_accept_length=0.668, num_blocks=2182
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 38...
+Success: True
+# episodes completed so far: 288
+# successes: 162 (56.2%)
+Speculative stats: length=1.552, avg_accept_length=0.552, num_blocks=762
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 39...
+Success: False
+# episodes completed so far: 289
+# successes: 162 (56.1%)
+Speculative stats: length=1.810, avg_accept_length=0.810, num_blocks=2011
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 40...
+Success: True
+# episodes completed so far: 290
+# successes: 163 (56.2%)
+Speculative stats: length=1.643, avg_accept_length=0.643, num_blocks=946
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 41...
+Success: False
+# episodes completed so far: 291
+# successes: 163 (56.0%)
+Speculative stats: length=1.621, avg_accept_length=0.621, num_blocks=2245
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 42...
+Success: True
+# episodes completed so far: 292
+# successes: 164 (56.2%)
+Speculative stats: length=1.536, avg_accept_length=0.536, num_blocks=916
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 43...
+Success: True
+# episodes completed so far: 293
+# successes: 165 (56.3%)
+Speculative stats: length=1.638, avg_accept_length=0.638, num_blocks=658
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 44...
+Success: True
+# episodes completed so far: 294
+# successes: 166 (56.5%)
+Speculative stats: length=1.517, avg_accept_length=0.517, num_blocks=775
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 45...
+Success: True
+# episodes completed so far: 295
+# successes: 167 (56.6%)
+Speculative stats: length=1.542, avg_accept_length=0.542, num_blocks=899
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 46...
+Success: False
+# episodes completed so far: 296
+# successes: 167 (56.4%)
+Speculative stats: length=1.734, avg_accept_length=0.734, num_blocks=2099
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 47...
+Success: True
+# episodes completed so far: 297
+# successes: 168 (56.6%)
+Speculative stats: length=1.706, avg_accept_length=0.706, num_blocks=1194
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 48...
+Success: False
+# episodes completed so far: 298
+# successes: 168 (56.4%)
+Speculative stats: length=1.587, avg_accept_length=0.587, num_blocks=2294
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 49...
+Success: True
+# episodes completed so far: 299
+# successes: 169 (56.5%)
+Speculative stats: length=1.617, avg_accept_length=0.617, num_blocks=909
+
+Task: pick up the book and place it in the back compartment of the caddy
+Starting episode 50...
+Success: True
+# episodes completed so far: 300
+# successes: 170 (56.7%)
+Speculative stats: length=1.498, avg_accept_length=0.498, num_blocks=1547
+Current task success rate: 0.72
+Current total success rate: 0.5666666666666667
+Current task speculative stats: length=1.600, avg_accept_length=0.600, num_blocks=65251
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 1...
+Success: True
+# episodes completed so far: 301
+# successes: 171 (56.8%)
+Speculative stats: length=1.610, avg_accept_length=0.610, num_blocks=1052
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 2...
+Success: False
+# episodes completed so far: 302
+# successes: 171 (56.6%)
+Speculative stats: length=1.859, avg_accept_length=0.859, num_blocks=1958
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 3...
+Success: False
+# episodes completed so far: 303
+# successes: 171 (56.4%)
+Speculative stats: length=1.630, avg_accept_length=0.630, num_blocks=2233
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 4...
+Success: True
+# episodes completed so far: 304
+# successes: 172 (56.6%)
+Speculative stats: length=1.800, avg_accept_length=0.800, num_blocks=1653
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 5...
+Success: True
+# episodes completed so far: 305
+# successes: 173 (56.7%)
+Speculative stats: length=1.708, avg_accept_length=0.708, num_blocks=1463
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 6...
+Success: True
+# episodes completed so far: 306
+# successes: 174 (56.9%)
+Speculative stats: length=1.598, avg_accept_length=0.598, num_blocks=911
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 7...
+Success: True
+# episodes completed so far: 307
+# successes: 175 (57.0%)
+Speculative stats: length=1.704, avg_accept_length=0.704, num_blocks=1228
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 8...
+Success: True
+# episodes completed so far: 308
+# successes: 176 (57.1%)
+Speculative stats: length=1.652, avg_accept_length=0.652, num_blocks=1288
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 9...
+Success: False
+# episodes completed so far: 309
+# successes: 176 (57.0%)
+Speculative stats: length=1.640, avg_accept_length=0.640, num_blocks=2219
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 10...
+Success: True
+# episodes completed so far: 310
+# successes: 177 (57.1%)
+Speculative stats: length=1.589, avg_accept_length=0.589, num_blocks=1031
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 11...
+Success: False
+# episodes completed so far: 311
+# successes: 177 (56.9%)
+Speculative stats: length=1.695, avg_accept_length=0.695, num_blocks=2147
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 12...
+Success: False
+# episodes completed so far: 312
+# successes: 177 (56.7%)
+Speculative stats: length=1.675, avg_accept_length=0.675, num_blocks=2173
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 13...
+Success: False
+# episodes completed so far: 313
+# successes: 177 (56.5%)
+Speculative stats: length=1.677, avg_accept_length=0.677, num_blocks=2170
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 14...
+Success: False
+# episodes completed so far: 314
+# successes: 177 (56.4%)
+Speculative stats: length=1.524, avg_accept_length=0.524, num_blocks=2388
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 15...
+Success: False
+# episodes completed so far: 315
+# successes: 177 (56.2%)
+Speculative stats: length=1.910, avg_accept_length=0.910, num_blocks=1906
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 16...
+Success: False
+# episodes completed so far: 316
+# successes: 177 (56.0%)
+Speculative stats: length=1.674, avg_accept_length=0.674, num_blocks=2175
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 17...
+Success: False
+# episodes completed so far: 317
+# successes: 177 (55.8%)
+Speculative stats: length=1.473, avg_accept_length=0.473, num_blocks=2471
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 18...
+Success: False
+# episodes completed so far: 318
+# successes: 177 (55.7%)
+Speculative stats: length=1.649, avg_accept_length=0.649, num_blocks=2207
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 19...
+Success: False
+# episodes completed so far: 319
+# successes: 177 (55.5%)
+Speculative stats: length=1.783, avg_accept_length=0.783, num_blocks=2041
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 20...
+Success: True
+# episodes completed so far: 320
+# successes: 178 (55.6%)
+Speculative stats: length=1.629, avg_accept_length=0.629, num_blocks=967
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 21...
+Success: False
+# episodes completed so far: 321
+# successes: 178 (55.5%)
+Speculative stats: length=1.715, avg_accept_length=0.715, num_blocks=2122
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 22...
+Success: False
+# episodes completed so far: 322
+# successes: 178 (55.3%)
+Speculative stats: length=1.974, avg_accept_length=0.974, num_blocks=1844
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 23...
+Success: True
+# episodes completed so far: 323
+# successes: 179 (55.4%)
+Speculative stats: length=1.630, avg_accept_length=0.630, num_blocks=932
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 24...
+Success: True
+# episodes completed so far: 324
+# successes: 180 (55.6%)
+Speculative stats: length=1.548, avg_accept_length=0.548, num_blocks=2062
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 25...
+Success: True
+# episodes completed so far: 325
+# successes: 181 (55.7%)
+Speculative stats: length=1.622, avg_accept_length=0.622, num_blocks=1096
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 26...
+Success: False
+# episodes completed so far: 326
+# successes: 181 (55.5%)
+Speculative stats: length=1.608, avg_accept_length=0.608, num_blocks=2264
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 27...
+Success: False
+# episodes completed so far: 327
+# successes: 181 (55.4%)
+Speculative stats: length=1.684, avg_accept_length=0.684, num_blocks=2161
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 28...
+Success: True
+# episodes completed so far: 328
+# successes: 182 (55.5%)
+Speculative stats: length=1.614, avg_accept_length=0.614, num_blocks=980
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 29...
+Success: False
+# episodes completed so far: 329
+# successes: 182 (55.3%)
+Speculative stats: length=1.759, avg_accept_length=0.759, num_blocks=2069
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 30...
+Success: False
+# episodes completed so far: 330
+# successes: 182 (55.2%)
+Speculative stats: length=1.847, avg_accept_length=0.847, num_blocks=1971
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 31...
+Success: False
+# episodes completed so far: 331
+# successes: 182 (55.0%)
+Speculative stats: length=1.651, avg_accept_length=0.651, num_blocks=2205
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 32...
+Success: True
+# episodes completed so far: 332
+# successes: 183 (55.1%)
+Speculative stats: length=1.564, avg_accept_length=0.564, num_blocks=1007
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 33...
+Success: False
+# episodes completed so far: 333
+# successes: 183 (55.0%)
+Speculative stats: length=1.748, avg_accept_length=0.748, num_blocks=2082
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 34...
+Success: False
+# episodes completed so far: 334
+# successes: 183 (54.8%)
+Speculative stats: length=1.948, avg_accept_length=0.948, num_blocks=1869
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 35...
+Success: False
+# episodes completed so far: 335
+# successes: 183 (54.6%)
+Speculative stats: length=1.691, avg_accept_length=0.691, num_blocks=2152
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 36...
+Success: False
+# episodes completed so far: 336
+# successes: 183 (54.5%)
+Speculative stats: length=1.744, avg_accept_length=0.744, num_blocks=2087
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 37...
+Success: True
+# episodes completed so far: 337
+# successes: 184 (54.6%)
+Speculative stats: length=1.585, avg_accept_length=0.585, num_blocks=1029
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 38...
+Success: True
+# episodes completed so far: 338
+# successes: 185 (54.7%)
+Speculative stats: length=1.541, avg_accept_length=0.541, num_blocks=936
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 39...
+Success: False
+# episodes completed so far: 339
+# successes: 185 (54.6%)
+Speculative stats: length=1.843, avg_accept_length=0.843, num_blocks=1975
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 40...
+Success: False
+# episodes completed so far: 340
+# successes: 185 (54.4%)
+Speculative stats: length=1.752, avg_accept_length=0.752, num_blocks=2078
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 41...
+Success: True
+# episodes completed so far: 341
+# successes: 186 (54.5%)
+Speculative stats: length=1.662, avg_accept_length=0.662, num_blocks=1015
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 42...
+Success: True
+# episodes completed so far: 342
+# successes: 187 (54.7%)
+Speculative stats: length=1.622, avg_accept_length=0.622, num_blocks=1070
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 43...
+Success: False
+# episodes completed so far: 343
+# successes: 187 (54.5%)
+Speculative stats: length=1.619, avg_accept_length=0.619, num_blocks=2248
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 44...
+Success: True
+# episodes completed so far: 344
+# successes: 188 (54.7%)
+Speculative stats: length=1.636, avg_accept_length=0.636, num_blocks=1232
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 45...
+Success: True
+# episodes completed so far: 345
+# successes: 189 (54.8%)
+Speculative stats: length=1.617, avg_accept_length=0.617, num_blocks=974
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 46...
+Success: False
+# episodes completed so far: 346
+# successes: 189 (54.6%)
+Speculative stats: length=1.727, avg_accept_length=0.727, num_blocks=2108
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 47...
+Success: False
+# episodes completed so far: 347
+# successes: 189 (54.5%)
+Speculative stats: length=1.688, avg_accept_length=0.688, num_blocks=2156
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 48...
+Success: False
+# episodes completed so far: 348
+# successes: 189 (54.3%)
+Speculative stats: length=1.647, avg_accept_length=0.647, num_blocks=2210
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 49...
+Success: True
+# episodes completed so far: 349
+# successes: 190 (54.4%)
+Speculative stats: length=1.627, avg_accept_length=0.627, num_blocks=938
+
+Task: put the white mug on the plate and put the chocolate pudding to the right of the plate
+Starting episode 50...
+Success: True
+# episodes completed so far: 350
+# successes: 191 (54.6%)
+Speculative stats: length=1.607, avg_accept_length=0.607, num_blocks=967
+Current task success rate: 0.42
+Current total success rate: 0.5457142857142857
+Current task speculative stats: length=1.689, avg_accept_length=0.689, num_blocks=85520
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 1...
+Success: True
+# episodes completed so far: 351
+# successes: 192 (54.7%)
+Speculative stats: length=1.565, avg_accept_length=0.565, num_blocks=1288
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 2...
+Success: True
+# episodes completed so far: 352
+# successes: 193 (54.8%)
+Speculative stats: length=1.545, avg_accept_length=0.545, num_blocks=1350
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 3...
+Success: False
+# episodes completed so far: 353
+# successes: 193 (54.7%)
+Speculative stats: length=1.700, avg_accept_length=0.700, num_blocks=2141
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 4...
+Success: True
+# episodes completed so far: 354
+# successes: 194 (54.8%)
+Speculative stats: length=1.549, avg_accept_length=0.549, num_blocks=1148
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 5...
+Success: False
+# episodes completed so far: 355
+# successes: 194 (54.6%)
+Speculative stats: length=2.533, avg_accept_length=1.533, num_blocks=1437
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 6...
+Success: False
+# episodes completed so far: 356
+# successes: 194 (54.5%)
+Speculative stats: length=3.082, avg_accept_length=2.082, num_blocks=1181
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 7...
+Success: True
+# episodes completed so far: 357
+# successes: 195 (54.6%)
+Speculative stats: length=1.497, avg_accept_length=0.497, num_blocks=1319
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 8...
+Success: True
+# episodes completed so far: 358
+# successes: 196 (54.7%)
+Speculative stats: length=1.613, avg_accept_length=0.613, num_blocks=1024
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 9...
+Success: False
+# episodes completed so far: 359
+# successes: 196 (54.6%)
+Speculative stats: length=1.639, avg_accept_length=0.639, num_blocks=2221
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 10...
+Success: True
+# episodes completed so far: 360
+# successes: 197 (54.7%)
+Speculative stats: length=1.561, avg_accept_length=0.561, num_blocks=1413
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 11...
+Success: True
+# episodes completed so far: 361
+# successes: 198 (54.8%)
+Speculative stats: length=1.602, avg_accept_length=0.602, num_blocks=1796
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 12...
+Success: True
+# episodes completed so far: 362
+# successes: 199 (55.0%)
+Speculative stats: length=1.819, avg_accept_length=0.819, num_blocks=1405
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 13...
+Success: True
+# episodes completed so far: 363
+# successes: 200 (55.1%)
+Speculative stats: length=1.625, avg_accept_length=0.625, num_blocks=1047
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 14...
+Success: False
+# episodes completed so far: 364
+# successes: 200 (54.9%)
+Speculative stats: length=1.774, avg_accept_length=0.774, num_blocks=2052
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 15...
+Success: True
+# episodes completed so far: 365
+# successes: 201 (55.1%)
+Speculative stats: length=1.517, avg_accept_length=0.517, num_blocks=1020
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 16...
+Success: True
+# episodes completed so far: 366
+# successes: 202 (55.2%)
+Speculative stats: length=1.599, avg_accept_length=0.599, num_blocks=1007
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 17...
+Success: True
+# episodes completed so far: 367
+# successes: 203 (55.3%)
+Speculative stats: length=1.537, avg_accept_length=0.537, num_blocks=1102
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 18...
+Success: True
+# episodes completed so far: 368
+# successes: 204 (55.4%)
+Speculative stats: length=1.699, avg_accept_length=0.699, num_blocks=1281
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 19...
+Success: True
+# episodes completed so far: 369
+# successes: 205 (55.6%)
+Speculative stats: length=1.526, avg_accept_length=0.526, num_blocks=1115
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 20...
+Success: True
+# episodes completed so far: 370
+# successes: 206 (55.7%)
+Speculative stats: length=1.575, avg_accept_length=0.575, num_blocks=960
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 21...
+Success: True
+# episodes completed so far: 371
+# successes: 207 (55.8%)
+Speculative stats: length=1.575, avg_accept_length=0.575, num_blocks=1404
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 22...
+Success: True
+# episodes completed so far: 372
+# successes: 208 (55.9%)
+Speculative stats: length=1.622, avg_accept_length=0.622, num_blocks=1394
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 23...
+Success: True
+# episodes completed so far: 373
+# successes: 209 (56.0%)
+Speculative stats: length=1.547, avg_accept_length=0.547, num_blocks=1131
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 24...
+Success: True
+# episodes completed so far: 374
+# successes: 210 (56.1%)
+Speculative stats: length=1.535, avg_accept_length=0.535, num_blocks=1332
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 25...
+Success: True
+# episodes completed so far: 375
+# successes: 211 (56.3%)
+Speculative stats: length=1.735, avg_accept_length=0.735, num_blocks=1295
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 26...
+Success: True
+# episodes completed so far: 376
+# successes: 212 (56.4%)
+Speculative stats: length=1.573, avg_accept_length=0.573, num_blocks=1286
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 27...
+Success: False
+# episodes completed so far: 377
+# successes: 212 (56.2%)
+Speculative stats: length=2.086, avg_accept_length=1.086, num_blocks=1745
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 28...
+Success: True
+# episodes completed so far: 378
+# successes: 213 (56.3%)
+Speculative stats: length=1.688, avg_accept_length=0.688, num_blocks=1319
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 29...
+Success: True
+# episodes completed so far: 379
+# successes: 214 (56.5%)
+Speculative stats: length=1.526, avg_accept_length=0.526, num_blocks=1294
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 30...
+Success: False
+# episodes completed so far: 380
+# successes: 214 (56.3%)
+Speculative stats: length=1.682, avg_accept_length=0.682, num_blocks=2164
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 31...
+Success: True
+# episodes completed so far: 381
+# successes: 215 (56.4%)
+Speculative stats: length=1.622, avg_accept_length=0.622, num_blocks=1152
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 32...
+Success: True
+# episodes completed so far: 382
+# successes: 216 (56.5%)
+Speculative stats: length=1.493, avg_accept_length=0.493, num_blocks=2209
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 33...
+Success: True
+# episodes completed so far: 383
+# successes: 217 (56.7%)
+Speculative stats: length=1.528, avg_accept_length=0.528, num_blocks=1113
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 34...
+Success: True
+# episodes completed so far: 384
+# successes: 218 (56.8%)
+Speculative stats: length=1.563, avg_accept_length=0.563, num_blocks=1272
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 35...
+Success: False
+# episodes completed so far: 385
+# successes: 218 (56.6%)
+Speculative stats: length=1.839, avg_accept_length=0.839, num_blocks=1979
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 36...
+Success: True
+# episodes completed so far: 386
+# successes: 219 (56.7%)
+Speculative stats: length=1.511, avg_accept_length=0.511, num_blocks=1357
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 37...
+Success: False
+# episodes completed so far: 387
+# successes: 219 (56.6%)
+Speculative stats: length=1.682, avg_accept_length=0.682, num_blocks=2164
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 38...
+Success: True
+# episodes completed so far: 388
+# successes: 220 (56.7%)
+Speculative stats: length=1.644, avg_accept_length=0.644, num_blocks=1052
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 39...
+Success: False
+# episodes completed so far: 389
+# successes: 220 (56.6%)
+Speculative stats: length=1.787, avg_accept_length=0.787, num_blocks=2037
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 40...
+Success: True
+# episodes completed so far: 390
+# successes: 221 (56.7%)
+Speculative stats: length=1.615, avg_accept_length=0.615, num_blocks=1270
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 41...
+Success: True
+# episodes completed so far: 391
+# successes: 222 (56.8%)
+Speculative stats: length=1.682, avg_accept_length=0.682, num_blocks=1457
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 42...
+Success: True
+# episodes completed so far: 392
+# successes: 223 (56.9%)
+Speculative stats: length=1.631, avg_accept_length=0.631, num_blocks=1120
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 43...
+Success: True
+# episodes completed so far: 393
+# successes: 224 (57.0%)
+Speculative stats: length=1.608, avg_accept_length=0.608, num_blocks=1058
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 44...
+Success: False
+# episodes completed so far: 394
+# successes: 224 (56.9%)
+Speculative stats: length=1.811, avg_accept_length=0.811, num_blocks=2010
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 45...
+Success: True
+# episodes completed so far: 395
+# successes: 225 (57.0%)
+Speculative stats: length=1.642, avg_accept_length=0.642, num_blocks=1117
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 46...
+Success: True
+# episodes completed so far: 396
+# successes: 226 (57.1%)
+Speculative stats: length=1.529, avg_accept_length=0.529, num_blocks=1296
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 47...
+Success: True
+# episodes completed so far: 397
+# successes: 227 (57.2%)
+Speculative stats: length=1.578, avg_accept_length=0.578, num_blocks=1025
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 48...
+Success: False
+# episodes completed so far: 398
+# successes: 227 (57.0%)
+Speculative stats: length=1.876, avg_accept_length=0.876, num_blocks=1940
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 49...
+Success: True
+# episodes completed so far: 399
+# successes: 228 (57.1%)
+Speculative stats: length=1.599, avg_accept_length=0.599, num_blocks=1738
+
+Task: put both the alphabet soup and the cream cheese box in the basket
+Starting episode 50...
+Success: True
+# episodes completed so far: 400
+# successes: 229 (57.2%)
+Speculative stats: length=1.665, avg_accept_length=0.665, num_blocks=1110
+Current task success rate: 0.76
+Current total success rate: 0.5725
+Current task speculative stats: length=1.690, avg_accept_length=0.690, num_blocks=71147
+
+Task: put both moka pots on the stove
+Starting episode 1...
+Success: False
+# episodes completed so far: 401
+# successes: 229 (57.1%)
+Speculative stats: length=1.614, avg_accept_length=0.614, num_blocks=2255
+
+Task: put both moka pots on the stove
+Starting episode 2...
+Success: False
+# episodes completed so far: 402
+# successes: 229 (57.0%)
+Speculative stats: length=1.628, avg_accept_length=0.628, num_blocks=2236
+
+Task: put both moka pots on the stove
+Starting episode 3...
+Success: True
+# episodes completed so far: 403
+# successes: 230 (57.1%)
+Speculative stats: length=1.410, avg_accept_length=0.410, num_blocks=2214
+
+Task: put both moka pots on the stove
+Starting episode 4...
+Success: False
+# episodes completed so far: 404
+# successes: 230 (56.9%)
+Speculative stats: length=1.567, avg_accept_length=0.567, num_blocks=2323
+
+Task: put both moka pots on the stove
+Starting episode 5...
+Success: False
+# episodes completed so far: 405
+# successes: 230 (56.8%)
+Speculative stats: length=1.515, avg_accept_length=0.515, num_blocks=2403
+
+Task: put both moka pots on the stove
+Starting episode 6...
+Success: True
+# episodes completed so far: 406
+# successes: 231 (56.9%)
+Speculative stats: length=1.526, avg_accept_length=0.526, num_blocks=1702
+
+Task: put both moka pots on the stove
+Starting episode 7...
+Success: False
+# episodes completed so far: 407
+# successes: 231 (56.8%)
+Speculative stats: length=1.731, avg_accept_length=0.731, num_blocks=2103
+
+Task: put both moka pots on the stove
+Starting episode 8...
+Success: True
+# episodes completed so far: 408
+# successes: 232 (56.9%)
+Speculative stats: length=1.496, avg_accept_length=0.496, num_blocks=1605
+
+Task: put both moka pots on the stove
+Starting episode 9...
+Success: False
+# episodes completed so far: 409
+# successes: 232 (56.7%)
+Speculative stats: length=1.742, avg_accept_length=0.742, num_blocks=2089
+
+Task: put both moka pots on the stove
+Starting episode 10...
+Success: False
+# episodes completed so far: 410
+# successes: 232 (56.6%)
+Speculative stats: length=1.515, avg_accept_length=0.515, num_blocks=2403
+
+Task: put both moka pots on the stove
+Starting episode 11...
+Success: True
+# episodes completed so far: 411
+# successes: 233 (56.7%)
+Speculative stats: length=1.513, avg_accept_length=0.513, num_blocks=2151
+
+Task: put both moka pots on the stove
+Starting episode 12...
+Success: True
+# episodes completed so far: 412
+# successes: 234 (56.8%)
+Speculative stats: length=1.442, avg_accept_length=0.442, num_blocks=2049
+
+Task: put both moka pots on the stove
+Starting episode 13...
+Success: False
+# episodes completed so far: 413
+# successes: 234 (56.7%)
+Speculative stats: length=1.899, avg_accept_length=0.899, num_blocks=1917
+
+Task: put both moka pots on the stove
+Starting episode 14...
+Success: False
+# episodes completed so far: 414
+# successes: 234 (56.5%)
+Speculative stats: length=1.646, avg_accept_length=0.646, num_blocks=2211
+
+Task: put both moka pots on the stove
+Starting episode 15...
+Success: False
+# episodes completed so far: 415
+# successes: 234 (56.4%)
+Speculative stats: length=1.576, avg_accept_length=0.576, num_blocks=2310
+
+Task: put both moka pots on the stove
+Starting episode 16...
+Success: True
+# episodes completed so far: 416
+# successes: 235 (56.5%)
+Speculative stats: length=1.429, avg_accept_length=0.429, num_blocks=2161
+
+Task: put both moka pots on the stove
+Starting episode 17...
+Success: True
+# episodes completed so far: 417
+# successes: 236 (56.6%)
+Speculative stats: length=1.492, avg_accept_length=0.492, num_blocks=2140
+
+Task: put both moka pots on the stove
+Starting episode 18...
+Success: False
+# episodes completed so far: 418
+# successes: 236 (56.5%)
+Speculative stats: length=1.590, avg_accept_length=0.590, num_blocks=2290
+
+Task: put both moka pots on the stove
+Starting episode 19...
+Success: False
+# episodes completed so far: 419
+# successes: 236 (56.3%)
+Speculative stats: length=1.474, avg_accept_length=0.474, num_blocks=2470
+
+Task: put both moka pots on the stove
+Starting episode 20...
+Success: False
+# episodes completed so far: 420
+# successes: 236 (56.2%)
+Speculative stats: length=1.526, avg_accept_length=0.526, num_blocks=2386
+
+Task: put both moka pots on the stove
+Starting episode 21...
+Success: False
+# episodes completed so far: 421
+# successes: 236 (56.1%)
+Speculative stats: length=1.682, avg_accept_length=0.682, num_blocks=2164
+
+Task: put both moka pots on the stove
+Starting episode 22...
+Success: False
+# episodes completed so far: 422
+# successes: 236 (55.9%)
+Speculative stats: length=1.683, avg_accept_length=0.683, num_blocks=2163
+
+Task: put both moka pots on the stove
+Starting episode 23...
+Success: True
+# episodes completed so far: 423
+# successes: 237 (56.0%)
+Speculative stats: length=1.501, avg_accept_length=0.501, num_blocks=1935
+
+Task: put both moka pots on the stove
+Starting episode 24...
+Success: False
+# episodes completed so far: 424
+# successes: 237 (55.9%)
+Speculative stats: length=1.711, avg_accept_length=0.711, num_blocks=2128
+
+Task: put both moka pots on the stove
+Starting episode 25...
+Success: True
+# episodes completed so far: 425
+# successes: 238 (56.0%)
+Speculative stats: length=1.496, avg_accept_length=0.496, num_blocks=1652
+
+Task: put both moka pots on the stove
+Starting episode 26...
+Success: False
+# episodes completed so far: 426
+# successes: 238 (55.9%)
+Speculative stats: length=1.936, avg_accept_length=0.936, num_blocks=1880
+
+Task: put both moka pots on the stove
+Starting episode 27...
+Success: True
+# episodes completed so far: 427
+# successes: 239 (56.0%)
+Speculative stats: length=1.558, avg_accept_length=0.558, num_blocks=2183
+
+Task: put both moka pots on the stove
+Starting episode 28...
+Success: True
+# episodes completed so far: 428
+# successes: 240 (56.1%)
+Speculative stats: length=1.472, avg_accept_length=0.472, num_blocks=1940
+
+Task: put both moka pots on the stove
+Starting episode 29...
+Success: False
+# episodes completed so far: 429
+# successes: 240 (55.9%)
+Speculative stats: length=1.515, avg_accept_length=0.515, num_blocks=2403
+
+Task: put both moka pots on the stove
+Starting episode 30...
+Success: True
+# episodes completed so far: 430
+# successes: 241 (56.0%)
+Speculative stats: length=1.499, avg_accept_length=0.499, num_blocks=1975
+
+Task: put both moka pots on the stove
+Starting episode 31...
+Success: True
+# episodes completed so far: 431
+# successes: 242 (56.1%)
+Speculative stats: length=1.477, avg_accept_length=0.477, num_blocks=1896
+
+Task: put both moka pots on the stove
+Starting episode 32...
+Success: True
+# episodes completed so far: 432
+# successes: 243 (56.2%)
+Speculative stats: length=1.480, avg_accept_length=0.480, num_blocks=1868
+
+Task: put both moka pots on the stove
+Starting episode 33...
+Success: False
+# episodes completed so far: 433
+# successes: 243 (56.1%)
+Speculative stats: length=1.833, avg_accept_length=0.833, num_blocks=1986
+
+Task: put both moka pots on the stove
+Starting episode 34...
+Success: False
+# episodes completed so far: 434
+# successes: 243 (56.0%)
+Speculative stats: length=1.527, avg_accept_length=0.527, num_blocks=2383
+
+Task: put both moka pots on the stove
+Starting episode 35...
+Success: False
+# episodes completed so far: 435
+# successes: 243 (55.9%)
+Speculative stats: length=1.483, avg_accept_length=0.483, num_blocks=2454
+
+Task: put both moka pots on the stove
+Starting episode 36...
+Success: False
+# episodes completed so far: 436
+# successes: 243 (55.7%)
+Speculative stats: length=1.545, avg_accept_length=0.545, num_blocks=2356
+
+Task: put both moka pots on the stove
+Starting episode 37...
+Success: True
+# episodes completed so far: 437
+# successes: 244 (55.8%)
+Speculative stats: length=1.471, avg_accept_length=0.471, num_blocks=1665
+
+Task: put both moka pots on the stove
+Starting episode 38...
+Success: False
+# episodes completed so far: 438
+# successes: 244 (55.7%)
+Speculative stats: length=1.822, avg_accept_length=0.822, num_blocks=1998
+
+Task: put both moka pots on the stove
+Starting episode 39...
+Success: False
+# episodes completed so far: 439
+# successes: 244 (55.6%)
+Speculative stats: length=1.973, avg_accept_length=0.973, num_blocks=1845
+
+Task: put both moka pots on the stove
+Starting episode 40...
+Success: False
+# episodes completed so far: 440
+# successes: 244 (55.5%)
+Speculative stats: length=1.695, avg_accept_length=0.695, num_blocks=2148
+
+Task: put both moka pots on the stove
+Starting episode 41...
+Success: False
+# episodes completed so far: 441
+# successes: 244 (55.3%)
+Speculative stats: length=1.591, avg_accept_length=0.591, num_blocks=2288
+
+Task: put both moka pots on the stove
+Starting episode 42...
+Success: True
+# episodes completed so far: 442
+# successes: 245 (55.4%)
+Speculative stats: length=1.547, avg_accept_length=0.547, num_blocks=2172
+
+Task: put both moka pots on the stove
+Starting episode 43...
+Success: False
+# episodes completed so far: 443
+# successes: 245 (55.3%)
+Speculative stats: length=1.648, avg_accept_length=0.648, num_blocks=2209
+
+Task: put both moka pots on the stove
+Starting episode 44...
+Success: True
+# episodes completed so far: 444
+# successes: 246 (55.4%)
+Speculative stats: length=1.521, avg_accept_length=0.521, num_blocks=2016
+
+Task: put both moka pots on the stove
+Starting episode 45...
+Success: True
+# episodes completed so far: 445
+# successes: 247 (55.5%)
+Speculative stats: length=1.479, avg_accept_length=0.479, num_blocks=1713
+
+Task: put both moka pots on the stove
+Starting episode 46...
+Success: False
+# episodes completed so far: 446
+# successes: 247 (55.4%)
+Speculative stats: length=1.470, avg_accept_length=0.470, num_blocks=2476
+
+Task: put both moka pots on the stove
+Starting episode 47...
+Success: False
+# episodes completed so far: 447
+# successes: 247 (55.3%)
+Speculative stats: length=1.714, avg_accept_length=0.714, num_blocks=2124
+
+Task: put both moka pots on the stove
+Starting episode 48...
+Success: False
+# episodes completed so far: 448
+# successes: 247 (55.1%)
+Speculative stats: length=1.608, avg_accept_length=0.608, num_blocks=2264
+
+Task: put both moka pots on the stove
+Starting episode 49...
+Success: False
+# episodes completed so far: 449
+# successes: 247 (55.0%)
+Speculative stats: length=1.992, avg_accept_length=0.992, num_blocks=1827
+
+Task: put both moka pots on the stove
+Starting episode 50...
+Success: True
+# episodes completed so far: 450
+# successes: 248 (55.1%)
+Speculative stats: length=1.513, avg_accept_length=0.513, num_blocks=1716
+Current task success rate: 0.38
+Current total success rate: 0.5511111111111111
+Current task speculative stats: length=1.593, avg_accept_length=0.593, num_blocks=105245
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 1...
+Success: True
+# episodes completed so far: 451
+# successes: 249 (55.2%)
+Speculative stats: length=1.399, avg_accept_length=0.399, num_blocks=1186
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 2...
+Success: False
+# episodes completed so far: 452
+# successes: 249 (55.1%)
+Speculative stats: length=1.584, avg_accept_length=0.584, num_blocks=2298
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 3...
+Success: True
+# episodes completed so far: 453
+# successes: 250 (55.2%)
+Speculative stats: length=1.381, avg_accept_length=0.381, num_blocks=1485
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 4...
+Success: False
+# episodes completed so far: 454
+# successes: 250 (55.1%)
+Speculative stats: length=1.497, avg_accept_length=0.497, num_blocks=2431
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 5...
+Success: False
+# episodes completed so far: 455
+# successes: 250 (54.9%)
+Speculative stats: length=1.584, avg_accept_length=0.584, num_blocks=2298
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 6...
+Success: True
+# episodes completed so far: 456
+# successes: 251 (55.0%)
+Speculative stats: length=1.369, avg_accept_length=0.369, num_blocks=1416
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 7...
+Success: True
+# episodes completed so far: 457
+# successes: 252 (55.1%)
+Speculative stats: length=1.448, avg_accept_length=0.448, num_blocks=1257
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 8...
+Success: False
+# episodes completed so far: 458
+# successes: 252 (55.0%)
+Speculative stats: length=2.675, avg_accept_length=1.675, num_blocks=1361
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 9...
+Success: False
+# episodes completed so far: 459
+# successes: 252 (54.9%)
+Speculative stats: length=1.689, avg_accept_length=0.689, num_blocks=2155
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 10...
+Success: False
+# episodes completed so far: 460
+# successes: 252 (54.8%)
+Speculative stats: length=1.935, avg_accept_length=0.935, num_blocks=1881
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 11...
+Success: False
+# episodes completed so far: 461
+# successes: 252 (54.7%)
+Speculative stats: length=2.569, avg_accept_length=1.569, num_blocks=1417
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 12...
+Success: False
+# episodes completed so far: 462
+# successes: 252 (54.5%)
+Speculative stats: length=1.671, avg_accept_length=0.671, num_blocks=2178
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 13...
+Success: False
+# episodes completed so far: 463
+# successes: 252 (54.4%)
+Speculative stats: length=1.523, avg_accept_length=0.523, num_blocks=2390
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 14...
+Success: True
+# episodes completed so far: 464
+# successes: 253 (54.5%)
+Speculative stats: length=1.667, avg_accept_length=0.667, num_blocks=1932
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 15...
+Success: False
+# episodes completed so far: 465
+# successes: 253 (54.4%)
+Speculative stats: length=1.664, avg_accept_length=0.664, num_blocks=2187
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 16...
+Success: True
+# episodes completed so far: 466
+# successes: 254 (54.5%)
+Speculative stats: length=1.448, avg_accept_length=0.448, num_blocks=1503
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 17...
+Success: False
+# episodes completed so far: 467
+# successes: 254 (54.4%)
+Speculative stats: length=1.568, avg_accept_length=0.568, num_blocks=2321
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 18...
+Success: True
+# episodes completed so far: 468
+# successes: 255 (54.5%)
+Speculative stats: length=1.423, avg_accept_length=0.423, num_blocks=2396
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 19...
+Success: True
+# episodes completed so far: 469
+# successes: 256 (54.6%)
+Speculative stats: length=1.453, avg_accept_length=0.453, num_blocks=1431
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 20...
+Success: True
+# episodes completed so far: 470
+# successes: 257 (54.7%)
+Speculative stats: length=1.413, avg_accept_length=0.413, num_blocks=1694
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 21...
+Success: True
+# episodes completed so far: 471
+# successes: 258 (54.8%)
+Speculative stats: length=1.469, avg_accept_length=0.469, num_blocks=1449
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 22...
+Success: False
+# episodes completed so far: 472
+# successes: 258 (54.7%)
+Speculative stats: length=1.562, avg_accept_length=0.562, num_blocks=2331
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 23...
+Success: True
+# episodes completed so far: 473
+# successes: 259 (54.8%)
+Speculative stats: length=1.598, avg_accept_length=0.598, num_blocks=1581
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 24...
+Success: False
+# episodes completed so far: 474
+# successes: 259 (54.6%)
+Speculative stats: length=1.424, avg_accept_length=0.424, num_blocks=2557
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 25...
+Success: False
+# episodes completed so far: 475
+# successes: 259 (54.5%)
+Speculative stats: length=1.886, avg_accept_length=0.886, num_blocks=1930
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 26...
+Success: False
+# episodes completed so far: 476
+# successes: 259 (54.4%)
+Speculative stats: length=1.653, avg_accept_length=0.653, num_blocks=2202
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 27...
+Success: True
+# episodes completed so far: 477
+# successes: 260 (54.5%)
+Speculative stats: length=1.456, avg_accept_length=0.456, num_blocks=1995
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 28...
+Success: False
+# episodes completed so far: 478
+# successes: 260 (54.4%)
+Speculative stats: length=1.519, avg_accept_length=0.519, num_blocks=2396
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 29...
+Success: False
+# episodes completed so far: 479
+# successes: 260 (54.3%)
+Speculative stats: length=1.443, avg_accept_length=0.443, num_blocks=2522
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 30...
+Success: True
+# episodes completed so far: 480
+# successes: 261 (54.4%)
+Speculative stats: length=1.624, avg_accept_length=0.624, num_blocks=1668
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 31...
+Success: False
+# episodes completed so far: 481
+# successes: 261 (54.3%)
+Speculative stats: length=1.816, avg_accept_length=0.816, num_blocks=2004
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 32...
+Success: True
+# episodes completed so far: 482
+# successes: 262 (54.4%)
+Speculative stats: length=1.471, avg_accept_length=0.471, num_blocks=1732
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 33...
+Success: False
+# episodes completed so far: 483
+# successes: 262 (54.2%)
+Speculative stats: length=1.560, avg_accept_length=0.560, num_blocks=2333
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 34...
+Success: True
+# episodes completed so far: 484
+# successes: 263 (54.3%)
+Speculative stats: length=1.360, avg_accept_length=0.360, num_blocks=1246
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 35...
+Success: False
+# episodes completed so far: 485
+# successes: 263 (54.2%)
+Speculative stats: length=1.410, avg_accept_length=0.410, num_blocks=2582
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 36...
+Success: True
+# episodes completed so far: 486
+# successes: 264 (54.3%)
+Speculative stats: length=1.382, avg_accept_length=0.382, num_blocks=2076
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 37...
+Success: True
+# episodes completed so far: 487
+# successes: 265 (54.4%)
+Speculative stats: length=1.498, avg_accept_length=0.498, num_blocks=1402
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 38...
+Success: True
+# episodes completed so far: 488
+# successes: 266 (54.5%)
+Speculative stats: length=1.455, avg_accept_length=0.455, num_blocks=1751
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 39...
+Success: False
+# episodes completed so far: 489
+# successes: 266 (54.4%)
+Speculative stats: length=1.435, avg_accept_length=0.435, num_blocks=2537
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 40...
+Success: True
+# episodes completed so far: 490
+# successes: 267 (54.5%)
+Speculative stats: length=1.389, avg_accept_length=0.389, num_blocks=1366
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 41...
+Success: True
+# episodes completed so far: 491
+# successes: 268 (54.6%)
+Speculative stats: length=1.359, avg_accept_length=0.359, num_blocks=1581
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 42...
+Success: True
+# episodes completed so far: 492
+# successes: 269 (54.7%)
+Speculative stats: length=1.417, avg_accept_length=0.417, num_blocks=1403
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 43...
+Success: False
+# episodes completed so far: 493
+# successes: 269 (54.6%)
+Speculative stats: length=1.588, avg_accept_length=0.588, num_blocks=2292
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 44...
+Success: True
+# episodes completed so far: 494
+# successes: 270 (54.7%)
+Speculative stats: length=1.541, avg_accept_length=0.541, num_blocks=1395
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 45...
+Success: False
+# episodes completed so far: 495
+# successes: 270 (54.5%)
+Speculative stats: length=1.773, avg_accept_length=0.773, num_blocks=2053
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 46...
+Success: False
+# episodes completed so far: 496
+# successes: 270 (54.4%)
+Speculative stats: length=1.587, avg_accept_length=0.587, num_blocks=2293
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 47...
+Success: False
+# episodes completed so far: 497
+# successes: 270 (54.3%)
+Speculative stats: length=1.454, avg_accept_length=0.454, num_blocks=2503
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 48...
+Success: True
+# episodes completed so far: 498
+# successes: 271 (54.4%)
+Speculative stats: length=1.324, avg_accept_length=0.324, num_blocks=1613
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 49...
+Success: True
+# episodes completed so far: 499
+# successes: 272 (54.5%)
+Speculative stats: length=1.456, avg_accept_length=0.456, num_blocks=2385
+
+Task: put the yellow and white mug in the microwave and close it
+Starting episode 50...
+Success: False
+# episodes completed so far: 500
+# successes: 272 (54.4%)
+Speculative stats: length=1.587, avg_accept_length=0.587, num_blocks=2293
+Current task success rate: 0.48
+Current total success rate: 0.544
+Current task speculative stats: length=1.564, avg_accept_length=0.564, num_blocks=96688
+Saved eval summary to: /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs/specvla_strict/EVAL-libero_10-openvla-2026_07_22-14_20_15--specvla-strict-10-r0-specvla_strict_summary.json
+Total speculative stats: length=1.564, avg_accept_length=0.564, num_blocks=96688
+Conditional prefix hit rate: p1=0.214, p2=0.822, p3=0.651, p4=0.442, p5=0.196

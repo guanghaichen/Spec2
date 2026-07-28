@@ -1,0 +1,734 @@
+Task suite: libero_goal
+
+Task: open the middle drawer of the cabinet
+Starting episode 1...
+Success: False
+# episodes completed so far: 1
+# successes: 0 (0.0%)
+Speculative stats: length=3.061, avg_accept_length=2.261, num_blocks=686, overall_hit_rate=0.509, temporal_route_rejects=10, temporal_fallback_blocks=20, temporal_fused_blocks=25, prefill_fused_actions=137, prefill_full_matches=128, prefill_accept=6.642
+
+Task: open the middle drawer of the cabinet
+Starting episode 2...
+Success: False
+# episodes completed so far: 2
+# successes: 0 (0.0%)
+Speculative stats: length=1.902, avg_accept_length=0.909, num_blocks=1104, overall_hit_rate=0.243, prefill_fused_actions=9, prefill_full_matches=4, prefill_accept=3.667
+
+Task: open the middle drawer of the cabinet
+Starting episode 3...
+Success: True
+# episodes completed so far: 3
+# successes: 1 (33.3%)
+Speculative stats: length=2.111, avg_accept_length=1.137, num_blocks=504, overall_hit_rate=0.296, prefill_fused_actions=13, prefill_full_matches=7, prefill_accept=4.385
+
+Task: open the middle drawer of the cabinet
+Starting episode 4...
+Success: False
+# episodes completed so far: 4
+# successes: 1 (25.0%)
+Speculative stats: length=2.373, avg_accept_length=1.434, num_blocks=885, overall_hit_rate=0.353, temporal_route_rejects=33, temporal_fallback_blocks=76, temporal_fused_blocks=60, prefill_fused_actions=63, prefill_full_matches=44, prefill_accept=5.000
+
+Task: open the middle drawer of the cabinet
+Starting episode 5...
+Success: True
+# episodes completed so far: 5
+# successes: 2 (40.0%)
+Speculative stats: length=2.018, avg_accept_length=1.018, num_blocks=392, overall_hit_rate=0.276
+
+Task: open the middle drawer of the cabinet
+Starting episode 6...
+Success: True
+# episodes completed so far: 6
+# successes: 3 (50.0%)
+Speculative stats: length=2.071, avg_accept_length=1.092, num_blocks=649, overall_hit_rate=0.277, temporal_route_rejects=1, temporal_fallback_blocks=3, temporal_fused_blocks=1, prefill_fused_actions=17, prefill_full_matches=5, prefill_accept=2.412
+
+Task: open the middle drawer of the cabinet
+Starting episode 7...
+Success: True
+# episodes completed so far: 7
+# successes: 4 (57.1%)
+Speculative stats: length=2.049, avg_accept_length=1.052, num_blocks=386, overall_hit_rate=0.282, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=3.000
+
+Task: open the middle drawer of the cabinet
+Starting episode 8...
+Success: False
+# episodes completed so far: 8
+# successes: 4 (50.0%)
+Speculative stats: length=2.612, avg_accept_length=1.703, num_blocks=804, overall_hit_rate=0.404, temporal_route_rejects=6, temporal_fallback_blocks=6, temporal_fused_blocks=34, prefill_fused_actions=73, prefill_full_matches=54, prefill_accept=5.575
+
+Task: open the middle drawer of the cabinet
+Starting episode 9...
+Success: True
+# episodes completed so far: 9
+# successes: 5 (55.6%)
+Speculative stats: length=2.092, avg_accept_length=1.119, num_blocks=967, overall_hit_rate=0.287, temporal_route_rejects=1, temporal_fallback_blocks=4, temporal_fused_blocks=5, prefill_fused_actions=33, prefill_full_matches=21, prefill_accept=4.758
+
+Task: open the middle drawer of the cabinet
+Starting episode 10...
+Success: False
+# episodes completed so far: 10
+# successes: 5 (50.0%)
+Speculative stats: length=1.882, avg_accept_length=0.880, num_blocks=1116, overall_hit_rate=0.233, prefill_fused_actions=2, prefill_full_matches=1, prefill_accept=4.500
+Current task success rate: 0.5
+Current total success rate: 0.5
+Current task speculative stats: length=2.204, avg_accept_length=1.247, num_blocks=7493, overall_hit_rate=0.316, temporal_route_rejects=51, temporal_fallback_blocks=109, temporal_fused_blocks=125, prefill_fused_actions=348, prefill_full_matches=264, prefill_accept=5.552
+
+Task: put the bowl on the stove
+Starting episode 1...
+Success: True
+# episodes completed so far: 11
+# successes: 6 (54.5%)
+Speculative stats: length=2.252, avg_accept_length=1.194, num_blocks=258, overall_hit_rate=0.297
+
+Task: put the bowl on the stove
+Starting episode 2...
+Success: True
+# episodes completed so far: 12
+# successes: 7 (58.3%)
+Speculative stats: length=2.154, avg_accept_length=1.115, num_blocks=286, overall_hit_rate=0.285
+
+Task: put the bowl on the stove
+Starting episode 3...
+Success: True
+# episodes completed so far: 13
+# successes: 8 (61.5%)
+Speculative stats: length=2.194, avg_accept_length=1.159, num_blocks=252, overall_hit_rate=0.291, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=0.000
+
+Task: put the bowl on the stove
+Starting episode 4...
+Success: True
+# episodes completed so far: 14
+# successes: 9 (64.3%)
+Speculative stats: length=2.215, avg_accept_length=1.171, num_blocks=275, overall_hit_rate=0.298
+
+Task: put the bowl on the stove
+Starting episode 5...
+Success: True
+# episodes completed so far: 15
+# successes: 10 (66.7%)
+Speculative stats: length=2.290, avg_accept_length=1.268, num_blocks=269, overall_hit_rate=0.320, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=0.000
+
+Task: put the bowl on the stove
+Starting episode 6...
+Success: True
+# episodes completed so far: 16
+# successes: 11 (68.8%)
+Speculative stats: length=2.287, avg_accept_length=1.257, num_blocks=300, overall_hit_rate=0.310, prefill_fused_actions=3, prefill_full_matches=1, prefill_accept=2.333
+
+Task: put the bowl on the stove
+Starting episode 7...
+Success: True
+# episodes completed so far: 17
+# successes: 12 (70.6%)
+Speculative stats: length=2.870, avg_accept_length=1.925, num_blocks=361, overall_hit_rate=0.446, temporal_route_rejects=2, temporal_fallback_blocks=3, temporal_fused_blocks=4, prefill_fused_actions=44, prefill_full_matches=42, prefill_accept=6.727
+
+Task: put the bowl on the stove
+Starting episode 8...
+Success: True
+# episodes completed so far: 18
+# successes: 13 (72.2%)
+Speculative stats: length=2.277, avg_accept_length=1.237, num_blocks=249, overall_hit_rate=0.311
+
+Task: put the bowl on the stove
+Starting episode 9...
+Success: True
+# episodes completed so far: 19
+# successes: 14 (73.7%)
+Speculative stats: length=2.393, avg_accept_length=1.321, num_blocks=234, overall_hit_rate=0.322, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=0.000
+
+Task: put the bowl on the stove
+Starting episode 10...
+Success: True
+# episodes completed so far: 20
+# successes: 15 (75.0%)
+Speculative stats: length=2.398, avg_accept_length=1.354, num_blocks=254, overall_hit_rate=0.325, prefill_fused_actions=2, prefill_full_matches=0, prefill_accept=0.000
+Current task success rate: 1.0
+Current total success rate: 0.75
+Current task speculative stats: length=2.350, avg_accept_length=1.320, num_blocks=2738, overall_hit_rate=0.326, temporal_route_rejects=2, temporal_fallback_blocks=3, temporal_fused_blocks=4, prefill_fused_actions=52, prefill_full_matches=43, prefill_accept=5.827
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 1...
+Success: True
+# episodes completed so far: 21
+# successes: 16 (76.2%)
+Speculative stats: length=2.140, avg_accept_length=1.115, num_blocks=278, overall_hit_rate=0.288, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=0.000
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 2...
+Success: True
+# episodes completed so far: 22
+# successes: 17 (77.3%)
+Speculative stats: length=2.192, avg_accept_length=1.121, num_blocks=297, overall_hit_rate=0.282
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 3...
+Success: True
+# episodes completed so far: 23
+# successes: 18 (78.3%)
+Speculative stats: length=2.346, avg_accept_length=1.335, num_blocks=355, overall_hit_rate=0.332, temporal_fused_blocks=1, prefill_fused_actions=9, prefill_full_matches=6, prefill_accept=4.667
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 4...
+Success: True
+# episodes completed so far: 24
+# successes: 19 (79.2%)
+Speculative stats: length=2.660, avg_accept_length=1.688, num_blocks=321, overall_hit_rate=0.406, prefill_fused_actions=21, prefill_full_matches=18, prefill_accept=6.000
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 5...
+Success: True
+# episodes completed so far: 25
+# successes: 20 (80.0%)
+Speculative stats: length=2.199, avg_accept_length=1.130, num_blocks=261, overall_hit_rate=0.284
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 6...
+Success: True
+# episodes completed so far: 26
+# successes: 21 (80.8%)
+Speculative stats: length=2.180, avg_accept_length=1.125, num_blocks=305, overall_hit_rate=0.286
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 7...
+Success: True
+# episodes completed so far: 27
+# successes: 22 (81.5%)
+Speculative stats: length=2.116, avg_accept_length=1.066, num_blocks=258, overall_hit_rate=0.272, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=0.000
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 8...
+Success: True
+# episodes completed so far: 28
+# successes: 23 (82.1%)
+Speculative stats: length=2.138, avg_accept_length=1.097, num_blocks=298, overall_hit_rate=0.284, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=0.000
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 9...
+Success: False
+# episodes completed so far: 29
+# successes: 23 (79.3%)
+Speculative stats: length=5.060, avg_accept_length=4.598, num_blocks=415, overall_hit_rate=0.841, temporal_route_rejects=2, temporal_fallback_blocks=2, temporal_fused_blocks=6, prefill_fused_actions=223, prefill_full_matches=203, prefill_accept=6.605
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 10...
+Success: True
+# episodes completed so far: 30
+# successes: 24 (80.0%)
+Speculative stats: length=2.171, avg_accept_length=1.151, num_blocks=258, overall_hit_rate=0.292
+Current task success rate: 0.9
+Current total success rate: 0.8
+Current task speculative stats: length=2.631, avg_accept_length=1.676, num_blocks=3046, overall_hit_rate=0.402, temporal_route_rejects=2, temporal_fallback_blocks=2, temporal_fused_blocks=7, prefill_fused_actions=256, prefill_full_matches=227, prefill_accept=6.410
+
+Task: open the top drawer and put the bowl inside
+Starting episode 1...
+Success: True
+# episodes completed so far: 31
+# successes: 25 (80.6%)
+Speculative stats: length=2.196, avg_accept_length=1.166, num_blocks=542, overall_hit_rate=0.299
+
+Task: open the top drawer and put the bowl inside
+Starting episode 2...
+Success: True
+# episodes completed so far: 32
+# successes: 26 (81.2%)
+Speculative stats: length=2.190, avg_accept_length=1.164, num_blocks=652, overall_hit_rate=0.293, prefill_fused_actions=6, prefill_full_matches=2, prefill_accept=2.833
+
+Task: open the top drawer and put the bowl inside
+Starting episode 3...
+Success: True
+# episodes completed so far: 33
+# successes: 27 (81.8%)
+Speculative stats: length=2.181, avg_accept_length=1.178, num_blocks=568, overall_hit_rate=0.299, prefill_fused_actions=9, prefill_full_matches=4, prefill_accept=3.111
+
+Task: open the top drawer and put the bowl inside
+Starting episode 4...
+Success: False
+# episodes completed so far: 34
+# successes: 27 (79.4%)
+Speculative stats: length=2.290, avg_accept_length=1.348, num_blocks=917, overall_hit_rate=0.339, prefill_fused_actions=57, prefill_full_matches=43, prefill_accept=5.649
+
+Task: open the top drawer and put the bowl inside
+Starting episode 5...
+Success: False
+# episodes completed so far: 35
+# successes: 27 (77.1%)
+Speculative stats: length=2.239, avg_accept_length=1.281, num_blocks=938, overall_hit_rate=0.310, temporal_route_rejects=9, temporal_fallback_blocks=17, temporal_fused_blocks=10, prefill_fused_actions=41, prefill_full_matches=20, prefill_accept=4.000
+
+Task: open the top drawer and put the bowl inside
+Starting episode 6...
+Success: True
+# episodes completed so far: 36
+# successes: 28 (77.8%)
+Speculative stats: length=2.236, avg_accept_length=1.209, num_blocks=598, overall_hit_rate=0.307
+
+Task: open the top drawer and put the bowl inside
+Starting episode 7...
+Success: True
+# episodes completed so far: 37
+# successes: 29 (78.4%)
+Speculative stats: length=2.141, avg_accept_length=1.124, num_blocks=631, overall_hit_rate=0.285, prefill_fused_actions=2, prefill_full_matches=1, prefill_accept=3.500
+
+Task: open the top drawer and put the bowl inside
+Starting episode 8...
+Success: False
+# episodes completed so far: 38
+# successes: 29 (76.3%)
+Speculative stats: length=2.199, avg_accept_length=1.179, num_blocks=955, overall_hit_rate=0.304, temporal_route_rejects=4, temporal_fallback_blocks=4, temporal_fused_blocks=9, prefill_fused_actions=17, prefill_full_matches=8, prefill_accept=4.588
+
+Task: open the top drawer and put the bowl inside
+Starting episode 9...
+Success: True
+# episodes completed so far: 39
+# successes: 30 (76.9%)
+Speculative stats: length=2.118, avg_accept_length=1.104, num_blocks=585, overall_hit_rate=0.280, prefill_fused_actions=2, prefill_full_matches=0, prefill_accept=1.000
+
+Task: open the top drawer and put the bowl inside
+Starting episode 10...
+Success: False
+# episodes completed so far: 40
+# successes: 30 (75.0%)
+Speculative stats: length=2.104, avg_accept_length=1.109, num_blocks=998, overall_hit_rate=0.283, prefill_fused_actions=6, prefill_full_matches=1, prefill_accept=2.333
+Current task success rate: 0.6
+Current total success rate: 0.75
+Current task speculative stats: length=2.192, avg_accept_length=1.193, num_blocks=7384, overall_hit_rate=0.301, temporal_route_rejects=13, temporal_fallback_blocks=21, temporal_fused_blocks=19, prefill_fused_actions=140, prefill_full_matches=79, prefill_accept=4.514
+
+Task: put the bowl on top of the cabinet
+Starting episode 1...
+Success: True
+# episodes completed so far: 41
+# successes: 31 (75.6%)
+Speculative stats: length=2.258, avg_accept_length=1.211, num_blocks=279, overall_hit_rate=0.311
+
+Task: put the bowl on top of the cabinet
+Starting episode 2...
+Success: True
+# episodes completed so far: 42
+# successes: 32 (76.2%)
+Speculative stats: length=2.270, avg_accept_length=1.254, num_blocks=370, overall_hit_rate=0.317, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=0.000
+
+Task: put the bowl on top of the cabinet
+Starting episode 3...
+Success: True
+# episodes completed so far: 43
+# successes: 33 (76.7%)
+Speculative stats: length=2.415, avg_accept_length=1.393, num_blocks=313, overall_hit_rate=0.341, prefill_fused_actions=5, prefill_full_matches=4, prefill_accept=5.600
+
+Task: put the bowl on top of the cabinet
+Starting episode 4...
+Success: True
+# episodes completed so far: 44
+# successes: 34 (77.3%)
+Speculative stats: length=2.190, avg_accept_length=1.164, num_blocks=342, overall_hit_rate=0.302
+
+Task: put the bowl on top of the cabinet
+Starting episode 5...
+Success: True
+# episodes completed so far: 45
+# successes: 35 (77.8%)
+Speculative stats: length=2.343, avg_accept_length=1.283, num_blocks=254, overall_hit_rate=0.326
+
+Task: put the bowl on top of the cabinet
+Starting episode 6...
+Success: True
+# episodes completed so far: 46
+# successes: 36 (78.3%)
+Speculative stats: length=2.260, avg_accept_length=1.214, num_blocks=285, overall_hit_rate=0.317, prefill_fused_actions=3, prefill_full_matches=1, prefill_accept=3.333
+
+Task: put the bowl on top of the cabinet
+Starting episode 7...
+Success: True
+# episodes completed so far: 47
+# successes: 37 (78.7%)
+Speculative stats: length=2.333, avg_accept_length=1.255, num_blocks=267, overall_hit_rate=0.320
+
+Task: put the bowl on top of the cabinet
+Starting episode 8...
+Success: True
+# episodes completed so far: 48
+# successes: 38 (79.2%)
+Speculative stats: length=2.486, avg_accept_length=1.440, num_blocks=259, overall_hit_rate=0.356
+
+Task: put the bowl on top of the cabinet
+Starting episode 9...
+Success: False
+# episodes completed so far: 49
+# successes: 38 (77.6%)
+Speculative stats: length=3.426, avg_accept_length=2.551, num_blocks=613, overall_hit_rate=0.549, temporal_route_rejects=10, temporal_fallback_blocks=17, temporal_fused_blocks=26, prefill_fused_actions=147, prefill_full_matches=140, prefill_accept=6.789
+
+Task: put the bowl on top of the cabinet
+Starting episode 10...
+Success: True
+# episodes completed so far: 50
+# successes: 39 (78.0%)
+Speculative stats: length=2.379, avg_accept_length=1.379, num_blocks=256, overall_hit_rate=0.347, prefill_fused_actions=4, prefill_full_matches=2, prefill_accept=4.000
+Current task success rate: 0.9
+Current total success rate: 0.78
+Current task speculative stats: length=2.529, avg_accept_length=1.523, num_blocks=3238, overall_hit_rate=0.374, temporal_route_rejects=10, temporal_fallback_blocks=17, temporal_fused_blocks=26, prefill_fused_actions=160, prefill_full_matches=147, prefill_accept=6.575
+
+Task: push the plate to the front of the stove
+Starting episode 1...
+Success: False
+# episodes completed so far: 51
+# successes: 39 (76.5%)
+Speculative stats: length=2.015, avg_accept_length=1.026, num_blocks=1042, overall_hit_rate=0.260, prefill_fused_actions=11, prefill_full_matches=3, prefill_accept=3.091
+
+Task: push the plate to the front of the stove
+Starting episode 2...
+Success: True
+# episodes completed so far: 52
+# successes: 40 (76.9%)
+Speculative stats: length=2.090, avg_accept_length=1.088, num_blocks=422, overall_hit_rate=0.271, prefill_fused_actions=3, prefill_full_matches=0, prefill_accept=1.000
+
+Task: push the plate to the front of the stove
+Starting episode 3...
+Success: True
+# episodes completed so far: 53
+# successes: 41 (77.4%)
+Speculative stats: length=2.571, avg_accept_length=1.634, num_blocks=678, overall_hit_rate=0.380, temporal_route_rejects=1, temporal_fallback_blocks=1, temporal_fused_blocks=1, prefill_fused_actions=66, prefill_full_matches=59, prefill_accept=6.333
+
+Task: push the plate to the front of the stove
+Starting episode 4...
+Success: True
+# episodes completed so far: 54
+# successes: 42 (77.8%)
+Speculative stats: length=2.094, avg_accept_length=1.085, num_blocks=458, overall_hit_rate=0.273, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=1.000
+
+Task: push the plate to the front of the stove
+Starting episode 5...
+Success: True
+# episodes completed so far: 55
+# successes: 43 (78.2%)
+Speculative stats: length=2.192, avg_accept_length=1.196, num_blocks=530, overall_hit_rate=0.297, prefill_fused_actions=8, prefill_full_matches=1, prefill_accept=1.500
+
+Task: push the plate to the front of the stove
+Starting episode 6...
+Success: False
+# episodes completed so far: 56
+# successes: 43 (76.8%)
+Speculative stats: length=2.067, avg_accept_length=1.068, num_blocks=1016, overall_hit_rate=0.271, prefill_fused_actions=9, prefill_full_matches=4, prefill_accept=3.333
+
+Task: push the plate to the front of the stove
+Starting episode 7...
+Success: True
+# episodes completed so far: 57
+# successes: 44 (77.2%)
+Speculative stats: length=2.208, avg_accept_length=1.205, num_blocks=390, overall_hit_rate=0.298
+
+Task: push the plate to the front of the stove
+Starting episode 8...
+Success: True
+# episodes completed so far: 58
+# successes: 45 (77.6%)
+Speculative stats: length=2.127, avg_accept_length=1.078, num_blocks=408, overall_hit_rate=0.272, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=2.000
+
+Task: push the plate to the front of the stove
+Starting episode 9...
+Success: False
+# episodes completed so far: 59
+# successes: 45 (76.3%)
+Speculative stats: length=5.147, avg_accept_length=4.679, num_blocks=408, overall_hit_rate=0.852, prefill_fused_actions=217, prefill_full_matches=192, prefill_accept=6.654
+
+Task: push the plate to the front of the stove
+Starting episode 10...
+Success: True
+# episodes completed so far: 60
+# successes: 46 (76.7%)
+Speculative stats: length=2.223, avg_accept_length=1.219, num_blocks=485, overall_hit_rate=0.305, prefill_fused_actions=5, prefill_full_matches=2, prefill_accept=3.000
+Current task success rate: 0.7
+Current total success rate: 0.7666666666666667
+Current task speculative stats: length=2.373, avg_accept_length=1.415, num_blocks=5837, overall_hit_rate=0.344, temporal_route_rejects=1, temporal_fallback_blocks=1, temporal_fused_blocks=1, prefill_fused_actions=321, prefill_full_matches=261, prefill_accept=6.103
+
+Task: put the cream cheese in the bowl
+Starting episode 1...
+Success: False
+# episodes completed so far: 61
+# successes: 46 (75.4%)
+Speculative stats: length=2.208, avg_accept_length=1.146, num_blocks=951, overall_hit_rate=0.295, prefill_fused_actions=14, prefill_full_matches=8, prefill_accept=4.786
+
+Task: put the cream cheese in the bowl
+Starting episode 2...
+Success: True
+# episodes completed so far: 62
+# successes: 47 (75.8%)
+Speculative stats: length=2.540, avg_accept_length=1.563, num_blocks=350, overall_hit_rate=0.375, prefill_fused_actions=18, prefill_full_matches=16, prefill_accept=6.333
+
+Task: put the cream cheese in the bowl
+Starting episode 3...
+Success: False
+# episodes completed so far: 63
+# successes: 47 (74.6%)
+Speculative stats: length=2.234, avg_accept_length=1.207, num_blocks=940, overall_hit_rate=0.313, prefill_fused_actions=9, prefill_full_matches=2, prefill_accept=2.333
+
+Task: put the cream cheese in the bowl
+Starting episode 4...
+Success: True
+# episodes completed so far: 64
+# successes: 48 (75.0%)
+Speculative stats: length=2.431, avg_accept_length=1.437, num_blocks=311, overall_hit_rate=0.357, temporal_fused_blocks=1, prefill_fused_actions=9, prefill_full_matches=5, prefill_accept=5.444
+
+Task: put the cream cheese in the bowl
+Starting episode 5...
+Success: True
+# episodes completed so far: 65
+# successes: 49 (75.4%)
+Speculative stats: length=2.333, avg_accept_length=1.277, num_blocks=282, overall_hit_rate=0.316, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=3.000
+
+Task: put the cream cheese in the bowl
+Starting episode 6...
+Success: False
+# episodes completed so far: 66
+# successes: 49 (74.2%)
+Speculative stats: length=2.612, avg_accept_length=1.614, num_blocks=804, overall_hit_rate=0.376, temporal_fused_blocks=1, prefill_fused_actions=39, prefill_full_matches=28, prefill_accept=5.513
+
+Task: put the cream cheese in the bowl
+Starting episode 7...
+Success: True
+# episodes completed so far: 67
+# successes: 50 (74.6%)
+Speculative stats: length=2.433, avg_accept_length=1.416, num_blocks=233, overall_hit_rate=0.346, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=3.000
+
+Task: put the cream cheese in the bowl
+Starting episode 8...
+Success: True
+# episodes completed so far: 68
+# successes: 51 (75.0%)
+Speculative stats: length=2.138, avg_accept_length=1.117, num_blocks=658, overall_hit_rate=0.283, temporal_route_rejects=1, temporal_fallback_blocks=2, temporal_fused_blocks=3, prefill_fused_actions=8, prefill_full_matches=3, prefill_accept=2.750
+
+Task: put the cream cheese in the bowl
+Starting episode 9...
+Success: True
+# episodes completed so far: 69
+# successes: 52 (75.4%)
+Speculative stats: length=2.167, avg_accept_length=1.126, num_blocks=294, overall_hit_rate=0.285
+
+Task: put the cream cheese in the bowl
+Starting episode 10...
+Success: True
+# episodes completed so far: 70
+# successes: 53 (75.7%)
+Speculative stats: length=2.275, avg_accept_length=1.250, num_blocks=320, overall_hit_rate=0.318, prefill_fused_actions=2, prefill_full_matches=0, prefill_accept=1.000
+Current task success rate: 0.7
+Current total success rate: 0.7571428571428571
+Current task speculative stats: length=2.322, avg_accept_length=1.297, num_blocks=5143, overall_hit_rate=0.324, temporal_route_rejects=1, temporal_fallback_blocks=2, temporal_fused_blocks=5, prefill_fused_actions=101, prefill_full_matches=62, prefill_accept=4.911
+
+Task: turn on the stove
+Starting episode 1...
+Success: True
+# episodes completed so far: 71
+# successes: 54 (76.1%)
+Speculative stats: length=2.256, avg_accept_length=1.169, num_blocks=332, overall_hit_rate=0.287, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=0.000
+
+Task: turn on the stove
+Starting episode 2...
+Success: True
+# episodes completed so far: 72
+# successes: 55 (76.4%)
+Speculative stats: length=2.229, avg_accept_length=1.192, num_blocks=292, overall_hit_rate=0.297, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=2.000
+
+Task: turn on the stove
+Starting episode 3...
+Success: False
+# episodes completed so far: 73
+# successes: 55 (75.3%)
+Speculative stats: length=6.344, avg_accept_length=6.166, num_blocks=331, overall_hit_rate=0.946, temporal_fused_blocks=5, prefill_fused_actions=272, prefill_full_matches=264, prefill_accept=6.890
+
+Task: turn on the stove
+Starting episode 4...
+Success: True
+# episodes completed so far: 74
+# successes: 56 (75.7%)
+Speculative stats: length=2.343, avg_accept_length=1.278, num_blocks=230, overall_hit_rate=0.304, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=0.000
+
+Task: turn on the stove
+Starting episode 5...
+Success: True
+# episodes completed so far: 75
+# successes: 57 (76.0%)
+Speculative stats: length=2.397, avg_accept_length=1.388, num_blocks=219, overall_hit_rate=0.334, prefill_fused_actions=4, prefill_full_matches=1, prefill_accept=2.750
+
+Task: turn on the stove
+Starting episode 6...
+Success: True
+# episodes completed so far: 76
+# successes: 58 (76.3%)
+Speculative stats: length=2.379, avg_accept_length=1.379, num_blocks=309, overall_hit_rate=0.335, prefill_fused_actions=8, prefill_full_matches=5, prefill_accept=4.750
+
+Task: turn on the stove
+Starting episode 7...
+Success: True
+# episodes completed so far: 77
+# successes: 59 (76.6%)
+Speculative stats: length=3.535, avg_accept_length=2.732, num_blocks=299, overall_hit_rate=0.563, temporal_fused_blocks=1, prefill_fused_actions=77, prefill_full_matches=73, prefill_accept=6.688
+
+Task: turn on the stove
+Starting episode 8...
+Success: True
+# episodes completed so far: 78
+# successes: 60 (76.9%)
+Speculative stats: length=2.294, avg_accept_length=1.193, num_blocks=296, overall_hit_rate=0.293, prefill_fused_actions=4, prefill_full_matches=1, prefill_accept=3.750
+
+Task: turn on the stove
+Starting episode 9...
+Success: True
+# episodes completed so far: 79
+# successes: 61 (77.2%)
+Speculative stats: length=2.382, avg_accept_length=1.332, num_blocks=241, overall_hit_rate=0.328, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=0.000
+
+Task: turn on the stove
+Starting episode 10...
+Success: True
+# episodes completed so far: 80
+# successes: 62 (77.5%)
+Speculative stats: length=2.388, avg_accept_length=1.360, num_blocks=214, overall_hit_rate=0.330, prefill_fused_actions=5, prefill_full_matches=3, prefill_accept=4.800
+Current task success rate: 0.9
+Current total success rate: 0.775
+Current task speculative stats: length=2.939, avg_accept_length=2.021, num_blocks=2763, overall_hit_rate=0.452, temporal_fused_blocks=6, prefill_fused_actions=374, prefill_full_matches=347, prefill_accept=6.628
+
+Task: put the bowl on the plate
+Starting episode 1...
+Success: True
+# episodes completed so far: 81
+# successes: 63 (77.8%)
+Speculative stats: length=2.286, avg_accept_length=1.198, num_blocks=248, overall_hit_rate=0.304
+
+Task: put the bowl on the plate
+Starting episode 2...
+Success: True
+# episodes completed so far: 82
+# successes: 64 (78.0%)
+Speculative stats: length=2.248, avg_accept_length=1.220, num_blocks=246, overall_hit_rate=0.312, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=0.000
+
+Task: put the bowl on the plate
+Starting episode 3...
+Success: True
+# episodes completed so far: 83
+# successes: 65 (78.3%)
+Speculative stats: length=2.313, avg_accept_length=1.265, num_blocks=230, overall_hit_rate=0.319
+
+Task: put the bowl on the plate
+Starting episode 4...
+Success: True
+# episodes completed so far: 84
+# successes: 66 (78.6%)
+Speculative stats: length=2.230, avg_accept_length=1.199, num_blocks=226, overall_hit_rate=0.299, prefill_fused_actions=3, prefill_full_matches=0, prefill_accept=0.667
+
+Task: put the bowl on the plate
+Starting episode 5...
+Success: True
+# episodes completed so far: 85
+# successes: 67 (78.8%)
+Speculative stats: length=2.204, avg_accept_length=1.170, num_blocks=235, overall_hit_rate=0.297, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=1.000
+
+Task: put the bowl on the plate
+Starting episode 6...
+Success: True
+# episodes completed so far: 86
+# successes: 68 (79.1%)
+Speculative stats: length=2.307, avg_accept_length=1.238, num_blocks=261, overall_hit_rate=0.310
+
+Task: put the bowl on the plate
+Starting episode 7...
+Success: True
+# episodes completed so far: 87
+# successes: 69 (79.3%)
+Speculative stats: length=2.261, avg_accept_length=1.239, num_blocks=226, overall_hit_rate=0.316
+
+Task: put the bowl on the plate
+Starting episode 8...
+Success: True
+# episodes completed so far: 88
+# successes: 70 (79.5%)
+Speculative stats: length=3.162, avg_accept_length=2.314, num_blocks=290, overall_hit_rate=0.501, prefill_fused_actions=52, prefill_full_matches=48, prefill_accept=6.481
+
+Task: put the bowl on the plate
+Starting episode 9...
+Success: False
+# episodes completed so far: 89
+# successes: 70 (78.7%)
+Speculative stats: length=3.737, avg_accept_length=3.044, num_blocks=562, overall_hit_rate=0.616, prefill_fused_actions=183, prefill_full_matches=175, prefill_accept=6.760
+
+Task: put the bowl on the plate
+Starting episode 10...
+Success: True
+# episodes completed so far: 90
+# successes: 71 (78.9%)
+Speculative stats: length=2.391, avg_accept_length=1.356, num_blocks=202, overall_hit_rate=0.333
+Current task success rate: 0.9
+Current total success rate: 0.7888888888888889
+Current task speculative stats: length=2.673, avg_accept_length=1.722, num_blocks=2726, overall_hit_rate=0.406, prefill_fused_actions=240, prefill_full_matches=223, prefill_accept=6.571
+
+Task: put the wine bottle on the rack
+Starting episode 1...
+Success: False
+# episodes completed so far: 91
+# successes: 71 (78.0%)
+Speculative stats: length=3.084, avg_accept_length=2.245, num_blocks=681, overall_hit_rate=0.512, temporal_route_rejects=11, temporal_fallback_blocks=21, temporal_fused_blocks=32, prefill_fused_actions=129, prefill_full_matches=111, prefill_accept=6.364
+
+Task: put the wine bottle on the rack
+Starting episode 2...
+Success: True
+# episodes completed so far: 92
+# successes: 72 (78.3%)
+Speculative stats: length=2.005, avg_accept_length=1.002, num_blocks=426, overall_hit_rate=0.262, prefill_fused_actions=4, prefill_full_matches=1, prefill_accept=2.250
+
+Task: put the wine bottle on the rack
+Starting episode 3...
+Success: True
+# episodes completed so far: 93
+# successes: 73 (78.5%)
+Speculative stats: length=2.208, avg_accept_length=1.196, num_blocks=409, overall_hit_rate=0.311, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=0.000
+
+Task: put the wine bottle on the rack
+Starting episode 4...
+Success: True
+# episodes completed so far: 94
+# successes: 74 (78.7%)
+Speculative stats: length=2.063, avg_accept_length=1.048, num_blocks=475, overall_hit_rate=0.274, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=0.000
+
+Task: put the wine bottle on the rack
+Starting episode 5...
+Success: True
+# episodes completed so far: 95
+# successes: 75 (78.9%)
+Speculative stats: length=2.115, avg_accept_length=1.113, num_blocks=470, overall_hit_rate=0.289, prefill_fused_actions=7, prefill_full_matches=5, prefill_accept=5.286
+
+Task: put the wine bottle on the rack
+Starting episode 6...
+Success: False
+# episodes completed so far: 96
+# successes: 75 (78.1%)
+Speculative stats: length=4.110, avg_accept_length=3.521, num_blocks=511, overall_hit_rate=0.689, temporal_fused_blocks=1, prefill_fused_actions=214, prefill_full_matches=214, prefill_accept=7.000
+
+Task: put the wine bottle on the rack
+Starting episode 7...
+Success: False
+# episodes completed so far: 97
+# successes: 75 (77.3%)
+Speculative stats: length=2.270, avg_accept_length=1.245, num_blocks=925, overall_hit_rate=0.311, temporal_route_rejects=5, temporal_fallback_blocks=12, temporal_fused_blocks=8, prefill_fused_actions=32, prefill_full_matches=17, prefill_accept=4.219
+
+Task: put the wine bottle on the rack
+Starting episode 8...
+Success: False
+# episodes completed so far: 98
+# successes: 75 (76.5%)
+Speculative stats: length=3.608, avg_accept_length=2.909, num_blocks=582, overall_hit_rate=0.610, prefill_fused_actions=191, prefill_full_matches=189, prefill_accept=6.942
+
+Task: put the wine bottle on the rack
+Starting episode 9...
+Success: True
+# episodes completed so far: 99
+# successes: 76 (76.8%)
+Speculative stats: length=2.049, avg_accept_length=1.038, num_blocks=526, overall_hit_rate=0.272, prefill_fused_actions=3, prefill_full_matches=0, prefill_accept=0.333
+
+Task: put the wine bottle on the rack
+Starting episode 10...
+Success: True
+# episodes completed so far: 100
+# successes: 77 (77.0%)
+Speculative stats: length=2.029, avg_accept_length=1.017, num_blocks=414, overall_hit_rate=0.263, prefill_fused_actions=5, prefill_full_matches=1, prefill_accept=1.600
+Current task success rate: 0.6
+Current total success rate: 0.77
+Current task speculative stats: length=2.593, avg_accept_length=1.675, num_blocks=5419, overall_hit_rate=0.403, temporal_route_rejects=16, temporal_fallback_blocks=33, temporal_fused_blocks=41, prefill_fused_actions=587, prefill_full_matches=538, prefill_accept=6.533
+Saved eval summary to: /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs/dflash_strict/EVAL-libero_goal-openvla-2026_07_28-00_04_55--dflash-vtpf-strict-rnn-off-pilot-e200-dflash_strict_summary.json
+Total speculative stats: length=2.593, avg_accept_length=1.675, num_blocks=5419, overall_hit_rate=0.403, temporal_route_rejects=16, temporal_fallback_blocks=33, temporal_fused_blocks=41, prefill_fused_actions=587, prefill_full_matches=538, prefill_accept=6.533
+Conditional prefix hit rate: p1=0.825, p2=0.362, p3=0.441, p4=0.838, p5=0.952, p6=0.995, p7=0.951

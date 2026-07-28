@@ -1,0 +1,3534 @@
+Task suite: libero_goal
+
+Task: open the middle drawer of the cabinet
+Starting episode 1...
+Success: False
+# episodes completed so far: 1
+# successes: 0 (0.0%)
+Speculative stats: length=2.344, avg_accept_length=1.121, num_blocks=896, overall_hit_rate=0.283, tree_blocks=796, tree_alt_wins=49, tree_extra_tokens=54, tree_nodes=3.34, tree_depth=2.53, main_accept=1.060
+
+Task: open the middle drawer of the cabinet
+Starting episode 2...
+Success: False
+# episodes completed so far: 2
+# successes: 0 (0.0%)
+Speculative stats: length=2.033, avg_accept_length=0.874, num_blocks=1033, overall_hit_rate=0.235, tree_blocks=897, tree_alt_wins=116, tree_extra_tokens=117, tree_nodes=3.14, tree_depth=2.08, main_accept=0.761
+
+Task: open the middle drawer of the cabinet
+Starting episode 3...
+Success: False
+# episodes completed so far: 3
+# successes: 0 (0.0%)
+Speculative stats: length=2.234, avg_accept_length=0.966, num_blocks=940, overall_hit_rate=0.248, tree_blocks=892, tree_alt_wins=36, tree_extra_tokens=39, tree_nodes=3.05, tree_depth=2.43, main_accept=0.924
+
+Task: open the middle drawer of the cabinet
+Starting episode 4...
+Success: True
+# episodes completed so far: 4
+# successes: 1 (25.0%)
+Speculative stats: length=2.106, avg_accept_length=0.915, num_blocks=565, overall_hit_rate=0.241, tree_blocks=503, tree_alt_wins=39, tree_extra_tokens=41, tree_nodes=3.15, tree_depth=2.12, main_accept=0.842
+
+Task: open the middle drawer of the cabinet
+Starting episode 5...
+Success: True
+# episodes completed so far: 5
+# successes: 2 (40.0%)
+Speculative stats: length=2.087, avg_accept_length=0.945, num_blocks=379, overall_hit_rate=0.258, tree_blocks=320, tree_alt_wins=29, tree_extra_tokens=30, tree_nodes=3.15, tree_depth=2.25, main_accept=0.865
+
+Task: open the middle drawer of the cabinet
+Starting episode 6...
+Success: True
+# episodes completed so far: 6
+# successes: 3 (50.0%)
+Speculative stats: length=2.168, avg_accept_length=0.978, num_blocks=507, overall_hit_rate=0.258, tree_blocks=446, tree_alt_wins=24, tree_extra_tokens=26, tree_nodes=3.17, tree_depth=2.31, main_accept=0.927
+
+Task: open the middle drawer of the cabinet
+Starting episode 7...
+Success: True
+# episodes completed so far: 7
+# successes: 4 (57.1%)
+Speculative stats: length=2.149, avg_accept_length=0.990, num_blocks=404, overall_hit_rate=0.268, tree_blocks=344, tree_alt_wins=29, tree_extra_tokens=32, tree_nodes=3.17, tree_depth=2.33, main_accept=0.911
+
+Task: open the middle drawer of the cabinet
+Starting episode 8...
+Success: True
+# episodes completed so far: 8
+# successes: 5 (62.5%)
+Speculative stats: length=2.139, avg_accept_length=0.957, num_blocks=396, overall_hit_rate=0.254, tree_blocks=347, tree_alt_wins=20, tree_extra_tokens=21, tree_nodes=3.16, tree_depth=2.31, main_accept=0.904
+
+Task: open the middle drawer of the cabinet
+Starting episode 9...
+Success: True
+# episodes completed so far: 9
+# successes: 6 (66.7%)
+Speculative stats: length=2.287, avg_accept_length=1.139, num_blocks=710, overall_hit_rate=0.311, tree_blocks=583, tree_alt_wins=60, tree_extra_tokens=62, tree_nodes=3.25, tree_depth=2.37, main_accept=1.052
+
+Task: open the middle drawer of the cabinet
+Starting episode 10...
+Success: False
+# episodes completed so far: 10
+# successes: 6 (60.0%)
+Speculative stats: length=2.013, avg_accept_length=0.863, num_blocks=1043, overall_hit_rate=0.233, tree_blocks=900, tree_alt_wins=86, tree_extra_tokens=88, tree_nodes=3.13, tree_depth=2.15, main_accept=0.779
+
+Task: open the middle drawer of the cabinet
+Starting episode 11...
+Success: True
+# episodes completed so far: 11
+# successes: 7 (63.6%)
+Speculative stats: length=2.234, avg_accept_length=0.997, num_blocks=398, overall_hit_rate=0.258, tree_blocks=365, tree_alt_wins=14, tree_extra_tokens=14, tree_nodes=3.12, tree_depth=2.35, main_accept=0.962
+
+Task: open the middle drawer of the cabinet
+Starting episode 12...
+Success: False
+# episodes completed so far: 12
+# successes: 7 (58.3%)
+Speculative stats: length=1.979, avg_accept_length=0.828, num_blocks=1061, overall_hit_rate=0.222, tree_blocks=921, tree_alt_wins=108, tree_extra_tokens=109, tree_nodes=3.14, tree_depth=2.14, main_accept=0.726
+
+Task: open the middle drawer of the cabinet
+Starting episode 13...
+Success: True
+# episodes completed so far: 13
+# successes: 8 (61.5%)
+Speculative stats: length=2.124, avg_accept_length=0.920, num_blocks=501, overall_hit_rate=0.246, tree_blocks=451, tree_alt_wins=50, tree_extra_tokens=50, tree_nodes=3.04, tree_depth=2.14, main_accept=0.820
+
+Task: open the middle drawer of the cabinet
+Starting episode 14...
+Success: False
+# episodes completed so far: 14
+# successes: 8 (57.1%)
+Speculative stats: length=1.935, avg_accept_length=0.862, num_blocks=1085, overall_hit_rate=0.249, tree_blocks=865, tree_alt_wins=77, tree_extra_tokens=81, tree_nodes=3.08, tree_depth=1.95, main_accept=0.787
+
+Task: open the middle drawer of the cabinet
+Starting episode 15...
+Success: True
+# episodes completed so far: 15
+# successes: 9 (60.0%)
+Speculative stats: length=2.227, avg_accept_length=0.998, num_blocks=415, overall_hit_rate=0.259, tree_blocks=378, tree_alt_wins=27, tree_extra_tokens=27, tree_nodes=3.13, tree_depth=2.15, main_accept=0.933
+
+Task: open the middle drawer of the cabinet
+Starting episode 16...
+Success: False
+# episodes completed so far: 16
+# successes: 9 (56.2%)
+Speculative stats: length=2.081, avg_accept_length=0.909, num_blocks=1009, overall_hit_rate=0.244, tree_blocks=883, tree_alt_wins=82, tree_extra_tokens=89, tree_nodes=3.12, tree_depth=2.28, main_accept=0.821
+
+Task: open the middle drawer of the cabinet
+Starting episode 17...
+Success: True
+# episodes completed so far: 17
+# successes: 10 (58.8%)
+Speculative stats: length=2.207, avg_accept_length=1.009, num_blocks=425, overall_hit_rate=0.268, tree_blocks=375, tree_alt_wins=40, tree_extra_tokens=40, tree_nodes=3.14, tree_depth=2.25, main_accept=0.915
+
+Task: open the middle drawer of the cabinet
+Starting episode 18...
+Success: False
+# episodes completed so far: 18
+# successes: 10 (55.6%)
+Speculative stats: length=2.004, avg_accept_length=0.846, num_blocks=1048, overall_hit_rate=0.228, tree_blocks=913, tree_alt_wins=109, tree_extra_tokens=109, tree_nodes=3.12, tree_depth=2.11, main_accept=0.742
+
+Task: open the middle drawer of the cabinet
+Starting episode 19...
+Success: True
+# episodes completed so far: 19
+# successes: 11 (57.9%)
+Speculative stats: length=2.138, avg_accept_length=0.989, num_blocks=537, overall_hit_rate=0.265, tree_blocks=453, tree_alt_wins=27, tree_extra_tokens=29, tree_nodes=3.24, tree_depth=2.46, main_accept=0.935
+
+Task: open the middle drawer of the cabinet
+Starting episode 20...
+Success: False
+# episodes completed so far: 20
+# successes: 11 (55.0%)
+Speculative stats: length=2.021, avg_accept_length=0.868, num_blocks=1039, overall_hit_rate=0.234, tree_blocks=898, tree_alt_wins=83, tree_extra_tokens=83, tree_nodes=3.13, tree_depth=2.09, main_accept=0.788
+
+Task: open the middle drawer of the cabinet
+Starting episode 21...
+Success: True
+# episodes completed so far: 21
+# successes: 12 (57.1%)
+Speculative stats: length=2.111, avg_accept_length=0.952, num_blocks=441, overall_hit_rate=0.257, tree_blocks=378, tree_alt_wins=24, tree_extra_tokens=25, tree_nodes=3.16, tree_depth=2.27, main_accept=0.896
+
+Task: open the middle drawer of the cabinet
+Starting episode 22...
+Success: True
+# episodes completed so far: 22
+# successes: 13 (59.1%)
+Speculative stats: length=2.102, avg_accept_length=0.959, num_blocks=393, overall_hit_rate=0.261, tree_blocks=331, tree_alt_wins=33, tree_extra_tokens=37, tree_nodes=3.17, tree_depth=2.30, main_accept=0.865
+
+Task: open the middle drawer of the cabinet
+Starting episode 23...
+Success: True
+# episodes completed so far: 23
+# successes: 14 (60.9%)
+Speculative stats: length=2.241, avg_accept_length=1.035, num_blocks=403, overall_hit_rate=0.275, tree_blocks=357, tree_alt_wins=24, tree_extra_tokens=27, tree_nodes=3.12, tree_depth=2.24, main_accept=0.968
+
+Task: open the middle drawer of the cabinet
+Starting episode 24...
+Success: True
+# episodes completed so far: 24
+# successes: 15 (62.5%)
+Speculative stats: length=2.217, avg_accept_length=1.014, num_blocks=663, overall_hit_rate=0.267, tree_blocks=588, tree_alt_wins=34, tree_extra_tokens=43, tree_nodes=3.15, tree_depth=2.38, main_accept=0.949
+
+Task: open the middle drawer of the cabinet
+Starting episode 25...
+Success: False
+# episodes completed so far: 25
+# successes: 15 (60.0%)
+Speculative stats: length=2.102, avg_accept_length=0.907, num_blocks=999, overall_hit_rate=0.240, tree_blocks=894, tree_alt_wins=82, tree_extra_tokens=85, tree_nodes=3.11, tree_depth=2.03, main_accept=0.822
+
+Task: open the middle drawer of the cabinet
+Starting episode 26...
+Success: False
+# episodes completed so far: 26
+# successes: 15 (57.7%)
+Speculative stats: length=2.057, avg_accept_length=0.897, num_blocks=1021, overall_hit_rate=0.242, tree_blocks=884, tree_alt_wins=83, tree_extra_tokens=84, tree_nodes=3.13, tree_depth=2.22, main_accept=0.815
+
+Task: open the middle drawer of the cabinet
+Starting episode 27...
+Success: True
+# episodes completed so far: 27
+# successes: 16 (59.3%)
+Speculative stats: length=2.186, avg_accept_length=0.995, num_blocks=586, overall_hit_rate=0.265, tree_blocks=515, tree_alt_wins=31, tree_extra_tokens=32, tree_nodes=3.13, tree_depth=2.24, main_accept=0.940
+
+Task: open the middle drawer of the cabinet
+Starting episode 28...
+Success: True
+# episodes completed so far: 28
+# successes: 17 (60.7%)
+Speculative stats: length=2.178, avg_accept_length=1.032, num_blocks=437, overall_hit_rate=0.280, tree_blocks=365, tree_alt_wins=43, tree_extra_tokens=44, tree_nodes=3.21, tree_depth=2.20, main_accept=0.931
+
+Task: open the middle drawer of the cabinet
+Starting episode 29...
+Success: True
+# episodes completed so far: 29
+# successes: 18 (62.1%)
+Speculative stats: length=2.062, avg_accept_length=0.914, num_blocks=465, overall_hit_rate=0.246, tree_blocks=397, tree_alt_wins=36, tree_extra_tokens=38, tree_nodes=3.18, tree_depth=2.15, main_accept=0.832
+
+Task: open the middle drawer of the cabinet
+Starting episode 30...
+Success: False
+# episodes completed so far: 30
+# successes: 18 (60.0%)
+Speculative stats: length=1.991, avg_accept_length=0.860, num_blocks=1055, overall_hit_rate=0.234, tree_blocks=892, tree_alt_wins=121, tree_extra_tokens=121, tree_nodes=3.16, tree_depth=2.11, main_accept=0.745
+
+Task: open the middle drawer of the cabinet
+Starting episode 31...
+Success: True
+# episodes completed so far: 31
+# successes: 19 (61.3%)
+Speculative stats: length=2.143, avg_accept_length=0.990, num_blocks=392, overall_hit_rate=0.270, tree_blocks=332, tree_alt_wins=28, tree_extra_tokens=30, tree_nodes=3.14, tree_depth=2.30, main_accept=0.913
+
+Task: open the middle drawer of the cabinet
+Starting episode 32...
+Success: True
+# episodes completed so far: 32
+# successes: 20 (62.5%)
+Speculative stats: length=2.057, avg_accept_length=0.904, num_blocks=810, overall_hit_rate=0.240, tree_blocks=696, tree_alt_wins=41, tree_extra_tokens=44, tree_nodes=3.21, tree_depth=2.32, main_accept=0.849
+
+Task: open the middle drawer of the cabinet
+Starting episode 33...
+Success: True
+# episodes completed so far: 33
+# successes: 21 (63.6%)
+Speculative stats: length=2.174, avg_accept_length=1.034, num_blocks=557, overall_hit_rate=0.283, tree_blocks=462, tree_alt_wins=37, tree_extra_tokens=49, tree_nodes=3.19, tree_depth=2.34, main_accept=0.946
+
+Task: open the middle drawer of the cabinet
+Starting episode 34...
+Success: False
+# episodes completed so far: 34
+# successes: 21 (61.8%)
+Speculative stats: length=2.071, avg_accept_length=0.887, num_blocks=1014, overall_hit_rate=0.236, tree_blocks=901, tree_alt_wins=69, tree_extra_tokens=69, tree_nodes=3.10, tree_depth=2.24, main_accept=0.819
+
+Task: open the middle drawer of the cabinet
+Starting episode 35...
+Success: False
+# episodes completed so far: 35
+# successes: 21 (60.0%)
+Speculative stats: length=2.087, avg_accept_length=0.898, num_blocks=1006, overall_hit_rate=0.239, tree_blocks=897, tree_alt_wins=95, tree_extra_tokens=98, tree_nodes=3.10, tree_depth=2.16, main_accept=0.800
+
+Task: open the middle drawer of the cabinet
+Starting episode 36...
+Success: False
+# episodes completed so far: 36
+# successes: 21 (58.3%)
+Speculative stats: length=2.021, avg_accept_length=0.873, num_blocks=1039, overall_hit_rate=0.235, tree_blocks=893, tree_alt_wins=93, tree_extra_tokens=96, tree_nodes=3.16, tree_depth=2.22, main_accept=0.781
+
+Task: open the middle drawer of the cabinet
+Starting episode 37...
+Success: False
+# episodes completed so far: 37
+# successes: 21 (56.8%)
+Speculative stats: length=2.108, avg_accept_length=0.951, num_blocks=996, overall_hit_rate=0.252, tree_blocks=853, tree_alt_wins=125, tree_extra_tokens=128, tree_nodes=3.24, tree_depth=2.06, main_accept=0.822
+
+Task: open the middle drawer of the cabinet
+Starting episode 38...
+Success: False
+# episodes completed so far: 38
+# successes: 21 (55.3%)
+Speculative stats: length=2.108, avg_accept_length=0.929, num_blocks=996, overall_hit_rate=0.244, tree_blocks=875, tree_alt_wins=109, tree_extra_tokens=111, tree_nodes=3.20, tree_depth=2.19, main_accept=0.817
+
+Task: open the middle drawer of the cabinet
+Starting episode 39...
+Success: True
+# episodes completed so far: 39
+# successes: 22 (56.4%)
+Speculative stats: length=2.247, avg_accept_length=1.053, num_blocks=620, overall_hit_rate=0.279, tree_blocks=541, tree_alt_wins=41, tree_extra_tokens=41, tree_nodes=3.18, tree_depth=2.28, main_accept=0.987
+
+Task: open the middle drawer of the cabinet
+Starting episode 40...
+Success: True
+# episodes completed so far: 40
+# successes: 23 (57.5%)
+Speculative stats: length=2.151, avg_accept_length=0.951, num_blocks=654, overall_hit_rate=0.252, tree_blocks=584, tree_alt_wins=51, tree_extra_tokens=51, tree_nodes=3.11, tree_depth=2.26, main_accept=0.873
+
+Task: open the middle drawer of the cabinet
+Starting episode 41...
+Success: True
+# episodes completed so far: 41
+# successes: 24 (58.5%)
+Speculative stats: length=2.221, avg_accept_length=1.011, num_blocks=353, overall_hit_rate=0.267, tree_blocks=315, tree_alt_wins=21, tree_extra_tokens=24, tree_nodes=3.12, tree_depth=2.21, main_accept=0.943
+
+Task: open the middle drawer of the cabinet
+Starting episode 42...
+Success: False
+# episodes completed so far: 42
+# successes: 24 (57.1%)
+Speculative stats: length=2.141, avg_accept_length=0.955, num_blocks=981, overall_hit_rate=0.256, tree_blocks=863, tree_alt_wins=76, tree_extra_tokens=79, tree_nodes=3.11, tree_depth=2.21, main_accept=0.875
+
+Task: open the middle drawer of the cabinet
+Starting episode 43...
+Success: False
+# episodes completed so far: 43
+# successes: 24 (55.8%)
+Speculative stats: length=2.059, avg_accept_length=0.918, num_blocks=1020, overall_hit_rate=0.249, tree_blocks=864, tree_alt_wins=108, tree_extra_tokens=112, tree_nodes=3.18, tree_depth=2.05, main_accept=0.808
+
+Task: open the middle drawer of the cabinet
+Starting episode 44...
+Success: True
+# episodes completed so far: 44
+# successes: 25 (56.8%)
+Speculative stats: length=2.060, avg_accept_length=0.925, num_blocks=931, overall_hit_rate=0.249, tree_blocks=783, tree_alt_wins=63, tree_extra_tokens=68, tree_nodes=3.22, tree_depth=2.27, main_accept=0.852
+
+Task: open the middle drawer of the cabinet
+Starting episode 45...
+Success: False
+# episodes completed so far: 45
+# successes: 25 (55.6%)
+Speculative stats: length=1.991, avg_accept_length=0.852, num_blocks=1055, overall_hit_rate=0.232, tree_blocks=901, tree_alt_wins=92, tree_extra_tokens=96, tree_nodes=3.14, tree_depth=2.14, main_accept=0.761
+
+Task: open the middle drawer of the cabinet
+Starting episode 46...
+Success: False
+# episodes completed so far: 46
+# successes: 25 (54.3%)
+Speculative stats: length=2.031, avg_accept_length=0.884, num_blocks=1034, overall_hit_rate=0.240, tree_blocks=886, tree_alt_wins=101, tree_extra_tokens=102, tree_nodes=3.13, tree_depth=2.10, main_accept=0.785
+
+Task: open the middle drawer of the cabinet
+Starting episode 47...
+Success: True
+# episodes completed so far: 47
+# successes: 26 (55.3%)
+Speculative stats: length=2.163, avg_accept_length=0.989, num_blocks=466, overall_hit_rate=0.264, tree_blocks=403, tree_alt_wins=39, tree_extra_tokens=40, tree_nodes=3.18, tree_depth=2.15, main_accept=0.903
+
+Task: open the middle drawer of the cabinet
+Starting episode 48...
+Success: False
+# episodes completed so far: 48
+# successes: 26 (54.2%)
+Speculative stats: length=2.063, avg_accept_length=0.910, num_blocks=1018, overall_hit_rate=0.245, tree_blocks=874, tree_alt_wins=90, tree_extra_tokens=92, tree_nodes=3.16, tree_depth=2.16, main_accept=0.819
+
+Task: open the middle drawer of the cabinet
+Starting episode 49...
+Success: False
+# episodes completed so far: 49
+# successes: 26 (53.1%)
+Speculative stats: length=2.096, avg_accept_length=0.973, num_blocks=1002, overall_hit_rate=0.269, tree_blocks=825, tree_alt_wins=120, tree_extra_tokens=122, tree_nodes=3.19, tree_depth=2.07, main_accept=0.851
+
+Task: open the middle drawer of the cabinet
+Starting episode 50...
+Success: False
+# episodes completed so far: 50
+# successes: 26 (52.0%)
+Speculative stats: length=2.275, avg_accept_length=1.024, num_blocks=923, overall_hit_rate=0.264, tree_blocks=855, tree_alt_wins=74, tree_extra_tokens=79, tree_nodes=3.11, tree_depth=2.29, main_accept=0.938
+Current task success rate: 0.52
+Current total success rate: 0.52
+Current task speculative stats: length=2.103, avg_accept_length=0.935, num_blocks=37721, overall_hit_rate=0.250, tree_blocks=32734, tree_alt_wins=3089, tree_extra_tokens=3208, tree_nodes=3.15, tree_depth=2.20, main_accept=0.850
+
+Task: put the bowl on the stove
+Starting episode 1...
+Success: True
+# episodes completed so far: 51
+# successes: 27 (52.9%)
+Speculative stats: length=2.306, avg_accept_length=1.087, num_blocks=252, overall_hit_rate=0.276, tree_blocks=224, tree_alt_wins=15, tree_extra_tokens=19, tree_nodes=3.31, tree_depth=2.51, main_accept=1.012
+
+Task: put the bowl on the stove
+Starting episode 2...
+Success: True
+# episodes completed so far: 52
+# successes: 28 (53.8%)
+Speculative stats: length=2.237, avg_accept_length=1.045, num_blocks=291, overall_hit_rate=0.272, tree_blocks=254, tree_alt_wins=22, tree_extra_tokens=24, tree_nodes=3.25, tree_depth=2.44, main_accept=0.962
+
+Task: put the bowl on the stove
+Starting episode 3...
+Success: True
+# episodes completed so far: 53
+# successes: 29 (54.7%)
+Speculative stats: length=2.324, avg_accept_length=1.071, num_blocks=238, overall_hit_rate=0.273, tree_blocks=219, tree_alt_wins=20, tree_extra_tokens=21, tree_nodes=3.18, tree_depth=2.43, main_accept=0.983
+
+Task: put the bowl on the stove
+Starting episode 4...
+Success: True
+# episodes completed so far: 54
+# successes: 30 (55.6%)
+Speculative stats: length=2.343, avg_accept_length=1.122, num_blocks=254, overall_hit_rate=0.290, tree_blocks=225, tree_alt_wins=17, tree_extra_tokens=18, tree_nodes=3.24, tree_depth=2.54, main_accept=1.051
+
+Task: put the bowl on the stove
+Starting episode 5...
+Success: True
+# episodes completed so far: 55
+# successes: 31 (56.4%)
+Speculative stats: length=2.459, avg_accept_length=1.174, num_blocks=242, overall_hit_rate=0.290, tree_blocks=226, tree_alt_wins=16, tree_extra_tokens=16, tree_nodes=3.27, tree_depth=2.50, main_accept=1.107
+
+Task: put the bowl on the stove
+Starting episode 6...
+Success: True
+# episodes completed so far: 56
+# successes: 32 (57.1%)
+Speculative stats: length=2.333, avg_accept_length=1.109, num_blocks=294, overall_hit_rate=0.280, tree_blocks=262, tree_alt_wins=15, tree_extra_tokens=15, tree_nodes=3.32, tree_depth=2.56, main_accept=1.058
+
+Task: put the bowl on the stove
+Starting episode 7...
+Success: True
+# episodes completed so far: 57
+# successes: 33 (57.9%)
+Speculative stats: length=2.582, avg_accept_length=1.300, num_blocks=404, overall_hit_rate=0.331, tree_blocks=369, tree_alt_wins=26, tree_extra_tokens=28, tree_nodes=3.20, tree_depth=2.64, main_accept=1.230
+
+Task: put the bowl on the stove
+Starting episode 8...
+Success: True
+# episodes completed so far: 58
+# successes: 34 (58.6%)
+Speculative stats: length=2.324, avg_accept_length=1.098, num_blocks=256, overall_hit_rate=0.281, tree_blocks=229, tree_alt_wins=19, tree_extra_tokens=20, tree_nodes=3.25, tree_depth=2.48, main_accept=1.020
+
+Task: put the bowl on the stove
+Starting episode 9...
+Success: True
+# episodes completed so far: 59
+# successes: 35 (59.3%)
+Speculative stats: length=2.362, avg_accept_length=1.111, num_blocks=243, overall_hit_rate=0.280, tree_blocks=222, tree_alt_wins=13, tree_extra_tokens=13, tree_nodes=3.24, tree_depth=2.59, main_accept=1.058
+
+Task: put the bowl on the stove
+Starting episode 10...
+Success: True
+# episodes completed so far: 60
+# successes: 36 (60.0%)
+Speculative stats: length=2.476, avg_accept_length=1.167, num_blocks=246, overall_hit_rate=0.284, tree_blocks=235, tree_alt_wins=16, tree_extra_tokens=17, tree_nodes=3.26, tree_depth=2.64, main_accept=1.098
+
+Task: put the bowl on the stove
+Starting episode 11...
+Success: True
+# episodes completed so far: 61
+# successes: 37 (60.7%)
+Speculative stats: length=2.369, avg_accept_length=1.152, num_blocks=263, overall_hit_rate=0.292, tree_blocks=231, tree_alt_wins=15, tree_extra_tokens=17, tree_nodes=3.35, tree_depth=2.73, main_accept=1.087
+
+Task: put the bowl on the stove
+Starting episode 12...
+Success: True
+# episodes completed so far: 62
+# successes: 38 (61.3%)
+Speculative stats: length=2.663, avg_accept_length=1.333, num_blocks=255, overall_hit_rate=0.321, tree_blocks=242, tree_alt_wins=15, tree_extra_tokens=15, tree_nodes=3.33, tree_depth=2.64, main_accept=1.275
+
+Task: put the bowl on the stove
+Starting episode 13...
+Success: False
+# episodes completed so far: 63
+# successes: 38 (60.3%)
+Speculative stats: length=5.833, avg_accept_length=4.003, num_blocks=360, overall_hit_rate=0.712, tree_blocks=359, tree_alt_wins=0, tree_extra_tokens=0, tree_nodes=4.64, tree_depth=4.63, main_accept=4.003
+
+Task: put the bowl on the stove
+Starting episode 14...
+Success: True
+# episodes completed so far: 64
+# successes: 39 (60.9%)
+Speculative stats: length=2.238, avg_accept_length=1.070, num_blocks=244, overall_hit_rate=0.279, tree_blocks=207, tree_alt_wins=22, tree_extra_tokens=22, tree_nodes=3.34, tree_depth=2.67, main_accept=0.980
+
+Task: put the bowl on the stove
+Starting episode 15...
+Success: True
+# episodes completed so far: 65
+# successes: 40 (61.5%)
+Speculative stats: length=2.314, avg_accept_length=1.057, num_blocks=245, overall_hit_rate=0.267, tree_blocks=227, tree_alt_wins=15, tree_extra_tokens=18, tree_nodes=3.20, tree_depth=2.49, main_accept=0.984
+
+Task: put the bowl on the stove
+Starting episode 16...
+Success: True
+# episodes completed so far: 66
+# successes: 41 (62.1%)
+Speculative stats: length=2.479, avg_accept_length=1.219, num_blocks=288, overall_hit_rate=0.303, tree_blocks=261, tree_alt_wins=9, tree_extra_tokens=9, tree_nodes=3.33, tree_depth=2.64, main_accept=1.188
+
+Task: put the bowl on the stove
+Starting episode 17...
+Success: True
+# episodes completed so far: 67
+# successes: 42 (62.7%)
+Speculative stats: length=2.443, avg_accept_length=1.180, num_blocks=255, overall_hit_rate=0.293, tree_blocks=233, tree_alt_wins=19, tree_extra_tokens=19, tree_nodes=3.31, tree_depth=2.55, main_accept=1.106
+
+Task: put the bowl on the stove
+Starting episode 18...
+Success: True
+# episodes completed so far: 68
+# successes: 43 (63.2%)
+Speculative stats: length=2.342, avg_accept_length=1.093, num_blocks=257, overall_hit_rate=0.275, tree_blocks=235, tree_alt_wins=16, tree_extra_tokens=18, tree_nodes=3.26, tree_depth=2.54, main_accept=1.023
+
+Task: put the bowl on the stove
+Starting episode 19...
+Success: True
+# episodes completed so far: 69
+# successes: 44 (63.8%)
+Speculative stats: length=2.248, avg_accept_length=1.004, num_blocks=274, overall_hit_rate=0.254, tree_blocks=253, tree_alt_wins=18, tree_extra_tokens=19, tree_nodes=3.19, tree_depth=2.47, main_accept=0.934
+
+Task: put the bowl on the stove
+Starting episode 20...
+Success: True
+# episodes completed so far: 70
+# successes: 45 (64.3%)
+Speculative stats: length=2.243, avg_accept_length=1.031, num_blocks=259, overall_hit_rate=0.265, tree_blocks=231, tree_alt_wins=22, tree_extra_tokens=24, tree_nodes=3.25, tree_depth=2.37, main_accept=0.938
+
+Task: put the bowl on the stove
+Starting episode 21...
+Success: True
+# episodes completed so far: 71
+# successes: 46 (64.8%)
+Speculative stats: length=2.194, avg_accept_length=0.996, num_blocks=252, overall_hit_rate=0.254, tree_blocks=222, tree_alt_wins=20, tree_extra_tokens=21, tree_nodes=3.32, tree_depth=2.45, main_accept=0.913
+
+Task: put the bowl on the stove
+Starting episode 22...
+Success: True
+# episodes completed so far: 72
+# successes: 47 (65.3%)
+Speculative stats: length=2.325, avg_accept_length=1.098, num_blocks=265, overall_hit_rate=0.281, tree_blocks=237, tree_alt_wins=13, tree_extra_tokens=13, tree_nodes=3.25, tree_depth=2.59, main_accept=1.049
+
+Task: put the bowl on the stove
+Starting episode 23...
+Success: True
+# episodes completed so far: 73
+# successes: 48 (65.8%)
+Speculative stats: length=2.351, avg_accept_length=1.073, num_blocks=262, overall_hit_rate=0.263, tree_blocks=247, tree_alt_wins=11, tree_extra_tokens=12, tree_nodes=3.27, tree_depth=2.55, main_accept=1.027
+
+Task: put the bowl on the stove
+Starting episode 24...
+Success: True
+# episodes completed so far: 74
+# successes: 49 (66.2%)
+Speculative stats: length=2.897, avg_accept_length=1.571, num_blocks=319, overall_hit_rate=0.369, tree_blocks=291, tree_alt_wins=23, tree_extra_tokens=24, tree_nodes=3.57, tree_depth=3.00, main_accept=1.495
+
+Task: put the bowl on the stove
+Starting episode 25...
+Success: True
+# episodes completed so far: 75
+# successes: 50 (66.7%)
+Speculative stats: length=2.424, avg_accept_length=1.155, num_blocks=283, overall_hit_rate=0.284, tree_blocks=261, tree_alt_wins=23, tree_extra_tokens=24, tree_nodes=3.32, tree_depth=2.65, main_accept=1.071
+
+Task: put the bowl on the stove
+Starting episode 26...
+Success: True
+# episodes completed so far: 76
+# successes: 51 (67.1%)
+Speculative stats: length=2.444, avg_accept_length=1.210, num_blocks=295, overall_hit_rate=0.312, tree_blocks=260, tree_alt_wins=17, tree_extra_tokens=19, tree_nodes=3.27, tree_depth=2.67, main_accept=1.146
+
+Task: put the bowl on the stove
+Starting episode 27...
+Success: True
+# episodes completed so far: 77
+# successes: 52 (67.5%)
+Speculative stats: length=2.250, avg_accept_length=1.036, num_blocks=252, overall_hit_rate=0.265, tree_blocks=225, tree_alt_wins=21, tree_extra_tokens=21, tree_nodes=3.26, tree_depth=2.50, main_accept=0.952
+
+Task: put the bowl on the stove
+Starting episode 28...
+Success: True
+# episodes completed so far: 78
+# successes: 53 (67.9%)
+Speculative stats: length=2.451, avg_accept_length=1.195, num_blocks=257, overall_hit_rate=0.299, tree_blocks=233, tree_alt_wins=19, tree_extra_tokens=20, tree_nodes=3.30, tree_depth=2.64, main_accept=1.117
+
+Task: put the bowl on the stove
+Starting episode 29...
+Success: True
+# episodes completed so far: 79
+# successes: 54 (68.4%)
+Speculative stats: length=2.464, avg_accept_length=1.216, num_blocks=250, overall_hit_rate=0.311, tree_blocks=224, tree_alt_wins=18, tree_extra_tokens=20, tree_nodes=3.24, tree_depth=2.62, main_accept=1.136
+
+Task: put the bowl on the stove
+Starting episode 30...
+Success: True
+# episodes completed so far: 80
+# successes: 55 (68.8%)
+Speculative stats: length=2.367, avg_accept_length=1.124, num_blocks=275, overall_hit_rate=0.284, tree_blocks=249, tree_alt_wins=15, tree_extra_tokens=16, tree_nodes=3.26, tree_depth=2.63, main_accept=1.065
+
+Task: put the bowl on the stove
+Starting episode 31...
+Success: True
+# episodes completed so far: 81
+# successes: 56 (69.1%)
+Speculative stats: length=2.668, avg_accept_length=1.360, num_blocks=286, overall_hit_rate=0.332, tree_blocks=265, tree_alt_wins=19, tree_extra_tokens=19, tree_nodes=3.34, tree_depth=2.67, main_accept=1.294
+
+Task: put the bowl on the stove
+Starting episode 32...
+Success: True
+# episodes completed so far: 82
+# successes: 57 (69.5%)
+Speculative stats: length=2.420, avg_accept_length=1.149, num_blocks=269, overall_hit_rate=0.284, tree_blocks=249, tree_alt_wins=27, tree_extra_tokens=28, tree_nodes=3.29, tree_depth=2.56, main_accept=1.045
+
+Task: put the bowl on the stove
+Starting episode 33...
+Success: False
+# episodes completed so far: 83
+# successes: 57 (68.7%)
+Speculative stats: length=6.818, avg_accept_length=4.864, num_blocks=308, overall_hit_rate=0.828, tree_blocks=302, tree_alt_wins=0, tree_extra_tokens=0, tree_nodes=4.97, tree_depth=4.97, main_accept=4.864
+
+Task: put the bowl on the stove
+Starting episode 34...
+Success: True
+# episodes completed so far: 84
+# successes: 58 (69.0%)
+Speculative stats: length=2.438, avg_accept_length=1.184, num_blocks=267, overall_hit_rate=0.300, tree_blocks=242, tree_alt_wins=18, tree_extra_tokens=19, tree_nodes=3.25, tree_depth=2.59, main_accept=1.112
+
+Task: put the bowl on the stove
+Starting episode 35...
+Success: True
+# episodes completed so far: 85
+# successes: 59 (69.4%)
+Speculative stats: length=2.264, avg_accept_length=1.067, num_blocks=269, overall_hit_rate=0.278, tree_blocks=234, tree_alt_wins=21, tree_extra_tokens=24, tree_nodes=3.27, tree_depth=2.49, main_accept=0.978
+
+Task: put the bowl on the stove
+Starting episode 36...
+Success: True
+# episodes completed so far: 86
+# successes: 60 (69.8%)
+Speculative stats: length=2.305, avg_accept_length=1.078, num_blocks=243, overall_hit_rate=0.273, tree_blocks=218, tree_alt_wins=19, tree_extra_tokens=19, tree_nodes=3.28, tree_depth=2.56, main_accept=1.000
+
+Task: put the bowl on the stove
+Starting episode 37...
+Success: True
+# episodes completed so far: 87
+# successes: 61 (70.1%)
+Speculative stats: length=2.270, avg_accept_length=1.058, num_blocks=259, overall_hit_rate=0.270, tree_blocks=230, tree_alt_wins=21, tree_extra_tokens=26, tree_nodes=3.29, tree_depth=2.40, main_accept=0.958
+
+Task: put the bowl on the stove
+Starting episode 38...
+Success: True
+# episodes completed so far: 88
+# successes: 62 (70.5%)
+Speculative stats: length=2.304, avg_accept_length=1.092, num_blocks=240, overall_hit_rate=0.282, tree_blocks=211, tree_alt_wins=20, tree_extra_tokens=22, tree_nodes=3.27, tree_depth=2.48, main_accept=1.000
+
+Task: put the bowl on the stove
+Starting episode 39...
+Success: True
+# episodes completed so far: 89
+# successes: 63 (70.8%)
+Speculative stats: length=2.366, avg_accept_length=1.128, num_blocks=290, overall_hit_rate=0.288, tree_blocks=261, tree_alt_wins=20, tree_extra_tokens=21, tree_nodes=3.23, tree_depth=2.58, main_accept=1.055
+
+Task: put the bowl on the stove
+Starting episode 40...
+Success: True
+# episodes completed so far: 90
+# successes: 64 (71.1%)
+Speculative stats: length=2.321, avg_accept_length=1.078, num_blocks=386, overall_hit_rate=0.272, tree_blocks=352, tree_alt_wins=29, tree_extra_tokens=30, tree_nodes=3.25, tree_depth=2.44, main_accept=1.000
+
+Task: put the bowl on the stove
+Starting episode 41...
+Success: False
+# episodes completed so far: 91
+# successes: 64 (70.3%)
+Speculative stats: length=2.462, avg_accept_length=1.202, num_blocks=853, overall_hit_rate=0.300, tree_blocks=770, tree_alt_wins=56, tree_extra_tokens=62, tree_nodes=3.34, tree_depth=2.70, main_accept=1.129
+
+Task: put the bowl on the stove
+Starting episode 42...
+Success: True
+# episodes completed so far: 92
+# successes: 65 (70.7%)
+Speculative stats: length=2.262, avg_accept_length=1.035, num_blocks=229, overall_hit_rate=0.265, tree_blocks=207, tree_alt_wins=13, tree_extra_tokens=15, tree_nodes=3.22, tree_depth=2.53, main_accept=0.969
+
+Task: put the bowl on the stove
+Starting episode 43...
+Success: True
+# episodes completed so far: 93
+# successes: 66 (71.0%)
+Speculative stats: length=2.353, avg_accept_length=1.129, num_blocks=241, overall_hit_rate=0.289, tree_blocks=214, tree_alt_wins=19, tree_extra_tokens=24, tree_nodes=3.27, tree_depth=2.50, main_accept=1.029
+
+Task: put the bowl on the stove
+Starting episode 44...
+Success: True
+# episodes completed so far: 94
+# successes: 67 (71.3%)
+Speculative stats: length=2.319, avg_accept_length=1.087, num_blocks=332, overall_hit_rate=0.276, tree_blocks=299, tree_alt_wins=25, tree_extra_tokens=28, tree_nodes=3.27, tree_depth=2.50, main_accept=1.003
+
+Task: put the bowl on the stove
+Starting episode 45...
+Success: True
+# episodes completed so far: 95
+# successes: 68 (71.6%)
+Speculative stats: length=2.360, avg_accept_length=1.139, num_blocks=267, overall_hit_rate=0.291, tree_blocks=236, tree_alt_wins=13, tree_extra_tokens=13, tree_nodes=3.30, tree_depth=2.61, main_accept=1.090
+
+Task: put the bowl on the stove
+Starting episode 46...
+Success: True
+# episodes completed so far: 96
+# successes: 69 (71.9%)
+Speculative stats: length=2.408, avg_accept_length=1.177, num_blocks=282, overall_hit_rate=0.297, tree_blocks=250, tree_alt_wins=21, tree_extra_tokens=21, tree_nodes=3.34, tree_depth=2.54, main_accept=1.103
+
+Task: put the bowl on the stove
+Starting episode 47...
+Success: True
+# episodes completed so far: 97
+# successes: 70 (72.2%)
+Speculative stats: length=3.223, avg_accept_length=1.803, num_blocks=417, overall_hit_rate=0.420, tree_blocks=400, tree_alt_wins=19, tree_extra_tokens=20, tree_nodes=3.43, tree_depth=2.98, main_accept=1.755
+
+Task: put the bowl on the stove
+Starting episode 48...
+Success: True
+# episodes completed so far: 98
+# successes: 71 (72.4%)
+Speculative stats: length=2.256, avg_accept_length=1.041, num_blocks=270, overall_hit_rate=0.268, tree_blocks=241, tree_alt_wins=28, tree_extra_tokens=30, tree_nodes=3.22, tree_depth=2.44, main_accept=0.930
+
+Task: put the bowl on the stove
+Starting episode 49...
+Success: True
+# episodes completed so far: 99
+# successes: 72 (72.7%)
+Speculative stats: length=2.412, avg_accept_length=1.169, num_blocks=267, overall_hit_rate=0.292, tree_blocks=240, tree_alt_wins=22, tree_extra_tokens=22, tree_nodes=3.34, tree_depth=2.59, main_accept=1.086
+
+Task: put the bowl on the stove
+Starting episode 50...
+Success: True
+# episodes completed so far: 100
+# successes: 73 (73.0%)
+Speculative stats: length=2.341, avg_accept_length=1.124, num_blocks=290, overall_hit_rate=0.288, tree_blocks=256, tree_alt_wins=14, tree_extra_tokens=17, tree_nodes=3.29, tree_depth=2.58, main_accept=1.066
+Current task success rate: 0.94
+Current total success rate: 0.73
+Current task speculative stats: length=2.592, avg_accept_length=1.313, num_blocks=14395, overall_hit_rate=0.324, tree_blocks=13070, tree_alt_wins=934, tree_extra_tokens=1002, tree_nodes=3.36, tree_depth=2.70, main_accept=1.243
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 1...
+Success: True
+# episodes completed so far: 101
+# successes: 74 (73.3%)
+Speculative stats: length=2.189, avg_accept_length=0.959, num_blocks=291, overall_hit_rate=0.251, tree_blocks=267, tree_alt_wins=28, tree_extra_tokens=30, tree_nodes=3.08, tree_depth=2.32, main_accept=0.856
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 2...
+Success: True
+# episodes completed so far: 102
+# successes: 75 (73.5%)
+Speculative stats: length=2.318, avg_accept_length=1.041, num_blocks=296, overall_hit_rate=0.264, tree_blocks=279, tree_alt_wins=30, tree_extra_tokens=31, tree_nodes=3.12, tree_depth=2.25, main_accept=0.936
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 3...
+Success: True
+# episodes completed so far: 103
+# successes: 76 (73.8%)
+Speculative stats: length=2.429, avg_accept_length=1.128, num_blocks=343, overall_hit_rate=0.284, tree_blocks=327, tree_alt_wins=21, tree_extra_tokens=23, tree_nodes=3.12, tree_depth=2.40, main_accept=1.061
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 4...
+Success: True
+# episodes completed so far: 104
+# successes: 77 (74.0%)
+Speculative stats: length=2.609, avg_accept_length=1.273, num_blocks=322, overall_hit_rate=0.322, tree_blocks=310, tree_alt_wins=10, tree_extra_tokens=11, tree_nodes=3.07, tree_depth=2.49, main_accept=1.239
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 5...
+Success: True
+# episodes completed so far: 105
+# successes: 78 (74.3%)
+Speculative stats: length=2.314, avg_accept_length=1.033, num_blocks=239, overall_hit_rate=0.262, tree_blocks=227, tree_alt_wins=22, tree_extra_tokens=22, tree_nodes=3.10, tree_depth=2.27, main_accept=0.941
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 6...
+Success: True
+# episodes completed so far: 106
+# successes: 79 (74.5%)
+Speculative stats: length=2.268, avg_accept_length=1.056, num_blocks=284, overall_hit_rate=0.280, tree_blocks=252, tree_alt_wins=30, tree_extra_tokens=33, tree_nodes=3.13, tree_depth=2.21, main_accept=0.940
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 7...
+Success: True
+# episodes completed so far: 107
+# successes: 80 (74.8%)
+Speculative stats: length=2.211, avg_accept_length=0.968, num_blocks=247, overall_hit_rate=0.250, tree_blocks=229, tree_alt_wins=16, tree_extra_tokens=16, tree_nodes=3.09, tree_depth=2.39, main_accept=0.903
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 8...
+Success: True
+# episodes completed so far: 108
+# successes: 81 (75.0%)
+Speculative stats: length=2.300, avg_accept_length=1.057, num_blocks=280, overall_hit_rate=0.275, tree_blocks=256, tree_alt_wins=22, tree_extra_tokens=25, tree_nodes=3.11, tree_depth=2.34, main_accept=0.968
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 9...
+Success: False
+# episodes completed so far: 109
+# successes: 81 (74.3%)
+Speculative stats: length=3.302, avg_accept_length=1.986, num_blocks=636, overall_hit_rate=0.528, tree_blocks=537, tree_alt_wins=4, tree_extra_tokens=5, tree_nodes=3.27, tree_depth=3.22, main_accept=1.978
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 10...
+Success: True
+# episodes completed so far: 110
+# successes: 82 (74.5%)
+Speculative stats: length=2.267, avg_accept_length=1.020, num_blocks=247, overall_hit_rate=0.260, tree_blocks=228, tree_alt_wins=16, tree_extra_tokens=16, tree_nodes=3.16, tree_depth=2.38, main_accept=0.955
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 11...
+Success: True
+# episodes completed so far: 111
+# successes: 83 (74.8%)
+Speculative stats: length=2.346, avg_accept_length=1.081, num_blocks=358, overall_hit_rate=0.279, tree_blocks=333, tree_alt_wins=21, tree_extra_tokens=24, tree_nodes=3.09, tree_depth=2.35, main_accept=1.014
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 12...
+Success: True
+# episodes completed so far: 112
+# successes: 84 (75.0%)
+Speculative stats: length=2.298, avg_accept_length=1.027, num_blocks=262, overall_hit_rate=0.263, tree_blocks=247, tree_alt_wins=13, tree_extra_tokens=14, tree_nodes=3.09, tree_depth=2.38, main_accept=0.973
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 13...
+Success: True
+# episodes completed so far: 113
+# successes: 85 (75.2%)
+Speculative stats: length=2.280, avg_accept_length=1.023, num_blocks=264, overall_hit_rate=0.259, tree_blocks=246, tree_alt_wins=21, tree_extra_tokens=22, tree_nodes=3.17, tree_depth=2.37, main_accept=0.939
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 14...
+Success: True
+# episodes completed so far: 114
+# successes: 86 (75.4%)
+Speculative stats: length=2.403, avg_accept_length=1.080, num_blocks=402, overall_hit_rate=0.268, tree_blocks=394, tree_alt_wins=11, tree_extra_tokens=11, tree_nodes=3.09, tree_depth=2.69, main_accept=1.052
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 15...
+Success: True
+# episodes completed so far: 115
+# successes: 87 (75.7%)
+Speculative stats: length=2.307, avg_accept_length=1.075, num_blocks=267, overall_hit_rate=0.278, tree_blocks=241, tree_alt_wins=25, tree_extra_tokens=27, tree_nodes=3.18, tree_depth=2.27, main_accept=0.974
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 16...
+Success: True
+# episodes completed so far: 116
+# successes: 88 (75.9%)
+Speculative stats: length=2.561, avg_accept_length=1.303, num_blocks=399, overall_hit_rate=0.336, tree_blocks=356, tree_alt_wins=30, tree_extra_tokens=30, tree_nodes=3.22, tree_depth=2.50, main_accept=1.228
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 17...
+Success: False
+# episodes completed so far: 117
+# successes: 88 (75.2%)
+Speculative stats: length=2.241, avg_accept_length=1.002, num_blocks=937, overall_hit_rate=0.259, tree_blocks=861, tree_alt_wins=56, tree_extra_tokens=58, tree_nodes=3.13, tree_depth=2.38, main_accept=0.940
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 18...
+Success: False
+# episodes completed so far: 118
+# successes: 88 (74.6%)
+Speculative stats: length=2.433, avg_accept_length=1.209, num_blocks=863, overall_hit_rate=0.321, tree_blocks=757, tree_alt_wins=44, tree_extra_tokens=45, tree_nodes=3.15, tree_depth=2.61, main_accept=1.156
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 19...
+Success: True
+# episodes completed so far: 119
+# successes: 89 (74.8%)
+Speculative stats: length=2.212, avg_accept_length=0.975, num_blocks=326, overall_hit_rate=0.252, tree_blocks=299, tree_alt_wins=27, tree_extra_tokens=31, tree_nodes=3.13, tree_depth=2.28, main_accept=0.880
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 20...
+Success: True
+# episodes completed so far: 120
+# successes: 90 (75.0%)
+Speculative stats: length=2.290, avg_accept_length=0.993, num_blocks=269, overall_hit_rate=0.250, tree_blocks=261, tree_alt_wins=17, tree_extra_tokens=18, tree_nodes=3.05, tree_depth=2.21, main_accept=0.926
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 21...
+Success: True
+# episodes completed so far: 121
+# successes: 91 (75.2%)
+Speculative stats: length=2.251, avg_accept_length=0.996, num_blocks=283, overall_hit_rate=0.256, tree_blocks=264, tree_alt_wins=18, tree_extra_tokens=21, tree_nodes=3.11, tree_depth=2.24, main_accept=0.922
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 22...
+Success: True
+# episodes completed so far: 122
+# successes: 92 (75.4%)
+Speculative stats: length=2.341, avg_accept_length=1.051, num_blocks=296, overall_hit_rate=0.265, tree_blocks=283, tree_alt_wins=34, tree_extra_tokens=34, tree_nodes=3.11, tree_depth=2.24, main_accept=0.936
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 23...
+Success: False
+# episodes completed so far: 123
+# successes: 92 (74.8%)
+Speculative stats: length=3.286, avg_accept_length=1.851, num_blocks=639, overall_hit_rate=0.474, tree_blocks=617, tree_alt_wins=18, tree_extra_tokens=30, tree_nodes=3.01, tree_depth=2.82, main_accept=1.804
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 24...
+Success: False
+# episodes completed so far: 124
+# successes: 92 (74.2%)
+Speculative stats: length=2.893, avg_accept_length=1.551, num_blocks=726, overall_hit_rate=0.407, tree_blocks=674, tree_alt_wins=15, tree_extra_tokens=21, tree_nodes=3.03, tree_depth=2.71, main_accept=1.522
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 25...
+Success: True
+# episodes completed so far: 125
+# successes: 93 (74.4%)
+Speculative stats: length=2.280, avg_accept_length=0.989, num_blocks=261, overall_hit_rate=0.249, tree_blocks=252, tree_alt_wins=9, tree_extra_tokens=9, tree_nodes=3.08, tree_depth=2.30, main_accept=0.954
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 26...
+Success: True
+# episodes completed so far: 126
+# successes: 94 (74.6%)
+Speculative stats: length=2.235, avg_accept_length=0.992, num_blocks=260, overall_hit_rate=0.257, tree_blocks=240, tree_alt_wins=15, tree_extra_tokens=17, tree_nodes=3.10, tree_depth=2.25, main_accept=0.927
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 27...
+Success: True
+# episodes completed so far: 127
+# successes: 95 (74.8%)
+Speculative stats: length=2.196, avg_accept_length=0.963, num_blocks=322, overall_hit_rate=0.249, tree_blocks=296, tree_alt_wins=22, tree_extra_tokens=23, tree_nodes=3.12, tree_depth=2.25, main_accept=0.891
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 28...
+Success: True
+# episodes completed so far: 128
+# successes: 96 (75.0%)
+Speculative stats: length=2.284, avg_accept_length=1.054, num_blocks=331, overall_hit_rate=0.271, tree_blocks=299, tree_alt_wins=23, tree_extra_tokens=25, tree_nodes=3.19, tree_depth=2.35, main_accept=0.979
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 29...
+Success: False
+# episodes completed so far: 129
+# successes: 96 (74.4%)
+Speculative stats: length=3.344, avg_accept_length=1.866, num_blocks=628, overall_hit_rate=0.466, tree_blocks=628, tree_alt_wins=38, tree_extra_tokens=73, tree_nodes=3.01, tree_depth=2.70, main_accept=1.750
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 30...
+Success: True
+# episodes completed so far: 130
+# successes: 97 (74.6%)
+Speculative stats: length=2.279, avg_accept_length=1.007, num_blocks=301, overall_hit_rate=0.255, tree_blocks=285, tree_alt_wins=17, tree_extra_tokens=17, tree_nodes=3.12, tree_depth=2.36, main_accept=0.950
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 31...
+Success: True
+# episodes completed so far: 131
+# successes: 98 (74.8%)
+Speculative stats: length=2.196, avg_accept_length=0.967, num_blocks=306, overall_hit_rate=0.254, tree_blocks=280, tree_alt_wins=26, tree_extra_tokens=26, tree_nodes=3.06, tree_depth=2.17, main_accept=0.882
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 32...
+Success: True
+# episodes completed so far: 132
+# successes: 99 (75.0%)
+Speculative stats: length=2.486, avg_accept_length=1.190, num_blocks=290, overall_hit_rate=0.305, tree_blocks=273, tree_alt_wins=17, tree_extra_tokens=19, tree_nodes=3.09, tree_depth=2.34, main_accept=1.124
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 33...
+Success: True
+# episodes completed so far: 133
+# successes: 100 (75.2%)
+Speculative stats: length=2.315, avg_accept_length=1.056, num_blocks=248, overall_hit_rate=0.268, tree_blocks=230, tree_alt_wins=13, tree_extra_tokens=14, tree_nodes=3.17, tree_depth=2.38, main_accept=1.000
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 34...
+Success: True
+# episodes completed so far: 134
+# successes: 101 (75.4%)
+Speculative stats: length=2.183, avg_accept_length=0.954, num_blocks=263, overall_hit_rate=0.244, tree_blocks=241, tree_alt_wins=27, tree_extra_tokens=29, tree_nodes=3.17, tree_depth=2.20, main_accept=0.844
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 35...
+Success: True
+# episodes completed so far: 135
+# successes: 102 (75.6%)
+Speculative stats: length=3.138, avg_accept_length=1.766, num_blocks=629, overall_hit_rate=0.442, tree_blocks=581, tree_alt_wins=22, tree_extra_tokens=24, tree_nodes=3.25, tree_depth=2.88, main_accept=1.728
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 36...
+Success: True
+# episodes completed so far: 136
+# successes: 103 (75.7%)
+Speculative stats: length=2.340, avg_accept_length=1.065, num_blocks=338, overall_hit_rate=0.275, tree_blocks=317, tree_alt_wins=20, tree_extra_tokens=20, tree_nodes=3.06, tree_depth=2.45, main_accept=1.006
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 37...
+Success: True
+# episodes completed so far: 137
+# successes: 104 (75.9%)
+Speculative stats: length=2.311, avg_accept_length=1.048, num_blocks=315, overall_hit_rate=0.267, tree_blocks=294, tree_alt_wins=13, tree_extra_tokens=14, tree_nodes=3.13, tree_depth=2.58, main_accept=1.003
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 38...
+Success: True
+# episodes completed so far: 138
+# successes: 105 (76.1%)
+Speculative stats: length=2.446, avg_accept_length=1.212, num_blocks=392, overall_hit_rate=0.307, tree_blocks=346, tree_alt_wins=26, tree_extra_tokens=29, tree_nodes=3.34, tree_depth=2.71, main_accept=1.138
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 39...
+Success: True
+# episodes completed so far: 139
+# successes: 106 (76.3%)
+Speculative stats: length=2.411, avg_accept_length=1.157, num_blocks=331, overall_hit_rate=0.296, tree_blocks=301, tree_alt_wins=13, tree_extra_tokens=13, tree_nodes=3.20, tree_depth=2.50, main_accept=1.118
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 40...
+Success: False
+# episodes completed so far: 140
+# successes: 106 (75.7%)
+Speculative stats: length=3.075, avg_accept_length=1.820, num_blocks=683, overall_hit_rate=0.501, tree_blocks=557, tree_alt_wins=23, tree_extra_tokens=31, tree_nodes=3.23, tree_depth=2.97, main_accept=1.775
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 41...
+Success: True
+# episodes completed so far: 141
+# successes: 107 (75.9%)
+Speculative stats: length=2.226, avg_accept_length=1.000, num_blocks=239, overall_hit_rate=0.260, tree_blocks=217, tree_alt_wins=19, tree_extra_tokens=19, tree_nodes=3.14, tree_depth=2.29, main_accept=0.921
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 42...
+Success: True
+# episodes completed so far: 142
+# successes: 108 (76.1%)
+Speculative stats: length=2.342, avg_accept_length=1.074, num_blocks=269, overall_hit_rate=0.276, tree_blocks=251, tree_alt_wins=11, tree_extra_tokens=13, tree_nodes=3.10, tree_depth=2.39, main_accept=1.026
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 43...
+Success: True
+# episodes completed so far: 143
+# successes: 109 (76.2%)
+Speculative stats: length=2.266, avg_accept_length=1.000, num_blocks=312, overall_hit_rate=0.254, tree_blocks=294, tree_alt_wins=16, tree_extra_tokens=17, tree_nodes=3.12, tree_depth=2.49, main_accept=0.946
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 44...
+Success: True
+# episodes completed so far: 144
+# successes: 110 (76.4%)
+Speculative stats: length=2.172, avg_accept_length=0.953, num_blocks=319, overall_hit_rate=0.248, tree_blocks=290, tree_alt_wins=27, tree_extra_tokens=30, tree_nodes=3.13, tree_depth=2.21, main_accept=0.859
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 45...
+Success: True
+# episodes completed so far: 145
+# successes: 111 (76.6%)
+Speculative stats: length=2.248, avg_accept_length=1.000, num_blocks=246, overall_hit_rate=0.259, tree_blocks=228, tree_alt_wins=22, tree_extra_tokens=22, tree_nodes=3.08, tree_depth=2.25, main_accept=0.911
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 46...
+Success: True
+# episodes completed so far: 146
+# successes: 112 (76.7%)
+Speculative stats: length=2.217, avg_accept_length=0.979, num_blocks=240, overall_hit_rate=0.254, tree_blocks=219, tree_alt_wins=14, tree_extra_tokens=14, tree_nodes=3.13, tree_depth=2.28, main_accept=0.921
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 47...
+Success: True
+# episodes completed so far: 147
+# successes: 113 (76.9%)
+Speculative stats: length=2.220, avg_accept_length=1.026, num_blocks=309, overall_hit_rate=0.268, tree_blocks=271, tree_alt_wins=27, tree_extra_tokens=27, tree_nodes=3.23, tree_depth=2.36, main_accept=0.939
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 48...
+Success: True
+# episodes completed so far: 148
+# successes: 114 (77.0%)
+Speculative stats: length=2.290, avg_accept_length=1.048, num_blocks=272, overall_hit_rate=0.264, tree_blocks=249, tree_alt_wins=29, tree_extra_tokens=33, tree_nodes=3.24, tree_depth=2.33, main_accept=0.926
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 49...
+Success: True
+# episodes completed so far: 149
+# successes: 115 (77.2%)
+Speculative stats: length=2.468, avg_accept_length=1.125, num_blocks=295, overall_hit_rate=0.279, tree_blocks=292, tree_alt_wins=11, tree_extra_tokens=11, tree_nodes=3.06, tree_depth=2.45, main_accept=1.088
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 50...
+Success: True
+# episodes completed so far: 150
+# successes: 116 (77.3%)
+Speculative stats: length=2.238, avg_accept_length=1.019, num_blocks=269, overall_hit_rate=0.267, tree_blocks=242, tree_alt_wins=21, tree_extra_tokens=21, tree_nodes=3.13, tree_depth=2.40, main_accept=0.941
+Current task success rate: 0.86
+Current total success rate: 0.7733333333333333
+Current task speculative stats: length=2.500, avg_accept_length=1.221, num_blocks=18144, overall_hit_rate=0.314, tree_blocks=16718, tree_alt_wins=1070, tree_extra_tokens=1188, tree_nodes=3.13, tree_depth=2.49, main_accept=1.156
+
+Task: open the top drawer and put the bowl inside
+Starting episode 1...
+Success: True
+# episodes completed so far: 151
+# successes: 117 (77.5%)
+Speculative stats: length=2.261, avg_accept_length=1.048, num_blocks=517, overall_hit_rate=0.268, tree_blocks=459, tree_alt_wins=27, tree_extra_tokens=29, tree_nodes=3.29, tree_depth=2.49, main_accept=0.992
+
+Task: open the top drawer and put the bowl inside
+Starting episode 2...
+Success: True
+# episodes completed so far: 152
+# successes: 118 (77.6%)
+Speculative stats: length=2.273, avg_accept_length=1.031, num_blocks=616, overall_hit_rate=0.262, tree_blocks=565, tree_alt_wins=48, tree_extra_tokens=48, tree_nodes=3.21, tree_depth=2.38, main_accept=0.953
+
+Task: open the top drawer and put the bowl inside
+Starting episode 3...
+Success: True
+# episodes completed so far: 153
+# successes: 119 (77.8%)
+Speculative stats: length=2.338, avg_accept_length=1.101, num_blocks=515, overall_hit_rate=0.281, tree_blocks=465, tree_alt_wins=30, tree_extra_tokens=31, tree_nodes=3.23, tree_depth=2.35, main_accept=1.041
+
+Task: open the top drawer and put the bowl inside
+Starting episode 4...
+Success: False
+# episodes completed so far: 154
+# successes: 119 (77.3%)
+Speculative stats: length=2.147, avg_accept_length=0.969, num_blocks=978, overall_hit_rate=0.257, tree_blocks=852, tree_alt_wins=77, tree_extra_tokens=78, tree_nodes=3.19, tree_depth=2.41, main_accept=0.890
+
+Task: open the top drawer and put the bowl inside
+Starting episode 5...
+Success: False
+# episodes completed so far: 155
+# successes: 119 (76.8%)
+Speculative stats: length=2.318, avg_accept_length=1.158, num_blocks=906, overall_hit_rate=0.297, tree_blocks=751, tree_alt_wins=121, tree_extra_tokens=124, tree_nodes=3.50, tree_depth=2.38, main_accept=1.021
+
+Task: open the top drawer and put the bowl inside
+Starting episode 6...
+Success: True
+# episodes completed so far: 156
+# successes: 120 (76.9%)
+Speculative stats: length=2.325, avg_accept_length=1.078, num_blocks=578, overall_hit_rate=0.277, tree_blocks=529, tree_alt_wins=33, tree_extra_tokens=38, tree_nodes=3.17, tree_depth=2.42, main_accept=1.012
+
+Task: open the top drawer and put the bowl inside
+Starting episode 7...
+Success: True
+# episodes completed so far: 157
+# successes: 121 (77.1%)
+Speculative stats: length=2.161, avg_accept_length=0.978, num_blocks=638, overall_hit_rate=0.259, tree_blocks=557, tree_alt_wins=56, tree_extra_tokens=57, tree_nodes=3.18, tree_depth=2.35, main_accept=0.889
+
+Task: open the top drawer and put the bowl inside
+Starting episode 8...
+Success: False
+# episodes completed so far: 158
+# successes: 121 (76.6%)
+Speculative stats: length=2.692, avg_accept_length=1.415, num_blocks=780, overall_hit_rate=0.335, tree_blocks=691, tree_alt_wins=28, tree_extra_tokens=31, tree_nodes=3.64, tree_depth=3.21, main_accept=1.376
+
+Task: open the top drawer and put the bowl inside
+Starting episode 9...
+Success: True
+# episodes completed so far: 159
+# successes: 122 (76.7%)
+Speculative stats: length=2.183, avg_accept_length=0.985, num_blocks=619, overall_hit_rate=0.257, tree_blocks=548, tree_alt_wins=54, tree_extra_tokens=55, tree_nodes=3.20, tree_depth=2.31, main_accept=0.897
+
+Task: open the top drawer and put the bowl inside
+Starting episode 10...
+Success: True
+# episodes completed so far: 160
+# successes: 123 (76.9%)
+Speculative stats: length=2.307, avg_accept_length=1.050, num_blocks=713, overall_hit_rate=0.266, tree_blocks=660, tree_alt_wins=47, tree_extra_tokens=48, tree_nodes=3.18, tree_depth=2.31, main_accept=0.983
+
+Task: open the top drawer and put the bowl inside
+Starting episode 11...
+Success: True
+# episodes completed so far: 161
+# successes: 124 (77.0%)
+Speculative stats: length=2.181, avg_accept_length=0.970, num_blocks=767, overall_hit_rate=0.251, tree_blocks=687, tree_alt_wins=67, tree_extra_tokens=68, tree_nodes=3.19, tree_depth=2.36, main_accept=0.881
+
+Task: open the top drawer and put the bowl inside
+Starting episode 12...
+Success: True
+# episodes completed so far: 162
+# successes: 125 (77.2%)
+Speculative stats: length=2.218, avg_accept_length=0.992, num_blocks=609, overall_hit_rate=0.258, tree_blocks=554, tree_alt_wins=38, tree_extra_tokens=39, tree_nodes=3.13, tree_depth=2.42, main_accept=0.928
+
+Task: open the top drawer and put the bowl inside
+Starting episode 13...
+Success: False
+# episodes completed so far: 163
+# successes: 125 (76.7%)
+Speculative stats: length=2.293, avg_accept_length=1.102, num_blocks=916, overall_hit_rate=0.286, tree_blocks=788, tree_alt_wins=74, tree_extra_tokens=74, tree_nodes=3.31, tree_depth=2.47, main_accept=1.021
+
+Task: open the top drawer and put the bowl inside
+Starting episode 14...
+Success: False
+# episodes completed so far: 164
+# successes: 125 (76.2%)
+Speculative stats: length=2.152, avg_accept_length=0.942, num_blocks=976, overall_hit_rate=0.246, tree_blocks=881, tree_alt_wins=69, tree_extra_tokens=70, tree_nodes=3.13, tree_depth=2.22, main_accept=0.870
+
+Task: open the top drawer and put the bowl inside
+Starting episode 15...
+Success: False
+# episodes completed so far: 165
+# successes: 125 (75.8%)
+Speculative stats: length=2.229, avg_accept_length=1.033, num_blocks=942, overall_hit_rate=0.271, tree_blocks=823, tree_alt_wins=77, tree_extra_tokens=78, tree_nodes=3.22, tree_depth=2.43, main_accept=0.950
+
+Task: open the top drawer and put the bowl inside
+Starting episode 16...
+Success: True
+# episodes completed so far: 166
+# successes: 126 (75.9%)
+Speculative stats: length=2.278, avg_accept_length=1.054, num_blocks=630, overall_hit_rate=0.272, tree_blocks=566, tree_alt_wins=40, tree_extra_tokens=40, tree_nodes=3.20, tree_depth=2.37, main_accept=0.990
+
+Task: open the top drawer and put the bowl inside
+Starting episode 17...
+Success: True
+# episodes completed so far: 167
+# successes: 127 (76.0%)
+Speculative stats: length=2.213, avg_accept_length=1.009, num_blocks=544, overall_hit_rate=0.265, tree_blocks=483, tree_alt_wins=38, tree_extra_tokens=41, tree_nodes=3.16, tree_depth=2.32, main_accept=0.934
+
+Task: open the top drawer and put the bowl inside
+Starting episode 18...
+Success: True
+# episodes completed so far: 168
+# successes: 128 (76.2%)
+Speculative stats: length=2.148, avg_accept_length=0.953, num_blocks=554, overall_hit_rate=0.249, tree_blocks=492, tree_alt_wins=40, tree_extra_tokens=42, tree_nodes=3.18, tree_depth=2.38, main_accept=0.877
+
+Task: open the top drawer and put the bowl inside
+Starting episode 19...
+Success: False
+# episodes completed so far: 169
+# successes: 128 (75.7%)
+Speculative stats: length=2.300, avg_accept_length=1.103, num_blocks=913, overall_hit_rate=0.287, tree_blocks=788, tree_alt_wins=36, tree_extra_tokens=36, tree_nodes=3.30, tree_depth=2.78, main_accept=1.064
+
+Task: open the top drawer and put the bowl inside
+Starting episode 20...
+Success: False
+# episodes completed so far: 170
+# successes: 128 (75.3%)
+Speculative stats: length=2.102, avg_accept_length=0.888, num_blocks=999, overall_hit_rate=0.233, tree_blocks=913, tree_alt_wins=118, tree_extra_tokens=119, tree_nodes=3.07, tree_depth=2.07, main_accept=0.769
+
+Task: open the top drawer and put the bowl inside
+Starting episode 21...
+Success: False
+# episodes completed so far: 171
+# successes: 128 (74.9%)
+Speculative stats: length=2.172, avg_accept_length=0.913, num_blocks=967, overall_hit_rate=0.231, tree_blocks=917, tree_alt_wins=116, tree_extra_tokens=117, tree_nodes=3.12, tree_depth=2.02, main_accept=0.792
+
+Task: open the top drawer and put the bowl inside
+Starting episode 22...
+Success: True
+# episodes completed so far: 172
+# successes: 129 (75.0%)
+Speculative stats: length=2.229, avg_accept_length=1.026, num_blocks=468, overall_hit_rate=0.267, tree_blocks=414, tree_alt_wins=31, tree_extra_tokens=31, tree_nodes=3.22, tree_depth=2.34, main_accept=0.959
+
+Task: open the top drawer and put the bowl inside
+Starting episode 23...
+Success: False
+# episodes completed so far: 173
+# successes: 129 (74.6%)
+Speculative stats: length=2.258, avg_accept_length=1.053, num_blocks=930, overall_hit_rate=0.274, tree_blocks=819, tree_alt_wins=68, tree_extra_tokens=70, tree_nodes=3.22, tree_depth=2.58, main_accept=0.977
+
+Task: open the top drawer and put the bowl inside
+Starting episode 24...
+Success: True
+# episodes completed so far: 174
+# successes: 130 (74.7%)
+Speculative stats: length=2.225, avg_accept_length=0.988, num_blocks=516, overall_hit_rate=0.253, tree_blocks=474, tree_alt_wins=39, tree_extra_tokens=40, tree_nodes=3.16, tree_depth=2.31, main_accept=0.911
+
+Task: open the top drawer and put the bowl inside
+Starting episode 25...
+Success: True
+# episodes completed so far: 175
+# successes: 131 (74.9%)
+Speculative stats: length=2.300, avg_accept_length=1.055, num_blocks=621, overall_hit_rate=0.269, tree_blocks=569, tree_alt_wins=38, tree_extra_tokens=40, tree_nodes=3.19, tree_depth=2.47, main_accept=0.990
+
+Task: open the top drawer and put the bowl inside
+Starting episode 26...
+Success: True
+# episodes completed so far: 176
+# successes: 132 (75.0%)
+Speculative stats: length=2.207, avg_accept_length=1.003, num_blocks=739, overall_hit_rate=0.262, tree_blocks=656, tree_alt_wins=48, tree_extra_tokens=49, tree_nodes=3.19, tree_depth=2.30, main_accept=0.936
+
+Task: open the top drawer and put the bowl inside
+Starting episode 27...
+Success: False
+# episodes completed so far: 177
+# successes: 132 (74.6%)
+Speculative stats: length=2.494, avg_accept_length=1.215, num_blocks=842, overall_hit_rate=0.293, tree_blocks=776, tree_alt_wins=55, tree_extra_tokens=61, tree_nodes=3.41, tree_depth=2.81, main_accept=1.143
+
+Task: open the top drawer and put the bowl inside
+Starting episode 28...
+Success: True
+# episodes completed so far: 178
+# successes: 133 (74.7%)
+Speculative stats: length=2.254, avg_accept_length=1.009, num_blocks=674, overall_hit_rate=0.259, tree_blocks=622, tree_alt_wins=48, tree_extra_tokens=48, tree_nodes=3.14, tree_depth=2.36, main_accept=0.938
+
+Task: open the top drawer and put the bowl inside
+Starting episode 29...
+Success: False
+# episodes completed so far: 179
+# successes: 133 (74.3%)
+Speculative stats: length=2.204, avg_accept_length=1.003, num_blocks=953, overall_hit_rate=0.261, tree_blocks=842, tree_alt_wins=74, tree_extra_tokens=74, tree_nodes=3.22, tree_depth=2.32, main_accept=0.925
+
+Task: open the top drawer and put the bowl inside
+Starting episode 30...
+Success: False
+# episodes completed so far: 180
+# successes: 133 (73.9%)
+Speculative stats: length=2.275, avg_accept_length=0.999, num_blocks=923, overall_hit_rate=0.254, tree_blocks=878, tree_alt_wins=18, tree_extra_tokens=18, tree_nodes=3.09, tree_depth=2.51, main_accept=0.979
+
+Task: open the top drawer and put the bowl inside
+Starting episode 31...
+Success: True
+# episodes completed so far: 181
+# successes: 134 (74.0%)
+Speculative stats: length=2.296, avg_accept_length=1.073, num_blocks=619, overall_hit_rate=0.277, tree_blocks=552, tree_alt_wins=50, tree_extra_tokens=51, tree_nodes=3.22, tree_depth=2.40, main_accept=0.990
+
+Task: open the top drawer and put the bowl inside
+Starting episode 32...
+Success: True
+# episodes completed so far: 182
+# successes: 135 (74.2%)
+Speculative stats: length=2.217, avg_accept_length=1.002, num_blocks=584, overall_hit_rate=0.260, tree_blocks=525, tree_alt_wins=43, tree_extra_tokens=45, tree_nodes=3.17, tree_depth=2.37, main_accept=0.925
+
+Task: open the top drawer and put the bowl inside
+Starting episode 33...
+Success: True
+# episodes completed so far: 183
+# successes: 136 (74.3%)
+Speculative stats: length=2.320, avg_accept_length=1.060, num_blocks=531, overall_hit_rate=0.271, tree_blocks=493, tree_alt_wins=23, tree_extra_tokens=24, tree_nodes=3.14, tree_depth=2.43, main_accept=1.015
+
+Task: open the top drawer and put the bowl inside
+Starting episode 34...
+Success: True
+# episodes completed so far: 184
+# successes: 137 (74.5%)
+Speculative stats: length=2.417, avg_accept_length=1.160, num_blocks=643, overall_hit_rate=0.292, tree_blocks=585, tree_alt_wins=56, tree_extra_tokens=59, tree_nodes=3.27, tree_depth=2.44, main_accept=1.068
+
+Task: open the top drawer and put the bowl inside
+Starting episode 35...
+Success: True
+# episodes completed so far: 185
+# successes: 138 (74.6%)
+Speculative stats: length=2.242, avg_accept_length=1.011, num_blocks=537, overall_hit_rate=0.262, tree_blocks=489, tree_alt_wins=43, tree_extra_tokens=45, tree_nodes=3.14, tree_depth=2.35, main_accept=0.927
+
+Task: open the top drawer and put the bowl inside
+Starting episode 36...
+Success: True
+# episodes completed so far: 186
+# successes: 139 (74.7%)
+Speculative stats: length=2.219, avg_accept_length=1.012, num_blocks=754, overall_hit_rate=0.260, tree_blocks=671, tree_alt_wins=49, tree_extra_tokens=49, tree_nodes=3.24, tree_depth=2.32, main_accept=0.947
+
+Task: open the top drawer and put the bowl inside
+Starting episode 37...
+Success: True
+# episodes completed so far: 187
+# successes: 140 (74.9%)
+Speculative stats: length=2.325, avg_accept_length=1.060, num_blocks=548, overall_hit_rate=0.268, tree_blocks=511, tree_alt_wins=37, tree_extra_tokens=38, tree_nodes=3.16, tree_depth=2.42, main_accept=0.991
+
+Task: open the top drawer and put the bowl inside
+Starting episode 38...
+Success: True
+# episodes completed so far: 188
+# successes: 141 (75.0%)
+Speculative stats: length=2.216, avg_accept_length=1.020, num_blocks=654, overall_hit_rate=0.269, tree_blocks=575, tree_alt_wins=50, tree_extra_tokens=51, tree_nodes=3.18, tree_depth=2.29, main_accept=0.942
+
+Task: open the top drawer and put the bowl inside
+Starting episode 39...
+Success: True
+# episodes completed so far: 189
+# successes: 142 (75.1%)
+Speculative stats: length=2.254, avg_accept_length=1.016, num_blocks=621, overall_hit_rate=0.259, tree_blocks=568, tree_alt_wins=46, tree_extra_tokens=47, tree_nodes=3.19, tree_depth=2.37, main_accept=0.940
+
+Task: open the top drawer and put the bowl inside
+Starting episode 40...
+Success: False
+# episodes completed so far: 190
+# successes: 142 (74.7%)
+Speculative stats: length=2.577, avg_accept_length=1.237, num_blocks=815, overall_hit_rate=0.304, tree_blocks=792, tree_alt_wins=115, tree_extra_tokens=115, tree_nodes=3.16, tree_depth=2.03, main_accept=1.096
+
+Task: open the top drawer and put the bowl inside
+Starting episode 41...
+Success: True
+# episodes completed so far: 191
+# successes: 143 (74.9%)
+Speculative stats: length=2.295, avg_accept_length=1.049, num_blocks=613, overall_hit_rate=0.268, tree_blocks=562, tree_alt_wins=46, tree_extra_tokens=46, tree_nodes=3.17, tree_depth=2.37, main_accept=0.974
+
+Task: open the top drawer and put the bowl inside
+Starting episode 42...
+Success: True
+# episodes completed so far: 192
+# successes: 144 (75.0%)
+Speculative stats: length=2.281, avg_accept_length=1.024, num_blocks=666, overall_hit_rate=0.261, tree_blocks=620, tree_alt_wins=55, tree_extra_tokens=56, tree_nodes=3.15, tree_depth=2.29, main_accept=0.940
+
+Task: open the top drawer and put the bowl inside
+Starting episode 43...
+Success: True
+# episodes completed so far: 193
+# successes: 145 (75.1%)
+Speculative stats: length=2.243, avg_accept_length=1.040, num_blocks=927, overall_hit_rate=0.272, tree_blocks=817, tree_alt_wins=66, tree_extra_tokens=68, tree_nodes=3.20, tree_depth=2.33, main_accept=0.967
+
+Task: open the top drawer and put the bowl inside
+Starting episode 44...
+Success: True
+# episodes completed so far: 194
+# successes: 146 (75.3%)
+Speculative stats: length=2.190, avg_accept_length=0.966, num_blocks=588, overall_hit_rate=0.250, tree_blocks=536, tree_alt_wins=48, tree_extra_tokens=48, tree_nodes=3.14, tree_depth=2.21, main_accept=0.884
+
+Task: open the top drawer and put the bowl inside
+Starting episode 45...
+Success: False
+# episodes completed so far: 195
+# successes: 146 (74.9%)
+Speculative stats: length=2.253, avg_accept_length=1.056, num_blocks=932, overall_hit_rate=0.272, tree_blocks=812, tree_alt_wins=72, tree_extra_tokens=73, tree_nodes=3.31, tree_depth=2.45, main_accept=0.977
+
+Task: open the top drawer and put the bowl inside
+Starting episode 46...
+Success: False
+# episodes completed so far: 196
+# successes: 146 (74.5%)
+Speculative stats: length=2.136, avg_accept_length=0.948, num_blocks=983, overall_hit_rate=0.254, tree_blocks=868, tree_alt_wins=162, tree_extra_tokens=163, tree_nodes=3.10, tree_depth=2.06, main_accept=0.782
+
+Task: open the top drawer and put the bowl inside
+Starting episode 47...
+Success: False
+# episodes completed so far: 197
+# successes: 146 (74.1%)
+Speculative stats: length=2.106, avg_accept_length=0.898, num_blocks=997, overall_hit_rate=0.236, tree_blocks=904, tree_alt_wins=85, tree_extra_tokens=85, tree_nodes=3.08, tree_depth=2.19, main_accept=0.812
+
+Task: open the top drawer and put the bowl inside
+Starting episode 48...
+Success: False
+# episodes completed so far: 198
+# successes: 146 (73.7%)
+Speculative stats: length=2.218, avg_accept_length=1.022, num_blocks=947, overall_hit_rate=0.265, tree_blocks=830, tree_alt_wins=61, tree_extra_tokens=65, tree_nodes=3.26, tree_depth=2.45, main_accept=0.954
+
+Task: open the top drawer and put the bowl inside
+Starting episode 49...
+Success: False
+# episodes completed so far: 199
+# successes: 146 (73.4%)
+Speculative stats: length=2.152, avg_accept_length=0.991, num_blocks=976, overall_hit_rate=0.263, tree_blocks=829, tree_alt_wins=90, tree_extra_tokens=90, tree_nodes=3.25, tree_depth=2.30, main_accept=0.899
+
+Task: open the top drawer and put the bowl inside
+Starting episode 50...
+Success: True
+# episodes completed so far: 200
+# successes: 147 (73.5%)
+Speculative stats: length=2.155, avg_accept_length=0.965, num_blocks=627, overall_hit_rate=0.254, tree_blocks=553, tree_alt_wins=42, tree_extra_tokens=42, tree_nodes=3.17, tree_depth=2.32, main_accept=0.898
+Current task success rate: 0.62
+Current total success rate: 0.735
+Current task speculative stats: length=2.253, avg_accept_length=1.033, num_blocks=36905, overall_hit_rate=0.266, tree_blocks=33111, tree_alt_wins=2892, tree_extra_tokens=2954, tree_nodes=3.21, tree_depth=2.37, main_accept=0.953
+
+Task: put the bowl on top of the cabinet
+Starting episode 1...
+Success: True
+# episodes completed so far: 201
+# successes: 148 (73.6%)
+Speculative stats: length=2.291, avg_accept_length=1.080, num_blocks=275, overall_hit_rate=0.282, tree_blocks=243, tree_alt_wins=16, tree_extra_tokens=19, tree_nodes=3.20, tree_depth=2.45, main_accept=1.011
+
+Task: put the bowl on top of the cabinet
+Starting episode 2...
+Success: True
+# episodes completed so far: 202
+# successes: 149 (73.8%)
+Speculative stats: length=2.348, avg_accept_length=1.111, num_blocks=316, overall_hit_rate=0.283, tree_blocks=285, tree_alt_wins=19, tree_extra_tokens=20, tree_nodes=3.24, tree_depth=2.47, main_accept=1.047
+
+Task: put the bowl on top of the cabinet
+Starting episode 3...
+Success: True
+# episodes completed so far: 203
+# successes: 150 (73.9%)
+Speculative stats: length=2.485, avg_accept_length=1.205, num_blocks=293, overall_hit_rate=0.299, tree_blocks=271, tree_alt_wins=14, tree_extra_tokens=14, tree_nodes=3.28, tree_depth=2.63, main_accept=1.157
+
+Task: put the bowl on top of the cabinet
+Starting episode 4...
+Success: True
+# episodes completed so far: 204
+# successes: 151 (74.0%)
+Speculative stats: length=2.226, avg_accept_length=1.046, num_blocks=327, overall_hit_rate=0.277, tree_blocks=282, tree_alt_wins=20, tree_extra_tokens=22, tree_nodes=3.22, tree_depth=2.44, main_accept=0.979
+
+Task: put the bowl on top of the cabinet
+Starting episode 5...
+Success: True
+# episodes completed so far: 205
+# successes: 152 (74.1%)
+Speculative stats: length=2.390, avg_accept_length=1.142, num_blocks=246, overall_hit_rate=0.295, tree_blocks=223, tree_alt_wins=14, tree_extra_tokens=14, tree_nodes=3.17, tree_depth=2.40, main_accept=1.085
+
+Task: put the bowl on top of the cabinet
+Starting episode 6...
+Success: True
+# episodes completed so far: 206
+# successes: 153 (74.3%)
+Speculative stats: length=2.294, avg_accept_length=1.089, num_blocks=293, overall_hit_rate=0.286, tree_blocks=257, tree_alt_wins=15, tree_extra_tokens=17, tree_nodes=3.19, tree_depth=2.50, main_accept=1.031
+
+Task: put the bowl on top of the cabinet
+Starting episode 7...
+Success: True
+# episodes completed so far: 207
+# successes: 154 (74.4%)
+Speculative stats: length=2.360, avg_accept_length=1.120, num_blocks=267, overall_hit_rate=0.289, tree_blocks=241, tree_alt_wins=16, tree_extra_tokens=17, tree_nodes=3.18, tree_depth=2.46, main_accept=1.056
+
+Task: put the bowl on top of the cabinet
+Starting episode 8...
+Success: True
+# episodes completed so far: 208
+# successes: 155 (74.5%)
+Speculative stats: length=2.496, avg_accept_length=1.209, num_blocks=258, overall_hit_rate=0.304, tree_blocks=240, tree_alt_wins=19, tree_extra_tokens=21, tree_nodes=3.21, tree_depth=2.52, main_accept=1.128
+
+Task: put the bowl on top of the cabinet
+Starting episode 9...
+Success: True
+# episodes completed so far: 209
+# successes: 156 (74.6%)
+Speculative stats: length=2.269, avg_accept_length=1.059, num_blocks=290, overall_hit_rate=0.279, tree_blocks=256, tree_alt_wins=22, tree_extra_tokens=23, tree_nodes=3.17, tree_depth=2.34, main_accept=0.979
+
+Task: put the bowl on top of the cabinet
+Starting episode 10...
+Success: True
+# episodes completed so far: 210
+# successes: 157 (74.8%)
+Speculative stats: length=2.484, avg_accept_length=1.214, num_blocks=248, overall_hit_rate=0.306, tree_blocks=227, tree_alt_wins=18, tree_extra_tokens=21, tree_nodes=3.24, tree_depth=2.50, main_accept=1.129
+
+Task: put the bowl on top of the cabinet
+Starting episode 11...
+Success: True
+# episodes completed so far: 211
+# successes: 158 (74.9%)
+Speculative stats: length=2.268, avg_accept_length=1.070, num_blocks=287, overall_hit_rate=0.281, tree_blocks=251, tree_alt_wins=17, tree_extra_tokens=19, tree_nodes=3.20, tree_depth=2.43, main_accept=1.003
+
+Task: put the bowl on top of the cabinet
+Starting episode 12...
+Success: True
+# episodes completed so far: 212
+# successes: 159 (75.0%)
+Speculative stats: length=2.457, avg_accept_length=1.196, num_blocks=265, overall_hit_rate=0.300, tree_blocks=241, tree_alt_wins=18, tree_extra_tokens=20, tree_nodes=3.29, tree_depth=2.54, main_accept=1.121
+
+Task: put the bowl on top of the cabinet
+Starting episode 13...
+Success: True
+# episodes completed so far: 213
+# successes: 160 (75.1%)
+Speculative stats: length=2.343, avg_accept_length=1.122, num_blocks=254, overall_hit_rate=0.293, tree_blocks=225, tree_alt_wins=13, tree_extra_tokens=16, tree_nodes=3.19, tree_depth=2.51, main_accept=1.059
+
+Task: put the bowl on top of the cabinet
+Starting episode 14...
+Success: True
+# episodes completed so far: 214
+# successes: 161 (75.2%)
+Speculative stats: length=2.379, avg_accept_length=1.119, num_blocks=253, overall_hit_rate=0.287, tree_blocks=233, tree_alt_wins=14, tree_extra_tokens=16, tree_nodes=3.15, tree_depth=2.39, main_accept=1.055
+
+Task: put the bowl on top of the cabinet
+Starting episode 15...
+Success: False
+# episodes completed so far: 215
+# successes: 161 (74.9%)
+Speculative stats: length=3.013, avg_accept_length=1.611, num_blocks=697, overall_hit_rate=0.358, tree_blocks=674, tree_alt_wins=39, tree_extra_tokens=40, tree_nodes=3.62, tree_depth=2.77, main_accept=1.554
+
+Task: put the bowl on top of the cabinet
+Starting episode 16...
+Success: False
+# episodes completed so far: 216
+# successes: 161 (74.5%)
+Speculative stats: length=2.222, avg_accept_length=1.021, num_blocks=945, overall_hit_rate=0.263, tree_blocks=832, tree_alt_wins=65, tree_extra_tokens=68, tree_nodes=3.27, tree_depth=2.46, main_accept=0.949
+
+Task: put the bowl on top of the cabinet
+Starting episode 17...
+Success: True
+# episodes completed so far: 217
+# successes: 162 (74.7%)
+Speculative stats: length=2.314, avg_accept_length=1.110, num_blocks=236, overall_hit_rate=0.289, tree_blocks=206, tree_alt_wins=12, tree_extra_tokens=12, tree_nodes=3.25, tree_depth=2.54, main_accept=1.059
+
+Task: put the bowl on top of the cabinet
+Starting episode 18...
+Success: True
+# episodes completed so far: 218
+# successes: 163 (74.8%)
+Speculative stats: length=2.548, avg_accept_length=1.276, num_blocks=283, overall_hit_rate=0.321, tree_blocks=257, tree_alt_wins=11, tree_extra_tokens=12, tree_nodes=3.28, tree_depth=2.66, main_accept=1.233
+
+Task: put the bowl on top of the cabinet
+Starting episode 19...
+Success: True
+# episodes completed so far: 219
+# successes: 164 (74.9%)
+Speculative stats: length=2.296, avg_accept_length=1.038, num_blocks=314, overall_hit_rate=0.267, tree_blocks=292, tree_alt_wins=22, tree_extra_tokens=22, tree_nodes=3.11, tree_depth=2.46, main_accept=0.968
+
+Task: put the bowl on top of the cabinet
+Starting episode 20...
+Success: True
+# episodes completed so far: 220
+# successes: 165 (75.0%)
+Speculative stats: length=2.363, avg_accept_length=1.118, num_blocks=237, overall_hit_rate=0.285, tree_blocks=215, tree_alt_wins=24, tree_extra_tokens=26, tree_nodes=3.23, tree_depth=2.41, main_accept=1.008
+
+Task: put the bowl on top of the cabinet
+Starting episode 21...
+Success: True
+# episodes completed so far: 221
+# successes: 166 (75.1%)
+Speculative stats: length=2.324, avg_accept_length=1.092, num_blocks=262, overall_hit_rate=0.283, tree_blocks=236, tree_alt_wins=21, tree_extra_tokens=23, tree_nodes=3.18, tree_depth=2.42, main_accept=1.004
+
+Task: put the bowl on top of the cabinet
+Starting episode 22...
+Success: True
+# episodes completed so far: 222
+# successes: 167 (75.2%)
+Speculative stats: length=2.424, avg_accept_length=1.174, num_blocks=384, overall_hit_rate=0.301, tree_blocks=347, tree_alt_wins=26, tree_extra_tokens=28, tree_nodes=3.21, tree_depth=2.57, main_accept=1.102
+
+Task: put the bowl on top of the cabinet
+Starting episode 23...
+Success: True
+# episodes completed so far: 223
+# successes: 168 (75.3%)
+Speculative stats: length=2.343, avg_accept_length=1.094, num_blocks=254, overall_hit_rate=0.280, tree_blocks=232, tree_alt_wins=23, tree_extra_tokens=27, tree_nodes=3.18, tree_depth=2.33, main_accept=0.988
+
+Task: put the bowl on top of the cabinet
+Starting episode 24...
+Success: True
+# episodes completed so far: 224
+# successes: 169 (75.4%)
+Speculative stats: length=2.324, avg_accept_length=1.104, num_blocks=241, overall_hit_rate=0.281, tree_blocks=214, tree_alt_wins=16, tree_extra_tokens=17, tree_nodes=3.29, tree_depth=2.59, main_accept=1.033
+
+Task: put the bowl on top of the cabinet
+Starting episode 25...
+Success: True
+# episodes completed so far: 225
+# successes: 170 (75.6%)
+Speculative stats: length=2.296, avg_accept_length=1.084, num_blocks=250, overall_hit_rate=0.281, tree_blocks=221, tree_alt_wins=17, tree_extra_tokens=18, tree_nodes=3.24, tree_depth=2.48, main_accept=1.012
+
+Task: put the bowl on top of the cabinet
+Starting episode 26...
+Success: True
+# episodes completed so far: 226
+# successes: 171 (75.7%)
+Speculative stats: length=2.789, avg_accept_length=1.485, num_blocks=487, overall_hit_rate=0.360, tree_blocks=441, tree_alt_wins=31, tree_extra_tokens=36, tree_nodes=3.45, tree_depth=2.76, main_accept=1.411
+
+Task: put the bowl on top of the cabinet
+Starting episode 27...
+Success: True
+# episodes completed so far: 227
+# successes: 172 (75.8%)
+Speculative stats: length=2.473, avg_accept_length=1.207, num_blocks=300, overall_hit_rate=0.301, tree_blocks=274, tree_alt_wins=25, tree_extra_tokens=27, tree_nodes=3.29, tree_depth=2.58, main_accept=1.117
+
+Task: put the bowl on top of the cabinet
+Starting episode 28...
+Success: False
+# episodes completed so far: 228
+# successes: 172 (75.4%)
+Speculative stats: length=2.227, avg_accept_length=1.078, num_blocks=943, overall_hit_rate=0.287, tree_blocks=780, tree_alt_wins=180, tree_extra_tokens=182, tree_nodes=3.33, tree_depth=2.12, main_accept=0.885
+
+Task: put the bowl on top of the cabinet
+Starting episode 29...
+Success: False
+# episodes completed so far: 229
+# successes: 172 (75.1%)
+Speculative stats: length=6.731, avg_accept_length=4.769, num_blocks=312, overall_hit_rate=0.802, tree_blocks=312, tree_alt_wins=0, tree_extra_tokens=0, tree_nodes=4.95, tree_depth=4.95, main_accept=4.769
+
+Task: put the bowl on top of the cabinet
+Starting episode 30...
+Success: True
+# episodes completed so far: 230
+# successes: 173 (75.2%)
+Speculative stats: length=2.471, avg_accept_length=1.224, num_blocks=255, overall_hit_rate=0.307, tree_blocks=228, tree_alt_wins=21, tree_extra_tokens=21, tree_nodes=3.34, tree_depth=2.62, main_accept=1.141
+
+Task: put the bowl on top of the cabinet
+Starting episode 31...
+Success: False
+# episodes completed so far: 231
+# successes: 173 (74.9%)
+Speculative stats: length=7.000, avg_accept_length=5.000, num_blocks=300, overall_hit_rate=0.833, tree_blocks=300, tree_alt_wins=0, tree_extra_tokens=0, tree_nodes=5.00, tree_depth=5.00, main_accept=5.000
+
+Task: put the bowl on top of the cabinet
+Starting episode 32...
+Success: True
+# episodes completed so far: 232
+# successes: 174 (75.0%)
+Speculative stats: length=2.505, avg_accept_length=1.244, num_blocks=299, overall_hit_rate=0.310, tree_blocks=270, tree_alt_wins=21, tree_extra_tokens=23, tree_nodes=3.34, tree_depth=2.61, main_accept=1.167
+
+Task: put the bowl on top of the cabinet
+Starting episode 33...
+Success: True
+# episodes completed so far: 233
+# successes: 175 (75.1%)
+Speculative stats: length=2.370, avg_accept_length=1.132, num_blocks=257, overall_hit_rate=0.291, tree_blocks=231, tree_alt_wins=21, tree_extra_tokens=23, tree_nodes=3.21, tree_depth=2.45, main_accept=1.043
+
+Task: put the bowl on top of the cabinet
+Starting episode 34...
+Success: True
+# episodes completed so far: 234
+# successes: 176 (75.2%)
+Speculative stats: length=2.431, avg_accept_length=1.188, num_blocks=239, overall_hit_rate=0.305, tree_blocks=214, tree_alt_wins=22, tree_extra_tokens=24, tree_nodes=3.23, tree_depth=2.45, main_accept=1.088
+
+Task: put the bowl on top of the cabinet
+Starting episode 35...
+Success: True
+# episodes completed so far: 235
+# successes: 177 (75.3%)
+Speculative stats: length=2.444, avg_accept_length=1.194, num_blocks=252, overall_hit_rate=0.304, tree_blocks=227, tree_alt_wins=20, tree_extra_tokens=22, tree_nodes=3.26, tree_depth=2.49, main_accept=1.107
+
+Task: put the bowl on top of the cabinet
+Starting episode 36...
+Success: True
+# episodes completed so far: 236
+# successes: 178 (75.4%)
+Speculative stats: length=2.333, avg_accept_length=1.086, num_blocks=279, overall_hit_rate=0.279, tree_blocks=255, tree_alt_wins=16, tree_extra_tokens=16, tree_nodes=3.17, tree_depth=2.46, main_accept=1.029
+
+Task: put the bowl on top of the cabinet
+Starting episode 37...
+Success: True
+# episodes completed so far: 237
+# successes: 179 (75.5%)
+Speculative stats: length=2.398, avg_accept_length=1.157, num_blocks=254, overall_hit_rate=0.294, tree_blocks=228, tree_alt_wins=17, tree_extra_tokens=19, tree_nodes=3.27, tree_depth=2.58, main_accept=1.083
+
+Task: put the bowl on top of the cabinet
+Starting episode 38...
+Success: True
+# episodes completed so far: 238
+# successes: 180 (75.6%)
+Speculative stats: length=2.371, avg_accept_length=1.133, num_blocks=248, overall_hit_rate=0.290, tree_blocks=223, tree_alt_wins=20, tree_extra_tokens=20, tree_nodes=3.24, tree_depth=2.54, main_accept=1.052
+
+Task: put the bowl on top of the cabinet
+Starting episode 39...
+Success: False
+# episodes completed so far: 239
+# successes: 180 (75.3%)
+Speculative stats: length=2.248, avg_accept_length=1.029, num_blocks=934, overall_hit_rate=0.269, tree_blocks=811, tree_alt_wins=87, tree_extra_tokens=89, tree_nodes=3.26, tree_depth=2.44, main_accept=0.934
+
+Task: put the bowl on top of the cabinet
+Starting episode 40...
+Success: True
+# episodes completed so far: 240
+# successes: 181 (75.4%)
+Speculative stats: length=2.333, avg_accept_length=1.116, num_blocks=267, overall_hit_rate=0.287, tree_blocks=236, tree_alt_wins=15, tree_extra_tokens=15, tree_nodes=3.28, tree_depth=2.44, main_accept=1.060
+
+Task: put the bowl on top of the cabinet
+Starting episode 41...
+Success: True
+# episodes completed so far: 241
+# successes: 182 (75.5%)
+Speculative stats: length=2.632, avg_accept_length=1.368, num_blocks=391, overall_hit_rate=0.334, tree_blocks=347, tree_alt_wins=14, tree_extra_tokens=14, tree_nodes=3.50, tree_depth=3.05, main_accept=1.332
+
+Task: put the bowl on top of the cabinet
+Starting episode 42...
+Success: True
+# episodes completed so far: 242
+# successes: 183 (75.6%)
+Speculative stats: length=2.360, avg_accept_length=1.155, num_blocks=258, overall_hit_rate=0.299, tree_blocks=224, tree_alt_wins=23, tree_extra_tokens=28, tree_nodes=3.30, tree_depth=2.47, main_accept=1.047
+
+Task: put the bowl on top of the cabinet
+Starting episode 43...
+Success: True
+# episodes completed so far: 243
+# successes: 184 (75.7%)
+Speculative stats: length=2.254, avg_accept_length=1.072, num_blocks=236, overall_hit_rate=0.288, tree_blocks=202, tree_alt_wins=16, tree_extra_tokens=19, tree_nodes=3.18, tree_depth=2.43, main_accept=0.992
+
+Task: put the bowl on top of the cabinet
+Starting episode 44...
+Success: True
+# episodes completed so far: 244
+# successes: 185 (75.8%)
+Speculative stats: length=2.265, avg_accept_length=1.047, num_blocks=275, overall_hit_rate=0.269, tree_blocks=246, tree_alt_wins=28, tree_extra_tokens=29, tree_nodes=3.23, tree_depth=2.49, main_accept=0.942
+
+Task: put the bowl on top of the cabinet
+Starting episode 45...
+Success: True
+# episodes completed so far: 245
+# successes: 186 (75.9%)
+Speculative stats: length=2.453, avg_accept_length=1.220, num_blocks=254, overall_hit_rate=0.312, tree_blocks=224, tree_alt_wins=16, tree_extra_tokens=18, tree_nodes=3.29, tree_depth=2.60, main_accept=1.150
+
+Task: put the bowl on top of the cabinet
+Starting episode 46...
+Success: True
+# episodes completed so far: 246
+# successes: 187 (76.0%)
+Speculative stats: length=2.389, avg_accept_length=1.167, num_blocks=293, overall_hit_rate=0.303, tree_blocks=258, tree_alt_wins=20, tree_extra_tokens=26, tree_nodes=3.24, tree_depth=2.66, main_accept=1.078
+
+Task: put the bowl on top of the cabinet
+Starting episode 47...
+Success: True
+# episodes completed so far: 247
+# successes: 188 (76.1%)
+Speculative stats: length=2.350, avg_accept_length=1.130, num_blocks=277, overall_hit_rate=0.291, tree_blocks=245, tree_alt_wins=22, tree_extra_tokens=26, tree_nodes=3.26, tree_depth=2.51, main_accept=1.036
+
+Task: put the bowl on top of the cabinet
+Starting episode 48...
+Success: False
+# episodes completed so far: 248
+# successes: 188 (75.8%)
+Speculative stats: length=2.206, avg_accept_length=0.958, num_blocks=952, overall_hit_rate=0.249, tree_blocks=877, tree_alt_wins=58, tree_extra_tokens=59, tree_nodes=3.09, tree_depth=2.21, main_accept=0.896
+
+Task: put the bowl on top of the cabinet
+Starting episode 49...
+Success: True
+# episodes completed so far: 249
+# successes: 189 (75.9%)
+Speculative stats: length=2.418, avg_accept_length=1.132, num_blocks=304, overall_hit_rate=0.283, tree_blocks=286, tree_alt_wins=28, tree_extra_tokens=30, tree_nodes=3.19, tree_depth=2.46, main_accept=1.033
+
+Task: put the bowl on top of the cabinet
+Starting episode 50...
+Success: True
+# episodes completed so far: 250
+# successes: 190 (76.0%)
+Speculative stats: length=2.236, avg_accept_length=1.045, num_blocks=288, overall_hit_rate=0.277, tree_blocks=251, tree_alt_wins=18, tree_extra_tokens=22, tree_nodes=3.18, tree_depth=2.45, main_accept=0.969
+Current task success rate: 0.86
+Current total success rate: 0.76
+Current task speculative stats: length=2.543, avg_accept_length=1.278, num_blocks=17129, overall_hit_rate=0.320, tree_blocks=15391, tree_alt_wins=1250, tree_extra_tokens=1340, tree_nodes=3.33, tree_depth=2.59, main_accept=1.200
+
+Task: push the plate to the front of the stove
+Starting episode 1...
+Success: True
+# episodes completed so far: 251
+# successes: 191 (76.1%)
+Speculative stats: length=2.237, avg_accept_length=1.044, num_blocks=413, overall_hit_rate=0.268, tree_blocks=361, tree_alt_wins=39, tree_extra_tokens=40, tree_nodes=3.30, tree_depth=2.42, main_accept=0.947
+
+Task: push the plate to the front of the stove
+Starting episode 2...
+Success: True
+# episodes completed so far: 252
+# successes: 192 (76.2%)
+Speculative stats: length=2.217, avg_accept_length=0.979, num_blocks=420, overall_hit_rate=0.252, tree_blocks=387, tree_alt_wins=34, tree_extra_tokens=36, tree_nodes=3.14, tree_depth=2.31, main_accept=0.893
+
+Task: push the plate to the front of the stove
+Starting episode 3...
+Success: True
+# episodes completed so far: 253
+# successes: 193 (76.3%)
+Speculative stats: length=2.643, avg_accept_length=1.296, num_blocks=527, overall_hit_rate=0.317, tree_blocks=511, tree_alt_wins=28, tree_extra_tokens=32, tree_nodes=3.19, tree_depth=2.67, main_accept=1.235
+
+Task: push the plate to the front of the stove
+Starting episode 4...
+Success: True
+# episodes completed so far: 254
+# successes: 194 (76.4%)
+Speculative stats: length=2.201, avg_accept_length=0.984, num_blocks=442, overall_hit_rate=0.253, tree_blocks=399, tree_alt_wins=46, tree_extra_tokens=47, tree_nodes=3.20, tree_depth=2.20, main_accept=0.878
+
+Task: push the plate to the front of the stove
+Starting episode 5...
+Success: True
+# episodes completed so far: 255
+# successes: 195 (76.5%)
+Speculative stats: length=2.261, avg_accept_length=1.029, num_blocks=483, overall_hit_rate=0.261, tree_blocks=439, tree_alt_wins=44, tree_extra_tokens=44, tree_nodes=3.23, tree_depth=2.34, main_accept=0.938
+
+Task: push the plate to the front of the stove
+Starting episode 6...
+Success: True
+# episodes completed so far: 256
+# successes: 196 (76.6%)
+Speculative stats: length=2.281, avg_accept_length=1.047, num_blocks=448, overall_hit_rate=0.263, tree_blocks=407, tree_alt_wins=37, tree_extra_tokens=37, tree_nodes=3.29, tree_depth=2.37, main_accept=0.964
+
+Task: push the plate to the front of the stove
+Starting episode 7...
+Success: True
+# episodes completed so far: 257
+# successes: 197 (76.7%)
+Speculative stats: length=2.301, avg_accept_length=1.050, num_blocks=362, overall_hit_rate=0.261, tree_blocks=334, tree_alt_wins=29, tree_extra_tokens=30, tree_nodes=3.27, tree_depth=2.37, main_accept=0.967
+
+Task: push the plate to the front of the stove
+Starting episode 8...
+Success: True
+# episodes completed so far: 258
+# successes: 198 (76.7%)
+Speculative stats: length=2.232, avg_accept_length=0.997, num_blocks=370, overall_hit_rate=0.252, tree_blocks=339, tree_alt_wins=29, tree_extra_tokens=29, tree_nodes=3.23, tree_depth=2.28, main_accept=0.919
+
+Task: push the plate to the front of the stove
+Starting episode 9...
+Success: False
+# episodes completed so far: 259
+# successes: 198 (76.4%)
+Speculative stats: length=3.477, avg_accept_length=1.982, num_blocks=604, overall_hit_rate=0.495, tree_blocks=603, tree_alt_wins=7, tree_extra_tokens=7, tree_nodes=3.00, tree_depth=2.96, main_accept=1.970
+
+Task: push the plate to the front of the stove
+Starting episode 10...
+Success: True
+# episodes completed so far: 260
+# successes: 199 (76.5%)
+Speculative stats: length=2.252, avg_accept_length=1.014, num_blocks=485, overall_hit_rate=0.259, tree_blocks=444, tree_alt_wins=35, tree_extra_tokens=36, tree_nodes=3.18, tree_depth=2.32, main_accept=0.940
+
+Task: push the plate to the front of the stove
+Starting episode 11...
+Success: False
+# episodes completed so far: 261
+# successes: 199 (76.2%)
+Speculative stats: length=2.152, avg_accept_length=0.989, num_blocks=976, overall_hit_rate=0.263, tree_blocks=835, tree_alt_wins=87, tree_extra_tokens=87, tree_nodes=3.22, tree_depth=2.23, main_accept=0.900
+
+Task: push the plate to the front of the stove
+Starting episode 12...
+Success: True
+# episodes completed so far: 262
+# successes: 200 (76.3%)
+Speculative stats: length=2.269, avg_accept_length=1.023, num_blocks=435, overall_hit_rate=0.259, tree_blocks=401, tree_alt_wins=26, tree_extra_tokens=27, tree_nodes=3.20, tree_depth=2.42, main_accept=0.961
+
+Task: push the plate to the front of the stove
+Starting episode 13...
+Success: True
+# episodes completed so far: 263
+# successes: 201 (76.4%)
+Speculative stats: length=2.154, avg_accept_length=0.932, num_blocks=546, overall_hit_rate=0.240, tree_blocks=499, tree_alt_wins=54, tree_extra_tokens=54, tree_nodes=3.15, tree_depth=2.22, main_accept=0.833
+
+Task: push the plate to the front of the stove
+Starting episode 14...
+Success: True
+# episodes completed so far: 264
+# successes: 202 (76.5%)
+Speculative stats: length=2.242, avg_accept_length=1.042, num_blocks=384, overall_hit_rate=0.265, tree_blocks=338, tree_alt_wins=28, tree_extra_tokens=30, tree_nodes=3.32, tree_depth=2.51, main_accept=0.964
+
+Task: push the plate to the front of the stove
+Starting episode 15...
+Success: True
+# episodes completed so far: 265
+# successes: 203 (76.6%)
+Speculative stats: length=2.192, avg_accept_length=0.968, num_blocks=412, overall_hit_rate=0.248, tree_blocks=375, tree_alt_wins=41, tree_extra_tokens=41, tree_nodes=3.19, tree_depth=2.20, main_accept=0.869
+
+Task: push the plate to the front of the stove
+Starting episode 16...
+Success: True
+# episodes completed so far: 266
+# successes: 204 (76.7%)
+Speculative stats: length=2.268, avg_accept_length=1.030, num_blocks=429, overall_hit_rate=0.262, tree_blocks=392, tree_alt_wins=40, tree_extra_tokens=42, tree_nodes=3.22, tree_depth=2.26, main_accept=0.932
+
+Task: push the plate to the front of the stove
+Starting episode 17...
+Success: True
+# episodes completed so far: 267
+# successes: 205 (76.8%)
+Speculative stats: length=2.205, avg_accept_length=0.979, num_blocks=435, overall_hit_rate=0.251, tree_blocks=396, tree_alt_wins=35, tree_extra_tokens=35, tree_nodes=3.19, tree_depth=2.14, main_accept=0.899
+
+Task: push the plate to the front of the stove
+Starting episode 18...
+Success: True
+# episodes completed so far: 268
+# successes: 206 (76.9%)
+Speculative stats: length=2.271, avg_accept_length=1.010, num_blocks=484, overall_hit_rate=0.254, tree_blocks=453, tree_alt_wins=31, tree_extra_tokens=31, tree_nodes=3.17, tree_depth=2.32, main_accept=0.946
+
+Task: push the plate to the front of the stove
+Starting episode 19...
+Success: True
+# episodes completed so far: 269
+# successes: 207 (77.0%)
+Speculative stats: length=2.277, avg_accept_length=1.024, num_blocks=415, overall_hit_rate=0.259, tree_blocks=385, tree_alt_wins=25, tree_extra_tokens=25, tree_nodes=3.18, tree_depth=2.34, main_accept=0.964
+
+Task: push the plate to the front of the stove
+Starting episode 20...
+Success: True
+# episodes completed so far: 270
+# successes: 208 (77.0%)
+Speculative stats: length=2.256, avg_accept_length=0.987, num_blocks=391, overall_hit_rate=0.252, tree_blocks=370, tree_alt_wins=21, tree_extra_tokens=21, tree_nodes=3.09, tree_depth=2.31, main_accept=0.934
+
+Task: push the plate to the front of the stove
+Starting episode 21...
+Success: True
+# episodes completed so far: 271
+# successes: 209 (77.1%)
+Speculative stats: length=2.237, avg_accept_length=1.018, num_blocks=438, overall_hit_rate=0.260, tree_blocks=394, tree_alt_wins=37, tree_extra_tokens=37, tree_nodes=3.24, tree_depth=2.37, main_accept=0.934
+
+Task: push the plate to the front of the stove
+Starting episode 22...
+Success: True
+# episodes completed so far: 272
+# successes: 210 (77.2%)
+Speculative stats: length=2.127, avg_accept_length=0.937, num_blocks=543, overall_hit_rate=0.243, tree_blocks=481, tree_alt_wins=71, tree_extra_tokens=72, tree_nodes=3.23, tree_depth=2.23, main_accept=0.805
+
+Task: push the plate to the front of the stove
+Starting episode 23...
+Success: True
+# episodes completed so far: 273
+# successes: 211 (77.3%)
+Speculative stats: length=2.227, avg_accept_length=1.009, num_blocks=352, overall_hit_rate=0.255, tree_blocks=317, tree_alt_wins=34, tree_extra_tokens=35, tree_nodes=3.29, tree_depth=2.33, main_accept=0.909
+
+Task: push the plate to the front of the stove
+Starting episode 24...
+Success: True
+# episodes completed so far: 274
+# successes: 212 (77.4%)
+Speculative stats: length=2.240, avg_accept_length=1.025, num_blocks=475, overall_hit_rate=0.261, tree_blocks=425, tree_alt_wins=39, tree_extra_tokens=39, tree_nodes=3.27, tree_depth=2.29, main_accept=0.943
+
+Task: push the plate to the front of the stove
+Starting episode 25...
+Success: True
+# episodes completed so far: 275
+# successes: 213 (77.5%)
+Speculative stats: length=2.311, avg_accept_length=1.051, num_blocks=409, overall_hit_rate=0.263, tree_blocks=380, tree_alt_wins=35, tree_extra_tokens=37, tree_nodes=3.23, tree_depth=2.24, main_accept=0.961
+
+Task: push the plate to the front of the stove
+Starting episode 26...
+Success: True
+# episodes completed so far: 276
+# successes: 214 (77.5%)
+Speculative stats: length=2.270, avg_accept_length=0.992, num_blocks=478, overall_hit_rate=0.251, tree_blocks=456, tree_alt_wins=36, tree_extra_tokens=37, tree_nodes=3.10, tree_depth=2.29, main_accept=0.914
+
+Task: push the plate to the front of the stove
+Starting episode 27...
+Success: True
+# episodes completed so far: 277
+# successes: 215 (77.6%)
+Speculative stats: length=2.245, avg_accept_length=1.007, num_blocks=421, overall_hit_rate=0.257, tree_blocks=386, tree_alt_wins=44, tree_extra_tokens=45, tree_nodes=3.19, tree_depth=2.23, main_accept=0.900
+
+Task: push the plate to the front of the stove
+Starting episode 28...
+Success: True
+# episodes completed so far: 278
+# successes: 216 (77.7%)
+Speculative stats: length=2.211, avg_accept_length=0.984, num_blocks=516, overall_hit_rate=0.253, tree_blocks=470, tree_alt_wins=24, tree_extra_tokens=24, tree_nodes=3.18, tree_depth=2.32, main_accept=0.938
+
+Task: push the plate to the front of the stove
+Starting episode 29...
+Success: True
+# episodes completed so far: 279
+# successes: 217 (77.8%)
+Speculative stats: length=2.218, avg_accept_length=0.995, num_blocks=748, overall_hit_rate=0.255, tree_blocks=678, tree_alt_wins=61, tree_extra_tokens=62, tree_nodes=3.20, tree_depth=2.23, main_accept=0.912
+
+Task: push the plate to the front of the stove
+Starting episode 30...
+Success: True
+# episodes completed so far: 280
+# successes: 218 (77.9%)
+Speculative stats: length=2.277, avg_accept_length=1.024, num_blocks=458, overall_hit_rate=0.254, tree_blocks=425, tree_alt_wins=33, tree_extra_tokens=34, tree_nodes=3.27, tree_depth=2.50, main_accept=0.950
+
+Task: push the plate to the front of the stove
+Starting episode 31...
+Success: True
+# episodes completed so far: 281
+# successes: 219 (77.9%)
+Speculative stats: length=2.265, avg_accept_length=1.063, num_blocks=510, overall_hit_rate=0.272, tree_blocks=448, tree_alt_wins=30, tree_extra_tokens=31, tree_nodes=3.31, tree_depth=2.46, main_accept=1.002
+
+Task: push the plate to the front of the stove
+Starting episode 32...
+Success: False
+# episodes completed so far: 282
+# successes: 219 (77.7%)
+Speculative stats: length=2.094, avg_accept_length=0.900, num_blocks=1003, overall_hit_rate=0.230, tree_blocks=897, tree_alt_wins=96, tree_extra_tokens=98, tree_nodes=3.27, tree_depth=2.23, main_accept=0.803
+
+Task: push the plate to the front of the stove
+Starting episode 33...
+Success: True
+# episodes completed so far: 283
+# successes: 220 (77.7%)
+Speculative stats: length=2.228, avg_accept_length=1.002, num_blocks=443, overall_hit_rate=0.258, tree_blocks=402, tree_alt_wins=38, tree_extra_tokens=38, tree_nodes=3.18, tree_depth=2.27, main_accept=0.916
+
+Task: push the plate to the front of the stove
+Starting episode 34...
+Success: False
+# episodes completed so far: 284
+# successes: 220 (77.5%)
+Speculative stats: length=3.465, avg_accept_length=1.977, num_blocks=606, overall_hit_rate=0.496, tree_blocks=602, tree_alt_wins=19, tree_extra_tokens=34, tree_nodes=3.01, tree_depth=2.83, main_accept=1.921
+
+Task: push the plate to the front of the stove
+Starting episode 35...
+Success: True
+# episodes completed so far: 285
+# successes: 221 (77.5%)
+Speculative stats: length=2.252, avg_accept_length=1.022, num_blocks=460, overall_hit_rate=0.260, tree_blocks=418, tree_alt_wins=44, tree_extra_tokens=46, tree_nodes=3.22, tree_depth=2.24, main_accept=0.922
+
+Task: push the plate to the front of the stove
+Starting episode 36...
+Success: False
+# episodes completed so far: 286
+# successes: 221 (77.3%)
+Speculative stats: length=2.163, avg_accept_length=0.953, num_blocks=971, overall_hit_rate=0.243, tree_blocks=875, tree_alt_wins=100, tree_extra_tokens=102, tree_nodes=3.23, tree_depth=2.27, main_accept=0.848
+
+Task: push the plate to the front of the stove
+Starting episode 37...
+Success: True
+# episodes completed so far: 287
+# successes: 222 (77.4%)
+Speculative stats: length=2.221, avg_accept_length=1.046, num_blocks=435, overall_hit_rate=0.271, tree_blocks=373, tree_alt_wins=40, tree_extra_tokens=44, tree_nodes=3.34, tree_depth=2.36, main_accept=0.945
+
+Task: push the plate to the front of the stove
+Starting episode 38...
+Success: True
+# episodes completed so far: 288
+# successes: 223 (77.4%)
+Speculative stats: length=2.313, avg_accept_length=1.095, num_blocks=463, overall_hit_rate=0.274, tree_blocks=411, tree_alt_wins=40, tree_extra_tokens=42, tree_nodes=3.37, tree_depth=2.32, main_accept=1.004
+
+Task: push the plate to the front of the stove
+Starting episode 39...
+Success: True
+# episodes completed so far: 289
+# successes: 224 (77.5%)
+Speculative stats: length=2.170, avg_accept_length=0.987, num_blocks=458, overall_hit_rate=0.256, tree_blocks=400, tree_alt_wins=38, tree_extra_tokens=39, tree_nodes=3.27, tree_depth=2.31, main_accept=0.902
+
+Task: push the plate to the front of the stove
+Starting episode 40...
+Success: True
+# episodes completed so far: 290
+# successes: 225 (77.6%)
+Speculative stats: length=2.280, avg_accept_length=1.029, num_blocks=347, overall_hit_rate=0.258, tree_blocks=321, tree_alt_wins=32, tree_extra_tokens=36, tree_nodes=3.23, tree_depth=2.25, main_accept=0.925
+
+Task: push the plate to the front of the stove
+Starting episode 41...
+Success: True
+# episodes completed so far: 291
+# successes: 226 (77.7%)
+Speculative stats: length=2.233, avg_accept_length=0.986, num_blocks=420, overall_hit_rate=0.251, tree_blocks=390, tree_alt_wins=48, tree_extra_tokens=50, tree_nodes=3.15, tree_depth=2.25, main_accept=0.867
+
+Task: push the plate to the front of the stove
+Starting episode 42...
+Success: True
+# episodes completed so far: 292
+# successes: 227 (77.7%)
+Speculative stats: length=2.327, avg_accept_length=1.074, num_blocks=379, overall_hit_rate=0.270, tree_blocks=349, tree_alt_wins=29, tree_extra_tokens=30, tree_nodes=3.24, tree_depth=2.28, main_accept=0.995
+
+Task: push the plate to the front of the stove
+Starting episode 43...
+Success: True
+# episodes completed so far: 293
+# successes: 228 (77.8%)
+Speculative stats: length=2.245, avg_accept_length=1.019, num_blocks=421, overall_hit_rate=0.259, tree_blocks=381, tree_alt_wins=35, tree_extra_tokens=35, tree_nodes=3.25, tree_depth=2.33, main_accept=0.936
+
+Task: push the plate to the front of the stove
+Starting episode 44...
+Success: True
+# episodes completed so far: 294
+# successes: 229 (77.9%)
+Speculative stats: length=2.236, avg_accept_length=0.989, num_blocks=454, overall_hit_rate=0.251, tree_blocks=421, tree_alt_wins=47, tree_extra_tokens=48, tree_nodes=3.17, tree_depth=2.24, main_accept=0.883
+
+Task: push the plate to the front of the stove
+Starting episode 45...
+Success: False
+# episodes completed so far: 295
+# successes: 229 (77.6%)
+Speculative stats: length=2.941, avg_accept_length=1.556, num_blocks=714, overall_hit_rate=0.390, tree_blocks=689, tree_alt_wins=30, tree_extra_tokens=35, tree_nodes=3.10, tree_depth=2.69, main_accept=1.507
+
+Task: push the plate to the front of the stove
+Starting episode 46...
+Success: True
+# episodes completed so far: 296
+# successes: 230 (77.7%)
+Speculative stats: length=2.224, avg_accept_length=1.000, num_blocks=683, overall_hit_rate=0.254, tree_blocks=619, tree_alt_wins=47, tree_extra_tokens=47, tree_nodes=3.24, tree_depth=2.35, main_accept=0.931
+
+Task: push the plate to the front of the stove
+Starting episode 47...
+Success: True
+# episodes completed so far: 297
+# successes: 231 (77.8%)
+Speculative stats: length=2.177, avg_accept_length=0.969, num_blocks=418, overall_hit_rate=0.250, tree_blocks=375, tree_alt_wins=29, tree_extra_tokens=30, tree_nodes=3.21, tree_depth=2.31, main_accept=0.897
+
+Task: push the plate to the front of the stove
+Starting episode 48...
+Success: True
+# episodes completed so far: 298
+# successes: 232 (77.9%)
+Speculative stats: length=2.358, avg_accept_length=1.099, num_blocks=466, overall_hit_rate=0.273, tree_blocks=430, tree_alt_wins=36, tree_extra_tokens=36, tree_nodes=3.27, tree_depth=2.54, main_accept=1.021
+
+Task: push the plate to the front of the stove
+Starting episode 49...
+Success: False
+# episodes completed so far: 299
+# successes: 232 (77.6%)
+Speculative stats: length=2.132, avg_accept_length=0.975, num_blocks=985, overall_hit_rate=0.256, tree_blocks=840, tree_alt_wins=92, tree_extra_tokens=92, tree_nodes=3.29, tree_depth=2.19, main_accept=0.881
+
+Task: push the plate to the front of the stove
+Starting episode 50...
+Success: True
+# episodes completed so far: 300
+# successes: 233 (77.7%)
+Speculative stats: length=2.193, avg_accept_length=0.971, num_blocks=383, overall_hit_rate=0.250, tree_blocks=348, tree_alt_wins=31, tree_extra_tokens=31, tree_nodes=3.18, tree_depth=2.26, main_accept=0.890
+Current task success rate: 0.86
+Current total success rate: 0.7766666666666666
+Current task speculative stats: length=2.311, avg_accept_length=1.070, num_blocks=25318, overall_hit_rate=0.273, tree_blocks=23069, tree_alt_wins=2031, tree_extra_tokens=2097, tree_nodes=3.21, tree_depth=2.35, main_accept=0.987
+
+Task: put the cream cheese in the bowl
+Starting episode 1...
+Success: False
+# episodes completed so far: 301
+# successes: 233 (77.4%)
+Speculative stats: length=2.431, avg_accept_length=1.204, num_blocks=864, overall_hit_rate=0.307, tree_blocks=754, tree_alt_wins=58, tree_extra_tokens=62, tree_nodes=3.34, tree_depth=2.74, main_accept=1.132
+
+Task: put the cream cheese in the bowl
+Starting episode 2...
+Success: True
+# episodes completed so far: 302
+# successes: 234 (77.5%)
+Speculative stats: length=2.504, avg_accept_length=1.211, num_blocks=355, overall_hit_rate=0.305, tree_blocks=332, tree_alt_wins=28, tree_extra_tokens=30, tree_nodes=3.18, tree_depth=2.48, main_accept=1.127
+
+Task: put the cream cheese in the bowl
+Starting episode 3...
+Success: False
+# episodes completed so far: 303
+# successes: 234 (77.2%)
+Speculative stats: length=2.344, avg_accept_length=1.124, num_blocks=896, overall_hit_rate=0.290, tree_blocks=792, tree_alt_wins=56, tree_extra_tokens=58, tree_nodes=3.25, tree_depth=2.73, main_accept=1.059
+
+Task: put the cream cheese in the bowl
+Starting episode 4...
+Success: True
+# episodes completed so far: 304
+# successes: 235 (77.3%)
+Speculative stats: length=2.400, avg_accept_length=1.152, num_blocks=315, overall_hit_rate=0.294, tree_blocks=285, tree_alt_wins=9, tree_extra_tokens=9, tree_nodes=3.23, tree_depth=2.82, main_accept=1.124
+
+Task: put the cream cheese in the bowl
+Starting episode 5...
+Success: True
+# episodes completed so far: 305
+# successes: 236 (77.4%)
+Speculative stats: length=2.319, avg_accept_length=1.066, num_blocks=335, overall_hit_rate=0.270, tree_blocks=309, tree_alt_wins=21, tree_extra_tokens=23, tree_nodes=3.19, tree_depth=2.39, main_accept=0.997
+
+Task: put the cream cheese in the bowl
+Starting episode 6...
+Success: True
+# episodes completed so far: 306
+# successes: 237 (77.5%)
+Speculative stats: length=2.440, avg_accept_length=1.168, num_blocks=832, overall_hit_rate=0.288, tree_blocks=766, tree_alt_wins=40, tree_extra_tokens=41, tree_nodes=3.32, tree_depth=2.88, main_accept=1.119
+
+Task: put the cream cheese in the bowl
+Starting episode 7...
+Success: True
+# episodes completed so far: 307
+# successes: 238 (77.5%)
+Speculative stats: length=2.451, avg_accept_length=1.198, num_blocks=237, overall_hit_rate=0.299, tree_blocks=214, tree_alt_wins=15, tree_extra_tokens=16, tree_nodes=3.34, tree_depth=2.70, main_accept=1.131
+
+Task: put the cream cheese in the bowl
+Starting episode 8...
+Success: True
+# episodes completed so far: 308
+# successes: 239 (77.6%)
+Speculative stats: length=2.255, avg_accept_length=1.010, num_blocks=298, overall_hit_rate=0.258, tree_blocks=274, tree_alt_wins=21, tree_extra_tokens=21, tree_nodes=3.17, tree_depth=2.38, main_accept=0.940
+
+Task: put the cream cheese in the bowl
+Starting episode 9...
+Success: True
+# episodes completed so far: 309
+# successes: 240 (77.7%)
+Speculative stats: length=2.259, avg_accept_length=1.021, num_blocks=282, overall_hit_rate=0.261, tree_blocks=258, tree_alt_wins=25, tree_extra_tokens=27, tree_nodes=3.19, tree_depth=2.48, main_accept=0.926
+
+Task: put the cream cheese in the bowl
+Starting episode 10...
+Success: True
+# episodes completed so far: 310
+# successes: 241 (77.7%)
+Speculative stats: length=2.309, avg_accept_length=1.081, num_blocks=285, overall_hit_rate=0.278, tree_blocks=256, tree_alt_wins=21, tree_extra_tokens=22, tree_nodes=3.21, tree_depth=2.50, main_accept=1.004
+
+Task: put the cream cheese in the bowl
+Starting episode 11...
+Success: True
+# episodes completed so far: 311
+# successes: 242 (77.8%)
+Speculative stats: length=2.401, avg_accept_length=1.120, num_blocks=274, overall_hit_rate=0.282, tree_blocks=257, tree_alt_wins=23, tree_extra_tokens=25, tree_nodes=3.18, tree_depth=2.33, main_accept=1.029
+
+Task: put the cream cheese in the bowl
+Starting episode 12...
+Success: False
+# episodes completed so far: 312
+# successes: 242 (77.6%)
+Speculative stats: length=3.057, avg_accept_length=1.661, num_blocks=687, overall_hit_rate=0.371, tree_blocks=659, tree_alt_wins=20, tree_extra_tokens=20, tree_nodes=3.63, tree_depth=3.31, main_accept=1.632
+
+Task: put the cream cheese in the bowl
+Starting episode 13...
+Success: True
+# episodes completed so far: 313
+# successes: 243 (77.6%)
+Speculative stats: length=2.333, avg_accept_length=1.060, num_blocks=333, overall_hit_rate=0.266, tree_blocks=313, tree_alt_wins=11, tree_extra_tokens=12, tree_nodes=3.18, tree_depth=2.56, main_accept=1.024
+
+Task: put the cream cheese in the bowl
+Starting episode 14...
+Success: True
+# episodes completed so far: 314
+# successes: 244 (77.7%)
+Speculative stats: length=2.209, avg_accept_length=0.986, num_blocks=282, overall_hit_rate=0.254, tree_blocks=256, tree_alt_wins=24, tree_extra_tokens=24, tree_nodes=3.17, tree_depth=2.59, main_accept=0.901
+
+Task: put the cream cheese in the bowl
+Starting episode 15...
+Success: True
+# episodes completed so far: 315
+# successes: 245 (77.8%)
+Speculative stats: length=2.891, avg_accept_length=1.602, num_blocks=339, overall_hit_rate=0.390, tree_blocks=297, tree_alt_wins=13, tree_extra_tokens=15, tree_nodes=3.55, tree_depth=3.06, main_accept=1.558
+
+Task: put the cream cheese in the bowl
+Starting episode 16...
+Success: True
+# episodes completed so far: 316
+# successes: 246 (77.8%)
+Speculative stats: length=2.341, avg_accept_length=1.041, num_blocks=317, overall_hit_rate=0.260, tree_blocks=306, tree_alt_wins=9, tree_extra_tokens=9, tree_nodes=3.10, tree_depth=2.62, main_accept=1.013
+
+Task: put the cream cheese in the bowl
+Starting episode 17...
+Success: False
+# episodes completed so far: 317
+# successes: 246 (77.6%)
+Speculative stats: length=2.213, avg_accept_length=0.995, num_blocks=949, overall_hit_rate=0.262, tree_blocks=854, tree_alt_wins=29, tree_extra_tokens=33, tree_nodes=3.10, tree_depth=2.74, main_accept=0.960
+
+Task: put the cream cheese in the bowl
+Starting episode 18...
+Success: False
+# episodes completed so far: 318
+# successes: 246 (77.4%)
+Speculative stats: length=2.368, avg_accept_length=1.160, num_blocks=887, overall_hit_rate=0.298, tree_blocks=769, tree_alt_wins=12, tree_extra_tokens=12, tree_nodes=3.33, tree_depth=2.57, main_accept=1.147
+
+Task: put the cream cheese in the bowl
+Starting episode 19...
+Success: True
+# episodes completed so far: 319
+# successes: 247 (77.4%)
+Speculative stats: length=2.307, avg_accept_length=1.056, num_blocks=270, overall_hit_rate=0.268, tree_blocks=249, tree_alt_wins=18, tree_extra_tokens=18, tree_nodes=3.19, tree_depth=2.55, main_accept=0.989
+
+Task: put the cream cheese in the bowl
+Starting episode 20...
+Success: True
+# episodes completed so far: 320
+# successes: 248 (77.5%)
+Speculative stats: length=2.289, avg_accept_length=1.031, num_blocks=318, overall_hit_rate=0.263, tree_blocks=296, tree_alt_wins=17, tree_extra_tokens=18, tree_nodes=3.14, tree_depth=2.46, main_accept=0.975
+
+Task: put the cream cheese in the bowl
+Starting episode 21...
+Success: False
+# episodes completed so far: 321
+# successes: 248 (77.3%)
+Speculative stats: length=2.381, avg_accept_length=1.134, num_blocks=882, overall_hit_rate=0.284, tree_blocks=795, tree_alt_wins=57, tree_extra_tokens=59, tree_nodes=3.32, tree_depth=2.57, main_accept=1.067
+
+Task: put the cream cheese in the bowl
+Starting episode 22...
+Success: True
+# episodes completed so far: 322
+# successes: 249 (77.3%)
+Speculative stats: length=2.373, avg_accept_length=1.125, num_blocks=295, overall_hit_rate=0.290, tree_blocks=268, tree_alt_wins=15, tree_extra_tokens=16, tree_nodes=3.18, tree_depth=2.51, main_accept=1.071
+
+Task: put the cream cheese in the bowl
+Starting episode 23...
+Success: True
+# episodes completed so far: 323
+# successes: 250 (77.4%)
+Speculative stats: length=2.478, avg_accept_length=1.192, num_blocks=291, overall_hit_rate=0.298, tree_blocks=271, tree_alt_wins=21, tree_extra_tokens=21, tree_nodes=3.23, tree_depth=2.59, main_accept=1.120
+
+Task: put the cream cheese in the bowl
+Starting episode 24...
+Success: False
+# episodes completed so far: 324
+# successes: 250 (77.2%)
+Speculative stats: length=4.158, avg_accept_length=2.943, num_blocks=505, overall_hit_rate=0.726, tree_blocks=314, tree_alt_wins=6, tree_extra_tokens=7, tree_nodes=4.91, tree_depth=4.82, main_accept=2.929
+
+Task: put the cream cheese in the bowl
+Starting episode 25...
+Success: True
+# episodes completed so far: 325
+# successes: 251 (77.2%)
+Speculative stats: length=2.326, avg_accept_length=1.106, num_blocks=322, overall_hit_rate=0.281, tree_blocks=286, tree_alt_wins=21, tree_extra_tokens=22, tree_nodes=3.30, tree_depth=2.72, main_accept=1.037
+
+Task: put the cream cheese in the bowl
+Starting episode 26...
+Success: True
+# episodes completed so far: 326
+# successes: 252 (77.3%)
+Speculative stats: length=2.432, avg_accept_length=1.131, num_blocks=259, overall_hit_rate=0.278, tree_blocks=247, tree_alt_wins=21, tree_extra_tokens=22, tree_nodes=3.22, tree_depth=2.49, main_accept=1.046
+
+Task: put the cream cheese in the bowl
+Starting episode 27...
+Success: True
+# episodes completed so far: 327
+# successes: 253 (77.4%)
+Speculative stats: length=2.494, avg_accept_length=1.197, num_blocks=233, overall_hit_rate=0.297, tree_blocks=219, tree_alt_wins=10, tree_extra_tokens=10, tree_nodes=3.23, tree_depth=2.58, main_accept=1.155
+
+Task: put the cream cheese in the bowl
+Starting episode 28...
+Success: True
+# episodes completed so far: 328
+# successes: 254 (77.4%)
+Speculative stats: length=2.325, avg_accept_length=1.065, num_blocks=277, overall_hit_rate=0.269, tree_blocks=257, tree_alt_wins=17, tree_extra_tokens=17, tree_nodes=3.18, tree_depth=2.46, main_accept=1.004
+
+Task: put the cream cheese in the bowl
+Starting episode 29...
+Success: True
+# episodes completed so far: 329
+# successes: 255 (77.5%)
+Speculative stats: length=2.333, avg_accept_length=1.080, num_blocks=312, overall_hit_rate=0.277, tree_blocks=287, tree_alt_wins=13, tree_extra_tokens=14, tree_nodes=3.16, tree_depth=2.57, main_accept=1.035
+
+Task: put the cream cheese in the bowl
+Starting episode 30...
+Success: True
+# episodes completed so far: 330
+# successes: 256 (77.6%)
+Speculative stats: length=2.366, avg_accept_length=1.138, num_blocks=290, overall_hit_rate=0.290, tree_blocks=258, tree_alt_wins=30, tree_extra_tokens=32, tree_nodes=3.28, tree_depth=2.56, main_accept=1.028
+
+Task: put the cream cheese in the bowl
+Starting episode 31...
+Success: True
+# episodes completed so far: 331
+# successes: 257 (77.6%)
+Speculative stats: length=2.360, avg_accept_length=1.116, num_blocks=344, overall_hit_rate=0.282, tree_blocks=312, tree_alt_wins=21, tree_extra_tokens=22, tree_nodes=3.26, tree_depth=2.54, main_accept=1.052
+
+Task: put the cream cheese in the bowl
+Starting episode 32...
+Success: True
+# episodes completed so far: 332
+# successes: 258 (77.7%)
+Speculative stats: length=2.368, avg_accept_length=1.162, num_blocks=408, overall_hit_rate=0.303, tree_blocks=353, tree_alt_wins=20, tree_extra_tokens=24, tree_nodes=3.28, tree_depth=2.72, main_accept=1.103
+
+Task: put the cream cheese in the bowl
+Starting episode 33...
+Success: True
+# episodes completed so far: 333
+# successes: 259 (77.8%)
+Speculative stats: length=2.316, avg_accept_length=1.098, num_blocks=275, overall_hit_rate=0.283, tree_blocks=244, tree_alt_wins=20, tree_extra_tokens=21, tree_nodes=3.25, tree_depth=2.62, main_accept=1.022
+
+Task: put the cream cheese in the bowl
+Starting episode 34...
+Success: True
+# episodes completed so far: 334
+# successes: 260 (77.8%)
+Speculative stats: length=2.301, avg_accept_length=1.075, num_blocks=292, overall_hit_rate=0.277, tree_blocks=262, tree_alt_wins=21, tree_extra_tokens=21, tree_nodes=3.21, tree_depth=2.62, main_accept=1.003
+
+Task: put the cream cheese in the bowl
+Starting episode 35...
+Success: True
+# episodes completed so far: 335
+# successes: 261 (77.9%)
+Speculative stats: length=2.443, avg_accept_length=1.192, num_blocks=318, overall_hit_rate=0.300, tree_blocks=286, tree_alt_wins=22, tree_extra_tokens=23, tree_nodes=3.31, tree_depth=2.73, main_accept=1.119
+
+Task: put the cream cheese in the bowl
+Starting episode 36...
+Success: True
+# episodes completed so far: 336
+# successes: 262 (78.0%)
+Speculative stats: length=2.432, avg_accept_length=1.120, num_blocks=259, overall_hit_rate=0.276, tree_blocks=250, tree_alt_wins=14, tree_extra_tokens=16, tree_nodes=3.17, tree_depth=2.60, main_accept=1.058
+
+Task: put the cream cheese in the bowl
+Starting episode 37...
+Success: True
+# episodes completed so far: 337
+# successes: 263 (78.0%)
+Speculative stats: length=2.353, avg_accept_length=1.095, num_blocks=241, overall_hit_rate=0.274, tree_blocks=222, tree_alt_wins=18, tree_extra_tokens=19, tree_nodes=3.25, tree_depth=2.44, main_accept=1.017
+
+Task: put the cream cheese in the bowl
+Starting episode 38...
+Success: True
+# episodes completed so far: 338
+# successes: 264 (78.1%)
+Speculative stats: length=2.399, avg_accept_length=1.136, num_blocks=353, overall_hit_rate=0.286, tree_blocks=325, tree_alt_wins=28, tree_extra_tokens=31, tree_nodes=3.23, tree_depth=2.55, main_accept=1.048
+
+Task: put the cream cheese in the bowl
+Starting episode 39...
+Success: True
+# episodes completed so far: 339
+# successes: 265 (78.2%)
+Speculative stats: length=2.209, avg_accept_length=0.991, num_blocks=320, overall_hit_rate=0.252, tree_blocks=289, tree_alt_wins=25, tree_extra_tokens=25, tree_nodes=3.25, tree_depth=2.54, main_accept=0.912
+
+Task: put the cream cheese in the bowl
+Starting episode 40...
+Success: True
+# episodes completed so far: 340
+# successes: 266 (78.2%)
+Speculative stats: length=2.429, avg_accept_length=1.142, num_blocks=268, overall_hit_rate=0.282, tree_blocks=252, tree_alt_wins=14, tree_extra_tokens=14, tree_nodes=3.25, tree_depth=2.50, main_accept=1.090
+
+Task: put the cream cheese in the bowl
+Starting episode 41...
+Success: False
+# episodes completed so far: 341
+# successes: 266 (78.0%)
+Speculative stats: length=2.411, avg_accept_length=1.119, num_blocks=871, overall_hit_rate=0.282, tree_blocks=822, tree_alt_wins=37, tree_extra_tokens=38, tree_nodes=3.15, tree_depth=2.51, main_accept=1.076
+
+Task: put the cream cheese in the bowl
+Starting episode 42...
+Success: True
+# episodes completed so far: 342
+# successes: 267 (78.1%)
+Speculative stats: length=2.351, avg_accept_length=1.071, num_blocks=268, overall_hit_rate=0.265, tree_blocks=253, tree_alt_wins=17, tree_extra_tokens=17, tree_nodes=3.21, tree_depth=2.56, main_accept=1.007
+
+Task: put the cream cheese in the bowl
+Starting episode 43...
+Success: True
+# episodes completed so far: 343
+# successes: 268 (78.1%)
+Speculative stats: length=2.263, avg_accept_length=1.021, num_blocks=331, overall_hit_rate=0.260, tree_blocks=304, tree_alt_wins=20, tree_extra_tokens=20, tree_nodes=3.18, tree_depth=2.43, main_accept=0.961
+
+Task: put the cream cheese in the bowl
+Starting episode 44...
+Success: False
+# episodes completed so far: 344
+# successes: 268 (77.9%)
+Speculative stats: length=2.331, avg_accept_length=1.110, num_blocks=901, overall_hit_rate=0.288, tree_blocks=799, tree_alt_wins=46, tree_extra_tokens=49, tree_nodes=3.22, tree_depth=2.67, main_accept=1.055
+
+Task: put the cream cheese in the bowl
+Starting episode 45...
+Success: True
+# episodes completed so far: 345
+# successes: 269 (78.0%)
+Speculative stats: length=2.362, avg_accept_length=1.119, num_blocks=329, overall_hit_rate=0.285, tree_blocks=298, tree_alt_wins=17, tree_extra_tokens=17, tree_nodes=3.22, tree_depth=2.58, main_accept=1.067
+
+Task: put the cream cheese in the bowl
+Starting episode 46...
+Success: True
+# episodes completed so far: 346
+# successes: 270 (78.0%)
+Speculative stats: length=2.343, avg_accept_length=1.098, num_blocks=245, overall_hit_rate=0.275, tree_blocks=223, tree_alt_wins=16, tree_extra_tokens=19, tree_nodes=3.28, tree_depth=2.56, main_accept=1.020
+
+Task: put the cream cheese in the bowl
+Starting episode 47...
+Success: True
+# episodes completed so far: 347
+# successes: 271 (78.1%)
+Speculative stats: length=2.378, avg_accept_length=1.133, num_blocks=315, overall_hit_rate=0.287, tree_blocks=285, tree_alt_wins=20, tree_extra_tokens=25, tree_nodes=3.26, tree_depth=2.48, main_accept=1.054
+
+Task: put the cream cheese in the bowl
+Starting episode 48...
+Success: False
+# episodes completed so far: 348
+# successes: 271 (77.9%)
+Speculative stats: length=2.439, avg_accept_length=1.144, num_blocks=861, overall_hit_rate=0.286, tree_blocks=814, tree_alt_wins=42, tree_extra_tokens=46, tree_nodes=3.18, tree_depth=2.66, main_accept=1.091
+
+Task: put the cream cheese in the bowl
+Starting episode 49...
+Success: False
+# episodes completed so far: 349
+# successes: 271 (77.7%)
+Speculative stats: length=2.838, avg_accept_length=1.488, num_blocks=740, overall_hit_rate=0.336, tree_blocks=699, tree_alt_wins=161, tree_extra_tokens=163, tree_nodes=3.63, tree_depth=2.78, main_accept=1.268
+
+Task: put the cream cheese in the bowl
+Starting episode 50...
+Success: False
+# episodes completed so far: 350
+# successes: 271 (77.4%)
+Speculative stats: length=2.778, avg_accept_length=1.435, num_blocks=756, overall_hit_rate=0.319, tree_blocks=715, tree_alt_wins=27, tree_extra_tokens=31, tree_nodes=3.70, tree_depth=3.30, main_accept=1.394
+Current task success rate: 0.76
+Current total success rate: 0.7742857142857142
+Current task speculative stats: length=2.464, avg_accept_length=1.204, num_blocks=21716, overall_hit_rate=0.301, tree_blocks=19705, tree_alt_wins=1287, tree_extra_tokens=1356, tree_nodes=3.30, tree_depth=2.70, main_accept=1.141
+
+Task: turn on the stove
+Starting episode 1...
+Success: True
+# episodes completed so far: 351
+# successes: 272 (77.5%)
+Speculative stats: length=2.305, avg_accept_length=1.043, num_blocks=325, overall_hit_rate=0.259, tree_blocks=303, tree_alt_wins=17, tree_extra_tokens=19, tree_nodes=3.24, tree_depth=2.57, main_accept=0.985
+
+Task: turn on the stove
+Starting episode 2...
+Success: True
+# episodes completed so far: 352
+# successes: 273 (77.6%)
+Speculative stats: length=2.324, avg_accept_length=1.053, num_blocks=244, overall_hit_rate=0.264, tree_blocks=229, tree_alt_wins=11, tree_extra_tokens=11, tree_nodes=3.19, tree_depth=2.56, main_accept=1.008
+
+Task: turn on the stove
+Starting episode 3...
+Success: False
+# episodes completed so far: 353
+# successes: 273 (77.3%)
+Speculative stats: length=3.535, avg_accept_length=2.032, num_blocks=594, overall_hit_rate=0.453, tree_blocks=593, tree_alt_wins=11, tree_extra_tokens=17, tree_nodes=3.50, tree_depth=3.32, main_accept=2.003
+
+Task: turn on the stove
+Starting episode 4...
+Success: True
+# episodes completed so far: 354
+# successes: 274 (77.4%)
+Speculative stats: length=2.405, avg_accept_length=1.101, num_blocks=227, overall_hit_rate=0.269, tree_blocks=218, tree_alt_wins=16, tree_extra_tokens=17, tree_nodes=3.22, tree_depth=2.54, main_accept=1.026
+
+Task: turn on the stove
+Starting episode 5...
+Success: True
+# episodes completed so far: 355
+# successes: 275 (77.5%)
+Speculative stats: length=2.476, avg_accept_length=1.179, num_blocks=212, overall_hit_rate=0.287, tree_blocks=200, tree_alt_wins=13, tree_extra_tokens=14, tree_nodes=3.29, tree_depth=2.57, main_accept=1.113
+
+Task: turn on the stove
+Starting episode 6...
+Success: True
+# episodes completed so far: 356
+# successes: 276 (77.5%)
+Speculative stats: length=2.579, avg_accept_length=1.278, num_blocks=399, overall_hit_rate=0.323, tree_blocks=372, tree_alt_wins=18, tree_extra_tokens=22, tree_nodes=3.17, tree_depth=2.60, main_accept=1.223
+
+Task: turn on the stove
+Starting episode 7...
+Success: True
+# episodes completed so far: 357
+# successes: 277 (77.6%)
+Speculative stats: length=3.447, avg_accept_length=2.000, num_blocks=329, overall_hit_rate=0.442, tree_blocks=314, tree_alt_wins=23, tree_extra_tokens=33, tree_nodes=3.69, tree_depth=3.15, main_accept=1.900
+
+Task: turn on the stove
+Starting episode 8...
+Success: True
+# episodes completed so far: 358
+# successes: 278 (77.7%)
+Speculative stats: length=2.333, avg_accept_length=1.058, num_blocks=291, overall_hit_rate=0.265, tree_blocks=274, tree_alt_wins=21, tree_extra_tokens=22, tree_nodes=3.18, tree_depth=2.60, main_accept=0.983
+
+Task: turn on the stove
+Starting episode 9...
+Success: True
+# episodes completed so far: 359
+# successes: 279 (77.7%)
+Speculative stats: length=2.453, avg_accept_length=1.167, num_blocks=234, overall_hit_rate=0.289, tree_blocks=219, tree_alt_wins=8, tree_extra_tokens=10, tree_nodes=3.24, tree_depth=2.58, main_accept=1.124
+
+Task: turn on the stove
+Starting episode 10...
+Success: True
+# episodes completed so far: 360
+# successes: 280 (77.8%)
+Speculative stats: length=2.413, avg_accept_length=1.146, num_blocks=206, overall_hit_rate=0.288, tree_blocks=189, tree_alt_wins=16, tree_extra_tokens=18, tree_nodes=3.25, tree_depth=2.56, main_accept=1.058
+
+Task: turn on the stove
+Starting episode 11...
+Success: True
+# episodes completed so far: 361
+# successes: 281 (77.8%)
+Speculative stats: length=2.351, avg_accept_length=1.049, num_blocks=265, overall_hit_rate=0.257, tree_blocks=256, tree_alt_wins=14, tree_extra_tokens=15, tree_nodes=3.18, tree_depth=2.51, main_accept=0.992
+
+Task: turn on the stove
+Starting episode 12...
+Success: True
+# episodes completed so far: 362
+# successes: 282 (77.9%)
+Speculative stats: length=2.480, avg_accept_length=1.166, num_blocks=223, overall_hit_rate=0.289, tree_blocks=214, tree_alt_wins=12, tree_extra_tokens=14, tree_nodes=3.17, tree_depth=2.55, main_accept=1.103
+
+Task: turn on the stove
+Starting episode 13...
+Success: True
+# episodes completed so far: 363
+# successes: 283 (78.0%)
+Speculative stats: length=2.408, avg_accept_length=1.195, num_blocks=282, overall_hit_rate=0.310, tree_blocks=245, tree_alt_wins=22, tree_extra_tokens=22, tree_nodes=3.29, tree_depth=2.38, main_accept=1.117
+
+Task: turn on the stove
+Starting episode 14...
+Success: True
+# episodes completed so far: 364
+# successes: 284 (78.0%)
+Speculative stats: length=2.300, avg_accept_length=1.056, num_blocks=213, overall_hit_rate=0.268, tree_blocks=195, tree_alt_wins=28, tree_extra_tokens=28, tree_nodes=3.22, tree_depth=2.32, main_accept=0.925
+
+Task: turn on the stove
+Starting episode 15...
+Success: True
+# episodes completed so far: 365
+# successes: 285 (78.1%)
+Speculative stats: length=2.314, avg_accept_length=1.045, num_blocks=245, overall_hit_rate=0.259, tree_blocks=230, tree_alt_wins=13, tree_extra_tokens=14, tree_nodes=3.23, tree_depth=2.60, main_accept=0.988
+
+Task: turn on the stove
+Starting episode 16...
+Success: True
+# episodes completed so far: 366
+# successes: 286 (78.1%)
+Speculative stats: length=2.414, avg_accept_length=1.123, num_blocks=203, overall_hit_rate=0.279, tree_blocks=191, tree_alt_wins=16, tree_extra_tokens=16, tree_nodes=3.21, tree_depth=2.62, main_accept=1.044
+
+Task: turn on the stove
+Starting episode 17...
+Success: True
+# episodes completed so far: 367
+# successes: 287 (78.2%)
+Speculative stats: length=2.481, avg_accept_length=1.181, num_blocks=237, overall_hit_rate=0.287, tree_blocks=224, tree_alt_wins=18, tree_extra_tokens=20, tree_nodes=3.30, tree_depth=2.62, main_accept=1.097
+
+Task: turn on the stove
+Starting episode 18...
+Success: True
+# episodes completed so far: 368
+# successes: 288 (78.3%)
+Speculative stats: length=2.366, avg_accept_length=1.102, num_blocks=216, overall_hit_rate=0.282, tree_blocks=200, tree_alt_wins=10, tree_extra_tokens=10, tree_nodes=3.13, tree_depth=2.54, main_accept=1.056
+
+Task: turn on the stove
+Starting episode 19...
+Success: True
+# episodes completed so far: 369
+# successes: 289 (78.3%)
+Speculative stats: length=2.560, avg_accept_length=1.227, num_blocks=216, overall_hit_rate=0.299, tree_blocks=209, tree_alt_wins=16, tree_extra_tokens=18, tree_nodes=3.20, tree_depth=2.52, main_accept=1.144
+
+Task: turn on the stove
+Starting episode 20...
+Success: True
+# episodes completed so far: 370
+# successes: 290 (78.4%)
+Speculative stats: length=2.312, avg_accept_length=1.081, num_blocks=221, overall_hit_rate=0.274, tree_blocks=199, tree_alt_wins=12, tree_extra_tokens=12, tree_nodes=3.28, tree_depth=2.50, main_accept=1.027
+
+Task: turn on the stove
+Starting episode 21...
+Success: True
+# episodes completed so far: 371
+# successes: 291 (78.4%)
+Speculative stats: length=2.324, avg_accept_length=1.088, num_blocks=250, overall_hit_rate=0.275, tree_blocks=226, tree_alt_wins=9, tree_extra_tokens=10, tree_nodes=3.27, tree_depth=2.52, main_accept=1.048
+
+Task: turn on the stove
+Starting episode 22...
+Success: True
+# episodes completed so far: 372
+# successes: 292 (78.5%)
+Speculative stats: length=2.545, avg_accept_length=1.273, num_blocks=220, overall_hit_rate=0.305, tree_blocks=200, tree_alt_wins=16, tree_extra_tokens=16, tree_nodes=3.49, tree_depth=2.77, main_accept=1.200
+
+Task: turn on the stove
+Starting episode 23...
+Success: True
+# episodes completed so far: 373
+# successes: 293 (78.6%)
+Speculative stats: length=2.419, avg_accept_length=1.120, num_blocks=191, overall_hit_rate=0.270, tree_blocks=182, tree_alt_wins=12, tree_extra_tokens=13, tree_nodes=3.30, tree_depth=2.65, main_accept=1.052
+
+Task: turn on the stove
+Starting episode 24...
+Success: True
+# episodes completed so far: 374
+# successes: 294 (78.6%)
+Speculative stats: length=2.593, avg_accept_length=1.301, num_blocks=216, overall_hit_rate=0.312, tree_blocks=199, tree_alt_wins=4, tree_extra_tokens=5, tree_nodes=3.45, tree_depth=2.78, main_accept=1.278
+
+Task: turn on the stove
+Starting episode 25...
+Success: True
+# episodes completed so far: 375
+# successes: 295 (78.7%)
+Speculative stats: length=2.644, avg_accept_length=1.307, num_blocks=225, overall_hit_rate=0.320, tree_blocks=216, tree_alt_wins=13, tree_extra_tokens=14, tree_nodes=3.22, tree_depth=2.65, main_accept=1.244
+
+Task: turn on the stove
+Starting episode 26...
+Success: True
+# episodes completed so far: 376
+# successes: 296 (78.7%)
+Speculative stats: length=2.418, avg_accept_length=1.123, num_blocks=220, overall_hit_rate=0.283, tree_blocks=209, tree_alt_wins=11, tree_extra_tokens=13, tree_nodes=3.12, tree_depth=2.61, main_accept=1.064
+
+Task: turn on the stove
+Starting episode 27...
+Success: True
+# episodes completed so far: 377
+# successes: 297 (78.8%)
+Speculative stats: length=2.300, avg_accept_length=1.068, num_blocks=207, overall_hit_rate=0.274, tree_blocks=187, tree_alt_wins=9, tree_extra_tokens=9, tree_nodes=3.21, tree_depth=2.71, main_accept=1.024
+
+Task: turn on the stove
+Starting episode 28...
+Success: True
+# episodes completed so far: 378
+# successes: 298 (78.8%)
+Speculative stats: length=2.445, avg_accept_length=1.188, num_blocks=229, overall_hit_rate=0.297, tree_blocks=208, tree_alt_wins=11, tree_extra_tokens=13, tree_nodes=3.30, tree_depth=2.62, main_accept=1.131
+
+Task: turn on the stove
+Starting episode 29...
+Success: True
+# episodes completed so far: 379
+# successes: 299 (78.9%)
+Speculative stats: length=2.268, avg_accept_length=1.016, num_blocks=250, overall_hit_rate=0.259, tree_blocks=231, tree_alt_wins=15, tree_extra_tokens=15, tree_nodes=3.17, tree_depth=2.45, main_accept=0.956
+
+Task: turn on the stove
+Starting episode 30...
+Success: True
+# episodes completed so far: 380
+# successes: 300 (78.9%)
+Speculative stats: length=2.290, avg_accept_length=1.009, num_blocks=217, overall_hit_rate=0.253, tree_blocks=207, tree_alt_wins=5, tree_extra_tokens=5, tree_nodes=3.14, tree_depth=2.52, main_accept=0.986
+
+Task: turn on the stove
+Starting episode 31...
+Success: True
+# episodes completed so far: 381
+# successes: 301 (79.0%)
+Speculative stats: length=2.296, avg_accept_length=1.047, num_blocks=253, overall_hit_rate=0.268, tree_blocks=231, tree_alt_wins=16, tree_extra_tokens=16, tree_nodes=3.18, tree_depth=2.47, main_accept=0.984
+
+Task: turn on the stove
+Starting episode 32...
+Success: True
+# episodes completed so far: 382
+# successes: 302 (79.1%)
+Speculative stats: length=2.315, avg_accept_length=1.039, num_blocks=254, overall_hit_rate=0.258, tree_blocks=240, tree_alt_wins=17, tree_extra_tokens=19, tree_nodes=3.20, tree_depth=2.44, main_accept=0.965
+
+Task: turn on the stove
+Starting episode 33...
+Success: True
+# episodes completed so far: 383
+# successes: 303 (79.1%)
+Speculative stats: length=2.386, avg_accept_length=1.121, num_blocks=223, overall_hit_rate=0.284, tree_blocks=206, tree_alt_wins=13, tree_extra_tokens=13, tree_nodes=3.19, tree_depth=2.56, main_accept=1.063
+
+Task: turn on the stove
+Starting episode 34...
+Success: False
+# episodes completed so far: 384
+# successes: 303 (78.9%)
+Speculative stats: length=1.862, avg_accept_length=0.795, num_blocks=1128, overall_hit_rate=0.222, tree_blocks=903, tree_alt_wins=28, tree_extra_tokens=28, tree_nodes=3.23, tree_depth=2.68, main_accept=0.770
+
+Task: turn on the stove
+Starting episode 35...
+Success: True
+# episodes completed so far: 385
+# successes: 304 (79.0%)
+Speculative stats: length=2.411, avg_accept_length=1.129, num_blocks=209, overall_hit_rate=0.277, tree_blocks=196, tree_alt_wins=13, tree_extra_tokens=13, tree_nodes=3.29, tree_depth=2.60, main_accept=1.067
+
+Task: turn on the stove
+Starting episode 36...
+Success: True
+# episodes completed so far: 386
+# successes: 305 (79.0%)
+Speculative stats: length=2.253, avg_accept_length=1.034, num_blocks=233, overall_hit_rate=0.265, tree_blocks=209, tree_alt_wins=25, tree_extra_tokens=25, tree_nodes=3.24, tree_depth=2.39, main_accept=0.927
+
+Task: turn on the stove
+Starting episode 37...
+Success: True
+# episodes completed so far: 387
+# successes: 306 (79.1%)
+Speculative stats: length=2.387, avg_accept_length=1.097, num_blocks=217, overall_hit_rate=0.273, tree_blocks=206, tree_alt_wins=5, tree_extra_tokens=5, tree_nodes=3.17, tree_depth=2.53, main_accept=1.074
+
+Task: turn on the stove
+Starting episode 38...
+Success: True
+# episodes completed so far: 388
+# successes: 307 (79.1%)
+Speculative stats: length=2.345, avg_accept_length=1.074, num_blocks=203, overall_hit_rate=0.268, tree_blocks=190, tree_alt_wins=14, tree_extra_tokens=15, tree_nodes=3.22, tree_depth=2.49, main_accept=1.000
+
+Task: turn on the stove
+Starting episode 39...
+Success: True
+# episodes completed so far: 389
+# successes: 308 (79.2%)
+Speculative stats: length=2.333, avg_accept_length=1.031, num_blocks=195, overall_hit_rate=0.258, tree_blocks=189, tree_alt_wins=11, tree_extra_tokens=12, tree_nodes=3.08, tree_depth=2.47, main_accept=0.969
+
+Task: turn on the stove
+Starting episode 40...
+Success: True
+# episodes completed so far: 390
+# successes: 309 (79.2%)
+Speculative stats: length=2.297, avg_accept_length=1.015, num_blocks=195, overall_hit_rate=0.258, tree_blocks=186, tree_alt_wins=10, tree_extra_tokens=10, tree_nodes=3.08, tree_depth=2.54, main_accept=0.964
+
+Task: turn on the stove
+Starting episode 41...
+Success: True
+# episodes completed so far: 391
+# successes: 310 (79.3%)
+Speculative stats: length=2.233, avg_accept_length=1.020, num_blocks=301, overall_hit_rate=0.259, tree_blocks=269, tree_alt_wins=27, tree_extra_tokens=29, tree_nodes=3.29, tree_depth=2.59, main_accept=0.924
+
+Task: turn on the stove
+Starting episode 42...
+Success: True
+# episodes completed so far: 392
+# successes: 311 (79.3%)
+Speculative stats: length=2.506, avg_accept_length=1.218, num_blocks=243, overall_hit_rate=0.291, tree_blocks=226, tree_alt_wins=21, tree_extra_tokens=22, tree_nodes=3.42, tree_depth=2.74, main_accept=1.128
+
+Task: turn on the stove
+Starting episode 43...
+Success: True
+# episodes completed so far: 393
+# successes: 312 (79.4%)
+Speculative stats: length=2.227, avg_accept_length=1.035, num_blocks=198, overall_hit_rate=0.268, tree_blocks=173, tree_alt_wins=14, tree_extra_tokens=14, tree_nodes=3.27, tree_depth=2.45, main_accept=0.965
+
+Task: turn on the stove
+Starting episode 44...
+Success: True
+# episodes completed so far: 394
+# successes: 313 (79.4%)
+Speculative stats: length=2.352, avg_accept_length=1.101, num_blocks=247, overall_hit_rate=0.279, tree_blocks=226, tree_alt_wins=14, tree_extra_tokens=15, tree_nodes=3.23, tree_depth=2.55, main_accept=1.040
+
+Task: turn on the stove
+Starting episode 45...
+Success: True
+# episodes completed so far: 395
+# successes: 314 (79.5%)
+Speculative stats: length=2.369, avg_accept_length=1.086, num_blocks=198, overall_hit_rate=0.269, tree_blocks=187, tree_alt_wins=14, tree_extra_tokens=18, tree_nodes=3.21, tree_depth=2.60, main_accept=0.995
+
+Task: turn on the stove
+Starting episode 46...
+Success: True
+# episodes completed so far: 396
+# successes: 315 (79.5%)
+Speculative stats: length=2.586, avg_accept_length=1.236, num_blocks=203, overall_hit_rate=0.296, tree_blocks=199, tree_alt_wins=8, tree_extra_tokens=9, tree_nodes=3.24, tree_depth=2.52, main_accept=1.192
+
+Task: turn on the stove
+Starting episode 47...
+Success: True
+# episodes completed so far: 397
+# successes: 316 (79.6%)
+Speculative stats: length=2.315, avg_accept_length=1.096, num_blocks=251, overall_hit_rate=0.283, tree_blocks=223, tree_alt_wins=8, tree_extra_tokens=8, tree_nodes=3.24, tree_depth=2.54, main_accept=1.064
+
+Task: turn on the stove
+Starting episode 48...
+Success: True
+# episodes completed so far: 398
+# successes: 317 (79.6%)
+Speculative stats: length=2.467, avg_accept_length=1.176, num_blocks=227, overall_hit_rate=0.283, tree_blocks=213, tree_alt_wins=12, tree_extra_tokens=13, tree_nodes=3.36, tree_depth=2.64, main_accept=1.119
+
+Task: turn on the stove
+Starting episode 49...
+Success: True
+# episodes completed so far: 399
+# successes: 318 (79.7%)
+Speculative stats: length=2.520, avg_accept_length=1.217, num_blocks=175, overall_hit_rate=0.293, tree_blocks=164, tree_alt_wins=13, tree_extra_tokens=13, tree_nodes=3.37, tree_depth=2.51, main_accept=1.143
+
+Task: turn on the stove
+Starting episode 50...
+Success: True
+# episodes completed so far: 400
+# successes: 319 (79.8%)
+Speculative stats: length=2.413, avg_accept_length=1.140, num_blocks=235, overall_hit_rate=0.282, tree_blocks=218, tree_alt_wins=16, tree_extra_tokens=16, tree_nodes=3.29, tree_depth=2.63, main_accept=1.072
+Current task success rate: 0.96
+Current total success rate: 0.7975
+Current task speculative stats: length=2.426, avg_accept_length=1.156, num_blocks=12995, overall_hit_rate=0.288, tree_blocks=11993, tree_alt_wins=719, tree_extra_tokens=778, tree_nodes=3.26, tree_depth=2.62, main_accept=1.096
+
+Task: put the bowl on the plate
+Starting episode 1...
+Success: True
+# episodes completed so far: 401
+# successes: 320 (79.8%)
+Speculative stats: length=2.419, avg_accept_length=1.159, num_blocks=246, overall_hit_rate=0.292, tree_blocks=225, tree_alt_wins=17, tree_extra_tokens=17, tree_nodes=3.25, tree_depth=2.61, main_accept=1.089
+
+Task: put the bowl on the plate
+Starting episode 2...
+Success: True
+# episodes completed so far: 402
+# successes: 321 (79.9%)
+Speculative stats: length=2.343, avg_accept_length=1.146, num_blocks=239, overall_hit_rate=0.299, tree_blocks=206, tree_alt_wins=16, tree_extra_tokens=17, tree_nodes=3.28, tree_depth=2.50, main_accept=1.075
+
+Task: put the bowl on the plate
+Starting episode 3...
+Success: True
+# episodes completed so far: 403
+# successes: 322 (79.9%)
+Speculative stats: length=2.355, avg_accept_length=1.132, num_blocks=220, overall_hit_rate=0.290, tree_blocks=195, tree_alt_wins=15, tree_extra_tokens=18, tree_nodes=3.28, tree_depth=2.62, main_accept=1.050
+
+Task: put the bowl on the plate
+Starting episode 4...
+Success: True
+# episodes completed so far: 404
+# successes: 323 (80.0%)
+Speculative stats: length=2.333, avg_accept_length=1.069, num_blocks=216, overall_hit_rate=0.270, tree_blocks=201, tree_alt_wins=13, tree_extra_tokens=13, tree_nodes=3.18, tree_depth=2.49, main_accept=1.009
+
+Task: put the bowl on the plate
+Starting episode 5...
+Success: True
+# episodes completed so far: 405
+# successes: 324 (80.0%)
+Speculative stats: length=2.302, avg_accept_length=1.093, num_blocks=225, overall_hit_rate=0.279, tree_blocks=198, tree_alt_wins=8, tree_extra_tokens=8, tree_nodes=3.32, tree_depth=2.59, main_accept=1.058
+
+Task: put the bowl on the plate
+Starting episode 6...
+Success: True
+# episodes completed so far: 406
+# successes: 325 (80.0%)
+Speculative stats: length=2.486, avg_accept_length=1.238, num_blocks=214, overall_hit_rate=0.315, tree_blocks=191, tree_alt_wins=16, tree_extra_tokens=19, tree_nodes=3.28, tree_depth=2.56, main_accept=1.150
+
+Task: put the bowl on the plate
+Starting episode 7...
+Success: True
+# episodes completed so far: 407
+# successes: 326 (80.1%)
+Speculative stats: length=2.302, avg_accept_length=1.086, num_blocks=222, overall_hit_rate=0.278, tree_blocks=197, tree_alt_wins=6, tree_extra_tokens=6, tree_nodes=3.27, tree_depth=2.62, main_accept=1.059
+
+Task: put the bowl on the plate
+Starting episode 8...
+Success: True
+# episodes completed so far: 408
+# successes: 327 (80.1%)
+Speculative stats: length=2.583, avg_accept_length=1.251, num_blocks=355, overall_hit_rate=0.310, tree_blocks=342, tree_alt_wins=17, tree_extra_tokens=19, tree_nodes=3.15, tree_depth=2.81, main_accept=1.197
+
+Task: put the bowl on the plate
+Starting episode 9...
+Success: False
+# episodes completed so far: 409
+# successes: 327 (80.0%)
+Speculative stats: length=2.425, avg_accept_length=1.113, num_blocks=866, overall_hit_rate=0.281, tree_blocks=836, tree_alt_wins=92, tree_extra_tokens=92, tree_nodes=3.07, tree_depth=2.36, main_accept=1.007
+
+Task: put the bowl on the plate
+Starting episode 10...
+Success: True
+# episodes completed so far: 410
+# successes: 328 (80.0%)
+Speculative stats: length=2.427, avg_accept_length=1.171, num_blocks=199, overall_hit_rate=0.292, tree_blocks=181, tree_alt_wins=9, tree_extra_tokens=9, tree_nodes=3.31, tree_depth=2.73, main_accept=1.126
+
+Task: put the bowl on the plate
+Starting episode 11...
+Success: True
+# episodes completed so far: 411
+# successes: 329 (80.0%)
+Speculative stats: length=2.293, avg_accept_length=1.092, num_blocks=229, overall_hit_rate=0.283, tree_blocks=200, tree_alt_wins=13, tree_extra_tokens=15, tree_nodes=3.27, tree_depth=2.62, main_accept=1.026
+
+Task: put the bowl on the plate
+Starting episode 12...
+Success: True
+# episodes completed so far: 412
+# successes: 330 (80.1%)
+Speculative stats: length=2.229, avg_accept_length=0.993, num_blocks=424, overall_hit_rate=0.252, tree_blocks=388, tree_alt_wins=34, tree_extra_tokens=35, tree_nodes=3.21, tree_depth=2.51, main_accept=0.910
+
+Task: put the bowl on the plate
+Starting episode 13...
+Success: True
+# episodes completed so far: 413
+# successes: 331 (80.1%)
+Speculative stats: length=2.262, avg_accept_length=1.105, num_blocks=229, overall_hit_rate=0.294, tree_blocks=189, tree_alt_wins=18, tree_extra_tokens=21, tree_nodes=3.35, tree_depth=2.65, main_accept=1.013
+
+Task: put the bowl on the plate
+Starting episode 14...
+Success: True
+# episodes completed so far: 414
+# successes: 332 (80.2%)
+Speculative stats: length=2.296, avg_accept_length=1.040, num_blocks=247, overall_hit_rate=0.260, tree_blocks=229, tree_alt_wins=17, tree_extra_tokens=18, tree_nodes=3.23, tree_depth=2.51, main_accept=0.968
+
+Task: put the bowl on the plate
+Starting episode 15...
+Success: True
+# episodes completed so far: 415
+# successes: 333 (80.2%)
+Speculative stats: length=2.266, avg_accept_length=1.083, num_blocks=241, overall_hit_rate=0.288, tree_blocks=207, tree_alt_wins=16, tree_extra_tokens=18, tree_nodes=3.22, tree_depth=2.64, main_accept=1.008
+
+Task: put the bowl on the plate
+Starting episode 16...
+Success: True
+# episodes completed so far: 416
+# successes: 334 (80.3%)
+Speculative stats: length=2.355, avg_accept_length=1.098, num_blocks=214, overall_hit_rate=0.279, tree_blocks=197, tree_alt_wins=12, tree_extra_tokens=12, tree_nodes=3.19, tree_depth=2.48, main_accept=1.042
+
+Task: put the bowl on the plate
+Starting episode 17...
+Success: False
+# episodes completed so far: 417
+# successes: 334 (80.1%)
+Speculative stats: length=2.331, avg_accept_length=1.050, num_blocks=901, overall_hit_rate=0.270, tree_blocks=853, tree_alt_wins=42, tree_extra_tokens=43, tree_nodes=3.05, tree_depth=2.27, main_accept=1.002
+
+Task: put the bowl on the plate
+Starting episode 18...
+Success: True
+# episodes completed so far: 418
+# successes: 335 (80.1%)
+Speculative stats: length=2.400, avg_accept_length=1.195, num_blocks=210, overall_hit_rate=0.300, tree_blocks=181, tree_alt_wins=14, tree_extra_tokens=14, tree_nodes=3.46, tree_depth=2.77, main_accept=1.129
+
+Task: put the bowl on the plate
+Starting episode 19...
+Success: False
+# episodes completed so far: 419
+# successes: 335 (80.0%)
+Speculative stats: length=2.298, avg_accept_length=1.222, num_blocks=914, overall_hit_rate=0.332, tree_blocks=682, tree_alt_wins=55, tree_extra_tokens=55, tree_nodes=3.60, tree_depth=3.24, main_accept=1.162
+
+Task: put the bowl on the plate
+Starting episode 20...
+Success: True
+# episodes completed so far: 420
+# successes: 336 (80.0%)
+Speculative stats: length=2.324, avg_accept_length=1.098, num_blocks=244, overall_hit_rate=0.285, tree_blocks=218, tree_alt_wins=10, tree_extra_tokens=11, tree_nodes=3.20, tree_depth=2.50, main_accept=1.053
+
+Task: put the bowl on the plate
+Starting episode 21...
+Success: True
+# episodes completed so far: 421
+# successes: 337 (80.0%)
+Speculative stats: length=2.411, avg_accept_length=1.172, num_blocks=209, overall_hit_rate=0.300, tree_blocks=187, tree_alt_wins=18, tree_extra_tokens=21, tree_nodes=3.25, tree_depth=2.55, main_accept=1.072
+
+Task: put the bowl on the plate
+Starting episode 22...
+Success: False
+# episodes completed so far: 422
+# successes: 337 (79.9%)
+Speculative stats: length=2.749, avg_accept_length=1.407, num_blocks=764, overall_hit_rate=0.324, tree_blocks=725, tree_alt_wins=18, tree_extra_tokens=19, tree_nodes=3.52, tree_depth=3.17, main_accept=1.382
+
+Task: put the bowl on the plate
+Starting episode 23...
+Success: True
+# episodes completed so far: 423
+# successes: 338 (79.9%)
+Speculative stats: length=2.395, avg_accept_length=1.120, num_blocks=301, overall_hit_rate=0.282, tree_blocks=281, tree_alt_wins=12, tree_extra_tokens=15, tree_nodes=3.18, tree_depth=2.60, main_accept=1.070
+
+Task: put the bowl on the plate
+Starting episode 24...
+Success: True
+# episodes completed so far: 424
+# successes: 339 (80.0%)
+Speculative stats: length=2.444, avg_accept_length=1.172, num_blocks=232, overall_hit_rate=0.292, tree_blocks=214, tree_alt_wins=12, tree_extra_tokens=12, tree_nodes=3.28, tree_depth=2.78, main_accept=1.121
+
+Task: put the bowl on the plate
+Starting episode 25...
+Success: True
+# episodes completed so far: 425
+# successes: 340 (80.0%)
+Speculative stats: length=2.333, avg_accept_length=1.093, num_blocks=216, overall_hit_rate=0.280, tree_blocks=196, tree_alt_wins=8, tree_extra_tokens=8, tree_nodes=3.20, tree_depth=2.53, main_accept=1.056
+
+Task: put the bowl on the plate
+Starting episode 26...
+Success: True
+# episodes completed so far: 426
+# successes: 341 (80.0%)
+Speculative stats: length=2.419, avg_accept_length=1.175, num_blocks=217, overall_hit_rate=0.300, tree_blocks=195, tree_alt_wins=13, tree_extra_tokens=15, tree_nodes=3.25, tree_depth=2.60, main_accept=1.106
+
+Task: put the bowl on the plate
+Starting episode 27...
+Success: True
+# episodes completed so far: 427
+# successes: 342 (80.1%)
+Speculative stats: length=3.816, avg_accept_length=2.329, num_blocks=343, overall_hit_rate=0.512, tree_blocks=323, tree_alt_wins=15, tree_extra_tokens=16, tree_nodes=3.77, tree_depth=3.36, main_accept=2.283
+
+Task: put the bowl on the plate
+Starting episode 28...
+Success: True
+# episodes completed so far: 428
+# successes: 343 (80.1%)
+Speculative stats: length=2.383, avg_accept_length=1.149, num_blocks=235, overall_hit_rate=0.295, tree_blocks=210, tree_alt_wins=14, tree_extra_tokens=14, tree_nodes=3.24, tree_depth=2.78, main_accept=1.089
+
+Task: put the bowl on the plate
+Starting episode 29...
+Success: True
+# episodes completed so far: 429
+# successes: 344 (80.2%)
+Speculative stats: length=2.343, avg_accept_length=1.121, num_blocks=248, overall_hit_rate=0.285, tree_blocks=220, tree_alt_wins=20, tree_extra_tokens=22, tree_nodes=3.30, tree_depth=2.60, main_accept=1.032
+
+Task: put the bowl on the plate
+Starting episode 30...
+Success: False
+# episodes completed so far: 430
+# successes: 344 (80.0%)
+Speculative stats: length=2.265, avg_accept_length=1.001, num_blocks=927, overall_hit_rate=0.257, tree_blocks=872, tree_alt_wins=17, tree_extra_tokens=17, tree_nodes=3.08, tree_depth=2.47, main_accept=0.983
+
+Task: put the bowl on the plate
+Starting episode 31...
+Success: True
+# episodes completed so far: 431
+# successes: 345 (80.0%)
+Speculative stats: length=2.304, avg_accept_length=1.062, num_blocks=240, overall_hit_rate=0.270, tree_blocks=219, tree_alt_wins=13, tree_extra_tokens=13, tree_nodes=3.22, tree_depth=2.59, main_accept=1.008
+
+Task: put the bowl on the plate
+Starting episode 32...
+Success: True
+# episodes completed so far: 432
+# successes: 346 (80.1%)
+Speculative stats: length=2.361, avg_accept_length=1.143, num_blocks=252, overall_hit_rate=0.296, tree_blocks=222, tree_alt_wins=11, tree_extra_tokens=11, tree_nodes=3.24, tree_depth=2.65, main_accept=1.099
+
+Task: put the bowl on the plate
+Starting episode 33...
+Success: False
+# episodes completed so far: 433
+# successes: 346 (79.9%)
+Speculative stats: length=2.658, avg_accept_length=1.325, num_blocks=790, overall_hit_rate=0.330, tree_blocks=753, tree_alt_wins=39, tree_extra_tokens=39, tree_nodes=3.17, tree_depth=2.72, main_accept=1.276
+
+Task: put the bowl on the plate
+Starting episode 34...
+Success: True
+# episodes completed so far: 434
+# successes: 347 (80.0%)
+Speculative stats: length=2.274, avg_accept_length=1.055, num_blocks=237, overall_hit_rate=0.275, tree_blocks=212, tree_alt_wins=17, tree_extra_tokens=18, tree_nodes=3.17, tree_depth=2.46, main_accept=0.979
+
+Task: put the bowl on the plate
+Starting episode 35...
+Success: False
+# episodes completed so far: 435
+# successes: 347 (79.8%)
+Speculative stats: length=5.237, avg_accept_length=3.534, num_blocks=401, overall_hit_rate=0.689, tree_blocks=383, tree_alt_wins=2, tree_extra_tokens=2, tree_nodes=4.32, tree_depth=4.09, main_accept=3.529
+
+Task: put the bowl on the plate
+Starting episode 36...
+Success: True
+# episodes completed so far: 436
+# successes: 348 (79.8%)
+Speculative stats: length=2.369, avg_accept_length=1.111, num_blocks=198, overall_hit_rate=0.274, tree_blocks=182, tree_alt_wins=8, tree_extra_tokens=8, tree_nodes=3.32, tree_depth=2.62, main_accept=1.071
+
+Task: put the bowl on the plate
+Starting episode 37...
+Success: True
+# episodes completed so far: 437
+# successes: 349 (79.9%)
+Speculative stats: length=2.254, avg_accept_length=1.088, num_blocks=205, overall_hit_rate=0.290, tree_blocks=173, tree_alt_wins=10, tree_extra_tokens=10, tree_nodes=3.25, tree_depth=2.60, main_accept=1.039
+
+Task: put the bowl on the plate
+Starting episode 38...
+Success: True
+# episodes completed so far: 438
+# successes: 350 (79.9%)
+Speculative stats: length=2.214, avg_accept_length=1.030, num_blocks=234, overall_hit_rate=0.274, tree_blocks=203, tree_alt_wins=9, tree_extra_tokens=10, tree_nodes=3.18, tree_depth=2.61, main_accept=0.987
+
+Task: put the bowl on the plate
+Starting episode 39...
+Success: True
+# episodes completed so far: 439
+# successes: 351 (80.0%)
+Speculative stats: length=2.369, avg_accept_length=1.141, num_blocks=198, overall_hit_rate=0.294, tree_blocks=176, tree_alt_wins=13, tree_extra_tokens=14, tree_nodes=3.25, tree_depth=2.47, main_accept=1.071
+
+Task: put the bowl on the plate
+Starting episode 40...
+Success: True
+# episodes completed so far: 440
+# successes: 352 (80.0%)
+Speculative stats: length=2.344, avg_accept_length=1.124, num_blocks=218, overall_hit_rate=0.289, tree_blocks=193, tree_alt_wins=12, tree_extra_tokens=14, tree_nodes=3.26, tree_depth=2.68, main_accept=1.060
+
+Task: put the bowl on the plate
+Starting episode 41...
+Success: False
+# episodes completed so far: 441
+# successes: 352 (79.8%)
+Speculative stats: length=2.265, avg_accept_length=1.004, num_blocks=927, overall_hit_rate=0.258, tree_blocks=869, tree_alt_wins=22, tree_extra_tokens=22, tree_nodes=3.09, tree_depth=2.72, main_accept=0.981
+
+Task: put the bowl on the plate
+Starting episode 42...
+Success: True
+# episodes completed so far: 442
+# successes: 353 (79.9%)
+Speculative stats: length=2.226, avg_accept_length=1.033, num_blocks=239, overall_hit_rate=0.269, tree_blocks=209, tree_alt_wins=17, tree_extra_tokens=20, tree_nodes=3.24, tree_depth=2.52, main_accept=0.950
+
+Task: put the bowl on the plate
+Starting episode 43...
+Success: True
+# episodes completed so far: 443
+# successes: 354 (79.9%)
+Speculative stats: length=2.596, avg_accept_length=1.309, num_blocks=275, overall_hit_rate=0.320, tree_blocks=252, tree_alt_wins=10, tree_extra_tokens=11, tree_nodes=3.37, tree_depth=2.93, main_accept=1.269
+
+Task: put the bowl on the plate
+Starting episode 44...
+Success: True
+# episodes completed so far: 444
+# successes: 355 (80.0%)
+Speculative stats: length=2.274, avg_accept_length=1.034, num_blocks=234, overall_hit_rate=0.264, tree_blocks=214, tree_alt_wins=12, tree_extra_tokens=12, tree_nodes=3.18, tree_depth=2.53, main_accept=0.983
+
+Task: put the bowl on the plate
+Starting episode 45...
+Success: True
+# episodes completed so far: 445
+# successes: 356 (80.0%)
+Speculative stats: length=2.223, avg_accept_length=1.017, num_blocks=296, overall_hit_rate=0.267, tree_blocks=263, tree_alt_wins=10, tree_extra_tokens=10, tree_nodes=3.16, tree_depth=2.61, main_accept=0.983
+
+Task: put the bowl on the plate
+Starting episode 46...
+Success: False
+# episodes completed so far: 446
+# successes: 356 (79.8%)
+Speculative stats: length=5.109, avg_accept_length=3.392, num_blocks=411, overall_hit_rate=0.608, tree_blocks=406, tree_alt_wins=7, tree_extra_tokens=12, tree_nodes=4.64, tree_depth=4.57, main_accept=3.363
+
+Task: put the bowl on the plate
+Starting episode 47...
+Success: True
+# episodes completed so far: 447
+# successes: 357 (79.9%)
+Speculative stats: length=2.377, avg_accept_length=1.121, num_blocks=215, overall_hit_rate=0.281, tree_blocks=197, tree_alt_wins=19, tree_extra_tokens=19, tree_nodes=3.26, tree_depth=2.61, main_accept=1.033
+
+Task: put the bowl on the plate
+Starting episode 48...
+Success: True
+# episodes completed so far: 448
+# successes: 358 (79.9%)
+Speculative stats: length=2.410, avg_accept_length=1.187, num_blocks=273, overall_hit_rate=0.312, tree_blocks=240, tree_alt_wins=17, tree_extra_tokens=18, tree_nodes=3.20, tree_depth=2.61, main_accept=1.121
+
+Task: put the bowl on the plate
+Starting episode 49...
+Success: True
+# episodes completed so far: 449
+# successes: 359 (80.0%)
+Speculative stats: length=2.432, avg_accept_length=1.166, num_blocks=259, overall_hit_rate=0.289, tree_blocks=238, tree_alt_wins=18, tree_extra_tokens=23, tree_nodes=3.30, tree_depth=2.77, main_accept=1.077
+
+Task: put the bowl on the plate
+Starting episode 50...
+Success: True
+# episodes completed so far: 450
+# successes: 360 (80.0%)
+Speculative stats: length=2.551, avg_accept_length=1.304, num_blocks=247, overall_hit_rate=0.333, tree_blocks=218, tree_alt_wins=19, tree_extra_tokens=21, tree_nodes=3.30, tree_depth=2.64, main_accept=1.219
+Current task success rate: 0.82
+Current total success rate: 0.8
+Current task speculative stats: length=2.543, avg_accept_length=1.270, num_blocks=16896, overall_hit_rate=0.317, tree_blocks=15361, tree_alt_wins=872, tree_extra_tokens=926, tree_nodes=3.31, tree_depth=2.74, main_accept=1.215
+
+Task: put the wine bottle on the rack
+Starting episode 1...
+Success: True
+# episodes completed so far: 451
+# successes: 361 (80.0%)
+Speculative stats: length=2.189, avg_accept_length=1.034, num_blocks=614, overall_hit_rate=0.279, tree_blocks=516, tree_alt_wins=57, tree_extra_tokens=59, tree_nodes=3.22, tree_depth=2.38, main_accept=0.938
+
+Task: put the wine bottle on the rack
+Starting episode 2...
+Success: True
+# episodes completed so far: 452
+# successes: 362 (80.1%)
+Speculative stats: length=2.078, avg_accept_length=0.893, num_blocks=411, overall_hit_rate=0.237, tree_blocks=365, tree_alt_wins=21, tree_extra_tokens=22, tree_nodes=3.12, tree_depth=2.37, main_accept=0.839
+
+Task: put the wine bottle on the rack
+Starting episode 3...
+Success: False
+# episodes completed so far: 453
+# successes: 362 (79.9%)
+Speculative stats: length=2.121, avg_accept_length=0.923, num_blocks=990, overall_hit_rate=0.242, tree_blocks=880, tree_alt_wins=75, tree_extra_tokens=78, tree_nodes=3.17, tree_depth=2.37, main_accept=0.844
+
+Task: put the wine bottle on the rack
+Starting episode 4...
+Success: False
+# episodes completed so far: 454
+# successes: 362 (79.7%)
+Speculative stats: length=2.176, avg_accept_length=0.959, num_blocks=965, overall_hit_rate=0.252, tree_blocks=875, tree_alt_wins=65, tree_extra_tokens=69, tree_nodes=3.10, tree_depth=2.26, main_accept=0.887
+
+Task: put the wine bottle on the rack
+Starting episode 5...
+Success: True
+# episodes completed so far: 455
+# successes: 363 (79.8%)
+Speculative stats: length=2.189, avg_accept_length=0.976, num_blocks=419, overall_hit_rate=0.258, tree_blocks=377, tree_alt_wins=43, tree_extra_tokens=45, tree_nodes=3.10, tree_depth=2.23, main_accept=0.869
+
+Task: put the wine bottle on the rack
+Starting episode 6...
+Success: False
+# episodes completed so far: 456
+# successes: 363 (79.6%)
+Speculative stats: length=2.256, avg_accept_length=1.046, num_blocks=931, overall_hit_rate=0.278, tree_blocks=825, tree_alt_wins=60, tree_extra_tokens=61, tree_nodes=3.12, tree_depth=2.40, main_accept=0.981
+
+Task: put the wine bottle on the rack
+Starting episode 7...
+Success: False
+# episodes completed so far: 457
+# successes: 363 (79.4%)
+Speculative stats: length=2.167, avg_accept_length=0.983, num_blocks=969, overall_hit_rate=0.259, tree_blocks=838, tree_alt_wins=84, tree_extra_tokens=85, tree_nodes=3.23, tree_depth=2.44, main_accept=0.896
+
+Task: put the wine bottle on the rack
+Starting episode 8...
+Success: False
+# episodes completed so far: 458
+# successes: 363 (79.3%)
+Speculative stats: length=2.136, avg_accept_length=0.948, num_blocks=983, overall_hit_rate=0.250, tree_blocks=863, tree_alt_wins=70, tree_extra_tokens=75, tree_nodes=3.19, tree_depth=2.40, main_accept=0.872
+
+Task: put the wine bottle on the rack
+Starting episode 9...
+Success: False
+# episodes completed so far: 459
+# successes: 363 (79.1%)
+Speculative stats: length=2.031, avg_accept_length=0.891, num_blocks=1034, overall_hit_rate=0.241, tree_blocks=869, tree_alt_wins=103, tree_extra_tokens=109, tree_nodes=3.20, tree_depth=2.27, main_accept=0.785
+
+Task: put the wine bottle on the rack
+Starting episode 10...
+Success: True
+# episodes completed so far: 460
+# successes: 364 (79.1%)
+Speculative stats: length=2.135, avg_accept_length=0.930, num_blocks=400, overall_hit_rate=0.245, tree_blocks=360, tree_alt_wins=28, tree_extra_tokens=30, tree_nodes=3.11, tree_depth=2.25, main_accept=0.855
+
+Task: put the wine bottle on the rack
+Starting episode 11...
+Success: False
+# episodes completed so far: 461
+# successes: 364 (79.0%)
+Speculative stats: length=2.433, avg_accept_length=1.173, num_blocks=863, overall_hit_rate=0.305, tree_blocks=787, tree_alt_wins=80, tree_extra_tokens=83, tree_nodes=3.12, tree_depth=2.32, main_accept=1.076
+
+Task: put the wine bottle on the rack
+Starting episode 12...
+Success: False
+# episodes completed so far: 462
+# successes: 364 (78.8%)
+Speculative stats: length=2.400, avg_accept_length=1.285, num_blocks=875, overall_hit_rate=0.349, tree_blocks=675, tree_alt_wins=64, tree_extra_tokens=64, tree_nodes=3.47, tree_depth=2.76, main_accept=1.211
+
+Task: put the wine bottle on the rack
+Starting episode 13...
+Success: False
+# episodes completed so far: 463
+# successes: 364 (78.6%)
+Speculative stats: length=2.126, avg_accept_length=0.959, num_blocks=988, overall_hit_rate=0.254, tree_blocks=846, tree_alt_wins=69, tree_extra_tokens=70, tree_nodes=3.24, tree_depth=2.39, main_accept=0.888
+
+Task: put the wine bottle on the rack
+Starting episode 14...
+Success: True
+# episodes completed so far: 464
+# successes: 365 (78.7%)
+Speculative stats: length=2.131, avg_accept_length=0.937, num_blocks=473, overall_hit_rate=0.250, tree_blocks=421, tree_alt_wins=44, tree_extra_tokens=47, tree_nodes=3.09, tree_depth=2.10, main_accept=0.837
+
+Task: put the wine bottle on the rack
+Starting episode 15...
+Success: False
+# episodes completed so far: 465
+# successes: 365 (78.5%)
+Speculative stats: length=2.222, avg_accept_length=0.981, num_blocks=945, overall_hit_rate=0.254, tree_blocks=873, tree_alt_wins=54, tree_extra_tokens=59, tree_nodes=3.10, tree_depth=2.34, main_accept=0.919
+
+Task: put the wine bottle on the rack
+Starting episode 16...
+Success: True
+# episodes completed so far: 466
+# successes: 366 (78.5%)
+Speculative stats: length=2.115, avg_accept_length=0.945, num_blocks=384, overall_hit_rate=0.253, tree_blocks=333, tree_alt_wins=31, tree_extra_tokens=33, tree_nodes=3.16, tree_depth=2.26, main_accept=0.859
+
+Task: put the wine bottle on the rack
+Starting episode 17...
+Success: False
+# episodes completed so far: 467
+# successes: 366 (78.4%)
+Speculative stats: length=2.081, avg_accept_length=0.901, num_blocks=1009, overall_hit_rate=0.239, tree_blocks=886, tree_alt_wins=80, tree_extra_tokens=83, tree_nodes=3.15, tree_depth=2.32, main_accept=0.819
+
+Task: put the wine bottle on the rack
+Starting episode 18...
+Success: True
+# episodes completed so far: 468
+# successes: 367 (78.4%)
+Speculative stats: length=2.167, avg_accept_length=0.964, num_blocks=659, overall_hit_rate=0.252, tree_blocks=587, tree_alt_wins=47, tree_extra_tokens=47, tree_nodes=3.17, tree_depth=2.22, main_accept=0.892
+
+Task: put the wine bottle on the rack
+Starting episode 19...
+Success: False
+# episodes completed so far: 469
+# successes: 367 (78.3%)
+Speculative stats: length=2.115, avg_accept_length=0.935, num_blocks=993, overall_hit_rate=0.249, tree_blocks=866, tree_alt_wins=89, tree_extra_tokens=94, tree_nodes=3.16, tree_depth=2.31, main_accept=0.840
+
+Task: put the wine bottle on the rack
+Starting episode 20...
+Success: False
+# episodes completed so far: 470
+# successes: 367 (78.1%)
+Speculative stats: length=1.989, avg_accept_length=0.838, num_blocks=1056, overall_hit_rate=0.226, tree_blocks=914, tree_alt_wins=88, tree_extra_tokens=91, tree_nodes=3.12, tree_depth=2.26, main_accept=0.752
+
+Task: put the wine bottle on the rack
+Starting episode 21...
+Success: True
+# episodes completed so far: 471
+# successes: 368 (78.1%)
+Speculative stats: length=2.203, avg_accept_length=0.996, num_blocks=467, overall_hit_rate=0.263, tree_blocks=417, tree_alt_wins=25, tree_extra_tokens=27, tree_nodes=3.12, tree_depth=2.33, main_accept=0.938
+
+Task: put the wine bottle on the rack
+Starting episode 22...
+Success: True
+# episodes completed so far: 472
+# successes: 369 (78.2%)
+Speculative stats: length=2.072, avg_accept_length=0.922, num_blocks=527, overall_hit_rate=0.250, tree_blocks=450, tree_alt_wins=47, tree_extra_tokens=51, tree_nodes=3.16, tree_depth=2.14, main_accept=0.825
+
+Task: put the wine bottle on the rack
+Starting episode 23...
+Success: True
+# episodes completed so far: 473
+# successes: 370 (78.2%)
+Speculative stats: length=2.162, avg_accept_length=0.973, num_blocks=641, overall_hit_rate=0.259, tree_blocks=564, tree_alt_wins=33, tree_extra_tokens=33, tree_nodes=3.13, tree_depth=2.52, main_accept=0.922
+
+Task: put the wine bottle on the rack
+Starting episode 24...
+Success: True
+# episodes completed so far: 474
+# successes: 371 (78.3%)
+Speculative stats: length=2.075, avg_accept_length=0.931, num_blocks=506, overall_hit_rate=0.251, tree_blocks=429, tree_alt_wins=37, tree_extra_tokens=38, tree_nodes=3.20, tree_depth=2.31, main_accept=0.856
+
+Task: put the wine bottle on the rack
+Starting episode 25...
+Success: False
+# episodes completed so far: 475
+# successes: 371 (78.1%)
+Speculative stats: length=4.626, avg_accept_length=2.982, num_blocks=454, overall_hit_rate=0.641, tree_blocks=446, tree_alt_wins=6, tree_extra_tokens=6, tree_nodes=3.72, tree_depth=3.70, main_accept=2.969
+
+Task: put the wine bottle on the rack
+Starting episode 26...
+Success: True
+# episodes completed so far: 476
+# successes: 372 (78.2%)
+Speculative stats: length=2.260, avg_accept_length=1.002, num_blocks=830, overall_hit_rate=0.260, tree_blocks=775, tree_alt_wins=40, tree_extra_tokens=42, tree_nodes=3.06, tree_depth=2.33, main_accept=0.952
+
+Task: put the wine bottle on the rack
+Starting episode 27...
+Success: False
+# episodes completed so far: 477
+# successes: 372 (78.0%)
+Speculative stats: length=2.318, avg_accept_length=1.138, num_blocks=906, overall_hit_rate=0.298, tree_blocks=769, tree_alt_wins=28, tree_extra_tokens=29, tree_nodes=3.31, tree_depth=2.53, main_accept=1.106
+
+Task: put the wine bottle on the rack
+Starting episode 28...
+Success: False
+# episodes completed so far: 478
+# successes: 372 (77.8%)
+Speculative stats: length=2.877, avg_accept_length=1.515, num_blocks=730, overall_hit_rate=0.346, tree_blocks=694, tree_alt_wins=25, tree_extra_tokens=25, tree_nodes=3.56, tree_depth=2.83, main_accept=1.481
+
+Task: put the wine bottle on the rack
+Starting episode 29...
+Success: True
+# episodes completed so far: 479
+# successes: 373 (77.9%)
+Speculative stats: length=2.354, avg_accept_length=1.123, num_blocks=559, overall_hit_rate=0.295, tree_blocks=500, tree_alt_wins=43, tree_extra_tokens=46, tree_nodes=3.15, tree_depth=2.43, main_accept=1.041
+
+Task: put the wine bottle on the rack
+Starting episode 30...
+Success: False
+# episodes completed so far: 480
+# successes: 373 (77.7%)
+Speculative stats: length=2.248, avg_accept_length=1.075, num_blocks=934, overall_hit_rate=0.291, tree_blocks=783, tree_alt_wins=80, tree_extra_tokens=92, tree_nodes=3.22, tree_depth=2.36, main_accept=0.976
+
+Task: put the wine bottle on the rack
+Starting episode 31...
+Success: True
+# episodes completed so far: 481
+# successes: 374 (77.8%)
+Speculative stats: length=2.027, avg_accept_length=0.854, num_blocks=404, overall_hit_rate=0.227, tree_blocks=357, tree_alt_wins=24, tree_extra_tokens=26, tree_nodes=3.12, tree_depth=2.27, main_accept=0.790
+
+Task: put the wine bottle on the rack
+Starting episode 32...
+Success: False
+# episodes completed so far: 482
+# successes: 374 (77.6%)
+Speculative stats: length=2.278, avg_accept_length=1.161, num_blocks=922, overall_hit_rate=0.326, tree_blocks=729, tree_alt_wins=44, tree_extra_tokens=44, tree_nodes=3.24, tree_depth=2.39, main_accept=1.113
+
+Task: put the wine bottle on the rack
+Starting episode 33...
+Success: True
+# episodes completed so far: 483
+# successes: 375 (77.6%)
+Speculative stats: length=2.000, avg_accept_length=0.844, num_blocks=546, overall_hit_rate=0.226, tree_blocks=475, tree_alt_wins=62, tree_extra_tokens=63, tree_nodes=3.14, tree_depth=2.14, main_accept=0.729
+
+Task: put the wine bottle on the rack
+Starting episode 34...
+Success: True
+# episodes completed so far: 484
+# successes: 376 (77.7%)
+Speculative stats: length=2.164, avg_accept_length=0.955, num_blocks=469, overall_hit_rate=0.251, tree_blocks=422, tree_alt_wins=36, tree_extra_tokens=37, tree_nodes=3.12, tree_depth=2.29, main_accept=0.876
+
+Task: put the wine bottle on the rack
+Starting episode 35...
+Success: True
+# episodes completed so far: 485
+# successes: 377 (77.7%)
+Speculative stats: length=2.089, avg_accept_length=0.920, num_blocks=449, overall_hit_rate=0.247, tree_blocks=391, tree_alt_wins=35, tree_extra_tokens=35, tree_nodes=3.13, tree_depth=2.25, main_accept=0.842
+
+Task: put the wine bottle on the rack
+Starting episode 36...
+Success: False
+# episodes completed so far: 486
+# successes: 377 (77.6%)
+Speculative stats: length=2.473, avg_accept_length=1.237, num_blocks=849, overall_hit_rate=0.321, tree_blocks=738, tree_alt_wins=96, tree_extra_tokens=100, tree_nodes=3.29, tree_depth=2.40, main_accept=1.119
+
+Task: put the wine bottle on the rack
+Starting episode 37...
+Success: True
+# episodes completed so far: 487
+# successes: 378 (77.6%)
+Speculative stats: length=2.162, avg_accept_length=0.981, num_blocks=476, overall_hit_rate=0.259, tree_blocks=415, tree_alt_wins=42, tree_extra_tokens=45, tree_nodes=3.20, tree_depth=2.28, main_accept=0.887
+
+Task: put the wine bottle on the rack
+Starting episode 38...
+Success: False
+# episodes completed so far: 488
+# successes: 378 (77.5%)
+Speculative stats: length=1.948, avg_accept_length=0.840, num_blocks=1078, overall_hit_rate=0.237, tree_blocks=893, tree_alt_wins=35, tree_extra_tokens=37, tree_nodes=3.07, tree_depth=2.25, main_accept=0.805
+
+Task: put the wine bottle on the rack
+Starting episode 39...
+Success: True
+# episodes completed so far: 489
+# successes: 379 (77.5%)
+Speculative stats: length=2.547, avg_accept_length=1.259, num_blocks=742, overall_hit_rate=0.326, tree_blocks=686, tree_alt_wins=40, tree_extra_tokens=45, tree_nodes=3.09, tree_depth=2.60, main_accept=1.198
+
+Task: put the wine bottle on the rack
+Starting episode 40...
+Success: True
+# episodes completed so far: 490
+# successes: 380 (77.6%)
+Speculative stats: length=2.266, avg_accept_length=1.004, num_blocks=488, overall_hit_rate=0.257, tree_blocks=457, tree_alt_wins=24, tree_extra_tokens=24, tree_nodes=3.10, tree_depth=2.33, main_accept=0.955
+
+Task: put the wine bottle on the rack
+Starting episode 41...
+Success: True
+# episodes completed so far: 491
+# successes: 381 (77.6%)
+Speculative stats: length=2.110, avg_accept_length=0.913, num_blocks=584, overall_hit_rate=0.242, tree_blocks=523, tree_alt_wins=44, tree_extra_tokens=47, tree_nodes=3.09, tree_depth=2.18, main_accept=0.832
+
+Task: put the wine bottle on the rack
+Starting episode 42...
+Success: True
+# episodes completed so far: 492
+# successes: 382 (77.6%)
+Speculative stats: length=2.075, avg_accept_length=0.885, num_blocks=742, overall_hit_rate=0.235, tree_blocks=663, tree_alt_wins=38, tree_extra_tokens=39, tree_nodes=3.11, tree_depth=2.40, main_accept=0.833
+
+Task: put the wine bottle on the rack
+Starting episode 43...
+Success: False
+# episodes completed so far: 493
+# successes: 382 (77.5%)
+Speculative stats: length=2.083, avg_accept_length=0.942, num_blocks=1008, overall_hit_rate=0.256, tree_blocks=847, tree_alt_wins=74, tree_extra_tokens=76, tree_nodes=3.19, tree_depth=2.31, main_accept=0.867
+
+Task: put the wine bottle on the rack
+Starting episode 44...
+Success: True
+# episodes completed so far: 494
+# successes: 383 (77.5%)
+Speculative stats: length=2.255, avg_accept_length=0.998, num_blocks=447, overall_hit_rate=0.256, tree_blocks=418, tree_alt_wins=21, tree_extra_tokens=23, tree_nodes=3.09, tree_depth=2.30, main_accept=0.946
+
+Task: put the wine bottle on the rack
+Starting episode 45...
+Success: True
+# episodes completed so far: 495
+# successes: 384 (77.6%)
+Speculative stats: length=2.100, avg_accept_length=0.921, num_blocks=480, overall_hit_rate=0.247, tree_blocks=422, tree_alt_wins=44, tree_extra_tokens=46, tree_nodes=3.10, tree_depth=2.23, main_accept=0.825
+
+Task: put the wine bottle on the rack
+Starting episode 46...
+Success: False
+# episodes completed so far: 496
+# successes: 384 (77.4%)
+Speculative stats: length=2.123, avg_accept_length=0.939, num_blocks=989, overall_hit_rate=0.248, tree_blocks=871, tree_alt_wins=51, tree_extra_tokens=52, tree_nodes=3.17, tree_depth=2.52, main_accept=0.887
+
+Task: put the wine bottle on the rack
+Starting episode 47...
+Success: True
+# episodes completed so far: 497
+# successes: 385 (77.5%)
+Speculative stats: length=2.185, avg_accept_length=1.002, num_blocks=426, overall_hit_rate=0.266, tree_blocks=371, tree_alt_wins=30, tree_extra_tokens=31, tree_nodes=3.18, tree_depth=2.41, main_accept=0.930
+
+Task: put the wine bottle on the rack
+Starting episode 48...
+Success: True
+# episodes completed so far: 498
+# successes: 386 (77.5%)
+Speculative stats: length=2.132, avg_accept_length=0.947, num_blocks=453, overall_hit_rate=0.251, tree_blocks=399, tree_alt_wins=32, tree_extra_tokens=32, tree_nodes=3.15, tree_depth=2.35, main_accept=0.876
+
+Task: put the wine bottle on the rack
+Starting episode 49...
+Success: True
+# episodes completed so far: 499
+# successes: 387 (77.6%)
+Speculative stats: length=2.093, avg_accept_length=0.931, num_blocks=418, overall_hit_rate=0.250, tree_blocks=361, tree_alt_wins=34, tree_extra_tokens=36, tree_nodes=3.15, tree_depth=2.17, main_accept=0.844
+
+Task: put the wine bottle on the rack
+Starting episode 50...
+Success: True
+# episodes completed so far: 500
+# successes: 388 (77.6%)
+Speculative stats: length=2.173, avg_accept_length=0.943, num_blocks=422, overall_hit_rate=0.247, tree_blocks=388, tree_alt_wins=28, tree_extra_tokens=28, tree_nodes=3.07, tree_depth=2.25, main_accept=0.877
+Current task success rate: 0.56
+Current total success rate: 0.776
+Current task speculative stats: length=2.221, avg_accept_length=1.024, num_blocks=34907, overall_hit_rate=0.270, tree_blocks=30609, tree_alt_wins=2450, tree_extra_tokens=2559, tree_nodes=3.18, tree_depth=2.38, main_accept=0.951
+Saved eval summary to: /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs/dflash_strict/EVAL-libero_goal-openvla-2026_07_25-22_44_00--dflash-action-rnn-4way-goal-e200-tree-strict-r0-dflash_strict_summary.json
+Total speculative stats: length=2.221, avg_accept_length=1.024, num_blocks=34907, overall_hit_rate=0.270, tree_blocks=30609, tree_alt_wins=2450, tree_extra_tokens=2559, tree_nodes=3.18, tree_depth=2.38, main_accept=0.951
+Conditional prefix hit rate: p1=0.866, p2=0.134, p3=0.263, p4=0.230, p5=0.727, p6=0.000

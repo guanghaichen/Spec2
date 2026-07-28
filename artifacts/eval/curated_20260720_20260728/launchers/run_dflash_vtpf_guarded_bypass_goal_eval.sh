@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# VTPF-GuardedBypass：在最近 target 已连续确认同一动作、且当前图像
+# 变化足够小时，最多复用一次上一条已验证动作并跳过整个 VLA prefill。
+# 下一动作强制恢复 target，因此误差不会连续无界累积。这是 relaxed 分支。
+#
+# 推荐先做全 suite 小样本：
+#   EVAL_EPOCH=200 NUM_TRIALS_PER_TASK=1 TIMING_SCOPE=full_suite \
+#     bash openvla/specdecoding/decode-scripts/run_dflash_vtpf_guarded_bypass_goal_eval.sh
+#
+# 已验证的默认保护点（Goal、golden e200、seed=7、3 trials/task）：
+#   DFLASH_TEMPORAL_BYPASS_MAX_PIXEL_RELATIVE_L2=0.03
+#   DFLASH_VERIFY_SKIP_MIN_STABLE_ACTIONS=1
+#   DFLASH_VERIFY_SKIP_MAX_CONSECUTIVE=1
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+export DFLASH_USE_CAUSAL_RESIDUAL_SAMPLING=False
+export DFLASH_ACCEPTANCE_MODE=token
+export ACCEPT_THRESHOLD=0
+export DFLASH_TREE_MODE=off
+export DFLASH_TREE_BUDGET=0
+export DFLASH_TARGET_LOGITS_MODE=action_only
+export DFLASH_VERIFY_SKIP_MODE=active
+export DFLASH_TEMPORAL_PREFILL_FUSION=True
+export DFLASH_TEMPORAL_PREFILL_MIN_STABLE_ACTIONS="${DFLASH_TEMPORAL_PREFILL_MIN_STABLE_ACTIONS:-3}"
+export DFLASH_TEMPORAL_PREFIX_CERT_TOKENS=0
+export DFLASH_TEMPORAL_BYPASS_MAX_PIXEL_RELATIVE_L2="${DFLASH_TEMPORAL_BYPASS_MAX_PIXEL_RELATIVE_L2:-0.03}"
+export DFLASH_TEMPORAL_BYPASS_USE_PIXEL_GUARD="${DFLASH_TEMPORAL_BYPASS_USE_PIXEL_GUARD:-True}"
+export DFLASH_VERIFY_SKIP_MIN_STABLE_ACTIONS="${DFLASH_VERIFY_SKIP_MIN_STABLE_ACTIONS:-1}"
+export DFLASH_VERIFY_SKIP_MAX_CONSECUTIVE="${DFLASH_VERIFY_SKIP_MAX_CONSECUTIVE:-1}"
+export DFLASH_VERIFY_SKIP_MIN_TEMPORAL_COSINE=1.0
+export DFLASH_TEMPORAL_ROUTE_MIN_COSINE="${DFLASH_TEMPORAL_ROUTE_MIN_COSINE:-0.99}"
+export DFLASH_TEMPORAL_ROUTE_STOP_ON_REJECT=True
+export DFLASH_TEMPORAL_FUSE_VERIFY=True
+export RUN_ID_NOTE="${RUN_ID_NOTE:-dflash-vtpf-guarded-bypass-goal-e${EVAL_EPOCH:-latest}-p${DFLASH_TEMPORAL_BYPASS_MAX_PIXEL_RELATIVE_L2}-k${DFLASH_VERIFY_SKIP_MIN_STABLE_ACTIONS}}"
+
+# 使用 relaxed 入口归档日志；fallback 校验本身仍是 exact token。
+bash "${SCRIPT_DIR}/run_dflash_goal_eval.sh" relaxed

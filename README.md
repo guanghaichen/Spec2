@@ -13,6 +13,21 @@
 [OpenVLA](https://github.com/openvla/openvla)。当前仓库仍是研究代码，不是已经定稿的公开复现包。
 所有结论必须同时报告成功率、接受长度和速度；训练准确率不能替代在线 LIBERO 结果。
 
+截至 2026-07-28，最重要的正式结果来自同一个 Golden e200 checkpoint、同一台 RTX 4090、同一 seed 7 和
+同一 paper-wrapped AR 分母：
+
+| 方法 | 校验性质 | SR | mean step | Speedup | Length |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Paper-wrapped AR | 精确基线 | 0.742 | 0.182718s | 1.000x | - |
+| SpecVLA strict | target-verified | 0.768 | 0.178764s | 1.022x | 1.631 |
+| SpecVLA relaxed (`r=9`) | 近似接受 | 0.734 | 0.141228s | 1.294x | 2.361 |
+| **Golden + VTPF strict** | **target-verified** | **0.790** | **0.142036s** | **1.286x** | **2.422** |
+| **Golden + VTPF-TD-Fast** | **单步时序近似** | **0.754** | **0.070050s** | **2.608x** | **3.653** |
+
+原始日志、逐动作 timing、summary、launcher 快照、checkpoint 配置、环境身份和 SHA-256 已统一固化在
+[`artifacts/eval/curated_20260720_20260728`](artifacts/eval/curated_20260720_20260728)。该目录是当前论文
+数字的首要证据源；README 中的表格只是其可读摘要。
+
 当前有三条必须隔离理解的实验线：
 
 - **Golden reference**：复杂版一层 Draft + Action-RNN + 跨 Anchor + Domino 交接，其 epoch 200 配合
@@ -162,7 +177,7 @@ parallel_draft=False
 DDTree 是已经实现并必须如实报告的历史/消融组件，不再因为结构复杂而自动算作主线贡献。最终新颖性仍须
 结合 HeiSD、缓存类工作与完整消融审慎表述。
 
-与 Domino 的关系需要准确表述：当前训练骨架与其核心思想高度一致，都是在同一次训练中令 Base 任务权重
+与 Domino 的关系需要准确表述：Golden 复杂版训练骨架与其核心思想高度一致，都是在同一次训练中令 Base 任务权重
 线性下降、Final 任务权重线性上升，并让 Final 梯度继续穿过修正头更新 Draft；但本项目不是原样复现。
 Domino 的公开实现主要交接 Base/Final CE，本项目交接的是 `Soft KL + 小权重 hard CE`，并额外保留完整
 Hidden/Cos、Draft-only 跨 Anchor、Action-RNN L1/Prefix 及启动前固定损失标定。这些差异来自 VLA 离线
@@ -227,9 +242,9 @@ anchor hidden。历史目录名称使用 `Residual-CAD`；为了避免缩写混�
 这一步的重要贡献是确定了方向：token 级因果信息和跨 anchor 蒸馏确实能抬高弱路径；但不能只追求离线
 teacher-forced accuracy，也不能忽视推理头成本。
 
-### 3.6 阶段六：Action-RNN 与 Base/Final 线性交接
+### 3.6 阶段六：Golden Action-RNN 与 Base/Final 线性交接
 
-当前版本保留一层并行 DFlash 主干，把旧的 hidden residual 和全词表 Markov bias 合并为一个很小的
+Golden 复杂版保留一层并行 DFlash 主干，把旧的 hidden residual 和全词表 Markov bias 合并为一个很小的
 动作专用顺序残差头。
 
 #### 块并行主干
@@ -256,7 +271,7 @@ RNN 每一步读取：当前位置 DFlash hidden、前一个 action token、当�
 
 `Base` 是并行 Draft hidden 经过冻结动作 `lm_head` 后的原始分布；`Final` 是 Base 加上 Action-RNN 残差后的
 最终分布。曾尝试先 Hidden/Cos、再 Final 微调的两次独立训练，但阶段二大部分更新被用于修复 Draft 退化，
-说明两个目标不能靠突然切换来衔接。当前恢复为一次训练，并使用 Domino 式全程线性交接：
+说明两个目标不能靠突然切换来衔接。Golden 配方随后恢复为一次训练，并使用 Domino 式全程线性交接：
 
 ```text
 lambda: 1 -> 0
@@ -298,9 +313,9 @@ self-rollout 仍有分布差异，必须看 `rollout_*` 和在线命中率。
 先用 teacher/student 动作分布的 total variation 得到每个位置的近似可接受概率，再沿块累乘，直接惩罚
 连续前缀中断。早期错误会同时破坏后面的累计前缀，因此无需再设置 p2、p3 等手工 boost。
 
-#### 当前边界
+#### Golden 结构边界
 
-DFlash transformer 仍只 forward 一次，但 Action-RNN 有最多 6 次很小的顺序状态更新。因此当前方法是
+DFlash transformer 仍只 forward 一次，但 Action-RNN 有最多 6 次很小的顺序状态更新。因此 Golden 复杂版是
 “块并行重计算 + 轻量顺序 token 修正”，不是严格意义上 6 个最终 token 完全 O(1) 同时输出。
 
 ## 4. 当前数据、模型和损失
@@ -678,6 +693,44 @@ prefill。它建立在 VTPF 已有的 target-verified 历史和逐 episode 状�
 在同种子 10-episode 小样本中维持 SR，但只比 clean strict 快约 `0.65%`；原因正是认证 prefill 本身没有被
 省掉。该机制保留作风险/固定成本消融，不作为推荐入口。
 
+#### VTPF 与 VTPF-TD 的关系
+
+两者共享“历史只能来自 target 已确认动作”和“episode reset 清空历史”两个安全不变量，但解决的是不同固定
+成本：VTPF 把本来分开的 prefill 与第一块验证合成一次；VTPF-TD 则在允许近似控制时省掉整次 target 调用。
+
+| 项目 | VTPF strict | VTPF-TD-Fast relaxed |
+| --- | --- | --- |
+| 当前图像是否进入 target | 每个动作都进入 | 关键帧进入；hold 帧不进入 |
+| 历史动作来源 | 最近 target-verified 动作 | 最近 target-verified 关键帧动作 |
+| 触发条件 | 同一动作已连续被 target 确认至少 3 次 | 已有可信历史，且上一步不是 hold |
+| 一次触发做什么 | 把历史候选编入必做 prefill 并严格校验 | 直接执行一次历史动作，跳过 prefill/Draft/verify |
+| 候选错误怎么办 | target partial accept/correction，裁掉错误 KV，余下回退 DFlash | 下一动作强制 target 回锚；不会连续 hold |
+| 是否改变当前 target 答案 | 否，当前动作仍由 target posterior 裁决 | 是，hold 帧没有查询当前 target |
+| 应报告的性质 | target-verified strict | bounded one-step approximate temporal decimation |
+| 核心收益来源 | 减少一次动作内的 target forward 数 | 约一半动作省掉整次 target prefill |
+
+VTPF 的单动作伪流程：
+
+```text
+读取当前图像和 prompt
+  -> 若历史未稳定：普通 target anchor -> DFlash -> target verify
+  -> 若历史稳定：prompt + 历史 c0..c5 一次 target prefill
+       -> 连续精确命中：直接提交接受前缀
+       -> 首次不命中：提交 target correction、裁 KV、从新 anchor 回退 DFlash
+```
+
+VTPF-TD-Fast 的跨动作伪流程：
+
+```text
+动作 k：完整 target/VTPF/DFlash 校验 -> 保存实际执行动作 A_k
+动作 k+1：直接执行 A_k -> 不增加 verified run
+动作 k+2：强制完整 target 回锚 -> 保存新的可信动作 A_(k+2)
+```
+
+因此 `Length` 在两种方法中不能机械地作同一语义解释。VTPF 的推进来自 target 校验；VTPF-TD 的 hold 会按
+控制推进记为 7，但 `verified_accepted_tokens=0`。公平比较必须以端到端 latency、target bypass rate 和 SR
+为主，Length 与 `avg_accept_length` 作为机制诊断分栏报告。
+
 ### 5.7 训练创新与推理创新怎样闭环
 
 训练端负责让一层块并行 Draft 产生有用候选，strict VTPF 负责把可信历史候选并入必做 prefill；VTPF-TD
@@ -699,7 +752,7 @@ prefill。它建立在 VTPF 已有的 target-verified 历史和逐 episode 状�
 | 旧统一余弦课程 Action-RNN | Soft/CE 从第 1 轮生效，Base/Final 连续交接 | 约 43 epoch 时 token acc 已接近 99%，hidden 尚未稳定 | token 监督入场过早，出现低维动作子空间捷径 |
 | Hidden-first 延迟余弦课程 | hidden/cos 全程；`g=s^4` 延迟 Soft/CE/跨 Anchor/RNN | 初期 raw token loss 抖动不影响梯度，但后程加权总 loss 的解释仍复杂 | 单次课程无法提供完全独立、干净的两种优化过程 |
 | 独立两阶段 | 100 epoch Hidden/Cos；再重置优化器做 Final/KL/CE/跨 Anchor/RNN | 阶段二初期 Draft hidden/连续前缀退化，RNN 大量增益用于补偿退化 | 突然切换优化目标会产生表示冲突，废弃为消融 |
-| 当前线性交接主实验 | 200 epoch；Soft/CE 同步 Base->Final；低维组自动固定为初始约 10% | 已完成；rollout acc 0.853，Final 前缀代理 3.576 | 高维主线没有退化，Action-RNN 得到稳定但有限的正增益，需由 4090 在线评测裁决 |
+| Golden 线性交接实验 | 200 epoch；Soft/CE 同步 Base->Final；低维组自动固定为初始约 10% | 已完成；rollout acc 0.853，Final 前缀代理 3.576 | 高维主线没有退化，但在线消融显示 Action-RNN 净收益很小；保留为可回退 Golden |
 
 Pure hidden、Residual-CAD、Markov-ACD 的代表性 anchor0 结果：
 
@@ -731,16 +784,16 @@ Pure hidden、Residual-CAD、Markov-ACD 的代表性 anchor0 结果：
 约 `5.7`。因此 RNN 的很大一部分能力被用于补偿阶段切换造成的 Draft 退化，而不是在稳定底稿上增加因果
 修正。这是废弃两阶段、恢复单次平滑交接的直接证据，并非仅凭总 loss 曲线作出的判断。
 
-### 6.3 当前 Base/Final 线性交接实验
+### 6.3 Golden Base/Final 线性交接实验
 
-当前实验从随机初始化一次训练 200 epoch，不加载上述阶段一 checkpoint。实验目录和入口分别为：
+该 Golden 实验从随机初始化一次训练 200 epoch，不加载上述阶段一 checkpoint。实验目录和入口分别为：
 
 ```text
 /data/wulin/c/specvla-data/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu_packedv2
 bash openvla/specdecoding/train-scripts/run_dflash_train.sh joint
 ```
 
-本版只让一件事随训练进度改变：`lambda_base` 从 1 线性下降到 0，`lambda_final` 同步从 0 上升到 1。Soft KL
+该配方只让一件事随训练进度改变：`lambda_base` 从 1 线性下降到 0，`lambda_final` 同步从 0 上升到 1。Soft KL
 与 hard CE 一起交接；Hidden/Cos、Draft-only 跨 Anchor 和自动求得的低维总缩放保持固定口径；RNN 专属
 L1/Prefix 随 Final 比例进入。正式 step 0 前 8 个只读 batch 负责求固定 `alpha`，目标是初始低维损失占比不
 超过10%。本实验首先需要验证：
@@ -819,7 +872,22 @@ tree-off。该现象不能解释为“目标模型答案不唯一”，根因是
 正式结论仍必须来自完整 50-trial 四路评测。strict 使用 DDTree 目标遍历；action-group relaxed 因定义上允许
 近似动作，继续使用整条路径的组误差预算，不能作为 lossless 结果报告。
 
-### 6.6 Goal 完整基线、四路结果与研究转向
+### 6.6 4090 完整基线、Goal 四路结果与研究转向
+
+四个 suite 的 paper-wrapped AR、SpecVLA strict 与 SpecVLA relaxed 均在同一 4090、seed 7、50 trials/task、
+`SYNC_CUDA_TIMING=False`、`TIMING_SCOPE=last_task` 下完成。每个单元格为 `SR / Length / Speedup`；AR 没有
+speculative block，故不定义 Length。
+
+| Suite | Paper-wrapped AR | SpecVLA strict | SpecVLA relaxed |
+| --- | --- | --- | --- |
+| Goal | 0.742 / - / 1.000x | 0.768 / 1.631 / 1.022x | 0.734 / 2.361 / 1.294x (`r=9`) |
+| Object | 0.884 / - / 1.000x | 0.876 / 1.806 / 1.096x | 0.850 / 2.401 / 1.308x (`r=9`) |
+| Spatial | 0.870 / - / 1.000x | 0.850 / 1.579 / 1.001x | 0.862 / 1.936 / 1.145x (`r=9`) |
+| Long (`libero_10`) | 0.514 / - / 1.000x | 0.544 / 1.564 / 0.994x | 0.498 / 1.837 / 1.107x (`r=5`) |
+
+这些是本仓库实际复现值，不是 2.2 节的论文原表。原始 36 份日志与统一 CSV 在
+[`artifacts/eval/curated_20260720_20260728/baseline`](artifacts/eval/curated_20260720_20260728/baseline)。
+当前 DFlash 只训练 Goal，因此其它三个 suite 只提供基线，不伪用 Goal Draft。
 
 epoch 200 在 Goal 上的 50 trials/task 完整结果如下。Speedup 均使用同一套 paper wrapped AR
 `0.182718 s/action` 作为分母：
@@ -891,11 +959,33 @@ Wilson 风险上界仍约 3.5%。因此它默认最多连续跳过一次，并�
 
 原始 `summary.json`、逐动作 timing 和 500-episode 文本日志已固化在
 [`artifacts/eval/libero_goal/vtpf_strict_e200_20260726`](artifacts/eval/libero_goal/vtpf_strict_e200_20260726)，
-并附运行 commit、命令和 SHA-256；后续不得覆盖该目录。
+并附运行 commit、命令和 SHA-256；用户整理后的同一原始运行也保存在
+[`artifacts/eval/curated_20260720_20260728/dflash_strict/复杂版Draft+VTPF`](artifacts/eval/curated_20260720_20260728/dflash_strict/复杂版Draft+VTPF)。
+两个目录都不得覆盖。
+
+正式复现身份如下：
+
+| 项目 | 固定值 |
+| --- | --- |
+| Draft 训练数据 | `dflash_goal_dataset_envfix_20260714_packed_v2.h5`；28,501 samples；`layers=[1,9,16,24,31]` |
+| Draft 训练配方 | `run_dflash_train.sh joint`；一层；block 7；global batch 64；200 epochs；完整参数见归档 `dflash_config.json` |
+| checkpoint | `ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu_packedv2/epoch_200_step_089600` |
+| Draft SHA-256 | `e10127daa030ab5d7fbe639090078d3380c91a6d98b9302b31cf4d2f9dc5dac8` |
+| 机制代码 | VTPF 引入 commit `d60c555`；冻结复现 tag `golden-vtpf-e200-20260726` (`ea7bcbb`) |
+| run id | `EVAL-libero_goal-openvla-2026_07_26-19_45_10--dflash-temporal-prefill-fusion-goal-e200` |
+| 评测协议 | RTX 4090；seed 7；50 trials/task；`sync=False`；`timing_scope=last_task` |
+
+原始启动命令为：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=200 NUM_TRIALS_PER_TASK=50 \
+SEED=7 SYNC_CUDA_TIMING=False TIMING_SCOPE=last_task \
+  bash openvla/specdecoding/decode-scripts/run_dflash_temporal_cascade_goal_eval.sh prefill
+```
 
 正式命令使用 `prefill` strict 模式、epoch 200、Goal 每任务 50 次，共 500 episodes。它采用精确 token
-接受、`tree=off`、`verify_skip_mode=route`，日志确认 `verify_skipped_blocks=0`，不存在 action-group、树或
-免校验带来的精度放宽。
+接受、Action-RNN 开、`target_logits=action_only`、`tree=off`、`verify_skip_mode=route`，日志确认
+`verify_skipped_blocks=0`，不存在 action-group、树或免校验带来的精度放宽。
 
 | 指标 | 正式结果 |
 | --- | ---: |
@@ -979,10 +1069,27 @@ SR 的 95% Wilson 区间约为 `[0.752, 0.823]`。相同初始状态的配对结
   成功 319 条、VTPF 独赢 76 条、TD 独赢 58 条、共同失败 47 条，McNemar 精确检验 `p=0.142`。
 - 正式最后 task mean 为 `0.070050s`，相对 paper AR 为 **2.608x**，相对 VTPF 的 `0.142036s` 快
   **2.028x**。即使只看成功轨迹，TD/VTPF 仍为 `0.079353s/0.155723s`，加速约 1.96 倍，因此收益不是
-  失败轨迹停滞造成的假象。该 task 共 11,137 个动作，其中 5,575 次绕过 target prefill，跳过率 50.06%。
+  失败轨迹停滞造成的假象。生成统计含 11,165 个动作状态，其中 5,575 次绕过 target prefill，跳过率
+  49.93%；去除计时 warmup 后的 timing 样本数为 11,137，两个分母不能混用。
+
+正式运行仍使用 6.8 的同一个 Golden e200 权重与目标模型；变化只发生在推理侧。实现 commit 为 `5626cb6`，
+正式证据 commit 为 `208482a`，run id 为
+`EVAL-libero_goal-openvla-2026_07_28-16_00_48--dflash-vtpf-temporal-decimation-goal-e200-h1`。完整命令：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=200 NUM_TRIALS_PER_TASK=50 \
+SEED=7 SYNC_CUDA_TIMING=False TIMING_SCOPE=last_task \
+  bash openvla/specdecoding/decode-scripts/run_dflash_vtpf_temporal_decimation_goal_eval.sh
+```
+
+该 launcher 强制 Action-RNN 关、DDTree 关、动作组关、视觉门关、`max_consecutive=1`；非 hold 动作仍使用
+`token/threshold=0` 的 target 校验。因此它与 VTPF 的主要实验变量是“是否在两个 target 关键帧之间插入
+一个未经当前 target 查询的保持帧”，不是同时改变 Draft、树或接受阈值。
 
 原始 pilot、Guard 和正式 500-episode summary、timing、文本日志固化在
 [`artifacts/eval/libero_goal/vtpf_temporal_decimation_e200_20260728`](artifacts/eval/libero_goal/vtpf_temporal_decimation_e200_20260728)。
+用户整理后的正式运行同时保存在
+[`artifacts/eval/curated_20260720_20260728/dflash_relaxed/复杂版去掉RNN的Draft+VTPF-TD`](artifacts/eval/curated_20260720_20260728/dflash_relaxed/复杂版去掉RNN的Draft+VTPF-TD)。
 当前结果已经达到“少量成功率代价、显著加速”的研发目标。后续需要多 seed、其它 suite 的独立 draft 和
 真机实验验证泛化，不能把单个 Goal seed 直接外推为全场景结论。
 
@@ -1011,7 +1118,7 @@ SR 的 95% Wilson 区间约为 `[0.752, 0.823]`。相同初始状态的配对结
 约 `0.921`，动作头净增益仅约 `0.0005`，而 rollout 约 `0.889`。这说明高权重动作损失主要在改动共享
 Draft hidden，Action-RNN 本身几乎没有学到有效残差。该版随后在 hidden 尚未收敛时就出现接近 99% 的
 训练 token acc，已判定为 token 级监督过早。后续高阶延迟余弦课程把太多损失同时改变权重；独立两阶段又在
-切换时产生表示冲突。当前版本改为只有 Base/Final 路径比例线性变化，Soft 与 CE 同步交接，低维组只在启动前
+切换时产生表示冲突。后续 Golden 版本改为只有 Base/Final 路径比例线性变化，Soft 与 CE 同步交接，低维组只在启动前
 标定一次固定总尺度。旧余弦和两阶段输出目录均不得续训到新配方。
 
 ## 7. 当前标准工作流
@@ -1247,6 +1354,31 @@ CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=200 NUM_TRIALS_PER_TASK=10 \
   bash openvla/specdecoding/decode-scripts/run_dflash_vtpf_prefix_cert_goal_eval.sh
 ```
 
+Minimal Draft 训练完成后只跑 VTPF strict 和 VTPF-TD-Fast 两组。它没有 Action-RNN 权重，因此第一条命令
+必须显式关闭 RNN；第二个 launcher 内部已经强制关闭。先确认 checkpoint 目录名再执行：
+
+```bash
+MINIMAL_CKPT_ROOT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_minimal_1layer_hidden_soft_b16x1_4gpu_packedv2
+
+# Minimal + VTPF strict
+LOG_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs/dflash_strict/简化版Draft+VTPF \
+DFLASH_OUTPUT_DIR="${MINIMAL_CKPT_ROOT}" DFLASH_USE_CAUSAL_RESIDUAL_SAMPLING=False \
+CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=200 NUM_TRIALS_PER_TASK=50 \
+SEED=7 SYNC_CUDA_TIMING=False TIMING_SCOPE=last_task \
+  bash openvla/specdecoding/decode-scripts/run_dflash_temporal_cascade_goal_eval.sh prefill
+
+# Minimal + VTPF-TD-Fast
+LOG_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs/dflash_relaxed/简化版Draft+VTPF-TD \
+DFLASH_OUTPUT_DIR="${MINIMAL_CKPT_ROOT}" \
+CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=200 NUM_TRIALS_PER_TASK=50 \
+SEED=7 SYNC_CUDA_TIMING=False TIMING_SCOPE=last_task \
+  bash openvla/specdecoding/decode-scripts/run_dflash_vtpf_temporal_decimation_goal_eval.sh
+```
+
+这两组与 Golden 正式结果的唯一模型变量应是 Draft checkpoint；目标模型、seed、trial 数、计时口径和 VTPF
+阈值必须保持一致。若 Minimal 最佳 checkpoint 不是 epoch 200，只改 `EVAL_EPOCH`，并在结果目录名和
+`RUN_ID_NOTE` 中同步写明，禁止悄悄挑权重。
+
 旧四路树/动作组机制消融一键评测：
 
 ```bash
@@ -1311,6 +1443,34 @@ EVAL_EPOCH=100 REPEAT_SEEDS="7 8 9 10 11" \
 *_timing.json     每个环境 step 的动作生成耗时
 *_summary.json    SR、timing、Length、接受统计
 ```
+
+4090 当前按“模型结构 + 推理机制”整理正式文件，禁止再把所有实验堆在 `eval_logs` 根目录：
+
+```text
+eval_logs/
+├── baseline/{openvla_ar,specvla_strict,specvla_relaxed}/
+├── dflash_strict/
+│   ├── 复杂版Draft/
+│   ├── 复杂版Draft+VTPF/
+│   └── 复杂版去掉RNN的Draft+VTPF/
+└── dflash_relaxed/
+    └── 复杂版去掉RNN的Draft+VTPF-TD/
+```
+
+现有正式日志已按上面目录人工归档并同步到
+[`artifacts/eval/curated_20260720_20260728`](artifacts/eval/curated_20260720_20260728)。新实验可在启动时直接
+覆盖 `LOG_DIR`，避免事后移动，例如简化版 VTPF：
+
+```bash
+LOG_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs/dflash_strict/简化版Draft+VTPF \
+DFLASH_OUTPUT_DIR=/绝对路径/ckpt_goal_dflash_minimal_1layer_hidden_soft_b16x1_4gpu_packedv2 \
+CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=200 NUM_TRIALS_PER_TASK=50 \
+SEED=7 SYNC_CUDA_TIMING=False TIMING_SCOPE=last_task \
+  bash openvla/specdecoding/decode-scripts/run_dflash_temporal_cascade_goal_eval.sh prefill
+```
+
+每个实验目录只放同一模型、同一机制、同一正式协议产生的三个文件；pilot、不同 seed 或不同阈值要在目录名或
+`RUN_ID_NOTE` 中显式区分。不要重命名 JSON 内部的 `run_id`，否则外部文件名和内部实验身份会失去对应关系。
 
 重点指标：
 
@@ -1381,7 +1541,7 @@ suite-specific `VLA_PATH`。
 Python 3.10
 torch 2.2.0+cu121
 transformers 4.40.1
-mujoco 3.3.4
+mujoco 3.3.2
 robosuite 1.4.1
 numpy 1.26.4
 accelerate 1.9.0

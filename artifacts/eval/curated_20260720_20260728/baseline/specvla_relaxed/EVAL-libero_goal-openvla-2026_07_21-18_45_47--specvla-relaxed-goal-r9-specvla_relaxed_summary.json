@@ -1,0 +1,117 @@
+{
+  "run_id": "EVAL-libero_goal-openvla-2026_07_21-18_45_47--specvla-relaxed-goal-r9",
+  "eval_family": "specvla_relaxed",
+  "task_suite_name": "libero_goal",
+  "model_family": "openvla",
+  "draft_backend": "eagle",
+  "use_spec": true,
+  "parallel_draft": false,
+  "ar_baseline": null,
+  "accept_threshold": 9,
+  "dflash_block_size": 7,
+  "dflash_num_draft_layers": 5,
+  "dflash_use_causal_residual_sampling": false,
+  "dflash_confidence_threshold": 0.0,
+  "dflash_confidence_min_tokens": 1,
+  "dflash_acceptance_mode": "action_group",
+  "dflash_tree_mode": "off",
+  "dflash_tree_branch_position": 0,
+  "dflash_tree_first_anchor_only": true,
+  "dflash_tree_auto_calibrate": null,
+  "dflash_tree_calibration_result": null,
+  "pretrained_checkpoint": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-goal",
+  "spec_checkpoint": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/specvla_checkpoint/goal",
+  "num_trials_per_task": 50,
+  "seed": 7,
+  "timing_scope": "last_task",
+  "sync_cuda_timing": false,
+  "total_episodes": 500,
+  "total_successes": 367,
+  "success_rate": 0.734,
+  "timing": {
+    "steps": 12407,
+    "mean": 0.1412283293887861,
+    "median": 0.14199542999267578,
+    "min": 0.11342716217041016,
+    "max": 0.25591087341308594,
+    "p95": 0.17179982662200927,
+    "p99": 0.19937530040740967,
+    "total": 1752.2198827266693
+  },
+  "generation": {
+    "backend": "eagle",
+    "use_causal_residual_sampling": null,
+    "action_head_type": null,
+    "acceptance_mode": null,
+    "tree_mode": null,
+    "tree_branch_position": null,
+    "tree_first_anchor_only": null,
+    "confidence_threshold": null,
+    "confidence_min_tokens": null,
+    "confidence_truncated_blocks": 0,
+    "num_steps": 12428,
+    "num_blocks": 36852,
+    "generated_tokens": 86996,
+    "progressed_tokens": 86996,
+    "avg_generated_length": 2.3606859871920114,
+    "length": 2.3606859871920114,
+    "table1_length": 2.3606859871920114,
+    "avg_progress_length": 2.3606859871920114,
+    "avg_accept_length": 1.3606859871920114,
+    "avg_main_path_accept_length": null,
+    "accepted_tokens": 50144,
+    "compared_tokens": 0,
+    "overall_hit_rate": null,
+    "action_group_rescued_blocks": 0,
+    "action_group_extra_accepted": 0,
+    "tree_triggered_blocks": 0,
+    "tree_selected_alternate_blocks": 0,
+    "tree_extra_verified_nodes": 0,
+    "tree_extra_accepted": 0,
+    "tree_mean_branch_score": null,
+    "accept_length_histogram": {
+      "0": 1,
+      "1": 48,
+      "2": 491,
+      "3": 2161,
+      "4": 6004,
+      "5": 3723
+    },
+    "progress_length_histogram": {
+      "7": 12428
+    },
+    "per_position": [],
+    "conditional_prefix": [
+      {
+        "position": 1,
+        "eligible_blocks": 36852,
+        "survived_blocks": 12427,
+        "conditional_hit_rate": 0.33721371974384023
+      },
+      {
+        "position": 2,
+        "eligible_blocks": 12427,
+        "survived_blocks": 12379,
+        "conditional_hit_rate": 0.9961374426651646
+      },
+      {
+        "position": 3,
+        "eligible_blocks": 12379,
+        "survived_blocks": 11888,
+        "conditional_hit_rate": 0.960336052992972
+      },
+      {
+        "position": 4,
+        "eligible_blocks": 11888,
+        "survived_blocks": 9727,
+        "conditional_hit_rate": 0.8182200538358008
+      },
+      {
+        "position": 5,
+        "eligible_blocks": 9727,
+        "survived_blocks": 3723,
+        "conditional_hit_rate": 0.3827490490387581
+      }
+    ]
+  }
+}

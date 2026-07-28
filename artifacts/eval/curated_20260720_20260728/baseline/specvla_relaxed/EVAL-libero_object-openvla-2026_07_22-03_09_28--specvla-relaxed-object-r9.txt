@@ -1,0 +1,3534 @@
+Task suite: libero_object
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 1...
+Success: True
+# episodes completed so far: 1
+# successes: 1 (100.0%)
+Speculative stats: length=2.279, avg_accept_length=1.279, num_blocks=473
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 2...
+Success: True
+# episodes completed so far: 2
+# successes: 2 (100.0%)
+Speculative stats: length=2.375, avg_accept_length=1.375, num_blocks=392
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 3...
+Success: True
+# episodes completed so far: 3
+# successes: 3 (100.0%)
+Speculative stats: length=2.265, avg_accept_length=1.265, num_blocks=550
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 4...
+Success: False
+# episodes completed so far: 4
+# successes: 3 (75.0%)
+Speculative stats: length=2.536, avg_accept_length=1.536, num_blocks=773
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 5...
+Success: True
+# episodes completed so far: 5
+# successes: 4 (80.0%)
+Speculative stats: length=2.242, avg_accept_length=1.242, num_blocks=459
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 6...
+Success: True
+# episodes completed so far: 6
+# successes: 5 (83.3%)
+Speculative stats: length=2.285, avg_accept_length=1.285, num_blocks=432
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 7...
+Success: True
+# episodes completed so far: 7
+# successes: 6 (85.7%)
+Speculative stats: length=2.419, avg_accept_length=1.419, num_blocks=547
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 8...
+Success: True
+# episodes completed so far: 8
+# successes: 7 (87.5%)
+Speculative stats: length=2.314, avg_accept_length=1.314, num_blocks=475
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 9...
+Success: False
+# episodes completed so far: 9
+# successes: 7 (77.8%)
+Speculative stats: length=2.593, avg_accept_length=1.593, num_blocks=756
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 10...
+Success: True
+# episodes completed so far: 10
+# successes: 8 (80.0%)
+Speculative stats: length=2.252, avg_accept_length=1.252, num_blocks=432
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 11...
+Success: False
+# episodes completed so far: 11
+# successes: 8 (72.7%)
+Speculative stats: length=2.092, avg_accept_length=1.092, num_blocks=937
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 12...
+Success: True
+# episodes completed so far: 12
+# successes: 9 (75.0%)
+Speculative stats: length=2.391, avg_accept_length=1.391, num_blocks=404
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 13...
+Success: False
+# episodes completed so far: 13
+# successes: 9 (69.2%)
+Speculative stats: length=2.645, avg_accept_length=1.645, num_blocks=741
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 14...
+Success: True
+# episodes completed so far: 14
+# successes: 10 (71.4%)
+Speculative stats: length=2.271, avg_accept_length=1.271, num_blocks=487
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 15...
+Success: True
+# episodes completed so far: 15
+# successes: 11 (73.3%)
+Speculative stats: length=2.283, avg_accept_length=1.283, num_blocks=420
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 16...
+Success: True
+# episodes completed so far: 16
+# successes: 12 (75.0%)
+Speculative stats: length=2.358, avg_accept_length=1.358, num_blocks=668
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 17...
+Success: True
+# episodes completed so far: 17
+# successes: 13 (76.5%)
+Speculative stats: length=2.401, avg_accept_length=1.401, num_blocks=484
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 18...
+Success: True
+# episodes completed so far: 18
+# successes: 14 (77.8%)
+Speculative stats: length=2.329, avg_accept_length=1.329, num_blocks=544
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 19...
+Success: False
+# episodes completed so far: 19
+# successes: 14 (73.7%)
+Speculative stats: length=2.472, avg_accept_length=1.472, num_blocks=793
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 20...
+Success: True
+# episodes completed so far: 20
+# successes: 15 (75.0%)
+Speculative stats: length=2.285, avg_accept_length=1.285, num_blocks=487
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 21...
+Success: True
+# episodes completed so far: 21
+# successes: 16 (76.2%)
+Speculative stats: length=2.450, avg_accept_length=1.450, num_blocks=380
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 22...
+Success: True
+# episodes completed so far: 22
+# successes: 17 (77.3%)
+Speculative stats: length=2.327, avg_accept_length=1.327, num_blocks=794
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 23...
+Success: True
+# episodes completed so far: 23
+# successes: 18 (78.3%)
+Speculative stats: length=2.289, avg_accept_length=1.289, num_blocks=471
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 24...
+Success: True
+# episodes completed so far: 24
+# successes: 19 (79.2%)
+Speculative stats: length=2.343, avg_accept_length=1.343, num_blocks=481
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 25...
+Success: True
+# episodes completed so far: 25
+# successes: 20 (80.0%)
+Speculative stats: length=2.271, avg_accept_length=1.271, num_blocks=598
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 26...
+Success: True
+# episodes completed so far: 26
+# successes: 21 (80.8%)
+Speculative stats: length=2.552, avg_accept_length=1.552, num_blocks=631
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 27...
+Success: True
+# episodes completed so far: 27
+# successes: 22 (81.5%)
+Speculative stats: length=2.390, avg_accept_length=1.390, num_blocks=372
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 28...
+Success: True
+# episodes completed so far: 28
+# successes: 23 (82.1%)
+Speculative stats: length=2.222, avg_accept_length=1.222, num_blocks=419
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 29...
+Success: True
+# episodes completed so far: 29
+# successes: 24 (82.8%)
+Speculative stats: length=2.285, avg_accept_length=1.285, num_blocks=481
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 30...
+Success: True
+# episodes completed so far: 30
+# successes: 25 (83.3%)
+Speculative stats: length=2.230, avg_accept_length=1.230, num_blocks=405
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 31...
+Success: True
+# episodes completed so far: 31
+# successes: 26 (83.9%)
+Speculative stats: length=2.305, avg_accept_length=1.305, num_blocks=744
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 32...
+Success: False
+# episodes completed so far: 32
+# successes: 26 (81.2%)
+Speculative stats: length=2.652, avg_accept_length=1.652, num_blocks=739
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 33...
+Success: False
+# episodes completed so far: 33
+# successes: 26 (78.8%)
+Speculative stats: length=2.163, avg_accept_length=1.163, num_blocks=906
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 34...
+Success: True
+# episodes completed so far: 34
+# successes: 27 (79.4%)
+Speculative stats: length=2.255, avg_accept_length=1.255, num_blocks=419
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 35...
+Success: True
+# episodes completed so far: 35
+# successes: 28 (80.0%)
+Speculative stats: length=2.223, avg_accept_length=1.223, num_blocks=444
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 36...
+Success: False
+# episodes completed so far: 36
+# successes: 28 (77.8%)
+Speculative stats: length=2.685, avg_accept_length=1.685, num_blocks=730
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 37...
+Success: True
+# episodes completed so far: 37
+# successes: 29 (78.4%)
+Speculative stats: length=2.296, avg_accept_length=1.296, num_blocks=433
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 38...
+Success: True
+# episodes completed so far: 38
+# successes: 30 (78.9%)
+Speculative stats: length=2.343, avg_accept_length=1.343, num_blocks=693
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 39...
+Success: True
+# episodes completed so far: 39
+# successes: 31 (79.5%)
+Speculative stats: length=2.463, avg_accept_length=1.463, num_blocks=486
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 40...
+Success: True
+# episodes completed so far: 40
+# successes: 32 (80.0%)
+Speculative stats: length=2.338, avg_accept_length=1.338, num_blocks=545
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 41...
+Success: True
+# episodes completed so far: 41
+# successes: 33 (80.5%)
+Speculative stats: length=2.280, avg_accept_length=1.280, num_blocks=439
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 42...
+Success: True
+# episodes completed so far: 42
+# successes: 34 (81.0%)
+Speculative stats: length=2.352, avg_accept_length=1.352, num_blocks=506
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 43...
+Success: False
+# episodes completed so far: 43
+# successes: 34 (79.1%)
+Speculative stats: length=2.195, avg_accept_length=1.195, num_blocks=893
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 44...
+Success: True
+# episodes completed so far: 44
+# successes: 35 (79.5%)
+Speculative stats: length=2.373, avg_accept_length=1.373, num_blocks=640
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 45...
+Success: True
+# episodes completed so far: 45
+# successes: 36 (80.0%)
+Speculative stats: length=2.153, avg_accept_length=1.153, num_blocks=504
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 46...
+Success: False
+# episodes completed so far: 46
+# successes: 36 (78.3%)
+Speculative stats: length=2.784, avg_accept_length=1.784, num_blocks=704
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 47...
+Success: False
+# episodes completed so far: 47
+# successes: 36 (76.6%)
+Speculative stats: length=2.253, avg_accept_length=1.253, num_blocks=870
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 48...
+Success: True
+# episodes completed so far: 48
+# successes: 37 (77.1%)
+Speculative stats: length=2.142, avg_accept_length=1.142, num_blocks=402
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 49...
+Success: True
+# episodes completed so far: 49
+# successes: 38 (77.6%)
+Speculative stats: length=2.435, avg_accept_length=1.435, num_blocks=457
+
+Task: pick up the alphabet soup and place it in the basket
+Starting episode 50...
+Success: True
+# episodes completed so far: 50
+# successes: 39 (78.0%)
+Speculative stats: length=2.351, avg_accept_length=1.351, num_blocks=792
+Current task success rate: 0.78
+Current total success rate: 0.78
+Current task speculative stats: length=2.358, avg_accept_length=1.358, num_blocks=28632
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 1...
+Success: True
+# episodes completed so far: 51
+# successes: 40 (78.4%)
+Speculative stats: length=2.272, avg_accept_length=1.272, num_blocks=456
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 2...
+Success: True
+# episodes completed so far: 52
+# successes: 41 (78.8%)
+Speculative stats: length=2.270, avg_accept_length=1.270, num_blocks=407
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 3...
+Success: True
+# episodes completed so far: 53
+# successes: 42 (79.2%)
+Speculative stats: length=2.371, avg_accept_length=1.371, num_blocks=437
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 4...
+Success: False
+# episodes completed so far: 54
+# successes: 42 (77.8%)
+Speculative stats: length=2.536, avg_accept_length=1.536, num_blocks=773
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 5...
+Success: True
+# episodes completed so far: 55
+# successes: 43 (78.2%)
+Speculative stats: length=2.316, avg_accept_length=1.316, num_blocks=402
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 6...
+Success: False
+# episodes completed so far: 56
+# successes: 43 (76.8%)
+Speculative stats: length=2.261, avg_accept_length=1.261, num_blocks=867
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 7...
+Success: True
+# episodes completed so far: 57
+# successes: 44 (77.2%)
+Speculative stats: length=2.212, avg_accept_length=1.212, num_blocks=576
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 8...
+Success: True
+# episodes completed so far: 58
+# successes: 45 (77.6%)
+Speculative stats: length=2.229, avg_accept_length=1.229, num_blocks=493
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 9...
+Success: True
+# episodes completed so far: 59
+# successes: 46 (78.0%)
+Speculative stats: length=2.194, avg_accept_length=1.194, num_blocks=469
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 10...
+Success: False
+# episodes completed so far: 60
+# successes: 46 (76.7%)
+Speculative stats: length=2.185, avg_accept_length=1.185, num_blocks=897
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 11...
+Success: False
+# episodes completed so far: 61
+# successes: 46 (75.4%)
+Speculative stats: length=2.248, avg_accept_length=1.248, num_blocks=872
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 12...
+Success: True
+# episodes completed so far: 62
+# successes: 47 (75.8%)
+Speculative stats: length=2.323, avg_accept_length=1.323, num_blocks=467
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 13...
+Success: True
+# episodes completed so far: 63
+# successes: 48 (76.2%)
+Speculative stats: length=2.294, avg_accept_length=1.294, num_blocks=479
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 14...
+Success: True
+# episodes completed so far: 64
+# successes: 49 (76.6%)
+Speculative stats: length=2.144, avg_accept_length=1.144, num_blocks=529
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 15...
+Success: True
+# episodes completed so far: 65
+# successes: 50 (76.9%)
+Speculative stats: length=2.266, avg_accept_length=1.266, num_blocks=417
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 16...
+Success: True
+# episodes completed so far: 66
+# successes: 51 (77.3%)
+Speculative stats: length=2.169, avg_accept_length=1.169, num_blocks=810
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 17...
+Success: True
+# episodes completed so far: 67
+# successes: 52 (77.6%)
+Speculative stats: length=2.305, avg_accept_length=1.305, num_blocks=498
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 18...
+Success: True
+# episodes completed so far: 68
+# successes: 53 (77.9%)
+Speculative stats: length=2.270, avg_accept_length=1.270, num_blocks=478
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 19...
+Success: False
+# episodes completed so far: 69
+# successes: 53 (76.8%)
+Speculative stats: length=2.367, avg_accept_length=1.367, num_blocks=828
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 20...
+Success: True
+# episodes completed so far: 70
+# successes: 54 (77.1%)
+Speculative stats: length=2.329, avg_accept_length=1.329, num_blocks=598
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 21...
+Success: True
+# episodes completed so far: 71
+# successes: 55 (77.5%)
+Speculative stats: length=2.299, avg_accept_length=1.299, num_blocks=408
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 22...
+Success: True
+# episodes completed so far: 72
+# successes: 56 (77.8%)
+Speculative stats: length=2.322, avg_accept_length=1.322, num_blocks=630
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 23...
+Success: False
+# episodes completed so far: 73
+# successes: 56 (76.7%)
+Speculative stats: length=2.429, avg_accept_length=1.429, num_blocks=807
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 24...
+Success: True
+# episodes completed so far: 74
+# successes: 57 (77.0%)
+Speculative stats: length=2.226, avg_accept_length=1.226, num_blocks=585
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 25...
+Success: False
+# episodes completed so far: 75
+# successes: 57 (76.0%)
+Speculative stats: length=2.325, avg_accept_length=1.325, num_blocks=843
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 26...
+Success: True
+# episodes completed so far: 76
+# successes: 58 (76.3%)
+Speculative stats: length=2.333, avg_accept_length=1.333, num_blocks=414
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 27...
+Success: True
+# episodes completed so far: 77
+# successes: 59 (76.6%)
+Speculative stats: length=2.270, avg_accept_length=1.270, num_blocks=552
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 28...
+Success: False
+# episodes completed so far: 78
+# successes: 59 (75.6%)
+Speculative stats: length=2.387, avg_accept_length=1.387, num_blocks=821
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 29...
+Success: False
+# episodes completed so far: 79
+# successes: 59 (74.7%)
+Speculative stats: length=2.253, avg_accept_length=1.253, num_blocks=870
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 30...
+Success: False
+# episodes completed so far: 80
+# successes: 59 (73.8%)
+Speculative stats: length=2.453, avg_accept_length=1.453, num_blocks=799
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 31...
+Success: False
+# episodes completed so far: 81
+# successes: 59 (72.8%)
+Speculative stats: length=2.287, avg_accept_length=1.287, num_blocks=857
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 32...
+Success: True
+# episodes completed so far: 82
+# successes: 60 (73.2%)
+Speculative stats: length=2.257, avg_accept_length=1.257, num_blocks=366
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 33...
+Success: True
+# episodes completed so far: 83
+# successes: 61 (73.5%)
+Speculative stats: length=2.150, avg_accept_length=1.150, num_blocks=472
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 34...
+Success: True
+# episodes completed so far: 84
+# successes: 62 (73.8%)
+Speculative stats: length=2.271, avg_accept_length=1.271, num_blocks=487
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 35...
+Success: False
+# episodes completed so far: 85
+# successes: 62 (72.9%)
+Speculative stats: length=2.749, avg_accept_length=1.749, num_blocks=713
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 36...
+Success: True
+# episodes completed so far: 86
+# successes: 63 (73.3%)
+Speculative stats: length=2.055, avg_accept_length=1.055, num_blocks=545
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 37...
+Success: True
+# episodes completed so far: 87
+# successes: 64 (73.6%)
+Speculative stats: length=2.294, avg_accept_length=1.294, num_blocks=357
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 38...
+Success: True
+# episodes completed so far: 88
+# successes: 65 (73.9%)
+Speculative stats: length=2.215, avg_accept_length=1.215, num_blocks=534
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 39...
+Success: False
+# episodes completed so far: 89
+# successes: 65 (73.0%)
+Speculative stats: length=2.255, avg_accept_length=1.255, num_blocks=869
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 40...
+Success: True
+# episodes completed so far: 90
+# successes: 66 (73.3%)
+Speculative stats: length=2.090, avg_accept_length=1.090, num_blocks=442
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 41...
+Success: True
+# episodes completed so far: 91
+# successes: 67 (73.6%)
+Speculative stats: length=2.282, avg_accept_length=1.282, num_blocks=678
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 42...
+Success: True
+# episodes completed so far: 92
+# successes: 68 (73.9%)
+Speculative stats: length=2.333, avg_accept_length=1.333, num_blocks=414
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 43...
+Success: True
+# episodes completed so far: 93
+# successes: 69 (74.2%)
+Speculative stats: length=2.202, avg_accept_length=1.202, num_blocks=496
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 44...
+Success: False
+# episodes completed so far: 94
+# successes: 69 (73.4%)
+Speculative stats: length=2.314, avg_accept_length=1.314, num_blocks=847
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 45...
+Success: True
+# episodes completed so far: 95
+# successes: 70 (73.7%)
+Speculative stats: length=2.368, avg_accept_length=1.368, num_blocks=405
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 46...
+Success: False
+# episodes completed so far: 96
+# successes: 70 (72.9%)
+Speculative stats: length=2.197, avg_accept_length=1.197, num_blocks=892
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 47...
+Success: False
+# episodes completed so far: 97
+# successes: 70 (72.2%)
+Speculative stats: length=1.434, avg_accept_length=0.434, num_blocks=1367
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 48...
+Success: False
+# episodes completed so far: 98
+# successes: 70 (71.4%)
+Speculative stats: length=2.331, avg_accept_length=1.331, num_blocks=841
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 49...
+Success: False
+# episodes completed so far: 99
+# successes: 70 (70.7%)
+Speculative stats: length=2.373, avg_accept_length=1.373, num_blocks=826
+
+Task: pick up the cream cheese and place it in the basket
+Starting episode 50...
+Success: True
+# episodes completed so far: 100
+# successes: 71 (71.0%)
+Speculative stats: length=2.211, avg_accept_length=1.211, num_blocks=535
+Current task success rate: 0.64
+Current total success rate: 0.71
+Current task speculative stats: length=2.257, avg_accept_length=1.257, num_blocks=31425
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 1...
+Success: True
+# episodes completed so far: 101
+# successes: 72 (71.3%)
+Speculative stats: length=2.365, avg_accept_length=1.365, num_blocks=373
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 2...
+Success: True
+# episodes completed so far: 102
+# successes: 73 (71.6%)
+Speculative stats: length=2.211, avg_accept_length=1.211, num_blocks=421
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 3...
+Success: True
+# episodes completed so far: 103
+# successes: 74 (71.8%)
+Speculative stats: length=2.356, avg_accept_length=1.356, num_blocks=306
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 4...
+Success: True
+# episodes completed so far: 104
+# successes: 75 (72.1%)
+Speculative stats: length=2.203, avg_accept_length=1.203, num_blocks=413
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 5...
+Success: True
+# episodes completed so far: 105
+# successes: 76 (72.4%)
+Speculative stats: length=2.249, avg_accept_length=1.249, num_blocks=333
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 6...
+Success: True
+# episodes completed so far: 106
+# successes: 77 (72.6%)
+Speculative stats: length=2.307, avg_accept_length=1.307, num_blocks=355
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 7...
+Success: True
+# episodes completed so far: 107
+# successes: 78 (72.9%)
+Speculative stats: length=2.188, avg_accept_length=1.188, num_blocks=368
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 8...
+Success: True
+# episodes completed so far: 108
+# successes: 79 (73.1%)
+Speculative stats: length=2.177, avg_accept_length=1.177, num_blocks=373
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 9...
+Success: True
+# episodes completed so far: 109
+# successes: 80 (73.4%)
+Speculative stats: length=2.369, avg_accept_length=1.369, num_blocks=325
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 10...
+Success: True
+# episodes completed so far: 110
+# successes: 81 (73.6%)
+Speculative stats: length=2.405, avg_accept_length=1.405, num_blocks=358
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 11...
+Success: True
+# episodes completed so far: 111
+# successes: 82 (73.9%)
+Speculative stats: length=2.205, avg_accept_length=1.205, num_blocks=365
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 12...
+Success: True
+# episodes completed so far: 112
+# successes: 83 (74.1%)
+Speculative stats: length=2.270, avg_accept_length=1.270, num_blocks=367
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 13...
+Success: True
+# episodes completed so far: 113
+# successes: 84 (74.3%)
+Speculative stats: length=2.309, avg_accept_length=1.309, num_blocks=376
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 14...
+Success: True
+# episodes completed so far: 114
+# successes: 85 (74.6%)
+Speculative stats: length=2.274, avg_accept_length=1.274, num_blocks=354
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 15...
+Success: True
+# episodes completed so far: 115
+# successes: 86 (74.8%)
+Speculative stats: length=2.413, avg_accept_length=1.413, num_blocks=351
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 16...
+Success: True
+# episodes completed so far: 116
+# successes: 87 (75.0%)
+Speculative stats: length=2.433, avg_accept_length=1.433, num_blocks=374
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 17...
+Success: True
+# episodes completed so far: 117
+# successes: 88 (75.2%)
+Speculative stats: length=2.383, avg_accept_length=1.383, num_blocks=329
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 18...
+Success: True
+# episodes completed so far: 118
+# successes: 89 (75.4%)
+Speculative stats: length=2.272, avg_accept_length=1.272, num_blocks=342
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 19...
+Success: True
+# episodes completed so far: 119
+# successes: 90 (75.6%)
+Speculative stats: length=2.327, avg_accept_length=1.327, num_blocks=367
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 20...
+Success: True
+# episodes completed so far: 120
+# successes: 91 (75.8%)
+Speculative stats: length=2.354, avg_accept_length=1.354, num_blocks=345
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 21...
+Success: True
+# episodes completed so far: 121
+# successes: 92 (76.0%)
+Speculative stats: length=2.340, avg_accept_length=1.340, num_blocks=359
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 22...
+Success: True
+# episodes completed so far: 122
+# successes: 93 (76.2%)
+Speculative stats: length=2.270, avg_accept_length=1.270, num_blocks=367
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 23...
+Success: True
+# episodes completed so far: 123
+# successes: 94 (76.4%)
+Speculative stats: length=2.296, avg_accept_length=1.296, num_blocks=375
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 24...
+Success: True
+# episodes completed so far: 124
+# successes: 95 (76.6%)
+Speculative stats: length=2.250, avg_accept_length=1.250, num_blocks=392
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 25...
+Success: True
+# episodes completed so far: 125
+# successes: 96 (76.8%)
+Speculative stats: length=2.333, avg_accept_length=1.333, num_blocks=390
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 26...
+Success: True
+# episodes completed so far: 126
+# successes: 97 (77.0%)
+Speculative stats: length=2.374, avg_accept_length=1.374, num_blocks=345
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 27...
+Success: True
+# episodes completed so far: 127
+# successes: 98 (77.2%)
+Speculative stats: length=2.340, avg_accept_length=1.340, num_blocks=350
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 28...
+Success: True
+# episodes completed so far: 128
+# successes: 99 (77.3%)
+Speculative stats: length=2.436, avg_accept_length=1.436, num_blocks=365
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 29...
+Success: True
+# episodes completed so far: 129
+# successes: 100 (77.5%)
+Speculative stats: length=2.315, avg_accept_length=1.315, num_blocks=387
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 30...
+Success: True
+# episodes completed so far: 130
+# successes: 101 (77.7%)
+Speculative stats: length=2.321, avg_accept_length=1.321, num_blocks=386
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 31...
+Success: True
+# episodes completed so far: 131
+# successes: 102 (77.9%)
+Speculative stats: length=2.333, avg_accept_length=1.333, num_blocks=267
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 32...
+Success: True
+# episodes completed so far: 132
+# successes: 103 (78.0%)
+Speculative stats: length=2.303, avg_accept_length=1.303, num_blocks=380
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 33...
+Success: True
+# episodes completed so far: 133
+# successes: 104 (78.2%)
+Speculative stats: length=2.263, avg_accept_length=1.263, num_blocks=399
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 34...
+Success: True
+# episodes completed so far: 134
+# successes: 105 (78.4%)
+Speculative stats: length=2.142, avg_accept_length=1.142, num_blocks=379
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 35...
+Success: True
+# episodes completed so far: 135
+# successes: 106 (78.5%)
+Speculative stats: length=2.198, avg_accept_length=1.198, num_blocks=516
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 36...
+Success: True
+# episodes completed so far: 136
+# successes: 107 (78.7%)
+Speculative stats: length=2.199, avg_accept_length=1.199, num_blocks=382
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 37...
+Success: True
+# episodes completed so far: 137
+# successes: 108 (78.8%)
+Speculative stats: length=2.190, avg_accept_length=1.190, num_blocks=406
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 38...
+Success: True
+# episodes completed so far: 138
+# successes: 109 (79.0%)
+Speculative stats: length=2.320, avg_accept_length=1.320, num_blocks=356
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 39...
+Success: True
+# episodes completed so far: 139
+# successes: 110 (79.1%)
+Speculative stats: length=2.333, avg_accept_length=1.333, num_blocks=381
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 40...
+Success: True
+# episodes completed so far: 140
+# successes: 111 (79.3%)
+Speculative stats: length=2.430, avg_accept_length=1.430, num_blocks=461
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 41...
+Success: True
+# episodes completed so far: 141
+# successes: 112 (79.4%)
+Speculative stats: length=2.302, avg_accept_length=1.302, num_blocks=377
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 42...
+Success: True
+# episodes completed so far: 142
+# successes: 113 (79.6%)
+Speculative stats: length=2.298, avg_accept_length=1.298, num_blocks=332
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 43...
+Success: True
+# episodes completed so far: 143
+# successes: 114 (79.7%)
+Speculative stats: length=2.333, avg_accept_length=1.333, num_blocks=372
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 44...
+Success: True
+# episodes completed so far: 144
+# successes: 115 (79.9%)
+Speculative stats: length=2.245, avg_accept_length=1.245, num_blocks=371
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 45...
+Success: True
+# episodes completed so far: 145
+# successes: 116 (80.0%)
+Speculative stats: length=2.372, avg_accept_length=1.372, num_blocks=363
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 46...
+Success: True
+# episodes completed so far: 146
+# successes: 117 (80.1%)
+Speculative stats: length=2.320, avg_accept_length=1.320, num_blocks=344
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 47...
+Success: True
+# episodes completed so far: 147
+# successes: 118 (80.3%)
+Speculative stats: length=2.247, avg_accept_length=1.247, num_blocks=726
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 48...
+Success: True
+# episodes completed so far: 148
+# successes: 119 (80.4%)
+Speculative stats: length=2.345, avg_accept_length=1.345, num_blocks=388
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 49...
+Success: True
+# episodes completed so far: 149
+# successes: 120 (80.5%)
+Speculative stats: length=2.195, avg_accept_length=1.195, num_blocks=389
+
+Task: pick up the salad dressing and place it in the basket
+Starting episode 50...
+Success: True
+# episodes completed so far: 150
+# successes: 121 (80.7%)
+Speculative stats: length=2.290, avg_accept_length=1.290, num_blocks=373
+Current task success rate: 1.0
+Current total success rate: 0.8066666666666666
+Current task speculative stats: length=2.297, avg_accept_length=1.297, num_blocks=18873
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 1...
+Success: False
+# episodes completed so far: 151
+# successes: 121 (80.1%)
+Speculative stats: length=2.772, avg_accept_length=1.772, num_blocks=707
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 2...
+Success: False
+# episodes completed so far: 152
+# successes: 121 (79.6%)
+Speculative stats: length=2.832, avg_accept_length=1.832, num_blocks=692
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 3...
+Success: True
+# episodes completed so far: 153
+# successes: 122 (79.7%)
+Speculative stats: length=2.344, avg_accept_length=1.344, num_blocks=433
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 4...
+Success: False
+# episodes completed so far: 154
+# successes: 122 (79.2%)
+Speculative stats: length=2.555, avg_accept_length=1.555, num_blocks=767
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 5...
+Success: False
+# episodes completed so far: 155
+# successes: 122 (78.7%)
+Speculative stats: length=2.478, avg_accept_length=1.478, num_blocks=791
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 6...
+Success: True
+# episodes completed so far: 156
+# successes: 123 (78.8%)
+Speculative stats: length=2.461, avg_accept_length=1.461, num_blocks=421
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 7...
+Success: True
+# episodes completed so far: 157
+# successes: 124 (79.0%)
+Speculative stats: length=2.322, avg_accept_length=1.322, num_blocks=419
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 8...
+Success: False
+# episodes completed so far: 158
+# successes: 124 (78.5%)
+Speculative stats: length=2.707, avg_accept_length=1.707, num_blocks=724
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 9...
+Success: True
+# episodes completed so far: 159
+# successes: 125 (78.6%)
+Speculative stats: length=2.218, avg_accept_length=1.218, num_blocks=606
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 10...
+Success: True
+# episodes completed so far: 160
+# successes: 126 (78.8%)
+Speculative stats: length=2.193, avg_accept_length=1.193, num_blocks=584
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 11...
+Success: True
+# episodes completed so far: 161
+# successes: 127 (78.9%)
+Speculative stats: length=2.244, avg_accept_length=1.244, num_blocks=577
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 12...
+Success: False
+# episodes completed so far: 162
+# successes: 127 (78.4%)
+Speculative stats: length=2.934, avg_accept_length=1.934, num_blocks=668
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 13...
+Success: True
+# episodes completed so far: 163
+# successes: 128 (78.5%)
+Speculative stats: length=2.136, avg_accept_length=1.136, num_blocks=462
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 14...
+Success: True
+# episodes completed so far: 164
+# successes: 129 (78.7%)
+Speculative stats: length=2.241, avg_accept_length=1.241, num_blocks=403
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 15...
+Success: False
+# episodes completed so far: 165
+# successes: 129 (78.2%)
+Speculative stats: length=3.126, avg_accept_length=2.126, num_blocks=627
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 16...
+Success: False
+# episodes completed so far: 166
+# successes: 129 (77.7%)
+Speculative stats: length=2.796, avg_accept_length=1.796, num_blocks=701
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 17...
+Success: True
+# episodes completed so far: 167
+# successes: 130 (77.8%)
+Speculative stats: length=2.456, avg_accept_length=1.456, num_blocks=798
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 18...
+Success: True
+# episodes completed so far: 168
+# successes: 131 (78.0%)
+Speculative stats: length=2.220, avg_accept_length=1.220, num_blocks=536
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 19...
+Success: True
+# episodes completed so far: 169
+# successes: 132 (78.1%)
+Speculative stats: length=2.164, avg_accept_length=1.164, num_blocks=440
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 20...
+Success: False
+# episodes completed so far: 170
+# successes: 132 (77.6%)
+Speculative stats: length=2.726, avg_accept_length=1.726, num_blocks=719
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 21...
+Success: True
+# episodes completed so far: 171
+# successes: 133 (77.8%)
+Speculative stats: length=2.227, avg_accept_length=1.227, num_blocks=415
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 22...
+Success: True
+# episodes completed so far: 172
+# successes: 134 (77.9%)
+Speculative stats: length=2.320, avg_accept_length=1.320, num_blocks=359
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 23...
+Success: False
+# episodes completed so far: 173
+# successes: 134 (77.5%)
+Speculative stats: length=2.816, avg_accept_length=1.816, num_blocks=696
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 24...
+Success: True
+# episodes completed so far: 174
+# successes: 135 (77.6%)
+Speculative stats: length=2.195, avg_accept_length=1.195, num_blocks=437
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 25...
+Success: True
+# episodes completed so far: 175
+# successes: 136 (77.7%)
+Speculative stats: length=2.243, avg_accept_length=1.243, num_blocks=415
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 26...
+Success: True
+# episodes completed so far: 176
+# successes: 137 (77.8%)
+Speculative stats: length=2.399, avg_accept_length=1.399, num_blocks=642
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 27...
+Success: True
+# episodes completed so far: 177
+# successes: 138 (78.0%)
+Speculative stats: length=2.278, avg_accept_length=1.278, num_blocks=504
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 28...
+Success: True
+# episodes completed so far: 178
+# successes: 139 (78.1%)
+Speculative stats: length=2.471, avg_accept_length=1.471, num_blocks=507
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 29...
+Success: True
+# episodes completed so far: 179
+# successes: 140 (78.2%)
+Speculative stats: length=2.362, avg_accept_length=1.362, num_blocks=403
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 30...
+Success: False
+# episodes completed so far: 180
+# successes: 140 (77.8%)
+Speculative stats: length=2.306, avg_accept_length=1.306, num_blocks=850
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 31...
+Success: False
+# episodes completed so far: 181
+# successes: 140 (77.3%)
+Speculative stats: length=2.250, avg_accept_length=1.250, num_blocks=871
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 32...
+Success: True
+# episodes completed so far: 182
+# successes: 141 (77.5%)
+Speculative stats: length=2.259, avg_accept_length=1.259, num_blocks=536
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 33...
+Success: False
+# episodes completed so far: 183
+# successes: 141 (77.0%)
+Speculative stats: length=2.865, avg_accept_length=1.865, num_blocks=684
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 34...
+Success: True
+# episodes completed so far: 184
+# successes: 142 (77.2%)
+Speculative stats: length=2.196, avg_accept_length=1.196, num_blocks=373
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 35...
+Success: False
+# episodes completed so far: 185
+# successes: 142 (76.8%)
+Speculative stats: length=3.131, avg_accept_length=2.131, num_blocks=626
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 36...
+Success: True
+# episodes completed so far: 186
+# successes: 143 (76.9%)
+Speculative stats: length=2.088, avg_accept_length=1.088, num_blocks=399
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 37...
+Success: True
+# episodes completed so far: 187
+# successes: 144 (77.0%)
+Speculative stats: length=2.608, avg_accept_length=1.608, num_blocks=475
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 38...
+Success: True
+# episodes completed so far: 188
+# successes: 145 (77.1%)
+Speculative stats: length=2.365, avg_accept_length=1.365, num_blocks=373
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 39...
+Success: True
+# episodes completed so far: 189
+# successes: 146 (77.2%)
+Speculative stats: length=2.354, avg_accept_length=1.354, num_blocks=559
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 40...
+Success: True
+# episodes completed so far: 190
+# successes: 147 (77.4%)
+Speculative stats: length=2.265, avg_accept_length=1.265, num_blocks=513
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 41...
+Success: True
+# episodes completed so far: 191
+# successes: 148 (77.5%)
+Speculative stats: length=2.098, avg_accept_length=1.098, num_blocks=397
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 42...
+Success: True
+# episodes completed so far: 192
+# successes: 149 (77.6%)
+Speculative stats: length=2.454, avg_accept_length=1.454, num_blocks=405
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 43...
+Success: True
+# episodes completed so far: 193
+# successes: 150 (77.7%)
+Speculative stats: length=2.328, avg_accept_length=1.328, num_blocks=427
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 44...
+Success: True
+# episodes completed so far: 194
+# successes: 151 (77.8%)
+Speculative stats: length=2.290, avg_accept_length=1.290, num_blocks=538
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 45...
+Success: True
+# episodes completed so far: 195
+# successes: 152 (77.9%)
+Speculative stats: length=2.530, avg_accept_length=1.530, num_blocks=451
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 46...
+Success: True
+# episodes completed so far: 196
+# successes: 153 (78.1%)
+Speculative stats: length=2.294, avg_accept_length=1.294, num_blocks=836
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 47...
+Success: True
+# episodes completed so far: 197
+# successes: 154 (78.2%)
+Speculative stats: length=2.149, avg_accept_length=1.149, num_blocks=645
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 48...
+Success: False
+# episodes completed so far: 198
+# successes: 154 (77.8%)
+Speculative stats: length=3.289, avg_accept_length=2.289, num_blocks=596
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 49...
+Success: False
+# episodes completed so far: 199
+# successes: 154 (77.4%)
+Speculative stats: length=2.917, avg_accept_length=1.917, num_blocks=672
+
+Task: pick up the bbq sauce and place it in the basket
+Starting episode 50...
+Success: True
+# episodes completed so far: 200
+# successes: 155 (77.5%)
+Speculative stats: length=2.096, avg_accept_length=1.096, num_blocks=374
+Current task success rate: 0.68
+Current total success rate: 0.775
+Current task speculative stats: length=2.480, avg_accept_length=1.480, num_blocks=28053
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 1...
+Success: False
+# episodes completed so far: 201
+# successes: 155 (77.1%)
+Speculative stats: length=2.506, avg_accept_length=1.506, num_blocks=782
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 2...
+Success: True
+# episodes completed so far: 202
+# successes: 156 (77.2%)
+Speculative stats: length=2.314, avg_accept_length=1.314, num_blocks=472
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 3...
+Success: True
+# episodes completed so far: 203
+# successes: 157 (77.3%)
+Speculative stats: length=2.278, avg_accept_length=1.278, num_blocks=418
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 4...
+Success: True
+# episodes completed so far: 204
+# successes: 158 (77.5%)
+Speculative stats: length=2.137, avg_accept_length=1.137, num_blocks=524
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 5...
+Success: True
+# episodes completed so far: 205
+# successes: 159 (77.6%)
+Speculative stats: length=2.150, avg_accept_length=1.150, num_blocks=446
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 6...
+Success: False
+# episodes completed so far: 206
+# successes: 159 (77.2%)
+Speculative stats: length=2.325, avg_accept_length=1.325, num_blocks=843
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 7...
+Success: True
+# episodes completed so far: 207
+# successes: 160 (77.3%)
+Speculative stats: length=2.187, avg_accept_length=1.187, num_blocks=461
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 8...
+Success: True
+# episodes completed so far: 208
+# successes: 161 (77.4%)
+Speculative stats: length=2.325, avg_accept_length=1.325, num_blocks=551
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 9...
+Success: True
+# episodes completed so far: 209
+# successes: 162 (77.5%)
+Speculative stats: length=2.319, avg_accept_length=1.319, num_blocks=480
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 10...
+Success: True
+# episodes completed so far: 210
+# successes: 163 (77.6%)
+Speculative stats: length=2.261, avg_accept_length=1.261, num_blocks=486
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 11...
+Success: True
+# episodes completed so far: 211
+# successes: 164 (77.7%)
+Speculative stats: length=2.131, avg_accept_length=1.131, num_blocks=496
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 12...
+Success: True
+# episodes completed so far: 212
+# successes: 165 (77.8%)
+Speculative stats: length=2.278, avg_accept_length=1.278, num_blocks=418
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 13...
+Success: True
+# episodes completed so far: 213
+# successes: 166 (77.9%)
+Speculative stats: length=2.233, avg_accept_length=1.233, num_blocks=467
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 14...
+Success: True
+# episodes completed so far: 214
+# successes: 167 (78.0%)
+Speculative stats: length=2.425, avg_accept_length=1.425, num_blocks=508
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 15...
+Success: True
+# episodes completed so far: 215
+# successes: 168 (78.1%)
+Speculative stats: length=2.349, avg_accept_length=1.349, num_blocks=456
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 16...
+Success: True
+# episodes completed so far: 216
+# successes: 169 (78.2%)
+Speculative stats: length=2.445, avg_accept_length=1.445, num_blocks=418
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 17...
+Success: True
+# episodes completed so far: 217
+# successes: 170 (78.3%)
+Speculative stats: length=2.125, avg_accept_length=1.125, num_blocks=514
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 18...
+Success: True
+# episodes completed so far: 218
+# successes: 171 (78.4%)
+Speculative stats: length=2.269, avg_accept_length=1.269, num_blocks=475
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 19...
+Success: True
+# episodes completed so far: 219
+# successes: 172 (78.5%)
+Speculative stats: length=2.207, avg_accept_length=1.207, num_blocks=498
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 20...
+Success: True
+# episodes completed so far: 220
+# successes: 173 (78.6%)
+Speculative stats: length=2.054, avg_accept_length=1.054, num_blocks=518
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 21...
+Success: True
+# episodes completed so far: 221
+# successes: 174 (78.7%)
+Speculative stats: length=2.597, avg_accept_length=1.597, num_blocks=566
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 22...
+Success: True
+# episodes completed so far: 222
+# successes: 175 (78.8%)
+Speculative stats: length=2.317, avg_accept_length=1.317, num_blocks=435
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 23...
+Success: True
+# episodes completed so far: 223
+# successes: 176 (78.9%)
+Speculative stats: length=2.236, avg_accept_length=1.236, num_blocks=432
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 24...
+Success: False
+# episodes completed so far: 224
+# successes: 176 (78.6%)
+Speculative stats: length=2.370, avg_accept_length=1.370, num_blocks=827
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 25...
+Success: True
+# episodes completed so far: 225
+# successes: 177 (78.7%)
+Speculative stats: length=2.282, avg_accept_length=1.282, num_blocks=500
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 26...
+Success: True
+# episodes completed so far: 226
+# successes: 178 (78.8%)
+Speculative stats: length=2.251, avg_accept_length=1.251, num_blocks=426
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 27...
+Success: True
+# episodes completed so far: 227
+# successes: 179 (78.9%)
+Speculative stats: length=2.098, avg_accept_length=1.098, num_blocks=457
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 28...
+Success: True
+# episodes completed so far: 228
+# successes: 180 (78.9%)
+Speculative stats: length=2.246, avg_accept_length=1.246, num_blocks=483
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 29...
+Success: True
+# episodes completed so far: 229
+# successes: 181 (79.0%)
+Speculative stats: length=2.402, avg_accept_length=1.402, num_blocks=443
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 30...
+Success: True
+# episodes completed so far: 230
+# successes: 182 (79.1%)
+Speculative stats: length=2.274, avg_accept_length=1.274, num_blocks=391
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 31...
+Success: True
+# episodes completed so far: 231
+# successes: 183 (79.2%)
+Speculative stats: length=2.297, avg_accept_length=1.297, num_blocks=448
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 32...
+Success: False
+# episodes completed so far: 232
+# successes: 183 (78.9%)
+Speculative stats: length=2.347, avg_accept_length=1.347, num_blocks=835
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 33...
+Success: True
+# episodes completed so far: 233
+# successes: 184 (79.0%)
+Speculative stats: length=2.201, avg_accept_length=1.201, num_blocks=493
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 34...
+Success: True
+# episodes completed so far: 234
+# successes: 185 (79.1%)
+Speculative stats: length=2.219, avg_accept_length=1.219, num_blocks=508
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 35...
+Success: True
+# episodes completed so far: 235
+# successes: 186 (79.1%)
+Speculative stats: length=2.338, avg_accept_length=1.338, num_blocks=530
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 36...
+Success: True
+# episodes completed so far: 236
+# successes: 187 (79.2%)
+Speculative stats: length=2.249, avg_accept_length=1.249, num_blocks=442
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 37...
+Success: True
+# episodes completed so far: 237
+# successes: 188 (79.3%)
+Speculative stats: length=2.297, avg_accept_length=1.297, num_blocks=390
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 38...
+Success: True
+# episodes completed so far: 238
+# successes: 189 (79.4%)
+Speculative stats: length=2.228, avg_accept_length=1.228, num_blocks=487
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 39...
+Success: True
+# episodes completed so far: 239
+# successes: 190 (79.5%)
+Speculative stats: length=2.170, avg_accept_length=1.170, num_blocks=500
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 40...
+Success: True
+# episodes completed so far: 240
+# successes: 191 (79.6%)
+Speculative stats: length=2.271, avg_accept_length=1.271, num_blocks=484
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 41...
+Success: True
+# episodes completed so far: 241
+# successes: 192 (79.7%)
+Speculative stats: length=2.257, avg_accept_length=1.257, num_blocks=487
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 42...
+Success: True
+# episodes completed so far: 242
+# successes: 193 (79.8%)
+Speculative stats: length=2.265, avg_accept_length=1.265, num_blocks=510
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 43...
+Success: True
+# episodes completed so far: 243
+# successes: 194 (79.8%)
+Speculative stats: length=2.248, avg_accept_length=1.248, num_blocks=411
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 44...
+Success: True
+# episodes completed so far: 244
+# successes: 195 (79.9%)
+Speculative stats: length=2.369, avg_accept_length=1.369, num_blocks=452
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 45...
+Success: True
+# episodes completed so far: 245
+# successes: 196 (80.0%)
+Speculative stats: length=2.439, avg_accept_length=1.439, num_blocks=554
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 46...
+Success: True
+# episodes completed so far: 246
+# successes: 197 (80.1%)
+Speculative stats: length=2.280, avg_accept_length=1.280, num_blocks=436
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 47...
+Success: True
+# episodes completed so far: 247
+# successes: 198 (80.2%)
+Speculative stats: length=2.305, avg_accept_length=1.305, num_blocks=416
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 48...
+Success: True
+# episodes completed so far: 248
+# successes: 199 (80.2%)
+Speculative stats: length=2.267, avg_accept_length=1.267, num_blocks=531
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 49...
+Success: True
+# episodes completed so far: 249
+# successes: 200 (80.3%)
+Speculative stats: length=2.271, avg_accept_length=1.271, num_blocks=413
+
+Task: pick up the ketchup and place it in the basket
+Starting episode 50...
+Success: True
+# episodes completed so far: 250
+# successes: 201 (80.4%)
+Speculative stats: length=2.369, avg_accept_length=1.369, num_blocks=452
+Current task success rate: 0.92
+Current total success rate: 0.804
+Current task speculative stats: length=2.288, avg_accept_length=1.288, num_blocks=24970
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 1...
+Success: True
+# episodes completed so far: 251
+# successes: 202 (80.5%)
+Speculative stats: length=2.221, avg_accept_length=1.221, num_blocks=416
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 2...
+Success: True
+# episodes completed so far: 252
+# successes: 203 (80.6%)
+Speculative stats: length=2.284, avg_accept_length=1.284, num_blocks=377
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 3...
+Success: False
+# episodes completed so far: 253
+# successes: 203 (80.2%)
+Speculative stats: length=2.526, avg_accept_length=1.526, num_blocks=776
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 4...
+Success: True
+# episodes completed so far: 254
+# successes: 204 (80.3%)
+Speculative stats: length=2.305, avg_accept_length=1.305, num_blocks=419
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 5...
+Success: False
+# episodes completed so far: 255
+# successes: 204 (80.0%)
+Speculative stats: length=2.589, avg_accept_length=1.589, num_blocks=757
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 6...
+Success: True
+# episodes completed so far: 256
+# successes: 205 (80.1%)
+Speculative stats: length=2.289, avg_accept_length=1.289, num_blocks=419
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 7...
+Success: False
+# episodes completed so far: 257
+# successes: 205 (79.8%)
+Speculative stats: length=3.006, avg_accept_length=2.006, num_blocks=652
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 8...
+Success: True
+# episodes completed so far: 258
+# successes: 206 (79.8%)
+Speculative stats: length=2.180, avg_accept_length=1.180, num_blocks=687
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 9...
+Success: True
+# episodes completed so far: 259
+# successes: 207 (79.9%)
+Speculative stats: length=2.379, avg_accept_length=1.379, num_blocks=412
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 10...
+Success: True
+# episodes completed so far: 260
+# successes: 208 (80.0%)
+Speculative stats: length=2.167, avg_accept_length=1.167, num_blocks=436
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 11...
+Success: True
+# episodes completed so far: 261
+# successes: 209 (80.1%)
+Speculative stats: length=2.308, avg_accept_length=1.308, num_blocks=367
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 12...
+Success: True
+# episodes completed so far: 262
+# successes: 210 (80.2%)
+Speculative stats: length=2.055, avg_accept_length=1.055, num_blocks=470
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 13...
+Success: True
+# episodes completed so far: 263
+# successes: 211 (80.2%)
+Speculative stats: length=2.362, avg_accept_length=1.362, num_blocks=412
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 14...
+Success: True
+# episodes completed so far: 264
+# successes: 212 (80.3%)
+Speculative stats: length=2.115, avg_accept_length=1.115, num_blocks=427
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 15...
+Success: True
+# episodes completed so far: 265
+# successes: 213 (80.4%)
+Speculative stats: length=2.160, avg_accept_length=1.160, num_blocks=486
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 16...
+Success: True
+# episodes completed so far: 266
+# successes: 214 (80.5%)
+Speculative stats: length=2.333, avg_accept_length=1.333, num_blocks=477
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 17...
+Success: False
+# episodes completed so far: 267
+# successes: 214 (80.1%)
+Speculative stats: length=2.290, avg_accept_length=1.290, num_blocks=856
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 18...
+Success: True
+# episodes completed so far: 268
+# successes: 215 (80.2%)
+Speculative stats: length=2.311, avg_accept_length=1.311, num_blocks=524
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 19...
+Success: False
+# episodes completed so far: 269
+# successes: 215 (79.9%)
+Speculative stats: length=2.542, avg_accept_length=1.542, num_blocks=771
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 20...
+Success: True
+# episodes completed so far: 270
+# successes: 216 (80.0%)
+Speculative stats: length=2.178, avg_accept_length=1.178, num_blocks=482
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 21...
+Success: True
+# episodes completed so far: 271
+# successes: 217 (80.1%)
+Speculative stats: length=2.179, avg_accept_length=1.179, num_blocks=485
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 22...
+Success: True
+# episodes completed so far: 272
+# successes: 218 (80.1%)
+Speculative stats: length=2.175, avg_accept_length=1.175, num_blocks=383
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 23...
+Success: True
+# episodes completed so far: 273
+# successes: 219 (80.2%)
+Speculative stats: length=2.274, avg_accept_length=1.274, num_blocks=434
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 24...
+Success: True
+# episodes completed so far: 274
+# successes: 220 (80.3%)
+Speculative stats: length=2.333, avg_accept_length=1.333, num_blocks=471
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 25...
+Success: True
+# episodes completed so far: 275
+# successes: 221 (80.4%)
+Speculative stats: length=2.352, avg_accept_length=1.352, num_blocks=494
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 26...
+Success: False
+# episodes completed so far: 276
+# successes: 221 (80.1%)
+Speculative stats: length=2.384, avg_accept_length=1.384, num_blocks=822
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 27...
+Success: True
+# episodes completed so far: 277
+# successes: 222 (80.1%)
+Speculative stats: length=2.524, avg_accept_length=1.524, num_blocks=452
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 28...
+Success: True
+# episodes completed so far: 278
+# successes: 223 (80.2%)
+Speculative stats: length=2.320, avg_accept_length=1.320, num_blocks=519
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 29...
+Success: False
+# episodes completed so far: 279
+# successes: 223 (79.9%)
+Speculative stats: length=2.845, avg_accept_length=1.845, num_blocks=689
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 30...
+Success: True
+# episodes completed so far: 280
+# successes: 224 (80.0%)
+Speculative stats: length=2.600, avg_accept_length=1.600, num_blocks=595
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 31...
+Success: False
+# episodes completed so far: 281
+# successes: 224 (79.7%)
+Speculative stats: length=2.481, avg_accept_length=1.481, num_blocks=790
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 32...
+Success: False
+# episodes completed so far: 282
+# successes: 224 (79.4%)
+Speculative stats: length=2.549, avg_accept_length=1.549, num_blocks=769
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 33...
+Success: False
+# episodes completed so far: 283
+# successes: 224 (79.2%)
+Speculative stats: length=2.484, avg_accept_length=1.484, num_blocks=789
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 34...
+Success: True
+# episodes completed so far: 284
+# successes: 225 (79.2%)
+Speculative stats: length=2.251, avg_accept_length=1.251, num_blocks=625
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 35...
+Success: True
+# episodes completed so far: 285
+# successes: 226 (79.3%)
+Speculative stats: length=2.160, avg_accept_length=1.160, num_blocks=486
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 36...
+Success: True
+# episodes completed so far: 286
+# successes: 227 (79.4%)
+Speculative stats: length=2.394, avg_accept_length=1.394, num_blocks=465
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 37...
+Success: True
+# episodes completed so far: 287
+# successes: 228 (79.4%)
+Speculative stats: length=2.219, avg_accept_length=1.219, num_blocks=429
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 38...
+Success: False
+# episodes completed so far: 288
+# successes: 228 (79.2%)
+Speculative stats: length=2.764, avg_accept_length=1.764, num_blocks=709
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 39...
+Success: True
+# episodes completed so far: 289
+# successes: 229 (79.2%)
+Speculative stats: length=2.109, avg_accept_length=1.109, num_blocks=468
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 40...
+Success: True
+# episodes completed so far: 290
+# successes: 230 (79.3%)
+Speculative stats: length=2.507, avg_accept_length=1.507, num_blocks=564
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 41...
+Success: True
+# episodes completed so far: 291
+# successes: 231 (79.4%)
+Speculative stats: length=2.262, avg_accept_length=1.262, num_blocks=390
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 42...
+Success: True
+# episodes completed so far: 292
+# successes: 232 (79.5%)
+Speculative stats: length=2.200, avg_accept_length=1.200, num_blocks=436
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 43...
+Success: True
+# episodes completed so far: 293
+# successes: 233 (79.5%)
+Speculative stats: length=2.210, avg_accept_length=1.210, num_blocks=415
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 44...
+Success: True
+# episodes completed so far: 294
+# successes: 234 (79.6%)
+Speculative stats: length=2.218, avg_accept_length=1.218, num_blocks=445
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 45...
+Success: True
+# episodes completed so far: 295
+# successes: 235 (79.7%)
+Speculative stats: length=2.176, avg_accept_length=1.176, num_blocks=415
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 46...
+Success: True
+# episodes completed so far: 296
+# successes: 236 (79.7%)
+Speculative stats: length=2.200, avg_accept_length=1.200, num_blocks=401
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 47...
+Success: True
+# episodes completed so far: 297
+# successes: 237 (79.8%)
+Speculative stats: length=2.194, avg_accept_length=1.194, num_blocks=520
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 48...
+Success: True
+# episodes completed so far: 298
+# successes: 238 (79.9%)
+Speculative stats: length=2.279, avg_accept_length=1.279, num_blocks=384
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 49...
+Success: True
+# episodes completed so far: 299
+# successes: 239 (79.9%)
+Speculative stats: length=2.333, avg_accept_length=1.333, num_blocks=627
+
+Task: pick up the tomato sauce and place it in the basket
+Starting episode 50...
+Success: True
+# episodes completed so far: 300
+# successes: 240 (80.0%)
+Speculative stats: length=2.175, avg_accept_length=1.175, num_blocks=441
+Current task success rate: 0.78
+Current total success rate: 0.8
+Current task speculative stats: length=2.364, avg_accept_length=1.364, num_blocks=26535
+
+Task: pick up the butter and place it in the basket
+Starting episode 1...
+Success: True
+# episodes completed so far: 301
+# successes: 241 (80.1%)
+Speculative stats: length=2.125, avg_accept_length=1.125, num_blocks=639
+
+Task: pick up the butter and place it in the basket
+Starting episode 2...
+Success: False
+# episodes completed so far: 302
+# successes: 241 (79.8%)
+Speculative stats: length=2.526, avg_accept_length=1.526, num_blocks=776
+
+Task: pick up the butter and place it in the basket
+Starting episode 3...
+Success: True
+# episodes completed so far: 303
+# successes: 242 (79.9%)
+Speculative stats: length=2.103, avg_accept_length=1.103, num_blocks=516
+
+Task: pick up the butter and place it in the basket
+Starting episode 4...
+Success: True
+# episodes completed so far: 304
+# successes: 243 (79.9%)
+Speculative stats: length=2.140, avg_accept_length=1.140, num_blocks=556
+
+Task: pick up the butter and place it in the basket
+Starting episode 5...
+Success: True
+# episodes completed so far: 305
+# successes: 244 (80.0%)
+Speculative stats: length=2.248, avg_accept_length=1.248, num_blocks=548
+
+Task: pick up the butter and place it in the basket
+Starting episode 6...
+Success: True
+# episodes completed so far: 306
+# successes: 245 (80.1%)
+Speculative stats: length=2.327, avg_accept_length=1.327, num_blocks=701
+
+Task: pick up the butter and place it in the basket
+Starting episode 7...
+Success: True
+# episodes completed so far: 307
+# successes: 246 (80.1%)
+Speculative stats: length=2.110, avg_accept_length=1.110, num_blocks=471
+
+Task: pick up the butter and place it in the basket
+Starting episode 8...
+Success: False
+# episodes completed so far: 308
+# successes: 246 (79.9%)
+Speculative stats: length=2.487, avg_accept_length=1.487, num_blocks=788
+
+Task: pick up the butter and place it in the basket
+Starting episode 9...
+Success: True
+# episodes completed so far: 309
+# successes: 247 (79.9%)
+Speculative stats: length=2.233, avg_accept_length=1.233, num_blocks=514
+
+Task: pick up the butter and place it in the basket
+Starting episode 10...
+Success: True
+# episodes completed so far: 310
+# successes: 248 (80.0%)
+Speculative stats: length=2.272, avg_accept_length=1.272, num_blocks=456
+
+Task: pick up the butter and place it in the basket
+Starting episode 11...
+Success: True
+# episodes completed so far: 311
+# successes: 249 (80.1%)
+Speculative stats: length=2.224, avg_accept_length=1.224, num_blocks=513
+
+Task: pick up the butter and place it in the basket
+Starting episode 12...
+Success: True
+# episodes completed so far: 312
+# successes: 250 (80.1%)
+Speculative stats: length=2.068, avg_accept_length=1.068, num_blocks=518
+
+Task: pick up the butter and place it in the basket
+Starting episode 13...
+Success: True
+# episodes completed so far: 313
+# successes: 251 (80.2%)
+Speculative stats: length=2.203, avg_accept_length=1.203, num_blocks=556
+
+Task: pick up the butter and place it in the basket
+Starting episode 14...
+Success: True
+# episodes completed so far: 314
+# successes: 252 (80.3%)
+Speculative stats: length=2.163, avg_accept_length=1.163, num_blocks=560
+
+Task: pick up the butter and place it in the basket
+Starting episode 15...
+Success: True
+# episodes completed so far: 315
+# successes: 253 (80.3%)
+Speculative stats: length=2.164, avg_accept_length=1.164, num_blocks=511
+
+Task: pick up the butter and place it in the basket
+Starting episode 16...
+Success: True
+# episodes completed so far: 316
+# successes: 254 (80.4%)
+Speculative stats: length=2.200, avg_accept_length=1.200, num_blocks=474
+
+Task: pick up the butter and place it in the basket
+Starting episode 17...
+Success: True
+# episodes completed so far: 317
+# successes: 255 (80.4%)
+Speculative stats: length=2.070, avg_accept_length=1.070, num_blocks=683
+
+Task: pick up the butter and place it in the basket
+Starting episode 18...
+Success: True
+# episodes completed so far: 318
+# successes: 256 (80.5%)
+Speculative stats: length=2.074, avg_accept_length=1.074, num_blocks=476
+
+Task: pick up the butter and place it in the basket
+Starting episode 19...
+Success: True
+# episodes completed so far: 319
+# successes: 257 (80.6%)
+Speculative stats: length=2.196, avg_accept_length=1.196, num_blocks=475
+
+Task: pick up the butter and place it in the basket
+Starting episode 20...
+Success: True
+# episodes completed so far: 320
+# successes: 258 (80.6%)
+Speculative stats: length=2.422, avg_accept_length=1.422, num_blocks=685
+
+Task: pick up the butter and place it in the basket
+Starting episode 21...
+Success: True
+# episodes completed so far: 321
+# successes: 259 (80.7%)
+Speculative stats: length=2.252, avg_accept_length=1.252, num_blocks=460
+
+Task: pick up the butter and place it in the basket
+Starting episode 22...
+Success: False
+# episodes completed so far: 322
+# successes: 259 (80.4%)
+Speculative stats: length=2.367, avg_accept_length=1.367, num_blocks=828
+
+Task: pick up the butter and place it in the basket
+Starting episode 23...
+Success: True
+# episodes completed so far: 323
+# successes: 260 (80.5%)
+Speculative stats: length=2.130, avg_accept_length=1.130, num_blocks=552
+
+Task: pick up the butter and place it in the basket
+Starting episode 24...
+Success: True
+# episodes completed so far: 324
+# successes: 261 (80.6%)
+Speculative stats: length=2.011, avg_accept_length=1.011, num_blocks=651
+
+Task: pick up the butter and place it in the basket
+Starting episode 25...
+Success: True
+# episodes completed so far: 325
+# successes: 262 (80.6%)
+Speculative stats: length=2.115, avg_accept_length=1.115, num_blocks=513
+
+Task: pick up the butter and place it in the basket
+Starting episode 26...
+Success: True
+# episodes completed so far: 326
+# successes: 263 (80.7%)
+Speculative stats: length=2.312, avg_accept_length=1.312, num_blocks=430
+
+Task: pick up the butter and place it in the basket
+Starting episode 27...
+Success: True
+# episodes completed so far: 327
+# successes: 264 (80.7%)
+Speculative stats: length=2.115, avg_accept_length=1.115, num_blocks=589
+
+Task: pick up the butter and place it in the basket
+Starting episode 28...
+Success: True
+# episodes completed so far: 328
+# successes: 265 (80.8%)
+Speculative stats: length=2.145, avg_accept_length=1.145, num_blocks=483
+
+Task: pick up the butter and place it in the basket
+Starting episode 29...
+Success: True
+# episodes completed so far: 329
+# successes: 266 (80.9%)
+Speculative stats: length=2.183, avg_accept_length=1.183, num_blocks=747
+
+Task: pick up the butter and place it in the basket
+Starting episode 30...
+Success: True
+# episodes completed so far: 330
+# successes: 267 (80.9%)
+Speculative stats: length=2.296, avg_accept_length=1.296, num_blocks=558
+
+Task: pick up the butter and place it in the basket
+Starting episode 31...
+Success: True
+# episodes completed so far: 331
+# successes: 268 (81.0%)
+Speculative stats: length=2.080, avg_accept_length=1.080, num_blocks=653
+
+Task: pick up the butter and place it in the basket
+Starting episode 32...
+Success: True
+# episodes completed so far: 332
+# successes: 269 (81.0%)
+Speculative stats: length=2.089, avg_accept_length=1.089, num_blocks=593
+
+Task: pick up the butter and place it in the basket
+Starting episode 33...
+Success: False
+# episodes completed so far: 333
+# successes: 269 (80.8%)
+Speculative stats: length=2.620, avg_accept_length=1.620, num_blocks=748
+
+Task: pick up the butter and place it in the basket
+Starting episode 34...
+Success: True
+# episodes completed so far: 334
+# successes: 270 (80.8%)
+Speculative stats: length=2.122, avg_accept_length=1.122, num_blocks=564
+
+Task: pick up the butter and place it in the basket
+Starting episode 35...
+Success: True
+# episodes completed so far: 335
+# successes: 271 (80.9%)
+Speculative stats: length=2.121, avg_accept_length=1.121, num_blocks=528
+
+Task: pick up the butter and place it in the basket
+Starting episode 36...
+Success: True
+# episodes completed so far: 336
+# successes: 272 (81.0%)
+Speculative stats: length=2.151, avg_accept_length=1.151, num_blocks=576
+
+Task: pick up the butter and place it in the basket
+Starting episode 37...
+Success: True
+# episodes completed so far: 337
+# successes: 273 (81.0%)
+Speculative stats: length=2.134, avg_accept_length=1.134, num_blocks=610
+
+Task: pick up the butter and place it in the basket
+Starting episode 38...
+Success: True
+# episodes completed so far: 338
+# successes: 274 (81.1%)
+Speculative stats: length=2.142, avg_accept_length=1.142, num_blocks=549
+
+Task: pick up the butter and place it in the basket
+Starting episode 39...
+Success: True
+# episodes completed so far: 339
+# successes: 275 (81.1%)
+Speculative stats: length=2.083, avg_accept_length=1.083, num_blocks=541
+
+Task: pick up the butter and place it in the basket
+Starting episode 40...
+Success: False
+# episodes completed so far: 340
+# successes: 275 (80.9%)
+Speculative stats: length=2.542, avg_accept_length=1.542, num_blocks=771
+
+Task: pick up the butter and place it in the basket
+Starting episode 41...
+Success: True
+# episodes completed so far: 341
+# successes: 276 (80.9%)
+Speculative stats: length=2.170, avg_accept_length=1.170, num_blocks=487
+
+Task: pick up the butter and place it in the basket
+Starting episode 42...
+Success: True
+# episodes completed so far: 342
+# successes: 277 (81.0%)
+Speculative stats: length=2.165, avg_accept_length=1.165, num_blocks=472
+
+Task: pick up the butter and place it in the basket
+Starting episode 43...
+Success: True
+# episodes completed so far: 343
+# successes: 278 (81.0%)
+Speculative stats: length=2.291, avg_accept_length=1.291, num_blocks=492
+
+Task: pick up the butter and place it in the basket
+Starting episode 44...
+Success: True
+# episodes completed so far: 344
+# successes: 279 (81.1%)
+Speculative stats: length=2.192, avg_accept_length=1.192, num_blocks=479
+
+Task: pick up the butter and place it in the basket
+Starting episode 45...
+Success: True
+# episodes completed so far: 345
+# successes: 280 (81.2%)
+Speculative stats: length=2.136, avg_accept_length=1.136, num_blocks=531
+
+Task: pick up the butter and place it in the basket
+Starting episode 46...
+Success: True
+# episodes completed so far: 346
+# successes: 281 (81.2%)
+Speculative stats: length=2.283, avg_accept_length=1.283, num_blocks=601
+
+Task: pick up the butter and place it in the basket
+Starting episode 47...
+Success: True
+# episodes completed so far: 347
+# successes: 282 (81.3%)
+Speculative stats: length=2.150, avg_accept_length=1.150, num_blocks=547
+
+Task: pick up the butter and place it in the basket
+Starting episode 48...
+Success: True
+# episodes completed so far: 348
+# successes: 283 (81.3%)
+Speculative stats: length=2.282, avg_accept_length=1.282, num_blocks=497
+
+Task: pick up the butter and place it in the basket
+Starting episode 49...
+Success: True
+# episodes completed so far: 349
+# successes: 284 (81.4%)
+Speculative stats: length=2.171, avg_accept_length=1.171, num_blocks=545
+
+Task: pick up the butter and place it in the basket
+Starting episode 50...
+Success: True
+# episodes completed so far: 350
+# successes: 285 (81.4%)
+Speculative stats: length=2.188, avg_accept_length=1.188, num_blocks=563
+Current task success rate: 0.9
+Current total success rate: 0.8142857142857143
+Current task speculative stats: length=2.219, avg_accept_length=1.219, num_blocks=28574
+
+Task: pick up the milk and place it in the basket
+Starting episode 1...
+Success: True
+# episodes completed so far: 351
+# successes: 286 (81.5%)
+Speculative stats: length=1.916, avg_accept_length=0.916, num_blocks=475
+
+Task: pick up the milk and place it in the basket
+Starting episode 2...
+Success: True
+# episodes completed so far: 352
+# successes: 287 (81.5%)
+Speculative stats: length=2.010, avg_accept_length=1.010, num_blocks=418
+
+Task: pick up the milk and place it in the basket
+Starting episode 3...
+Success: False
+# episodes completed so far: 353
+# successes: 287 (81.3%)
+Speculative stats: length=2.124, avg_accept_length=1.124, num_blocks=923
+
+Task: pick up the milk and place it in the basket
+Starting episode 4...
+Success: True
+# episodes completed so far: 354
+# successes: 288 (81.4%)
+Speculative stats: length=2.154, avg_accept_length=1.154, num_blocks=429
+
+Task: pick up the milk and place it in the basket
+Starting episode 5...
+Success: True
+# episodes completed so far: 355
+# successes: 289 (81.4%)
+Speculative stats: length=2.052, avg_accept_length=1.052, num_blocks=481
+
+Task: pick up the milk and place it in the basket
+Starting episode 6...
+Success: True
+# episodes completed so far: 356
+# successes: 290 (81.5%)
+Speculative stats: length=2.195, avg_accept_length=1.195, num_blocks=437
+
+Task: pick up the milk and place it in the basket
+Starting episode 7...
+Success: True
+# episodes completed so far: 357
+# successes: 291 (81.5%)
+Speculative stats: length=2.153, avg_accept_length=1.153, num_blocks=439
+
+Task: pick up the milk and place it in the basket
+Starting episode 8...
+Success: True
+# episodes completed so far: 358
+# successes: 292 (81.6%)
+Speculative stats: length=2.112, avg_accept_length=1.112, num_blocks=484
+
+Task: pick up the milk and place it in the basket
+Starting episode 9...
+Success: True
+# episodes completed so far: 359
+# successes: 293 (81.6%)
+Speculative stats: length=2.175, avg_accept_length=1.175, num_blocks=383
+
+Task: pick up the milk and place it in the basket
+Starting episode 10...
+Success: True
+# episodes completed so far: 360
+# successes: 294 (81.7%)
+Speculative stats: length=2.133, avg_accept_length=1.133, num_blocks=607
+
+Task: pick up the milk and place it in the basket
+Starting episode 11...
+Success: True
+# episodes completed so far: 361
+# successes: 295 (81.7%)
+Speculative stats: length=2.097, avg_accept_length=1.097, num_blocks=651
+
+Task: pick up the milk and place it in the basket
+Starting episode 12...
+Success: True
+# episodes completed so far: 362
+# successes: 296 (81.8%)
+Speculative stats: length=2.200, avg_accept_length=1.200, num_blocks=401
+
+Task: pick up the milk and place it in the basket
+Starting episode 13...
+Success: True
+# episodes completed so far: 363
+# successes: 297 (81.8%)
+Speculative stats: length=2.008, avg_accept_length=1.008, num_blocks=387
+
+Task: pick up the milk and place it in the basket
+Starting episode 14...
+Success: True
+# episodes completed so far: 364
+# successes: 298 (81.9%)
+Speculative stats: length=2.199, avg_accept_length=1.199, num_blocks=554
+
+Task: pick up the milk and place it in the basket
+Starting episode 15...
+Success: True
+# episodes completed so far: 365
+# successes: 299 (81.9%)
+Speculative stats: length=2.130, avg_accept_length=1.130, num_blocks=401
+
+Task: pick up the milk and place it in the basket
+Starting episode 16...
+Success: True
+# episodes completed so far: 366
+# successes: 300 (82.0%)
+Speculative stats: length=2.090, avg_accept_length=1.090, num_blocks=432
+
+Task: pick up the milk and place it in the basket
+Starting episode 17...
+Success: True
+# episodes completed so far: 367
+# successes: 301 (82.0%)
+Speculative stats: length=2.072, avg_accept_length=1.072, num_blocks=429
+
+Task: pick up the milk and place it in the basket
+Starting episode 18...
+Success: True
+# episodes completed so far: 368
+# successes: 302 (82.1%)
+Speculative stats: length=2.099, avg_accept_length=1.099, num_blocks=487
+
+Task: pick up the milk and place it in the basket
+Starting episode 19...
+Success: True
+# episodes completed so far: 369
+# successes: 303 (82.1%)
+Speculative stats: length=2.094, avg_accept_length=1.094, num_blocks=438
+
+Task: pick up the milk and place it in the basket
+Starting episode 20...
+Success: True
+# episodes completed so far: 370
+# successes: 304 (82.2%)
+Speculative stats: length=2.207, avg_accept_length=1.207, num_blocks=406
+
+Task: pick up the milk and place it in the basket
+Starting episode 21...
+Success: True
+# episodes completed so far: 371
+# successes: 305 (82.2%)
+Speculative stats: length=2.287, avg_accept_length=1.287, num_blocks=554
+
+Task: pick up the milk and place it in the basket
+Starting episode 22...
+Success: True
+# episodes completed so far: 372
+# successes: 306 (82.3%)
+Speculative stats: length=2.248, avg_accept_length=1.248, num_blocks=439
+
+Task: pick up the milk and place it in the basket
+Starting episode 23...
+Success: True
+# episodes completed so far: 373
+# successes: 307 (82.3%)
+Speculative stats: length=2.167, avg_accept_length=1.167, num_blocks=407
+
+Task: pick up the milk and place it in the basket
+Starting episode 24...
+Success: True
+# episodes completed so far: 374
+# successes: 308 (82.4%)
+Speculative stats: length=2.195, avg_accept_length=1.195, num_blocks=389
+
+Task: pick up the milk and place it in the basket
+Starting episode 25...
+Success: False
+# episodes completed so far: 375
+# successes: 308 (82.1%)
+Speculative stats: length=2.613, avg_accept_length=1.613, num_blocks=750
+
+Task: pick up the milk and place it in the basket
+Starting episode 26...
+Success: True
+# episodes completed so far: 376
+# successes: 309 (82.2%)
+Speculative stats: length=2.115, avg_accept_length=1.115, num_blocks=417
+
+Task: pick up the milk and place it in the basket
+Starting episode 27...
+Success: True
+# episodes completed so far: 377
+# successes: 310 (82.2%)
+Speculative stats: length=2.139, avg_accept_length=1.139, num_blocks=432
+
+Task: pick up the milk and place it in the basket
+Starting episode 28...
+Success: True
+# episodes completed so far: 378
+# successes: 311 (82.3%)
+Speculative stats: length=2.100, avg_accept_length=1.100, num_blocks=400
+
+Task: pick up the milk and place it in the basket
+Starting episode 29...
+Success: True
+# episodes completed so far: 379
+# successes: 312 (82.3%)
+Speculative stats: length=2.190, avg_accept_length=1.190, num_blocks=882
+
+Task: pick up the milk and place it in the basket
+Starting episode 30...
+Success: True
+# episodes completed so far: 380
+# successes: 313 (82.4%)
+Speculative stats: length=2.150, avg_accept_length=1.150, num_blocks=394
+
+Task: pick up the milk and place it in the basket
+Starting episode 31...
+Success: True
+# episodes completed so far: 381
+# successes: 314 (82.4%)
+Speculative stats: length=2.023, avg_accept_length=1.023, num_blocks=436
+
+Task: pick up the milk and place it in the basket
+Starting episode 32...
+Success: True
+# episodes completed so far: 382
+# successes: 315 (82.5%)
+Speculative stats: length=2.061, avg_accept_length=1.061, num_blocks=462
+
+Task: pick up the milk and place it in the basket
+Starting episode 33...
+Success: True
+# episodes completed so far: 383
+# successes: 316 (82.5%)
+Speculative stats: length=2.170, avg_accept_length=1.170, num_blocks=371
+
+Task: pick up the milk and place it in the basket
+Starting episode 34...
+Success: True
+# episodes completed so far: 384
+# successes: 317 (82.6%)
+Speculative stats: length=2.161, avg_accept_length=1.161, num_blocks=434
+
+Task: pick up the milk and place it in the basket
+Starting episode 35...
+Success: True
+# episodes completed so far: 385
+# successes: 318 (82.6%)
+Speculative stats: length=2.075, avg_accept_length=1.075, num_blocks=398
+
+Task: pick up the milk and place it in the basket
+Starting episode 36...
+Success: True
+# episodes completed so far: 386
+# successes: 319 (82.6%)
+Speculative stats: length=1.882, avg_accept_length=0.882, num_blocks=450
+
+Task: pick up the milk and place it in the basket
+Starting episode 37...
+Success: True
+# episodes completed so far: 387
+# successes: 320 (82.7%)
+Speculative stats: length=2.208, avg_accept_length=1.208, num_blocks=447
+
+Task: pick up the milk and place it in the basket
+Starting episode 38...
+Success: True
+# episodes completed so far: 388
+# successes: 321 (82.7%)
+Speculative stats: length=2.049, avg_accept_length=1.049, num_blocks=410
+
+Task: pick up the milk and place it in the basket
+Starting episode 39...
+Success: True
+# episodes completed so far: 389
+# successes: 322 (82.8%)
+Speculative stats: length=2.237, avg_accept_length=1.237, num_blocks=413
+
+Task: pick up the milk and place it in the basket
+Starting episode 40...
+Success: True
+# episodes completed so far: 390
+# successes: 323 (82.8%)
+Speculative stats: length=2.167, avg_accept_length=1.167, num_blocks=533
+
+Task: pick up the milk and place it in the basket
+Starting episode 41...
+Success: True
+# episodes completed so far: 391
+# successes: 324 (82.9%)
+Speculative stats: length=2.317, avg_accept_length=1.317, num_blocks=559
+
+Task: pick up the milk and place it in the basket
+Starting episode 42...
+Success: True
+# episodes completed so far: 392
+# successes: 325 (82.9%)
+Speculative stats: length=2.100, avg_accept_length=1.100, num_blocks=460
+
+Task: pick up the milk and place it in the basket
+Starting episode 43...
+Success: True
+# episodes completed so far: 393
+# successes: 326 (83.0%)
+Speculative stats: length=2.118, avg_accept_length=1.118, num_blocks=499
+
+Task: pick up the milk and place it in the basket
+Starting episode 44...
+Success: True
+# episodes completed so far: 394
+# successes: 327 (83.0%)
+Speculative stats: length=2.097, avg_accept_length=1.097, num_blocks=404
+
+Task: pick up the milk and place it in the basket
+Starting episode 45...
+Success: True
+# episodes completed so far: 395
+# successes: 328 (83.0%)
+Speculative stats: length=2.168, avg_accept_length=1.168, num_blocks=423
+
+Task: pick up the milk and place it in the basket
+Starting episode 46...
+Success: True
+# episodes completed so far: 396
+# successes: 329 (83.1%)
+Speculative stats: length=2.144, avg_accept_length=1.144, num_blocks=431
+
+Task: pick up the milk and place it in the basket
+Starting episode 47...
+Success: True
+# episodes completed so far: 397
+# successes: 330 (83.1%)
+Speculative stats: length=2.168, avg_accept_length=1.168, num_blocks=465
+
+Task: pick up the milk and place it in the basket
+Starting episode 48...
+Success: True
+# episodes completed so far: 398
+# successes: 331 (83.2%)
+Speculative stats: length=2.197, avg_accept_length=1.197, num_blocks=427
+
+Task: pick up the milk and place it in the basket
+Starting episode 49...
+Success: False
+# episodes completed so far: 399
+# successes: 331 (83.0%)
+Speculative stats: length=2.140, avg_accept_length=1.140, num_blocks=916
+
+Task: pick up the milk and place it in the basket
+Starting episode 50...
+Success: True
+# episodes completed so far: 400
+# successes: 332 (83.0%)
+Speculative stats: length=2.109, avg_accept_length=1.109, num_blocks=405
+Current task success rate: 0.94
+Current total success rate: 0.83
+Current task speculative stats: length=2.148, avg_accept_length=1.148, num_blocks=24069
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 1...
+Success: True
+# episodes completed so far: 401
+# successes: 333 (83.0%)
+Speculative stats: length=2.221, avg_accept_length=1.221, num_blocks=457
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 2...
+Success: True
+# episodes completed so far: 402
+# successes: 334 (83.1%)
+Speculative stats: length=2.282, avg_accept_length=1.282, num_blocks=549
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 3...
+Success: True
+# episodes completed so far: 403
+# successes: 335 (83.1%)
+Speculative stats: length=2.197, avg_accept_length=1.197, num_blocks=513
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 4...
+Success: True
+# episodes completed so far: 404
+# successes: 336 (83.2%)
+Speculative stats: length=2.168, avg_accept_length=1.168, num_blocks=494
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 5...
+Success: True
+# episodes completed so far: 405
+# successes: 337 (83.2%)
+Speculative stats: length=2.141, avg_accept_length=1.141, num_blocks=546
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 6...
+Success: True
+# episodes completed so far: 406
+# successes: 338 (83.3%)
+Speculative stats: length=2.247, avg_accept_length=1.247, num_blocks=539
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 7...
+Success: True
+# episodes completed so far: 407
+# successes: 339 (83.3%)
+Speculative stats: length=2.234, avg_accept_length=1.234, num_blocks=564
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 8...
+Success: True
+# episodes completed so far: 408
+# successes: 340 (83.3%)
+Speculative stats: length=2.270, avg_accept_length=1.270, num_blocks=444
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 9...
+Success: True
+# episodes completed so far: 409
+# successes: 341 (83.4%)
+Speculative stats: length=2.208, avg_accept_length=1.208, num_blocks=485
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 10...
+Success: True
+# episodes completed so far: 410
+# successes: 342 (83.4%)
+Speculative stats: length=2.110, avg_accept_length=1.110, num_blocks=491
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 11...
+Success: True
+# episodes completed so far: 411
+# successes: 343 (83.5%)
+Speculative stats: length=2.135, avg_accept_length=1.135, num_blocks=495
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 12...
+Success: True
+# episodes completed so far: 412
+# successes: 344 (83.5%)
+Speculative stats: length=2.194, avg_accept_length=1.194, num_blocks=501
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 13...
+Success: True
+# episodes completed so far: 413
+# successes: 345 (83.5%)
+Speculative stats: length=2.180, avg_accept_length=1.180, num_blocks=578
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 14...
+Success: True
+# episodes completed so far: 414
+# successes: 346 (83.6%)
+Speculative stats: length=2.324, avg_accept_length=1.324, num_blocks=476
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 15...
+Success: True
+# episodes completed so far: 415
+# successes: 347 (83.6%)
+Speculative stats: length=2.280, avg_accept_length=1.280, num_blocks=482
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 16...
+Success: False
+# episodes completed so far: 416
+# successes: 347 (83.4%)
+Speculative stats: length=2.292, avg_accept_length=1.292, num_blocks=855
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 17...
+Success: True
+# episodes completed so far: 417
+# successes: 348 (83.5%)
+Speculative stats: length=2.290, avg_accept_length=1.290, num_blocks=428
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 18...
+Success: True
+# episodes completed so far: 418
+# successes: 349 (83.5%)
+Speculative stats: length=1.948, avg_accept_length=0.948, num_blocks=557
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 19...
+Success: True
+# episodes completed so far: 419
+# successes: 350 (83.5%)
+Speculative stats: length=2.220, avg_accept_length=1.220, num_blocks=473
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 20...
+Success: True
+# episodes completed so far: 420
+# successes: 351 (83.6%)
+Speculative stats: length=2.315, avg_accept_length=1.315, num_blocks=523
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 21...
+Success: True
+# episodes completed so far: 421
+# successes: 352 (83.6%)
+Speculative stats: length=2.270, avg_accept_length=1.270, num_blocks=589
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 22...
+Success: True
+# episodes completed so far: 422
+# successes: 353 (83.6%)
+Speculative stats: length=2.276, avg_accept_length=1.276, num_blocks=818
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 23...
+Success: True
+# episodes completed so far: 423
+# successes: 354 (83.7%)
+Speculative stats: length=2.401, avg_accept_length=1.401, num_blocks=656
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 24...
+Success: True
+# episodes completed so far: 424
+# successes: 355 (83.7%)
+Speculative stats: length=2.218, avg_accept_length=1.218, num_blocks=426
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 25...
+Success: True
+# episodes completed so far: 425
+# successes: 356 (83.8%)
+Speculative stats: length=2.275, avg_accept_length=1.275, num_blocks=560
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 26...
+Success: True
+# episodes completed so far: 426
+# successes: 357 (83.8%)
+Speculative stats: length=2.303, avg_accept_length=1.303, num_blocks=608
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 27...
+Success: True
+# episodes completed so far: 427
+# successes: 358 (83.8%)
+Speculative stats: length=2.172, avg_accept_length=1.172, num_blocks=493
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 28...
+Success: True
+# episodes completed so far: 428
+# successes: 359 (83.9%)
+Speculative stats: length=2.234, avg_accept_length=1.234, num_blocks=470
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 29...
+Success: True
+# episodes completed so far: 429
+# successes: 360 (83.9%)
+Speculative stats: length=2.363, avg_accept_length=1.363, num_blocks=542
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 30...
+Success: True
+# episodes completed so far: 430
+# successes: 361 (84.0%)
+Speculative stats: length=2.176, avg_accept_length=1.176, num_blocks=518
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 31...
+Success: False
+# episodes completed so far: 431
+# successes: 361 (83.8%)
+Speculative stats: length=2.320, avg_accept_length=1.320, num_blocks=845
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 32...
+Success: True
+# episodes completed so far: 432
+# successes: 362 (83.8%)
+Speculative stats: length=2.222, avg_accept_length=1.222, num_blocks=482
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 33...
+Success: True
+# episodes completed so far: 433
+# successes: 363 (83.8%)
+Speculative stats: length=2.249, avg_accept_length=1.249, num_blocks=445
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 34...
+Success: True
+# episodes completed so far: 434
+# successes: 364 (83.9%)
+Speculative stats: length=2.495, avg_accept_length=1.495, num_blocks=606
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 35...
+Success: True
+# episodes completed so far: 435
+# successes: 365 (83.9%)
+Speculative stats: length=2.226, avg_accept_length=1.226, num_blocks=588
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 36...
+Success: True
+# episodes completed so far: 436
+# successes: 366 (83.9%)
+Speculative stats: length=2.201, avg_accept_length=1.201, num_blocks=458
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 37...
+Success: True
+# episodes completed so far: 437
+# successes: 367 (84.0%)
+Speculative stats: length=2.235, avg_accept_length=1.235, num_blocks=473
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 38...
+Success: False
+# episodes completed so far: 438
+# successes: 367 (83.8%)
+Speculative stats: length=2.212, avg_accept_length=1.212, num_blocks=886
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 39...
+Success: True
+# episodes completed so far: 439
+# successes: 368 (83.8%)
+Speculative stats: length=2.220, avg_accept_length=1.220, num_blocks=637
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 40...
+Success: True
+# episodes completed so far: 440
+# successes: 369 (83.9%)
+Speculative stats: length=2.253, avg_accept_length=1.253, num_blocks=435
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 41...
+Success: True
+# episodes completed so far: 441
+# successes: 370 (83.9%)
+Speculative stats: length=2.170, avg_accept_length=1.170, num_blocks=513
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 42...
+Success: True
+# episodes completed so far: 442
+# successes: 371 (83.9%)
+Speculative stats: length=2.232, avg_accept_length=1.232, num_blocks=624
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 43...
+Success: True
+# episodes completed so far: 443
+# successes: 372 (84.0%)
+Speculative stats: length=2.273, avg_accept_length=1.273, num_blocks=576
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 44...
+Success: True
+# episodes completed so far: 444
+# successes: 373 (84.0%)
+Speculative stats: length=2.395, avg_accept_length=1.395, num_blocks=757
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 45...
+Success: False
+# episodes completed so far: 445
+# successes: 373 (83.8%)
+Speculative stats: length=2.414, avg_accept_length=1.414, num_blocks=812
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 46...
+Success: True
+# episodes completed so far: 446
+# successes: 374 (83.9%)
+Speculative stats: length=2.191, avg_accept_length=1.191, num_blocks=540
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 47...
+Success: True
+# episodes completed so far: 447
+# successes: 375 (83.9%)
+Speculative stats: length=2.505, avg_accept_length=1.505, num_blocks=570
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 48...
+Success: False
+# episodes completed so far: 448
+# successes: 375 (83.7%)
+Speculative stats: length=2.659, avg_accept_length=1.659, num_blocks=737
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 49...
+Success: True
+# episodes completed so far: 449
+# successes: 376 (83.7%)
+Speculative stats: length=2.250, avg_accept_length=1.250, num_blocks=613
+
+Task: pick up the chocolate pudding and place it in the basket
+Starting episode 50...
+Success: True
+# episodes completed so far: 450
+# successes: 377 (83.8%)
+Speculative stats: length=2.270, avg_accept_length=1.270, num_blocks=552
+Current task success rate: 0.9
+Current total success rate: 0.8377777777777777
+Current task speculative stats: length=2.267, avg_accept_length=1.267, num_blocks=28279
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 1...
+Success: True
+# episodes completed so far: 451
+# successes: 378 (83.8%)
+Speculative stats: length=2.418, avg_accept_length=1.418, num_blocks=330
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 2...
+Success: True
+# episodes completed so far: 452
+# successes: 379 (83.8%)
+Speculative stats: length=2.414, avg_accept_length=1.414, num_blocks=374
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 3...
+Success: True
+# episodes completed so far: 453
+# successes: 380 (83.9%)
+Speculative stats: length=2.199, avg_accept_length=1.199, num_blocks=417
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 4...
+Success: True
+# episodes completed so far: 454
+# successes: 381 (83.9%)
+Speculative stats: length=2.347, avg_accept_length=1.347, num_blocks=349
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 5...
+Success: True
+# episodes completed so far: 455
+# successes: 382 (84.0%)
+Speculative stats: length=2.466, avg_accept_length=1.466, num_blocks=386
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 6...
+Success: True
+# episodes completed so far: 456
+# successes: 383 (84.0%)
+Speculative stats: length=2.353, avg_accept_length=1.353, num_blocks=360
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 7...
+Success: True
+# episodes completed so far: 457
+# successes: 384 (84.0%)
+Speculative stats: length=2.385, avg_accept_length=1.385, num_blocks=358
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 8...
+Success: True
+# episodes completed so far: 458
+# successes: 385 (84.1%)
+Speculative stats: length=2.431, avg_accept_length=1.431, num_blocks=383
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 9...
+Success: True
+# episodes completed so far: 459
+# successes: 386 (84.1%)
+Speculative stats: length=2.333, avg_accept_length=1.333, num_blocks=366
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 10...
+Success: True
+# episodes completed so far: 460
+# successes: 387 (84.1%)
+Speculative stats: length=2.396, avg_accept_length=1.396, num_blocks=374
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 11...
+Success: True
+# episodes completed so far: 461
+# successes: 388 (84.2%)
+Speculative stats: length=2.211, avg_accept_length=1.211, num_blocks=421
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 12...
+Success: True
+# episodes completed so far: 462
+# successes: 389 (84.2%)
+Speculative stats: length=2.299, avg_accept_length=1.299, num_blocks=411
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 13...
+Success: True
+# episodes completed so far: 463
+# successes: 390 (84.2%)
+Speculative stats: length=2.442, avg_accept_length=1.442, num_blocks=344
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 14...
+Success: True
+# episodes completed so far: 464
+# successes: 391 (84.3%)
+Speculative stats: length=2.276, avg_accept_length=1.276, num_blocks=369
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 15...
+Success: True
+# episodes completed so far: 465
+# successes: 392 (84.3%)
+Speculative stats: length=2.407, avg_accept_length=1.407, num_blocks=378
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 16...
+Success: True
+# episodes completed so far: 466
+# successes: 393 (84.3%)
+Speculative stats: length=2.327, avg_accept_length=1.327, num_blocks=379
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 17...
+Success: True
+# episodes completed so far: 467
+# successes: 394 (84.4%)
+Speculative stats: length=2.408, avg_accept_length=1.408, num_blocks=343
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 18...
+Success: True
+# episodes completed so far: 468
+# successes: 395 (84.4%)
+Speculative stats: length=2.364, avg_accept_length=1.364, num_blocks=379
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 19...
+Success: True
+# episodes completed so far: 469
+# successes: 396 (84.4%)
+Speculative stats: length=2.371, avg_accept_length=1.371, num_blocks=372
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 20...
+Success: True
+# episodes completed so far: 470
+# successes: 397 (84.5%)
+Speculative stats: length=2.408, avg_accept_length=1.408, num_blocks=404
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 21...
+Success: True
+# episodes completed so far: 471
+# successes: 398 (84.5%)
+Speculative stats: length=2.346, avg_accept_length=1.346, num_blocks=373
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 22...
+Success: True
+# episodes completed so far: 472
+# successes: 399 (84.5%)
+Speculative stats: length=2.378, avg_accept_length=1.378, num_blocks=315
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 23...
+Success: False
+# episodes completed so far: 473
+# successes: 399 (84.4%)
+Speculative stats: length=2.730, avg_accept_length=1.730, num_blocks=718
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 24...
+Success: True
+# episodes completed so far: 474
+# successes: 400 (84.4%)
+Speculative stats: length=2.413, avg_accept_length=1.413, num_blocks=351
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 25...
+Success: True
+# episodes completed so far: 475
+# successes: 401 (84.4%)
+Speculative stats: length=2.375, avg_accept_length=1.375, num_blocks=392
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 26...
+Success: True
+# episodes completed so far: 476
+# successes: 402 (84.5%)
+Speculative stats: length=2.425, avg_accept_length=1.425, num_blocks=355
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 27...
+Success: True
+# episodes completed so far: 477
+# successes: 403 (84.5%)
+Speculative stats: length=2.296, avg_accept_length=1.296, num_blocks=372
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 28...
+Success: True
+# episodes completed so far: 478
+# successes: 404 (84.5%)
+Speculative stats: length=2.450, avg_accept_length=1.450, num_blocks=400
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 29...
+Success: True
+# episodes completed so far: 479
+# successes: 405 (84.6%)
+Speculative stats: length=2.374, avg_accept_length=1.374, num_blocks=348
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 30...
+Success: True
+# episodes completed so far: 480
+# successes: 406 (84.6%)
+Speculative stats: length=2.383, avg_accept_length=1.383, num_blocks=373
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 31...
+Success: True
+# episodes completed so far: 481
+# successes: 407 (84.6%)
+Speculative stats: length=2.458, avg_accept_length=1.458, num_blocks=356
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 32...
+Success: True
+# episodes completed so far: 482
+# successes: 408 (84.6%)
+Speculative stats: length=2.344, avg_accept_length=1.344, num_blocks=421
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 33...
+Success: False
+# episodes completed so far: 483
+# successes: 408 (84.5%)
+Speculative stats: length=2.617, avg_accept_length=1.617, num_blocks=749
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 34...
+Success: True
+# episodes completed so far: 484
+# successes: 409 (84.5%)
+Speculative stats: length=2.354, avg_accept_length=1.354, num_blocks=333
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 35...
+Success: True
+# episodes completed so far: 485
+# successes: 410 (84.5%)
+Speculative stats: length=2.459, avg_accept_length=1.459, num_blocks=353
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 36...
+Success: True
+# episodes completed so far: 486
+# successes: 411 (84.6%)
+Speculative stats: length=2.434, avg_accept_length=1.434, num_blocks=348
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 37...
+Success: True
+# episodes completed so far: 487
+# successes: 412 (84.6%)
+Speculative stats: length=2.421, avg_accept_length=1.421, num_blocks=373
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 38...
+Success: True
+# episodes completed so far: 488
+# successes: 413 (84.6%)
+Speculative stats: length=2.484, avg_accept_length=1.484, num_blocks=341
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 39...
+Success: True
+# episodes completed so far: 489
+# successes: 414 (84.7%)
+Speculative stats: length=2.333, avg_accept_length=1.333, num_blocks=342
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 40...
+Success: True
+# episodes completed so far: 490
+# successes: 415 (84.7%)
+Speculative stats: length=2.404, avg_accept_length=1.404, num_blocks=329
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 41...
+Success: True
+# episodes completed so far: 491
+# successes: 416 (84.7%)
+Speculative stats: length=2.393, avg_accept_length=1.393, num_blocks=351
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 42...
+Success: True
+# episodes completed so far: 492
+# successes: 417 (84.8%)
+Speculative stats: length=2.328, avg_accept_length=1.328, num_blocks=403
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 43...
+Success: True
+# episodes completed so far: 493
+# successes: 418 (84.8%)
+Speculative stats: length=2.478, avg_accept_length=1.478, num_blocks=339
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 44...
+Success: True
+# episodes completed so far: 494
+# successes: 419 (84.8%)
+Speculative stats: length=2.454, avg_accept_length=1.454, num_blocks=368
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 45...
+Success: True
+# episodes completed so far: 495
+# successes: 420 (84.8%)
+Speculative stats: length=2.391, avg_accept_length=1.391, num_blocks=404
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 46...
+Success: True
+# episodes completed so far: 496
+# successes: 421 (84.9%)
+Speculative stats: length=2.366, avg_accept_length=1.366, num_blocks=355
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 47...
+Success: True
+# episodes completed so far: 497
+# successes: 422 (84.9%)
+Speculative stats: length=2.391, avg_accept_length=1.391, num_blocks=322
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 48...
+Success: True
+# episodes completed so far: 498
+# successes: 423 (84.9%)
+Speculative stats: length=2.403, avg_accept_length=1.403, num_blocks=402
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 49...
+Success: True
+# episodes completed so far: 499
+# successes: 424 (85.0%)
+Speculative stats: length=2.408, avg_accept_length=1.408, num_blocks=404
+
+Task: pick up the orange juice and place it in the basket
+Starting episode 50...
+Success: True
+# episodes completed so far: 500
+# successes: 425 (85.0%)
+Speculative stats: length=2.265, avg_accept_length=1.265, num_blocks=411
+Current task success rate: 0.96
+Current total success rate: 0.85
+Current task speculative stats: length=2.401, avg_accept_length=1.401, num_blocks=19198
+Saved eval summary to: /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs/specvla_relaxed/EVAL-libero_object-openvla-2026_07_22-03_09_28--specvla-relaxed-object-r9-specvla_relaxed_summary.json
+Total speculative stats: length=2.401, avg_accept_length=1.401, num_blocks=19198
+Conditional prefix hit rate: p1=0.343, p2=0.999, p3=0.986, p4=0.881, p5=0.266

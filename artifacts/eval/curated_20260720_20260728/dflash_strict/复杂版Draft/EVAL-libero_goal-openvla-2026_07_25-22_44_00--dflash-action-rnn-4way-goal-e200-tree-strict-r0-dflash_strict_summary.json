@@ -1,0 +1,174 @@
+{
+  "run_id": "EVAL-libero_goal-openvla-2026_07_25-22_44_00--dflash-action-rnn-4way-goal-e200-tree-strict-r0",
+  "eval_family": "dflash_strict",
+  "task_suite_name": "libero_goal",
+  "model_family": "openvla",
+  "draft_backend": "dflash",
+  "use_spec": true,
+  "parallel_draft": false,
+  "ar_baseline": null,
+  "accept_threshold": 0,
+  "dflash_block_size": 7,
+  "dflash_num_draft_layers": 1,
+  "dflash_use_causal_residual_sampling": true,
+  "dflash_confidence_threshold": 0.0,
+  "dflash_confidence_min_tokens": 1,
+  "dflash_acceptance_mode": "token",
+  "dflash_tree_mode": "ddtree",
+  "dflash_tree_budget": 0,
+  "pretrained_checkpoint": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-goal",
+  "spec_checkpoint": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu_packedv2/epoch_200_step_089600",
+  "num_trials_per_task": 50,
+  "seed": 7,
+  "timing_scope": "last_task",
+  "sync_cuda_timing": false,
+  "total_episodes": 500,
+  "total_successes": 388,
+  "success_rate": 0.776,
+  "timing": {
+    "steps": 11048,
+    "mean": 0.17279369439619507,
+    "median": 0.17422986030578613,
+    "min": 0.09577059745788574,
+    "max": 0.27198243141174316,
+    "p95": 0.21324894428253172,
+    "p99": 0.232736713886261,
+    "total": 1909.0247356891632
+  },
+  "generation": {
+    "backend": "dflash",
+    "use_causal_residual_sampling": true,
+    "action_head_type": "slot_rnn",
+    "acceptance_mode": "token",
+    "tree_mode": "ddtree",
+    "tree_budget": 0,
+    "confidence_threshold": 0.0,
+    "confidence_min_tokens": 1,
+    "confidence_truncated_blocks": 0,
+    "num_steps": 11076,
+    "num_blocks": 34907,
+    "generated_tokens": 77532,
+    "progressed_tokens": 77532,
+    "avg_generated_length": 2.221101784742315,
+    "length": 2.221101784742315,
+    "table1_length": 2.221101784742315,
+    "avg_progress_length": 2.221101784742315,
+    "avg_accept_length": 1.0244077119202453,
+    "avg_main_path_accept_length": 0.951098633511903,
+    "accepted_tokens": 35759,
+    "compared_tokens": 132209,
+    "overall_hit_rate": 0.27047326581397635,
+    "action_group_rescued_blocks": 0,
+    "action_group_extra_accepted": 0,
+    "tree_triggered_blocks": 30609,
+    "tree_selected_alternate_blocks": 2450,
+    "tree_extra_verified_nodes": 0,
+    "tree_extra_accepted": 2559,
+    "tree_average_verified_nodes": 3.1788689601097717,
+    "tree_average_max_depth": 2.375902512332974,
+    "accept_length_histogram": {
+      "0": 4674,
+      "1": 26193,
+      "2": 2977,
+      "3": 818,
+      "4": 67,
+      "5": 178
+    },
+    "progress_length_histogram": {
+      "1": 8884,
+      "2": 21983,
+      "3": 2977,
+      "4": 818,
+      "5": 67,
+      "6": 178
+    },
+    "per_position": [
+      {
+        "position": 1,
+        "count": 34907,
+        "hit_count": 30233,
+        "reject_count": 4674,
+        "hit_rate": 0.8661013550290773,
+        "reject_rate": 0.13389864497092274
+      },
+      {
+        "position": 2,
+        "count": 30609,
+        "hit_count": 4040,
+        "reject_count": 26569,
+        "hit_rate": 0.13198732398967625,
+        "reject_rate": 0.8680126760103237
+      },
+      {
+        "position": 3,
+        "count": 23423,
+        "hit_count": 1063,
+        "reject_count": 22360,
+        "hit_rate": 0.045382743457285574,
+        "reject_rate": 0.9546172565427145
+      },
+      {
+        "position": 4,
+        "count": 20184,
+        "hit_count": 245,
+        "reject_count": 19939,
+        "hit_rate": 0.012138327388030123,
+        "reject_rate": 0.9878616726119699
+      },
+      {
+        "position": 5,
+        "count": 12010,
+        "hit_count": 178,
+        "reject_count": 11832,
+        "hit_rate": 0.014820982514571191,
+        "reject_rate": 0.9851790174854288
+      },
+      {
+        "position": 6,
+        "count": 11076,
+        "hit_count": 0,
+        "reject_count": 11076,
+        "hit_rate": 0.0,
+        "reject_rate": 1.0
+      }
+    ],
+    "conditional_prefix": [
+      {
+        "position": 1,
+        "eligible_blocks": 34907,
+        "survived_blocks": 30233,
+        "conditional_hit_rate": 0.8661013550290773
+      },
+      {
+        "position": 2,
+        "eligible_blocks": 30233,
+        "survived_blocks": 4040,
+        "conditional_hit_rate": 0.13362881619422484
+      },
+      {
+        "position": 3,
+        "eligible_blocks": 4040,
+        "survived_blocks": 1063,
+        "conditional_hit_rate": 0.26311881188118813
+      },
+      {
+        "position": 4,
+        "eligible_blocks": 1063,
+        "survived_blocks": 245,
+        "conditional_hit_rate": 0.23047977422389465
+      },
+      {
+        "position": 5,
+        "eligible_blocks": 245,
+        "survived_blocks": 178,
+        "conditional_hit_rate": 0.726530612244898
+      },
+      {
+        "position": 6,
+        "eligible_blocks": 178,
+        "survived_blocks": 0,
+        "conditional_hit_rate": 0.0
+      }
+    ]
+  }
+}

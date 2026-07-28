@@ -1,0 +1,117 @@
+{
+  "run_id": "EVAL-libero_spatial-openvla-2026_07_22-07_15_20--specvla-strict-spatial-r0",
+  "eval_family": "specvla_strict",
+  "task_suite_name": "libero_spatial",
+  "model_family": "openvla",
+  "draft_backend": "eagle",
+  "use_spec": true,
+  "parallel_draft": false,
+  "ar_baseline": null,
+  "accept_threshold": 0,
+  "dflash_block_size": 4,
+  "dflash_num_draft_layers": 1,
+  "dflash_use_causal_residual_sampling": false,
+  "dflash_confidence_threshold": 0.0,
+  "dflash_confidence_min_tokens": 1,
+  "dflash_acceptance_mode": "token",
+  "dflash_tree_mode": "off",
+  "dflash_tree_branch_position": 0,
+  "dflash_tree_first_anchor_only": true,
+  "dflash_tree_auto_calibrate": false,
+  "dflash_tree_calibration_result": null,
+  "pretrained_checkpoint": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-spatial",
+  "spec_checkpoint": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/specvla_checkpoint/spatial",
+  "num_trials_per_task": 50,
+  "seed": 7,
+  "timing_scope": "last_task",
+  "sync_cuda_timing": false,
+  "total_episodes": 500,
+  "total_successes": 425,
+  "success_rate": 0.85,
+  "timing": {
+    "steps": 7723,
+    "mean": 0.1832883338244116,
+    "median": 0.171860933303833,
+    "min": 0.11401653289794922,
+    "max": 0.25879383087158203,
+    "p95": 0.2276012897491455,
+    "p99": 0.22908621311187743,
+    "total": 1415.5358021259308
+  },
+  "generation": {
+    "backend": "eagle",
+    "use_causal_residual_sampling": null,
+    "action_head_type": null,
+    "acceptance_mode": null,
+    "tree_mode": null,
+    "tree_branch_position": null,
+    "tree_first_anchor_only": null,
+    "confidence_threshold": null,
+    "confidence_min_tokens": null,
+    "confidence_truncated_blocks": 0,
+    "num_steps": 7757,
+    "num_blocks": 34390,
+    "generated_tokens": 54299,
+    "progressed_tokens": 54299,
+    "avg_generated_length": 1.5789182902006398,
+    "length": 1.5789182902006398,
+    "table1_length": 1.5789182902006398,
+    "avg_progress_length": 1.5789182902006398,
+    "avg_accept_length": 0.5789182902006397,
+    "avg_main_path_accept_length": null,
+    "accepted_tokens": 19909,
+    "compared_tokens": 0,
+    "overall_hit_rate": null,
+    "action_group_rescued_blocks": 0,
+    "action_group_extra_accepted": 0,
+    "tree_triggered_blocks": 0,
+    "tree_selected_alternate_blocks": 0,
+    "tree_extra_verified_nodes": 0,
+    "tree_extra_accepted": 0,
+    "tree_mean_branch_score": null,
+    "accept_length_histogram": {
+      "0": 29,
+      "1": 988,
+      "2": 2607,
+      "3": 2842,
+      "4": 1274,
+      "5": 17
+    },
+    "progress_length_histogram": {
+      "7": 7757
+    },
+    "per_position": [],
+    "conditional_prefix": [
+      {
+        "position": 1,
+        "eligible_blocks": 34390,
+        "survived_blocks": 7728,
+        "conditional_hit_rate": 0.22471648735097413
+      },
+      {
+        "position": 2,
+        "eligible_blocks": 7728,
+        "survived_blocks": 6740,
+        "conditional_hit_rate": 0.8721532091097308
+      },
+      {
+        "position": 3,
+        "eligible_blocks": 6740,
+        "survived_blocks": 4133,
+        "conditional_hit_rate": 0.6132047477744808
+      },
+      {
+        "position": 4,
+        "eligible_blocks": 4133,
+        "survived_blocks": 1291,
+        "conditional_hit_rate": 0.3123639003145415
+      },
+      {
+        "position": 5,
+        "eligible_blocks": 1291,
+        "survived_blocks": 17,
+        "conditional_hit_rate": 0.013168086754453912
+      }
+    ]
+  }
+}

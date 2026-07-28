@@ -1,0 +1,17 @@
+suite,method,mode,episodes,successes,success_rate,timing_scope,mean_seconds,speedup_vs_suite_ar,length,avg_accept_length,seed,checkpoint,notes
+libero_goal,paper_wrapped_ar,strict,500,371,0.742,last_task,0.1827175977,1.000000,,,7,openvla-7b-finetuned-libero-goal,SpecVLA paper denominator
+libero_goal,specvla,strict,500,384,0.768,last_task,0.1787636681,1.022118,1.631284,0.631284,7,specvla_checkpoint/goal,r=0
+libero_goal,specvla,relaxed,500,367,0.734,last_task,0.1412283294,1.293774,2.360686,1.360686,7,specvla_checkpoint/goal,r=9
+libero_object,paper_wrapped_ar,strict,500,442,0.884,last_task,0.1833018495,1.000000,,,7,openvla-7b-finetuned-libero-object,SpecVLA paper denominator
+libero_object,specvla,strict,500,438,0.876,last_task,0.1673095857,1.095585,1.805754,0.805754,7,specvla_checkpoint/object,r=0
+libero_object,specvla,relaxed,500,425,0.850,last_task,0.1401654634,1.307753,2.401031,1.401031,7,specvla_checkpoint/object,r=9
+libero_spatial,paper_wrapped_ar,strict,500,435,0.870,last_task,0.1834591200,1.000000,,,7,openvla-7b-finetuned-libero-spatial,SpecVLA paper denominator
+libero_spatial,specvla,strict,500,425,0.850,last_task,0.1832883338,1.000932,1.578918,0.578918,7,specvla_checkpoint/spatial,r=0
+libero_spatial,specvla,relaxed,500,431,0.862,last_task,0.1601570276,1.145495,1.936019,0.936019,7,specvla_checkpoint/spatial,r=9
+libero_10,paper_wrapped_ar,strict,500,257,0.514,last_task,0.1834142184,1.000000,,,7,openvla-7b-finetuned-libero-10,SpecVLA paper denominator
+libero_10,specvla,strict,500,272,0.544,last_task,0.1845619640,0.993781,1.563865,0.563865,7,specvla_checkpoint/10,r=0
+libero_10,specvla,relaxed,500,249,0.498,last_task,0.1657495384,1.106575,1.836906,0.836906,7,specvla_checkpoint/10,r=5
+libero_goal,golden_action_rnn_ddtree,strict,500,388,0.776,last_task,0.1727936944,1.057432,2.221102,1.024408,7,epoch_200_step_089600,tree budget q-1
+libero_goal,golden_vtpf,strict,500,395,0.790,last_task,0.1420364775,1.286413,2.422030,1.466110,7,epoch_200_step_089600,RNN on; exact target verification; no skip
+libero_goal,golden_vtpf_rnn_off,pilot,100,77,0.770,last_task,0.1339858956,1.363708,2.592545,1.675032,7,epoch_200_step_089600,RNN off; 10 trials/task; not formal
+libero_goal,golden_vtpf_td_fast,relaxed,500,377,0.754,last_task,0.0700498499,2.608394,3.653127,1.119192,7,epoch_200_step_089600,RNN off; 5575 one-step prefill bypasses

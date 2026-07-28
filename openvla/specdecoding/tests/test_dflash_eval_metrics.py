@@ -91,6 +91,58 @@ class DFlashEvalMetricsTest(unittest.TestCase):
         self.assertAlmostEqual(summary["temporal_prefill_avg_accept_length"], 4.5)
         self.assertEqual(summary["temporal_prefill_accept_histogram"], {2: 1, 7: 1})
 
+    def test_temporal_prefix_certification_reports_trusted_suffix_separately(self):
+        stats = [
+            {
+                "backend": "dflash",
+                "block_size": 7,
+                "num_blocks": 1,
+                "generated_tokens": 7,
+                "progressed_tokens": 7,
+                "accept_lengths": [7],
+                "progress_lengths": [7],
+                "temporal_prefill_fusion_record": {
+                    "mode": "prefix_cert",
+                    "accept_length": 7,
+                    "verified_accept_length": 4,
+                    "compared_length": 4,
+                    "progress_length": 7,
+                    "full_match": True,
+                    "prefix_certified": True,
+                    "certified_prefix_length": 4,
+                    "trusted_suffix_length": 3,
+                },
+            },
+            {
+                "backend": "dflash",
+                "block_size": 7,
+                "num_blocks": 2,
+                "generated_tokens": 7,
+                "progressed_tokens": 4,
+                "accept_lengths": [2, 1],
+                "progress_lengths": [3, 1],
+                "temporal_prefill_fusion_record": {
+                    "mode": "prefix_cert",
+                    "accept_length": 2,
+                    "verified_accept_length": 2,
+                    "compared_length": 4,
+                    "progress_length": 3,
+                    "full_match": False,
+                    "prefix_certified": False,
+                    "certified_prefix_length": 4,
+                    "trusted_suffix_length": 0,
+                },
+            },
+        ]
+
+        summary = summarize_generation_stats(stats)
+
+        self.assertEqual(summary["temporal_prefix_cert_attempts"], 2)
+        self.assertEqual(summary["temporal_prefix_cert_successes"], 1)
+        self.assertEqual(summary["temporal_prefix_cert_fallbacks"], 1)
+        self.assertEqual(summary["temporal_prefix_cert_trusted_tokens"], 3)
+        self.assertEqual(summary["temporal_prefix_cert_avg_verified_tokens"], 4.0)
+
     def test_temporal_prefill_tree_reports_branch_coverage_and_gain(self):
         stats = [
             {
@@ -122,6 +174,42 @@ class DFlashEvalMetricsTest(unittest.TestCase):
         self.assertEqual(summary["temporal_prefill_tree_extra_accepted"], 4)
         self.assertEqual(summary["temporal_prefill_tree_avg_candidates"], 3.0)
         self.assertEqual(summary["temporal_prefill_tree_avg_verified_nodes"], 12.0)
+
+    def test_temporal_prefill_bypass_is_counted_separately(self):
+        stats = [
+            {
+                "backend": "dflash",
+                "block_size": 7,
+                "num_blocks": 1,
+                "generated_tokens": 7,
+                "progressed_tokens": 7,
+                "accept_lengths": [0],
+                "progress_lengths": [7],
+                "temporal_prefill_bypass_record": {
+                    "pixel_relative_l2": 0.001,
+                    "max_pixel_relative_l2": 0.003,
+                    "verified_action_run_length": 3,
+                },
+            },
+            {
+                "backend": "dflash",
+                "block_size": 7,
+                "num_blocks": 1,
+                "generated_tokens": 7,
+                "progressed_tokens": 2,
+                "accept_lengths": [1],
+                "progress_lengths": [2],
+            },
+        ]
+
+        summary = summarize_generation_stats(stats)
+
+        self.assertEqual(summary["temporal_prefill_bypassed_actions"], 1)
+        self.assertEqual(summary["length"], 4.5)
+        self.assertEqual(summary["avg_accept_length"], 0.5)
+        self.assertAlmostEqual(
+            summary["temporal_prefill_bypass_avg_pixel_relative_l2"], 0.001
+        )
 
 
 if __name__ == "__main__":

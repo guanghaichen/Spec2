@@ -108,6 +108,15 @@ def get_vla(cfg):
             dflash_temporal_prefill_min_stable_actions=getattr(
                 cfg, "dflash_temporal_prefill_min_stable_actions", 3
             ),
+            dflash_temporal_prefix_cert_tokens=getattr(
+                cfg, "dflash_temporal_prefix_cert_tokens", 0
+            ),
+            dflash_temporal_bypass_max_pixel_relative_l2=getattr(
+                cfg, "dflash_temporal_bypass_max_pixel_relative_l2", 0.0
+            ),
+            dflash_temporal_bypass_use_pixel_guard=getattr(
+                cfg, "dflash_temporal_bypass_use_pixel_guard", True
+            ),
             dflash_temporal_prefill_tree=getattr(
                 cfg, "dflash_temporal_prefill_tree", False
             ),

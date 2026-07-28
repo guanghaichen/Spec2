@@ -640,6 +640,9 @@ class SpecVLAforActionPrediction(nn.Module):
             dflash_temporal_fuse_verify=True,
             dflash_temporal_prefill_fusion=False,
             dflash_temporal_prefill_min_stable_actions=3,
+            dflash_temporal_prefix_cert_tokens=0,
+            dflash_temporal_bypass_max_pixel_relative_l2=0.0,
+            dflash_temporal_bypass_use_pixel_guard=True,
             dflash_temporal_prefill_tree=False,
             dflash_temporal_prefill_tree_max_candidates=3,
             dflash_temporal_prefill_tree_min_history=2,
@@ -702,6 +705,23 @@ class SpecVLAforActionPrediction(nn.Module):
             raise ValueError(
                 "dflash_temporal_prefill_min_stable_actions must be >= 1."
             )
+        self.dflash_temporal_prefix_cert_tokens = int(
+            dflash_temporal_prefix_cert_tokens
+        )
+        if not 0 <= self.dflash_temporal_prefix_cert_tokens <= int(dflash_action_dim):
+            raise ValueError(
+                "dflash_temporal_prefix_cert_tokens must be in [0, action_dim]."
+            )
+        self.dflash_temporal_bypass_max_pixel_relative_l2 = float(
+            dflash_temporal_bypass_max_pixel_relative_l2
+        )
+        if self.dflash_temporal_bypass_max_pixel_relative_l2 < 0.0:
+            raise ValueError(
+                "dflash_temporal_bypass_max_pixel_relative_l2 must be >= 0."
+            )
+        self.dflash_temporal_bypass_use_pixel_guard = bool(
+            dflash_temporal_bypass_use_pixel_guard
+        )
         self.dflash_temporal_prefill_tree = bool(dflash_temporal_prefill_tree)
         self.dflash_temporal_prefill_tree_max_candidates = int(
             dflash_temporal_prefill_tree_max_candidates
@@ -1721,6 +1741,27 @@ class SpecVLAforActionPrediction(nn.Module):
         )
         return int(accept_mask.cumprod(dim=1).sum(dim=1)[0].item())# 一旦有一个 False，后面全部变 0
 
+    @staticmethod
+    def _evaluate_temporal_prefix_certificate(
+        proposed_tokens: torch.LongTensor,
+        posterior_tokens: torch.LongTensor,
+    ) -> tuple[bool, int]:
+        """Return whether the complete target-checked prefix is exactly equal."""
+        if proposed_tokens.shape != posterior_tokens.shape:
+            raise ValueError(
+                "Prefix certification requires proposal/posterior shape equality: "
+                f"proposal={tuple(proposed_tokens.shape)} "
+                f"posterior={tuple(posterior_tokens.shape)}"
+            )
+        exact_prefix_length = int(
+            proposed_tokens.eq(posterior_tokens)
+            .int()
+            .cumprod(dim=1)
+            .sum(dim=1)[0]
+            .item()
+        )
+        return exact_prefix_length == int(posterior_tokens.shape[1]), exact_prefix_length
+
     @torch.no_grad()
     def dflash_generate(
         self,
@@ -2063,6 +2104,21 @@ class SpecVLAforActionPrediction(nn.Module):
         prefill_tree_mask = None
         prefill_tree_relative_positions = None
         prefill_fusion_input_count = 0
+        prefill_prefix_cert_probe = bool(
+            self.dflash_temporal_prefill_fusion
+            and self.dflash_verify_skip_mode == "active"
+            and 0 < self.dflash_temporal_prefix_cert_tokens < max_new_tokens
+            and self._dflash_verified_action_run_length
+            >= self.dflash_verify_skip_min_stable_actions
+            and self._dflash_previous_action_tokens is not None
+            and self._dflash_previous_action_tokens.shape[1] >= max_new_tokens
+            and self._dflash_consecutive_verify_skips
+            < self.dflash_verify_skip_max_consecutive
+        )
+        strict_prefill_ready = bool(
+            self._dflash_verified_action_run_length
+            >= self.dflash_temporal_prefill_min_stable_actions
+        )
         if (
             self.dflash_temporal_prefill_tree
             and self.dflash_tree_mode == "off"
@@ -2097,19 +2153,25 @@ class SpecVLAforActionPrediction(nn.Module):
             self.dflash_temporal_prefill_fusion
             and self.dflash_tree_mode == "off"
             and max_new_tokens > 1
-            and self._dflash_verified_action_run_length
-            >= self.dflash_temporal_prefill_min_stable_actions
+            and (prefill_prefix_cert_probe or strict_prefill_ready)
             and self._dflash_previous_action_tokens is not None
             and self._dflash_previous_action_tokens.shape[1] >= max_new_tokens
             and model_inputs.get("input_ids") is not None
         ):
-            # The previous verified action is known before the current image
-            # prefill. Appending c0..c5 makes the mandatory multimodal prefill
-            # produce target logits for c0..c6 in one causal forward.
+            # Strict VTPF appends c0..c5 and verifies the complete action in the
+            # mandatory multimodal prefill. Prefix certification appends only
+            # c0..c(m-2); an exact target prefix then certifies a trusted suffix.
             prefill_fusion_candidate = self._dflash_previous_action_tokens[
                 :, :max_new_tokens
             ].detach()
-            prefill_verify_inputs = prefill_fusion_candidate[:, :-1]
+            verified_token_count = (
+                self.dflash_temporal_prefix_cert_tokens
+                if prefill_prefix_cert_probe
+                else max_new_tokens
+            )
+            prefill_verify_inputs = prefill_fusion_candidate[
+                :, : max(verified_token_count - 1, 0)
+            ]
             prefill_fusion_input_count = int(prefill_verify_inputs.shape[1])
             model_inputs["input_ids"] = torch.cat(
                 [model_inputs["input_ids"], prefill_verify_inputs], dim=1
@@ -2141,9 +2203,16 @@ class SpecVLAforActionPrediction(nn.Module):
             model_inputs["attention_mask"] = torch.cat(
                 [model_inputs["attention_mask"], attention_extension], dim=1
             )
+        collect_pixel_signature = bool(
+            self.dflash_verify_skip_mode == "shadow"
+            or (
+                self.dflash_temporal_bypass_max_pixel_relative_l2 > 0.0
+                and self.dflash_temporal_bypass_use_pixel_guard
+            )
+        )
         current_pixel_signature = (
             self._dflash_pixel_signature(model_inputs.get("pixel_values"))
-            if self.dflash_verify_skip_mode == "shadow"
+            if collect_pixel_signature
             else None
         )
         pixel_temporal_cosine = None
@@ -2173,6 +2242,118 @@ class SpecVLAforActionPrediction(nn.Module):
                     ).clamp_min(1e-6)
                 )[0].item()
             )
+
+        temporal_prefill_bypass_active = bool(
+            self.dflash_verify_skip_mode == "active"
+            and self.dflash_temporal_bypass_max_pixel_relative_l2 > 0.0
+            and (
+                not self.dflash_temporal_bypass_use_pixel_guard
+                or (
+                    pixel_temporal_relative_l2 is not None
+                    and pixel_temporal_relative_l2
+                    <= self.dflash_temporal_bypass_max_pixel_relative_l2
+                )
+            )
+            and self._dflash_previous_action_tokens is not None
+            and self._dflash_previous_action_tokens.shape[1] >= max_new_tokens
+            and self._dflash_verified_action_run_length
+            >= self.dflash_verify_skip_min_stable_actions
+            and self._dflash_consecutive_verify_skips
+            < self.dflash_verify_skip_max_consecutive
+        )
+        if temporal_prefill_bypass_active:
+            # This is the only path that skips the mandatory multimodal target
+            # prefill. It is deliberately bounded to a short temporal hold and
+            # must be followed by a target-verified action.
+            final_action_tokens = self._dflash_previous_action_tokens[
+                :, :max_new_tokens
+            ].detach().clone()
+            self._dflash_previous_pixel_signature = current_pixel_signature
+            self._dflash_consecutive_verify_skips += 1
+            self._record_dflash_action_history(final_action_tokens)
+            generation_stats = {
+                "backend": "dflash",
+                "block_size": block_size,
+                "generated_tokens": max_new_tokens,
+                "include_anchor_hidden": True,
+                "use_causal_residual_sampling": bool(
+                    self.dflash_use_causal_residual_sampling
+                ),
+                "action_head_type": getattr(
+                    self.ea_layer, "action_head_type", "none"
+                ),
+                "acceptance_mode": self.dflash_acceptance_mode,
+                "tree_mode": self.dflash_tree_mode,
+                "tree_budget": self.dflash_tree_budget,
+                "target_logits_mode": self.dflash_target_logits_mode,
+                "target_logit_shadow_checks": self._target_logit_shadow_checks,
+                "target_logit_shadow_mismatches": self._target_logit_shadow_mismatches,
+                "verify_skip_mode": self.dflash_verify_skip_mode,
+                "temporal_prefill_bypass_record": {
+                    "pixel_relative_l2": pixel_temporal_relative_l2,
+                    "max_pixel_relative_l2": (
+                        self.dflash_temporal_bypass_max_pixel_relative_l2
+                    ),
+                    "pixel_guard_enabled": (
+                        self.dflash_temporal_bypass_use_pixel_guard
+                    ),
+                    "verified_action_run_length": int(
+                        self._dflash_verified_action_run_length
+                    ),
+                },
+                "temporal_prefill_fusion_record": None,
+                "temporal_action_skip_record": None,
+                "verify_skip_records": [],
+                "verify_skipped_actions": 1,
+                "verify_skipped_blocks": 1,
+                "verify_skipped_tokens": max_new_tokens,
+                "temporal_proposal_routed_actions": 0,
+                "temporal_proposal_routed_blocks": 0,
+                "temporal_proposal_rejected_blocks": 0,
+                "temporal_fallback_draft_blocks": 0,
+                "temporal_fused_verify_blocks": 0,
+                "first_token_early_reject_blocks": 0,
+                "confidence_truncated_blocks": 0,
+                "num_blocks": 1,
+                "bootstrapped_tokens": 0,
+                "progressed_tokens": max_new_tokens,
+                "progress_lengths": [max_new_tokens],
+                "length": float(max_new_tokens),
+                "table1_length": float(max_new_tokens),
+                "avg_progress_length": float(max_new_tokens),
+                "avg_tail_progress_length": float(max_new_tokens),
+                "anchor_decode_steps": 0,
+                "target_bootstrap_tokens": 0,
+                # A hold advances the control stream but is not accepted by a
+                # target verifier. Keep Length/progress and draft acceptance
+                # as separate quantities in the aggregate metrics.
+                "accept_lengths": [0],
+                "main_path_accept_lengths": [0],
+                "avg_accept_length": 0.0,
+                "accepted_tokens": 0,
+                "verified_accepted_tokens": 0,
+                "compared_tokens": 0,
+                "overall_hit_rate": None,
+                "action_group_rescued_blocks": 0,
+                "action_group_extra_accepted": 0,
+                "tree_triggered_blocks": 0,
+                "tree_selected_alternate_blocks": 0,
+                "tree_extra_verified_nodes": 0,
+                "tree_extra_accepted": 0,
+                "tree_average_verified_nodes": None,
+                "tree_average_max_depth": None,
+                "stage_profile": None,
+                "per_position": [],
+                "final_action_tokens": (
+                    final_action_tokens[0].detach().cpu().tolist()
+                    if self.dflash_profile_stages
+                    else None
+                ),
+                "target_ar_reference_tokens": None,
+            }
+            self.last_dflash_stats = generation_stats
+            self.last_generation_stats = generation_stats
+            return final_action_tokens
 
         stage_started = profile_start()
         prefill_active = (
@@ -2243,6 +2424,7 @@ class SpecVLAforActionPrediction(nn.Module):
 
         prefill_fusion_record = None
         prefill_selected_hidden = None
+        prefill_prefix_cert_succeeded = False
         initial_anchor_idx = 0
         if prefill_fusion_candidate is None and prefill_tree_candidates is None:
             first_token_logits = orig[:, -1:, :]
@@ -2343,21 +2525,44 @@ class SpecVLAforActionPrediction(nn.Module):
             }
         else:
             prefill_posterior_tokens = self._sample_dflash_target_logits(orig)
+            verified_token_count = int(prefill_posterior_tokens.shape[1])
+            checked_candidate = prefill_fusion_candidate[:, :verified_token_count]
             prefill_action_positions = torch.arange(
-                max_new_tokens,
+                verified_token_count,
                 device=input_ids.device,
                 dtype=torch.long,
             ).unsqueeze(0)
-            prefill_accept_mask = self._compute_dflash_accept_mask(
-                prefill_fusion_candidate,
-                prefill_posterior_tokens,
-                accept_threshold=accept_threshold,
-                action_position_ids=prefill_action_positions,
-                acceptance_mode=self.dflash_acceptance_mode,
-            )
-            prefill_accept_length = min(
-                int(prefill_accept_mask.int().cumprod(dim=1).sum(dim=1)[0].item()),
-                max_new_tokens,
+            if prefill_prefix_cert_probe:
+                # The certificate itself is always exact. Relaxation happens
+                # only after a causal target prefix has been proven identical.
+                (
+                    prefill_prefix_cert_succeeded,
+                    verified_prefix_accept_length,
+                ) = self._evaluate_temporal_prefix_certificate(
+                    checked_candidate,
+                    prefill_posterior_tokens,
+                )
+            else:
+                prefill_accept_mask = self._compute_dflash_accept_mask(
+                    checked_candidate,
+                    prefill_posterior_tokens,
+                    accept_threshold=accept_threshold,
+                    action_position_ids=prefill_action_positions,
+                    acceptance_mode=self.dflash_acceptance_mode,
+                )
+                verified_prefix_accept_length = min(
+                    int(
+                        prefill_accept_mask.int()
+                        .cumprod(dim=1)
+                        .sum(dim=1)[0]
+                        .item()
+                    ),
+                    verified_token_count,
+                )
+            prefill_accept_length = (
+                max_new_tokens
+                if prefill_prefix_cert_succeeded
+                else verified_prefix_accept_length
             )
             if prefill_accept_length > 0:
                 output_ids[
@@ -2377,9 +2582,13 @@ class SpecVLAforActionPrediction(nn.Module):
             accepted_cached_inputs = min(
                 prefill_accept_length, prefill_fusion_input_count
             )
-            past_key_values = self._crop_past_key_values(
-                outputs.past_key_values,
-                action_base_position + accepted_cached_inputs,
+            past_key_values = (
+                None
+                if prefill_prefix_cert_succeeded
+                else self._crop_past_key_values(
+                    outputs.past_key_values,
+                    action_base_position + accepted_cached_inputs,
+                )
             )
             if accepted_cached_inputs > 0:
                 action_context = full_prefill_hidden[
@@ -2395,10 +2604,27 @@ class SpecVLAforActionPrediction(nn.Module):
                 :, token_prefix_len : token_prefix_len + 1
             ]
             prefill_fusion_record = {
-                "mode": "single_hold",
+                "mode": (
+                    "prefix_cert" if prefill_prefix_cert_probe else "single_hold"
+                ),
                 "accept_length": prefill_accept_length,
+                "verified_accept_length": (
+                    verified_token_count
+                    if prefill_prefix_cert_succeeded
+                    else verified_prefix_accept_length
+                ),
+                "compared_length": verified_token_count,
                 "progress_length": prefill_progress_length,
                 "full_match": prefill_accept_length == max_new_tokens,
+                "prefix_certified": prefill_prefix_cert_succeeded,
+                "certified_prefix_length": (
+                    verified_token_count if prefill_prefix_cert_probe else 0
+                ),
+                "trusted_suffix_length": (
+                    max_new_tokens - verified_token_count
+                    if prefill_prefix_cert_succeeded
+                    else 0
+                ),
             }
 
         target_ar_reference_tokens = None
@@ -2459,7 +2685,10 @@ class SpecVLAforActionPrediction(nn.Module):
         temporal_action_skip_record = None
         temporal_action_skip_active = False
         temporal_proposal_route_active = False
-        if self.dflash_verify_skip_mode != "off":
+        if self.dflash_verify_skip_mode != "off" and (
+            self.dflash_verify_skip_mode == "shadow"
+            or prefill_fusion_record is None
+        ):
             previous_prompt_signature = self._dflash_previous_prompt_signature
             previous_prompt_pooled_signature = (
                 self._dflash_previous_prompt_pooled_signature
@@ -2604,6 +2833,7 @@ class SpecVLAforActionPrediction(nn.Module):
             )
             temporal_action_skip_active = bool(
                 self.dflash_verify_skip_mode == "active"
+                and self.dflash_temporal_bypass_max_pixel_relative_l2 <= 0.0
                 and temporal_gate_selected
                 and prefill_fusion_record is None
                 and self._dflash_consecutive_verify_skips
@@ -2720,6 +2950,13 @@ class SpecVLAforActionPrediction(nn.Module):
                 "temporal_prefill_min_stable_actions": (
                     self.dflash_temporal_prefill_min_stable_actions
                 ),
+                "temporal_prefix_cert_tokens": self.dflash_temporal_prefix_cert_tokens,
+                "temporal_bypass_max_pixel_relative_l2": (
+                    self.dflash_temporal_bypass_max_pixel_relative_l2
+                ),
+                "temporal_bypass_use_pixel_guard": (
+                    self.dflash_temporal_bypass_use_pixel_guard
+                ),
                 "temporal_prefill_tree": self.dflash_temporal_prefill_tree,
                 "temporal_prefill_tree_max_candidates": (
                     self.dflash_temporal_prefill_tree_max_candidates
@@ -2817,8 +3054,14 @@ class SpecVLAforActionPrediction(nn.Module):
             ]
             progress_lengths = [prefill_progress_length]
             total_accepted = prefill_accept_length
-            total_compared = max_new_tokens
-            total_verified_accepted = prefill_accept_length
+            total_compared = int(
+                prefill_fusion_record.get("compared_length", max_new_tokens)
+            )
+            total_verified_accepted = int(
+                prefill_fusion_record.get(
+                    "verified_accept_length", prefill_accept_length
+                )
+            )
             bootstrapped_tokens = 0
         anchor_decode_steps = 0
         confidence_truncated_blocks = 0
@@ -2831,8 +3074,12 @@ class SpecVLAforActionPrediction(nn.Module):
         tree_total_verified_nodes = 0
         tree_max_depth_sum = 0
         verify_skip_records = []
-        verify_skipped_blocks = 0
-        verify_skipped_tokens = 0
+        verify_skipped_blocks = int(prefill_prefix_cert_succeeded)
+        verify_skipped_tokens = int(
+            prefill_fusion_record.get("trusted_suffix_length", 0)
+            if prefill_fusion_record is not None
+            else 0
+        )
         first_token_early_reject_blocks = 0
         temporal_proposal_routed_blocks = 0
         temporal_proposal_rejected_blocks = 0
@@ -3617,21 +3864,27 @@ class SpecVLAforActionPrediction(nn.Module):
         )
         self._dflash_previous_first_action_probs = current_first_action_probs
         self._dflash_previous_pixel_signature = current_pixel_signature
-        if (
-            self._dflash_previous_verified_action_tokens is not None
-            and self._dflash_previous_verified_action_tokens.eq(
-                final_action_tokens
-            ).all()
-        ):
-            self._dflash_verified_action_run_length += 1
+        if prefill_prefix_cert_succeeded:
+            # A trusted suffix must not strengthen the verified-history gate.
+            # The next action is forced through strict verification by the
+            # consecutive-skip budget before it can earn more temporal credit.
+            self._dflash_consecutive_verify_skips += 1
         else:
-            self._dflash_verified_action_run_length = 1
-        self._dflash_previous_verified_action_tokens = (
-            final_action_tokens.detach().clone()
-        )
+            if (
+                self._dflash_previous_verified_action_tokens is not None
+                and self._dflash_previous_verified_action_tokens.eq(
+                    final_action_tokens
+                ).all()
+            ):
+                self._dflash_verified_action_run_length += 1
+            else:
+                self._dflash_verified_action_run_length = 1
+            self._dflash_previous_verified_action_tokens = (
+                final_action_tokens.detach().clone()
+            )
+            self._dflash_consecutive_verify_skips = 0
         self._dflash_previous_action_tokens = final_action_tokens.detach().clone()
         self._record_dflash_action_history(final_action_tokens)
-        self._dflash_consecutive_verify_skips = 0
 
         per_position_stats = []
         for idx, (hit_count, compare_count) in enumerate(zip(position_hits, position_counts), start=1):
@@ -3675,6 +3928,13 @@ class SpecVLAforActionPrediction(nn.Module):
             "temporal_prefill_min_stable_actions": (
                 self.dflash_temporal_prefill_min_stable_actions
             ),
+            "temporal_prefix_cert_tokens": self.dflash_temporal_prefix_cert_tokens,
+            "temporal_bypass_max_pixel_relative_l2": (
+                self.dflash_temporal_bypass_max_pixel_relative_l2
+            ),
+            "temporal_bypass_use_pixel_guard": (
+                self.dflash_temporal_bypass_use_pixel_guard
+            ),
             "temporal_prefill_tree": self.dflash_temporal_prefill_tree,
             "temporal_prefill_tree_max_candidates": (
                 self.dflash_temporal_prefill_tree_max_candidates
@@ -3688,7 +3948,7 @@ class SpecVLAforActionPrediction(nn.Module):
             "verify_skip_max_consecutive": self.dflash_verify_skip_max_consecutive,
             "verify_skip_records": verify_skip_records,
             "temporal_action_skip_record": temporal_action_skip_record,
-            "verify_skipped_actions": 0,
+            "verify_skipped_actions": int(prefill_prefix_cert_succeeded),
             "temporal_proposal_routed_actions": int(
                 temporal_proposal_routed_blocks > 0
             ),

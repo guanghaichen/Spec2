@@ -160,6 +160,21 @@ def summarize_generation_stats(step_stats_list):
         for record in temporal_prefill_fusion_records
         if record.get("mode") == "temporal_tree"
     ]
+    temporal_prefix_cert_records = [
+        record
+        for record in temporal_prefill_fusion_records
+        if record.get("mode") == "prefix_cert"
+    ]
+    temporal_prefill_bypass_records = [
+        item["temporal_prefill_bypass_record"]
+        for item in valid_stats
+        if item.get("temporal_prefill_bypass_record") is not None
+    ]
+    temporal_prefill_bypass_pixel_l2 = [
+        float(record["pixel_relative_l2"])
+        for record in temporal_prefill_bypass_records
+        if record.get("pixel_relative_l2") is not None
+    ]
 
     stage_profile_totals = {}
     stage_profile_calls = {}
@@ -716,6 +731,37 @@ def summarize_generation_stats(step_stats_list):
         "temporal_prefill_accept_histogram": dict(
             sorted(Counter(temporal_prefill_accept_lengths).items())
         ),
+        "temporal_prefix_cert_attempts": len(temporal_prefix_cert_records),
+        "temporal_prefix_cert_successes": sum(
+            int(bool(record.get("prefix_certified", False)))
+            for record in temporal_prefix_cert_records
+        ),
+        "temporal_prefix_cert_fallbacks": sum(
+            int(not bool(record.get("prefix_certified", False)))
+            for record in temporal_prefix_cert_records
+        ),
+        "temporal_prefix_cert_trusted_tokens": sum(
+            int(record.get("trusted_suffix_length", 0))
+            for record in temporal_prefix_cert_records
+        ),
+        "temporal_prefix_cert_avg_verified_tokens": (
+            sum(
+                int(record.get("compared_length", 0))
+                for record in temporal_prefix_cert_records
+            )
+            / len(temporal_prefix_cert_records)
+            if temporal_prefix_cert_records
+            else None
+        ),
+        "temporal_prefill_bypassed_actions": len(
+            temporal_prefill_bypass_records
+        ),
+        "temporal_prefill_bypass_avg_pixel_relative_l2": (
+            sum(temporal_prefill_bypass_pixel_l2)
+            / len(temporal_prefill_bypass_pixel_l2)
+            if temporal_prefill_bypass_pixel_l2
+            else None
+        ),
         "temporal_prefill_tree_actions": len(temporal_prefill_tree_records),
         "temporal_prefill_tree_full_exact_actions": sum(
             int(bool(record.get("full_exact_match", False)))
@@ -860,6 +906,15 @@ def write_eval_summary(
         "dflash_temporal_prefill_min_stable_actions": getattr(
             cfg, "dflash_temporal_prefill_min_stable_actions", None
         ),
+        "dflash_temporal_prefix_cert_tokens": getattr(
+            cfg, "dflash_temporal_prefix_cert_tokens", None
+        ),
+        "dflash_temporal_bypass_max_pixel_relative_l2": getattr(
+            cfg, "dflash_temporal_bypass_max_pixel_relative_l2", None
+        ),
+        "dflash_temporal_bypass_use_pixel_guard": getattr(
+            cfg, "dflash_temporal_bypass_use_pixel_guard", None
+        ),
         "dflash_temporal_prefill_tree": getattr(
             cfg, "dflash_temporal_prefill_tree", None
         ),
@@ -967,6 +1022,19 @@ def format_generation_summary(summary, prefix="Speculative stats"):
             f"actions={summary['temporal_prefill_tree_actions']}"
             f"/alternate={summary['temporal_prefill_tree_selected_alternate_actions']}"
             f"/extra={summary['temporal_prefill_tree_extra_accepted']}"
+        )
+    if summary.get("temporal_prefix_cert_attempts"):
+        parts.append(
+            "prefix_cert="
+            f"{summary['temporal_prefix_cert_successes']}/"
+            f"{summary['temporal_prefix_cert_attempts']}"
+            f"/trusted={summary['temporal_prefix_cert_trusted_tokens']}"
+        )
+    if summary.get("temporal_prefill_bypassed_actions"):
+        pixel_l2 = summary.get("temporal_prefill_bypass_avg_pixel_relative_l2")
+        suffix = f"/pixel_l2={pixel_l2:.6f}" if pixel_l2 is not None else ""
+        parts.append(
+            f"prefill_bypass={summary['temporal_prefill_bypassed_actions']}{suffix}"
         )
     shadow = summary.get("verify_skip_shadow") or {}
     if shadow:

@@ -119,6 +119,21 @@ class DFlashVerificationTest(unittest.TestCase):
         self.assertEqual(token_mask.tolist(), [[0, 1, 1, 1, 1, 1]])
         self.assertEqual(group_mask.tolist(), [[1, 1, 1, 1, 1, 0]])
 
+    def test_temporal_prefix_certificate_requires_complete_exact_prefix(self):
+        certified, accept_length = self.verifier._evaluate_temporal_prefix_certificate(
+            torch.tensor([[100, 101, 102, 103]]),
+            torch.tensor([[100, 101, 102, 103]]),
+        )
+        self.assertTrue(certified)
+        self.assertEqual(accept_length, 4)
+
+        certified, accept_length = self.verifier._evaluate_temporal_prefix_certificate(
+            torch.tensor([[100, 101, 102, 103]]),
+            torch.tensor([[100, 101, 199, 103]]),
+        )
+        self.assertFalse(certified)
+        self.assertEqual(accept_length, 2)
+
     def test_relaxed_ddtree_selects_longest_group_valid_leaf_and_correction(self):
         # Virtual root -> token 100 -> token 101 is the longest group-valid
         # branch. Token 110 is a shorter sibling branch.

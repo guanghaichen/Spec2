@@ -100,6 +100,9 @@ class GenerateConfig:
     dflash_temporal_fuse_verify: bool = True
     dflash_temporal_prefill_fusion: bool = False
     dflash_temporal_prefill_min_stable_actions: int = 3
+    dflash_temporal_prefix_cert_tokens: int = 0
+    dflash_temporal_bypass_max_pixel_relative_l2: float = 0.0
+    dflash_temporal_bypass_use_pixel_guard: bool = True
     dflash_temporal_prefill_tree: bool = False
     dflash_temporal_prefill_tree_max_candidates: int = 3
     dflash_temporal_prefill_tree_min_history: int = 2

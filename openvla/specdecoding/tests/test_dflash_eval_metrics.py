@@ -211,6 +211,68 @@ class DFlashEvalMetricsTest(unittest.TestCase):
             summary["temporal_prefill_bypass_avg_pixel_relative_l2"], 0.001
         )
 
+    def test_adaptive_temporal_hold_reports_real_extensions_and_forced_targets(self):
+        common = {
+            "backend": "dflash",
+            "block_size": 7,
+            "num_blocks": 1,
+            "generated_tokens": 7,
+            "progressed_tokens": 7,
+            "accept_lengths": [0],
+            "progress_lengths": [7],
+            "temporal_hold_policy": "adaptive",
+        }
+        stats = [
+            {
+                **common,
+                "temporal_hold_decision_record": {
+                    "allow": True,
+                    "reason": "base_hold",
+                    "hold_depth": 1,
+                    "adaptive_extension": False,
+                    "anchor_pixel_relative_l2": 0.01,
+                    "consecutive_holds_before": 0,
+                },
+            },
+            {
+                **common,
+                "temporal_hold_decision_record": {
+                    "allow": True,
+                    "reason": "adaptive_extension",
+                    "hold_depth": 2,
+                    "adaptive_extension": True,
+                    "anchor_pixel_relative_l2": 0.02,
+                    "consecutive_holds_before": 1,
+                },
+            },
+            {
+                **common,
+                "temporal_hold_decision_record": {
+                    "allow": False,
+                    "reason": "max_consecutive_reached",
+                    "hold_depth": 3,
+                    "adaptive_extension": False,
+                    "anchor_pixel_relative_l2": 0.03,
+                    "consecutive_holds_before": 2,
+                },
+            },
+        ]
+
+        summary = summarize_generation_stats(stats)
+        temporal_hold = summary["temporal_hold"]
+
+        self.assertEqual(temporal_hold["policy"], "adaptive")
+        self.assertEqual(temporal_hold["allowed_holds"], 2)
+        self.assertAlmostEqual(temporal_hold["hold_rate"], 2.0 / 3.0)
+        self.assertEqual(temporal_hold["target_prefill_actions"], 1)
+        self.assertEqual(temporal_hold["base_holds"], 1)
+        self.assertEqual(temporal_hold["adaptive_extension_candidates"], 1)
+        self.assertEqual(temporal_hold["adaptive_extended_holds"], 1)
+        self.assertEqual(temporal_hold["adaptive_extension_rate"], 1.0)
+        self.assertEqual(temporal_hold["forced_target_after_hold"], 1)
+        self.assertEqual(temporal_hold["allowed_depth_histogram"], {1: 1, 2: 1})
+        self.assertAlmostEqual(temporal_hold["avg_anchor_pixel_relative_l2"], 0.02)
+
 
 if __name__ == "__main__":
     unittest.main()

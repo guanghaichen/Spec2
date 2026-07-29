@@ -175,6 +175,31 @@ def summarize_generation_stats(step_stats_list):
         for record in temporal_prefill_bypass_records
         if record.get("pixel_relative_l2") is not None
     ]
+    temporal_hold_decision_records = [
+        item["temporal_hold_decision_record"]
+        for item in valid_stats
+        if item.get("temporal_hold_decision_record") is not None
+    ]
+    temporal_hold_allowed_records = [
+        record
+        for record in temporal_hold_decision_records
+        if bool(record.get("allow", False))
+    ]
+    temporal_hold_extension_candidates = [
+        record
+        for record in temporal_hold_decision_records
+        if int(record.get("consecutive_holds_before", 0)) == 1
+    ]
+    temporal_hold_extended_records = [
+        record
+        for record in temporal_hold_allowed_records
+        if bool(record.get("adaptive_extension", False))
+    ]
+    temporal_hold_anchor_pixel_l2 = [
+        float(record["anchor_pixel_relative_l2"])
+        for record in temporal_hold_decision_records
+        if record.get("anchor_pixel_relative_l2") is not None
+    ]
 
     stage_profile_totals = {}
     stage_profile_calls = {}
@@ -762,6 +787,65 @@ def summarize_generation_stats(step_stats_list):
             if temporal_prefill_bypass_pixel_l2
             else None
         ),
+        "temporal_hold": {
+            "policy": valid_stats[0].get("temporal_hold_policy", "fixed"),
+            "num_decisions": len(temporal_hold_decision_records),
+            "allowed_holds": len(temporal_hold_allowed_records),
+            "hold_rate": (
+                len(temporal_hold_allowed_records)
+                / len(temporal_hold_decision_records)
+                if temporal_hold_decision_records
+                else None
+            ),
+            "target_prefill_actions": (
+                len(temporal_hold_decision_records)
+                - len(temporal_hold_allowed_records)
+            ),
+            "base_holds": sum(
+                int(record.get("hold_depth", 0) == 1)
+                for record in temporal_hold_allowed_records
+            ),
+            "adaptive_extension_candidates": len(
+                temporal_hold_extension_candidates
+            ),
+            "adaptive_extended_holds": len(temporal_hold_extended_records),
+            "adaptive_extension_rate": (
+                len(temporal_hold_extended_records)
+                / len(temporal_hold_extension_candidates)
+                if temporal_hold_extension_candidates
+                else None
+            ),
+            "forced_target_after_hold": sum(
+                int(
+                    not bool(record.get("allow", False))
+                    and int(record.get("consecutive_holds_before", 0)) > 0
+                )
+                for record in temporal_hold_decision_records
+            ),
+            "allowed_depth_histogram": dict(
+                sorted(
+                    Counter(
+                        int(record.get("hold_depth", 0))
+                        for record in temporal_hold_allowed_records
+                    ).items()
+                )
+            ),
+            "reason_histogram": dict(
+                sorted(
+                    Counter(
+                        str(record.get("reason", "unknown"))
+                        for record in temporal_hold_decision_records
+                    ).items()
+                )
+            ),
+            "avg_anchor_pixel_relative_l2": (
+                sum(temporal_hold_anchor_pixel_l2)
+                / len(temporal_hold_anchor_pixel_l2)
+                if temporal_hold_anchor_pixel_l2
+                else None
+            ),
+            "records": temporal_hold_decision_records,
+        },
         "temporal_prefill_tree_actions": len(temporal_prefill_tree_records),
         "temporal_prefill_tree_full_exact_actions": sum(
             int(bool(record.get("full_exact_match", False)))
@@ -915,6 +999,17 @@ def write_eval_summary(
         "dflash_temporal_bypass_use_pixel_guard": getattr(
             cfg, "dflash_temporal_bypass_use_pixel_guard", None
         ),
+        "dflash_temporal_hold_policy": getattr(
+            cfg, "dflash_temporal_hold_policy", None
+        ),
+        "dflash_temporal_adaptive_min_verified_run": getattr(
+            cfg, "dflash_temporal_adaptive_min_verified_run", None
+        ),
+        "dflash_temporal_adaptive_max_anchor_pixel_relative_l2": getattr(
+            cfg,
+            "dflash_temporal_adaptive_max_anchor_pixel_relative_l2",
+            None,
+        ),
         "dflash_temporal_prefill_tree": getattr(
             cfg, "dflash_temporal_prefill_tree", None
         ),
@@ -1035,6 +1130,16 @@ def format_generation_summary(summary, prefix="Speculative stats"):
         suffix = f"/pixel_l2={pixel_l2:.6f}" if pixel_l2 is not None else ""
         parts.append(
             f"prefill_bypass={summary['temporal_prefill_bypassed_actions']}{suffix}"
+        )
+    temporal_hold = summary.get("temporal_hold") or {}
+    if temporal_hold.get("allowed_holds"):
+        parts.append(
+            "temporal_hold="
+            f"policy={temporal_hold.get('policy')}"
+            f"/base={temporal_hold.get('base_holds', 0)}"
+            f"/extended={temporal_hold.get('adaptive_extended_holds', 0)}"
+            f"/{temporal_hold.get('adaptive_extension_candidates', 0)}"
+            f"/forced={temporal_hold.get('forced_target_after_hold', 0)}"
         )
     shadow = summary.get("verify_skip_shadow") or {}
     if shadow:

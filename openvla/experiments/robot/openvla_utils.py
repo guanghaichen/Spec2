@@ -117,6 +117,17 @@ def get_vla(cfg):
             dflash_temporal_bypass_use_pixel_guard=getattr(
                 cfg, "dflash_temporal_bypass_use_pixel_guard", True
             ),
+            dflash_temporal_hold_policy=getattr(
+                cfg, "dflash_temporal_hold_policy", "fixed"
+            ),
+            dflash_temporal_adaptive_min_verified_run=getattr(
+                cfg, "dflash_temporal_adaptive_min_verified_run", 2
+            ),
+            dflash_temporal_adaptive_max_anchor_pixel_relative_l2=getattr(
+                cfg,
+                "dflash_temporal_adaptive_max_anchor_pixel_relative_l2",
+                0.03,
+            ),
             dflash_temporal_prefill_tree=getattr(
                 cfg, "dflash_temporal_prefill_tree", False
             ),

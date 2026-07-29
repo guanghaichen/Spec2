@@ -19,6 +19,10 @@ from openvla.specdecoding.model.dflash import (
     normalize_selected_hidden_variant,
     sample as dflash_sample,
 )# 导入dflash模型、从目标模型提取hidden的函数、从logits采样token的函数
+from openvla.specdecoding.model.temporal_hold import (
+    decide_temporal_hold,
+    normalize_temporal_hold_policy,
+)
 from openvla.specdecoding.model.cnets import EConfig
 from transformers import AutoTokenizer
 import os
@@ -643,6 +647,9 @@ class SpecVLAforActionPrediction(nn.Module):
             dflash_temporal_prefix_cert_tokens=0,
             dflash_temporal_bypass_max_pixel_relative_l2=0.0,
             dflash_temporal_bypass_use_pixel_guard=True,
+            dflash_temporal_hold_policy="fixed",
+            dflash_temporal_adaptive_min_verified_run=2,
+            dflash_temporal_adaptive_max_anchor_pixel_relative_l2=0.03,
             dflash_temporal_prefill_tree=False,
             dflash_temporal_prefill_tree_max_candidates=3,
             dflash_temporal_prefill_tree_min_history=2,
@@ -722,6 +729,23 @@ class SpecVLAforActionPrediction(nn.Module):
         self.dflash_temporal_bypass_use_pixel_guard = bool(
             dflash_temporal_bypass_use_pixel_guard
         )
+        self.dflash_temporal_hold_policy = normalize_temporal_hold_policy(
+            dflash_temporal_hold_policy
+        )
+        self.dflash_temporal_adaptive_min_verified_run = int(
+            dflash_temporal_adaptive_min_verified_run
+        )
+        self.dflash_temporal_adaptive_max_anchor_pixel_relative_l2 = float(
+            dflash_temporal_adaptive_max_anchor_pixel_relative_l2
+        )
+        if self.dflash_temporal_adaptive_min_verified_run < 2:
+            raise ValueError(
+                "dflash_temporal_adaptive_min_verified_run must be >= 2."
+            )
+        if self.dflash_temporal_adaptive_max_anchor_pixel_relative_l2 <= 0.0:
+            raise ValueError(
+                "dflash_temporal_adaptive_max_anchor_pixel_relative_l2 must be > 0."
+            )
         self.dflash_temporal_prefill_tree = bool(dflash_temporal_prefill_tree)
         self.dflash_temporal_prefill_tree_max_candidates = int(
             dflash_temporal_prefill_tree_max_candidates
@@ -865,6 +889,7 @@ class SpecVLAforActionPrediction(nn.Module):
         self._dflash_previous_prompt_pooled_signature = None
         self._dflash_previous_first_action_probs = None
         self._dflash_previous_pixel_signature = None
+        self._dflash_last_target_pixel_signature = None
         self._dflash_previous_action_tokens = None
         self._dflash_action_history_cpu = []
         self._dflash_previous_verified_action_tokens = None
@@ -1077,6 +1102,7 @@ class SpecVLAforActionPrediction(nn.Module):
         self._dflash_previous_prompt_pooled_signature = None
         self._dflash_previous_first_action_probs = None
         self._dflash_previous_pixel_signature = None
+        self._dflash_last_target_pixel_signature = None
         self._dflash_previous_action_tokens = None
         self._dflash_action_history_cpu = []
         self._dflash_previous_verified_action_tokens = None
@@ -2203,12 +2229,16 @@ class SpecVLAforActionPrediction(nn.Module):
             model_inputs["attention_mask"] = torch.cat(
                 [model_inputs["attention_mask"], attention_extension], dim=1
             )
-        collect_pixel_signature = bool(
+        collect_previous_pixel_diagnostics = bool(
             self.dflash_verify_skip_mode == "shadow"
             or (
                 self.dflash_temporal_bypass_max_pixel_relative_l2 > 0.0
                 and self.dflash_temporal_bypass_use_pixel_guard
             )
+        )
+        collect_pixel_signature = bool(
+            collect_previous_pixel_diagnostics
+            or self.dflash_temporal_hold_policy == "adaptive"
         )
         current_pixel_signature = (
             self._dflash_pixel_signature(model_inputs.get("pixel_values"))
@@ -2217,8 +2247,10 @@ class SpecVLAforActionPrediction(nn.Module):
         )
         pixel_temporal_cosine = None
         pixel_temporal_relative_l2 = None
+        target_anchor_pixel_relative_l2 = None
         if (
-            current_pixel_signature is not None
+            collect_previous_pixel_diagnostics
+            and current_pixel_signature is not None
             and self._dflash_previous_pixel_signature is not None
             and current_pixel_signature.shape
             == self._dflash_previous_pixel_signature.shape
@@ -2242,8 +2274,28 @@ class SpecVLAforActionPrediction(nn.Module):
                     ).clamp_min(1e-6)
                 )[0].item()
             )
+        if (
+            self.dflash_temporal_hold_policy == "adaptive"
+            and self._dflash_consecutive_verify_skips == 1
+            and current_pixel_signature is not None
+            and self._dflash_last_target_pixel_signature is not None
+            and current_pixel_signature.shape
+            == self._dflash_last_target_pixel_signature.shape
+        ):
+            target_anchor_pixel_relative_l2 = float(
+                (
+                    torch.linalg.vector_norm(
+                        current_pixel_signature
+                        - self._dflash_last_target_pixel_signature,
+                        dim=-1,
+                    )
+                    / torch.linalg.vector_norm(
+                        self._dflash_last_target_pixel_signature, dim=-1
+                    ).clamp_min(1e-6)
+                )[0].item()
+            )
 
-        temporal_prefill_bypass_active = bool(
+        base_temporal_hold_eligible = bool(
             self.dflash_verify_skip_mode == "active"
             and self.dflash_temporal_bypass_max_pixel_relative_l2 > 0.0
             and (
@@ -2258,13 +2310,44 @@ class SpecVLAforActionPrediction(nn.Module):
             and self._dflash_previous_action_tokens.shape[1] >= max_new_tokens
             and self._dflash_verified_action_run_length
             >= self.dflash_verify_skip_min_stable_actions
-            and self._dflash_consecutive_verify_skips
-            < self.dflash_verify_skip_max_consecutive
         )
+        temporal_hold_decision = decide_temporal_hold(
+            policy=self.dflash_temporal_hold_policy,
+            base_eligible=base_temporal_hold_eligible,
+            consecutive_holds=self._dflash_consecutive_verify_skips,
+            max_consecutive_holds=self.dflash_verify_skip_max_consecutive,
+            verified_action_run_length=self._dflash_verified_action_run_length,
+            adaptive_min_verified_run=(
+                self.dflash_temporal_adaptive_min_verified_run
+            ),
+            anchor_pixel_relative_l2=target_anchor_pixel_relative_l2,
+            adaptive_max_anchor_pixel_relative_l2=(
+                self.dflash_temporal_adaptive_max_anchor_pixel_relative_l2
+            ),
+        )
+        temporal_hold_decision_record = temporal_hold_decision.as_record()
+        temporal_hold_decision_record.update(
+            {
+                "policy": self.dflash_temporal_hold_policy,
+                "consecutive_holds_before": int(
+                    self._dflash_consecutive_verify_skips
+                ),
+                "verified_action_run_length": int(
+                    self._dflash_verified_action_run_length
+                ),
+                "adaptive_min_verified_run": int(
+                    self.dflash_temporal_adaptive_min_verified_run
+                ),
+                "adaptive_max_anchor_pixel_relative_l2": float(
+                    self.dflash_temporal_adaptive_max_anchor_pixel_relative_l2
+                ),
+            }
+        )
+        temporal_prefill_bypass_active = temporal_hold_decision.allow
         if temporal_prefill_bypass_active:
             # This is the only path that skips the mandatory multimodal target
-            # prefill. It is deliberately bounded to a short temporal hold and
-            # must be followed by a target-verified action.
+            # prefill. Fixed mode preserves the legacy budget; adaptive mode
+            # permits at most one evidence-gated extension before forcing target.
             final_action_tokens = self._dflash_previous_action_tokens[
                 :, :max_new_tokens
             ].detach().clone()
@@ -2289,8 +2372,19 @@ class SpecVLAforActionPrediction(nn.Module):
                 "target_logit_shadow_checks": self._target_logit_shadow_checks,
                 "target_logit_shadow_mismatches": self._target_logit_shadow_mismatches,
                 "verify_skip_mode": self.dflash_verify_skip_mode,
+                "temporal_hold_policy": self.dflash_temporal_hold_policy,
+                "temporal_adaptive_min_verified_run": (
+                    self.dflash_temporal_adaptive_min_verified_run
+                ),
+                "temporal_adaptive_max_anchor_pixel_relative_l2": (
+                    self.dflash_temporal_adaptive_max_anchor_pixel_relative_l2
+                ),
+                "temporal_hold_decision_record": temporal_hold_decision_record,
                 "temporal_prefill_bypass_record": {
                     "pixel_relative_l2": pixel_temporal_relative_l2,
+                    "target_anchor_pixel_relative_l2": (
+                        target_anchor_pixel_relative_l2
+                    ),
                     "max_pixel_relative_l2": (
                         self.dflash_temporal_bypass_max_pixel_relative_l2
                     ),
@@ -2299,6 +2393,10 @@ class SpecVLAforActionPrediction(nn.Module):
                     ),
                     "verified_action_run_length": int(
                         self._dflash_verified_action_run_length
+                    ),
+                    "hold_depth": int(temporal_hold_decision.hold_depth),
+                    "adaptive_extension": bool(
+                        temporal_hold_decision.adaptive_extension
                     ),
                 },
                 "temporal_prefill_fusion_record": None,
@@ -3864,6 +3962,11 @@ class SpecVLAforActionPrediction(nn.Module):
         )
         self._dflash_previous_first_action_probs = current_first_action_probs
         self._dflash_previous_pixel_signature = current_pixel_signature
+        self._dflash_last_target_pixel_signature = (
+            current_pixel_signature.detach().clone()
+            if current_pixel_signature is not None
+            else None
+        )
         if prefill_prefix_cert_succeeded:
             # A trusted suffix must not strengthen the verified-history gate.
             # The next action is forced through strict verification by the
@@ -3935,6 +4038,13 @@ class SpecVLAforActionPrediction(nn.Module):
             "temporal_bypass_use_pixel_guard": (
                 self.dflash_temporal_bypass_use_pixel_guard
             ),
+            "temporal_hold_policy": self.dflash_temporal_hold_policy,
+            "temporal_adaptive_min_verified_run": (
+                self.dflash_temporal_adaptive_min_verified_run
+            ),
+            "temporal_adaptive_max_anchor_pixel_relative_l2": (
+                self.dflash_temporal_adaptive_max_anchor_pixel_relative_l2
+            ),
             "temporal_prefill_tree": self.dflash_temporal_prefill_tree,
             "temporal_prefill_tree_max_candidates": (
                 self.dflash_temporal_prefill_tree_max_candidates
@@ -3943,6 +4053,7 @@ class SpecVLAforActionPrediction(nn.Module):
                 self.dflash_temporal_prefill_tree_min_history
             ),
             "temporal_prefill_fusion_record": prefill_fusion_record,
+            "temporal_hold_decision_record": temporal_hold_decision_record,
             "verify_skip_min_temporal_cosine": self.dflash_verify_skip_min_temporal_cosine,
             "verify_skip_min_stable_actions": self.dflash_verify_skip_min_stable_actions,
             "verify_skip_max_consecutive": self.dflash_verify_skip_max_consecutive,

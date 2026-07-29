@@ -13,7 +13,7 @@
 [OpenVLA](https://github.com/openvla/openvla)。当前仓库仍是研究代码，不是已经定稿的公开复现包。
 所有结论必须同时报告成功率、接受长度和速度；训练准确率不能替代在线 LIBERO 结果。
 
-截至 2026-07-28，最重要的正式结果来自同一个 Golden e200 checkpoint、同一台 RTX 4090、同一 seed 7 和
+截至 2026-07-29，最重要的正式结果来自同一个 Golden e200 checkpoint、同一台 RTX 4090、同一 seed 7 和
 同一 paper-wrapped AR 分母：
 
 | 方法 | 校验性质 | SR | mean step | Speedup | Length |
@@ -41,6 +41,9 @@
   变化门控；速度档固定执行 `target -> hold -> target`。任何 hold 都不增加“已验证历史”，且下一步强制
   回到 target，避免误差连续传播。Goal 正式 500-episode 结果为 SR `0.754`、最后 task 口径 `2.608x`；
   相对 VTPF strict 的 SR 下降 3.6 个百分点、速度提高约 2.03 倍。
+- **VTPF-TD-Adaptive 候选**：与以上正式结果完全隔离。第一跳保持 TD-Fast，第二跳必须同时满足“至少两个
+  target 关键帧给出完全相同的 7-token 动作”和“当前图像相对最近 target 锚点的累计相对 L2 不超过阈值”；
+  两次 hold 后强制 target。该分支尚未完成 50 trials/task，不能提前写入主结果表。
 
 ## 1. 阅读顺序和项目地图
 
@@ -70,6 +73,8 @@
 | 时序 Prefill 树 | `openvla/specdecoding/decode-scripts/run_dflash_temporal_prefill_tree_goal_eval.sh` | golden e200 的 strict/动作组 relaxed 多候选 prefill 树 |
 | VTPF-TD 速度档 | `openvla/specdecoding/decode-scripts/run_dflash_vtpf_temporal_decimation_goal_eval.sh` | target 与单步 hold 交替，跳过整次 prefill |
 | VTPF-TD 保护档 | `openvla/specdecoding/decode-scripts/run_dflash_vtpf_guarded_bypass_goal_eval.sh` | 在单步 hold 前增加当前图像变化门 |
+| VTPF-TD 自适应档 | `openvla/specdecoding/decode-scripts/run_dflash_vtpf_adaptive_decimation_goal_eval.sh` | 仅在双重证据成立时把一次 hold 扩为两次；独立实验入口 |
+| 自适应 hold 决策 | `openvla/specdecoding/model/temporal_hold.py` | 无 CUDA 依赖的固定/风险受限策略与硬上限，可独立单测 |
 | 短前缀认证消融 | `openvla/specdecoding/decode-scripts/run_dflash_vtpf_prefix_cert_goal_eval.sh` | target 精确认证短前缀后信任尾部；当前净收益很小 |
 | 时序门校准 | `openvla/specdecoding/test-speed/analyze_dflash_temporal_shadow.py` | 从 shadow summary 统计覆盖、错误和 95% 风险上界 |
 
@@ -170,6 +175,7 @@ parallel_draft=False
 | 首 token 哨兵时序级联 | 本项目，受 HeiSD 时序相似性分析启发但不使用离线轨迹库 | 普通路径由当前 `t0` 和 prompt hidden 判断是否复用上一动作；target 首次拒绝后立刻切回带真实纠正前缀的 DFlash | 当前推理端主线 |
 | 验证式时序 Prefill 融合（VTPF） | 本项目 | 连续 3 次 target 确认相同动作后，把历史 `c0..c5` 附在当前 prompt 后；一次必做的多模态 prefill 同时严格校验 `c0..c6`，拒绝后裁掉错误 KV 并回退 DFlash | 降低 target 固定调用数的结构性增量 |
 | 目标锚定时序降采样（VTPF-TD） | 本项目 | target 关键帧与最多一次历史动作保持交替；保护档再加图像变化门，保持帧不积累已验证历史 | 当前 relaxed 主线，直接减少 target prefill 次数 |
+| 风险受限自适应降采样（VTPF-TD-Adaptive） | 本项目 | 保留第一跳；只有 target 动作重复证据和相对最近 target 的累计视觉变化同时通过时才增加第二跳；随后强制 target | 与正式 TD-Fast 隔离的候选推理模块，不需要重训 |
 | 固定成本无损优化 | 本项目的实现诊断 | 目标 `lm_head` 仅投影 256 个动作 token；首 proposal 已被 anchor 判错时不再验证无效后缀；已知历史 proposal 时把 anchor 与整块校验融合为一次 target forward | 当前默认开启 |
 
 因此，当前论文主线应表述为：**一层块并行 Draft 产生候选；strict VTPF 把可信历史 proposal 的校验并入
@@ -797,6 +803,16 @@ prefill。它建立在 VTPF 已有的 target-verified 历史和逐 episode 状�
   作为额外门；仍最多保持一帧。
 - **速度档（VTPF-TD-Fast）**：不读取图像门，稳定历史存在后固定交替 target 与单步保持，获得接近 50% 的
   target prefill 跳过率。它的假设是 LIBERO 20 Hz 控制下相邻观测的最优动作具有短时平滑性。
+- **自适应档（VTPF-TD-Adaptive，待正式评测）**：第一帧 hold 与 Fast 完全一致；准备连续保持第二帧时，
+  必须满足 `verified_action_run_length>=2`，即最近两个真实 target 关键帧输出完全相同的 7-token 动作，并且
+  当前 `16x16` 图像签名相对**最近 target 关键帧**的累计相对 L2 不超过 `0.03`。通过后只多保持这一帧，
+  下一帧无条件 target；任一证据缺失或超阈值都立即 target。它不是逐帧小变化的累加放行，因此缓慢漂移不能
+  通过反复更新参考帧绕过风险门。
+
+自适应档的计算约束同样是设计的一部分：每个动作只做一次很小的池化；只有申请第二跳时才计算一次锚点 L2
+并取标量，不计算 target hidden、logits 或额外 Draft forward。旧 Fast 的最后 task timing 中，hold/target
+均值约为 `0.000238s/0.139699s`，所以一次成功扩展省下的是完整 target 路径，而不是用一个接近 target 成本的
+门控换取名义跳过。该策略的最坏连续陈旧度从一帧增至两帧，且被硬上限截断；它仍属于 relaxed 推理。
 
 保持帧在推进意义上记录 `Length=7`，但 `verified_accepted_tokens=0`、`compared_tokens=0`，并单独记录
 `prefill_bypass`；因此论文不能把这部分称为 target 接受长度，只能称为“执行推进长度”或“目标调用跳过率”。
@@ -1207,7 +1223,33 @@ SEED=7 SYNC_CUDA_TIMING=False TIMING_SCOPE=last_task \
 当前结果已经达到“少量成功率代价、显著加速”的研发目标。后续需要多 seed、其它 suite 的独立 draft 和
 真机实验验证泛化，不能把单个 Goal seed 直接外推为全场景结论。
 
-### 6.11 已废弃的旧余弦课程早期快照
+### 6.11 2026-07-29 风险受限自适应降采样候选
+
+固定 `T-H-T` 已把 target 比例压到约 50%，但所有稳定段和变化段都使用同一个保持预算。新增实验分支
+`VTPF-TD-Adaptive` 只尝试解决这个调度问题，不改 Draft、checkpoint、VTPF 校验或动作接受规则：
+
+```text
+普通段：T -> H -> T
+高证据稳定段：T(A) -> H(A) -> T(A) -> H(A) -> H(A) -> T
+                                               ^ 第二次 H 才需要双重门
+```
+
+双重门由在线已有证据组成：`T(A)` 的两个最近 target 关键帧必须给出完全相同的 7-token 动作，且第二跳时的
+当前图像相对最近 target 锚点的累计相对 L2 必须 `<=0.03`。hold 不会增加 verified run，参考图像也只在
+真实 target 路径更新；两次连续 hold 后由硬上限强制 target。因此不存在用自身重复输出伪造稳定证据，或用
+逐帧更新参考图像掩盖慢漂移的问题。
+
+阈值不是按当前 50-trial 结果调出的：历史带图像诊断的 exact-action 样本中，单步 pixel relative L2 的
+中位数约 `0.0048`、p90 约 `0.0331`，所以预注册 `0.03` 作为保守工作点。正式 TD-Fast 最后 task 中，hold
+和 target 路径均值约为 `0.000238s/0.139699s`；自适应门只在第二跳候选上增加一次小池化后的 L2 标量读取，
+成功扩展时省掉完整 target 路径。另一方面，历史相邻 target 完整动作 exact 比例只有约 `14.1%`，因此本分支
+预期是有限但真实的提速，而不是对 `3x` 作无依据承诺。
+
+输出 summary 新增 `generation.temporal_hold`：必须同时查看 `hold_rate`、
+`adaptive_extended_holds/adaptive_extension_candidates`、`target_prefill_actions`、拒绝原因直方图、SR 和 timing。
+在完整 50 trials/task 结束前，该分支保持“候选”状态，不能覆盖 6.10 的正式 TD-Fast 证据。
+
+### 6.12 已废弃的旧余弦课程早期快照
 
 2026-07-15，旧 3090 主训练在 step 500、warmup 进行到一半时：
 
@@ -1461,7 +1503,22 @@ CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=200 NUM_TRIALS_PER_TASK=50 \
 ```
 
 两者都必须在同机 paper AR 下计算 Speedup。速度档已完成 50 trials/task；保护档可作为 SR-Speed Pareto
-对照，尚未跑满 500 episodes。PrefixCert 仅用于固定成本消融：
+对照，尚未跑满 500 episodes。
+
+风险受限自适应档是独立的单组入口，必须显式指定 checkpoint，避免解析到旧 golden 目录。下面正是 Minimal
+epoch 100 的 50 trials/task 命令；它不会顺带运行线性、VTPF strict 或旧 TD-Fast：
+
+```bash
+SPEC_CKPT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/minimal-100epoch/epoch_100_step_044800 \
+EVAL_EPOCH=100 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+SEED=7 SYNC_CUDA_TIMING=False TIMING_SCOPE=last_task \
+  bash openvla/specdecoding/decode-scripts/run_dflash_vtpf_adaptive_decimation_goal_eval.sh
+```
+
+默认预注册参数为 `min_verified_run=2`、`anchor_pixel_relative_l2<=0.03`、`max_consecutive=2`。如需后续消融，
+只能显式覆盖 `DFLASH_TEMPORAL_ADAPTIVE_MIN_VERIFIED_RUN` 或
+`DFLASH_TEMPORAL_ADAPTIVE_MAX_ANCHOR_PIXEL_RELATIVE_L2`，并在 run id 中保留参数；不得用正式结果反向挑阈值。
+PrefixCert 仅用于固定成本消融：
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=200 NUM_TRIALS_PER_TASK=10 \
@@ -1648,6 +1705,7 @@ AR、strict、relaxed 必须同机、同 GPU、串行执行。4090 是正式速�
 | `run_dflash_temporal_prefill_tree_goal_eval.sh` | golden e200 的时序多候选 prefill 树，参数为 `strict` 或 `relaxed` |
 | `run_dflash_vtpf_temporal_decimation_goal_eval.sh` | VTPF-TD 速度档：target 与单步 hold 交替 |
 | `run_dflash_vtpf_guarded_bypass_goal_eval.sh` | VTPF-TD 保护档：图像变化门控的单步 hold |
+| `run_dflash_vtpf_adaptive_decimation_goal_eval.sh` | 单组 VTPF-TD 自适应档：双重证据才扩展第二次 hold，随后强制 target |
 | `run_dflash_vtpf_prefix_cert_goal_eval.sh` | PrefixCert 固定成本消融，不是推荐主线 |
 | `analyze_dflash_temporal_shadow.py` | 汇总时序门覆盖率、错误率和 Wilson 风险上界 |
 | `run_dflash_action_rnn_goal_4way_eval.sh` | 同一 Goal checkpoint 的 RNN/树 × strict/动作组四路消融 |
@@ -1722,8 +1780,8 @@ git pull --ff-only origin main
 1. 3090 继续训练 Minimal Draft；Action-RNN 在线消融未显示净收益，不再重启复杂 joint 训练。
 2. 比较相同推理配置下 golden/minimal 的 SR、Length、Speedup；若相当，后续
    训练消融以 minimal 为干净基线，若明显退化则直接回退 golden。
-3. VTPF-TD-Fast 已完成 50 trials/task；下一步补 Guard 正式结果与至少两个额外 seed。
-4. 消融 hold 深度、视觉门、PrefixCert 与 strict VTPF，明确收益来自整次 prefill 省略而非 Length 记账。
+3. VTPF-TD-Fast 已完成 50 trials/task；先按预注册阈值完成 Adaptive 单组正式评测，再决定是否进入主表。
+4. 消融固定/自适应 hold 深度、视觉门、PrefixCert 与 strict VTPF，明确收益来自整次 prefill 省略而非 Length 记账。
 5. 在其它 suite 的各自权重和真实机械臂上验证短时保持的稳定性。
 
 ### 11.2 论文需要的完整证据

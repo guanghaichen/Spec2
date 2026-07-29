@@ -1354,8 +1354,18 @@ CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=200 NUM_TRIALS_PER_TASK=10 \
   bash openvla/specdecoding/decode-scripts/run_dflash_vtpf_prefix_cert_goal_eval.sh
 ```
 
-Minimal Draft 训练完成后只跑 VTPF strict 和 VTPF-TD-Fast 两组。它没有 Action-RNN 权重，因此第一条命令
-必须显式关闭 RNN；第二个 launcher 内部已经强制关闭。先确认 checkpoint 目录名再执行：
+Minimal Draft 的中途/最终 checkpoint 可用三路入口串行比较：线性 DFlash strict、VTPF strict、
+VTPF-TD-Fast。它会强制三路使用同一个 checkpoint、RNN-off、seed 和计时协议，并把日志写入三个带 epoch
+标识的独立目录；中断后可用 `START_CASE=2` 或 `3` 续跑。e100 示例：
+
+```bash
+SPEC_CKPT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/minimal-100epoch/epoch_100_step_044800 \
+EVAL_EPOCH=100 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+  bash openvla/specdecoding/decode-scripts/run_dflash_minimal_goal_3way_eval.sh
+```
+
+它没有 Action-RNN 权重，因此线性 strict 和 VTPF strict 都必须关闭 RNN；三路入口已经统一处理。若只想单独
+运行正式 e200 的 VTPF/VTPF-TD，可使用下面两条细粒度命令。先确认 checkpoint 目录名再执行：
 
 ```bash
 MINIMAL_CKPT_ROOT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/ckpt_goal_dflash_minimal_1layer_hidden_soft_b16x1_4gpu_packedv2
@@ -1519,6 +1529,7 @@ AR、strict、relaxed 必须同机、同 GPU、串行执行。4090 是正式速�
 | `run_specvla_goal_upstream_compatible_eval.sh` | Goal AR+strict+relaxed 一键复现 |
 | `run_specvla_main_table_eval.sh` | 四 suite strict/relaxed 自动续跑与汇总 |
 | `run_dflash_goal_eval.sh` | 当前 Goal DFlash 单项 strict/relaxed |
+| `run_dflash_minimal_goal_3way_eval.sh` | 同一 Minimal checkpoint 的线性 strict、VTPF strict、VTPF-TD-Fast 串行评测；支持断点续跑 |
 | `run_dflash_temporal_cascade_goal_eval.sh` | strict VTPF 主线：`shadow`、严格 `route`、严格 `prefill`、旧 approximate `cascade` |
 | `run_dflash_temporal_prefill_tree_goal_eval.sh` | golden e200 的时序多候选 prefill 树，参数为 `strict` 或 `relaxed` |
 | `run_dflash_vtpf_temporal_decimation_goal_eval.sh` | VTPF-TD 速度档：target 与单步 hold 交替 |

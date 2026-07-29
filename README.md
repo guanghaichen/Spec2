@@ -535,6 +535,120 @@ SwanLab 的 loss 曲线是最近 20 optimizer step 的窗口均值，可能随 b
 目标校验只输入 `q-1` 个 proposal 是标准 next-token shift：anchor logits 校验第一个 proposal，输入前
 `q-1` 个 proposal 后得到的 logits 分别校验余下 token。最后一个 proposal 不需要再次作为本块输入。
 
+#### 5.1.1 从普通 AR 到 VTPF：计算到底省在哪里
+
+这一节只回答一个问题：一条 7-token 动作从 `t0` 到 `t6` 究竟经过哪些 forward，以及 DFlash、VTPF 和
+VTPF-TD 分别省掉了什么。记当前图像与指令形成的多模态 prompt 为 `P`，Draft proposal 记为
+`d1...d6`，目标模型在对应因果前缀下的 greedy token 记为 `y1...y6`。
+
+普通 OpenVLA 自回归会重复调用目标模型：
+
+```text
+P                         -> target 得到 t0
+P + t0                    -> target 得到 t1
+P + t0 + t1               -> target 得到 t2
+...
+P + t0 + ... + t5         -> target 得到 t6
+```
+
+传统投机解码已经会让目标模型一次校验多个 token，但小 Draft 仍需自回归运行多次才能产生整块 proposal。
+DFlash 改进的是 proposal 产生端：Draft 在一次 forward 中并行给出 `d1...d6`，目标模型仍进行标准的块
+校验。当前普通 DFlash 的首块完整流程为：
+
+```text
+1. 多模态 prefill
+   输入 P -> target 得到可信 t0，并建立 KV(P)
+
+2. target anchor
+   在 KV(P) 后只输入 t0 -> 得到 H(t0)、目标答案 y1，并建立 KV(P,t0)
+
+3. DFlash 块并行生成
+   输入完整 prompt hidden、H(t0) 与动作槽 -> 一次得到 d1...d6
+
+4. target verify
+   在 KV(P,t0) 后只输入 d1...d5 -> 一次得到 y2...y6
+```
+
+步骤 4 在数学上等价于让目标模型看到 `P+t0+d1+...+d5`，但工程上 `P+t0` 已在 KV Cache 中，不会重复
+计算。因果语言模型在每个输入位置预测下一个 token，因此映射关系是：
+
+| 已处理到的位置 | 该位置 logits 校验的 proposal |
+| --- | --- |
+| `t0` | `d1` 是否等于 `y1` |
+| `d1` | `d2` 是否等于 `y2` |
+| `d2` | `d3` 是否等于 `y3` |
+| `d3` | `d4` 是否等于 `y4` |
+| `d4` | `d5` 是否等于 `y5` |
+| `d5` | `d6` 是否等于 `y6` |
+
+例如 `d1,d2,d3` 正确而 `d4` 错误，系统只接受 `d1...d3`，把目标模型在 `d3` 后给出的 `y4` 写作
+correction，并丢弃同一次 forward 中 `d4` 之后的 posterior。原因是后面的 posterior 已经以错误的 `d4`
+为条件，不能代表目标模型在正确前缀上的自回归答案。下一小块以纠正后的 `y4` 为新 anchor，只补 `t5,t6`。
+因此“正确”始终表示与当前目标模型的因果 greedy 路径一致，而不是另有一份离线环境标签。
+
+Prefill 与 verify 虽然都运行 OpenVLA，却不是同等成本。Prefill 要处理当前图像、全部图像 token 和文本
+prompt，并从零建立 KV；anchor/verify 复用已有 KV，只处理 1 个或数个动作 token。4090 阶段 profiler 的
+数量级为：
+
+| 阶段 | 输入与缓存状态 | 实测均值 |
+| --- | --- | ---: |
+| 普通多模态 prefill | 完整图像与 prompt，无 KV | 约 `55.3 ms` |
+| VTPF 融合 prefill | 完整图像与 prompt，再附 6 个历史 token | 约 `54.9 ms` |
+| target anchor | 1 个新动作 token，有 KV | 约 `17.9 ms` |
+| 一层 Draft + Action-RNN | 一次块并行生成 | 约 `1.9 ms` |
+| target verify | 约 5 个新动作 token，有 KV | 约 `18.8 ms` |
+
+`17.9/18.8 ms` 是缓存后的子阶段 profiler，`55.3/54.9 ms` 是完整多模态 prefill，不能当成同一计时盒子
+随意比较；但它们清楚说明两个事实：附加 6 个 token 相对长 prompt 的边际成本不可测，而 batch-1 短序列
+target forward 的固定成本很高，1-token anchor 与 5-token verify 几乎同价。
+
+VTPF 利用的观察是：同一条由 target 确认的 7-token 动作连续重复越久，下一控制步仍完全相同的概率越高。
+若过去至少 3 个 target-verified 动作均为 `C=[c0...c6]`，三次重复只作为候选可靠性门，不会把三份动作
+都送入模型。当前输入实际是：
+
+```text
+当前 P + c0 + c1 + c2 + c3 + c4 + c5
+```
+
+这一次必做的融合 prefill 同时给出 `y0...y6`：prompt 最后位置预测 `y0`，`c0` 位置预测 `y1`，依次到
+`c5` 位置预测 `y6`。若 `C==[y0...y6]`，当前 target 已在当前图像上严格确认整条历史候选，系统直接执行
+`C`；不再运行 target anchor、Draft 或后续 target verify。VTPF 因而不是“把 Draft 放进 prefill”，而是
+用可信历史动作替代 Draft proposal，并把 target 校验融合进 prefill。普通 DFlash 的
+`prefill + anchor + Draft + verify` 在完整命中时被压成一个 `fused prefill`。
+
+若融合 prefill 在 `c4` 首次失败，系统保留已验证的 `c0...c3`，写入 target correction `y4`，裁掉错误
+候选 KV，只让 DFlash 补 `t5,t6`；若 `c0` 就失败，则直接使用 prefill 给出的当前可信 `y0`，再从 `t0`
+进入普通 DFlash。它不会丢掉本次 prefill 后从头重算。
+
+历史尚未稳定到 3 次时，系统仍会在普通 prefill 得到绝对可信 `t0` 后检查：当前 `t0` 是否等于历史
+`t0`，以及当前帧与上一帧“最后 prompt 位置的所选多层 target hidden”余弦相似度是否至少为 `0.99`。
+余弦相似度
+
+```text
+cos(h_now, h_prev) = dot(h_now, h_prev) / (norm(h_now) * norm(h_prev))
+```
+
+衡量的是 OpenVLA 高层上下文表示的方向相似程度，不是 99% 正确概率。相同 `t0` 只能说明第一个动作维度
+一致；高 hidden cosine 进一步筛掉场景或内部状态明显变化的情况。门通过后，历史 `c1...c6` 代替 Draft
+proposal，但仍由当前 target 严格校验。实现把原本分开的 anchor 与 verify 合成一次缓存后 target forward，
+因此这条路由从普通 DFlash 的 3 次 target 调用降为 2 次，并跳过 Draft；该 cosine 只决定 proposal 来源，
+不决定是否接受。
+
+VTPF-TD 再进一步减少跨控制步的 target 调用。Target 重算步正常读取当前观测并保存最终 target-verified
+动作 `A_k`；紧随其后的单步 hold 不运行 prefill、Draft 或 verify，直接再次执行 `A_k`；再下一步强制
+target 回锚。正式速度档形成 `target -> hold -> target -> hold`，所以接近跳过一半目标模型调用。由于 hold
+没有询问当前图像对应的 target 答案，它属于 bounded one-step relaxed 推理，而不是 strict VTPF。
+
+| 路径 | 一条动作中的 target forward | Draft forward | 当前 target 是否裁决 |
+| --- | ---: | ---: | --- |
+| 普通 DFlash 首块完整命中 | 通常至少 3 次：prefill、anchor、verify | 1 次 | 是 |
+| 未满 3 次的严格历史路由 | 2 次：prefill、融合 anchor/verify | 0 次 | 是 |
+| VTPF stable=3 完整命中 | 1 次：融合 prefill | 0 次 | 是 |
+| VTPF-TD hold | 0 次 | 0 次 | 否，下一步强制回锚 |
+
+所以 VTPF strict 的核心收益不是笼统的“少做一次校验”，而是：**把历史候选整条动作的严格校验嵌入本来
+必做的多模态 prefill，在完整命中时同时消除 target anchor、Draft 和后续 target verify。**
+
 ### 5.2 动作组级宽松校验
 
 SpecVLA 原始 relaxed 规则逐 token 判断 `|draft_i-target_i| <= r`，等价于在每个动作维度上分别设置 bin
@@ -606,8 +720,8 @@ token `t0`。本项目不再把这一步只当作启动 token，而把它作为�
    prompt 后，使本来就必须执行的多模态 prefill 在最后 7 个 logits 上同时校验 `c0..c6`。只提交 target
    连续接受的候选；首个拒绝位置写入 target correction，未接受候选的 KV 立即裁掉，余下位置切回 DFlash。
    它不跳过 target，也不增加 target forward，而是让 prefill 同时承担第一块严格验证。
-2. **严格时序路由。** 未进入 VTPF 时，若当前 `t0` 与上一条已验证动作的 `t0` 相同，且最后层 prompt hidden cosine 不低于
-   路由阈值，则优先用上一动作的 `t1..t6` 作为 proposal。目标模型仍按原 strict 规则验证，因此候选错误时
+2. **严格时序路由。** 未进入 VTPF 时，若当前 `t0` 与上一条已验证动作的 `t0` 相同，且最后 prompt 位置的
+   所选多层 target hidden cosine 不低于路由阈值，则优先用上一动作的 `t1..t6` 作为 proposal。目标模型仍按原 strict 规则验证，因此候选错误时
    仍会 partial accept/correction；这层只改变 proposal 来源，不主动放宽目标答案。
 3. **融合哨兵验证。** 历史 proposal 在 anchor 解码前已经存在，因此把
    `[当前 anchor, 历史 proposal[:-1]]` 一次送入 target；这一 causal forward 的各位置 logits 恰好校验整块

@@ -11,8 +11,8 @@ set -euo pipefail
 # minimal 是与主实验完全隔离的简化对照：只保留一层并行 Draft、完整目标上下文、
 # multi-anchor 覆盖、Hidden/Cos 与轻量 Soft-KL；不创建 Action-RNN，也不启用跨
 # Anchor 蒸馏、Domino 交接、hard CE、L1 或 Prefix Survival。
-# 当前 Minimal 正式协议固定为 100 epoch、2 卡、每卡 batch 16、不做梯度累积，
-# 即 global batch=32；TASK_SUITE_NAME 选择四个 LIBERO 子集。
+# 当前 Minimal 正式协议固定为 100 epoch、2 卡、每卡 batch 32、不做梯度累积，
+# 即 global batch=64，与 Goal 正式实验保持一致；TASK_SUITE_NAME 选择四个 LIBERO 子集。
 # stage1/stage2 仅保留用于复现实验历程，不再是推荐主线。
 
 PHASE="${1:-joint}"
@@ -77,7 +77,7 @@ DATAPATH="${DATAPATH:-${DEFAULT_DATAPATH}}"
 
 CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1}"
 NPROC_PER_NODE="${NPROC_PER_NODE:-2}"
-BATCH_SIZE="${BATCH_SIZE:-16}"
+BATCH_SIZE="${BATCH_SIZE:-32}"
 GRAD_ACCUM_STEPS="${GRAD_ACCUM_STEPS:-1}"
 NUM_DRAFT_LAYERS="${NUM_DRAFT_LAYERS:-1}"
 SAVE_EVERY="${SAVE_EVERY:-10}"
@@ -87,6 +87,7 @@ NUM_WORKERS="${NUM_WORKERS:-1}"
 HDF5_BLOCK_SIZE="${HDF5_BLOCK_SIZE:-64}"
 SWANLAB_LOG_EVERY_STEPS="${SWANLAB_LOG_EVERY_STEPS:-20}"
 SWANLAB_DETAIL_EVERY_STEPS="${SWANLAB_DETAIL_EVERY_STEPS:-200}"
+SWANLAB_MODE="${SWANLAB_MODE:-cloud}"
 IO_NICE_CLASS="${IO_NICE_CLASS:-2}"
 IO_NICE_LEVEL="${IO_NICE_LEVEL:-7}"
 CPU_NICE_LEVEL="${CPU_NICE_LEVEL:-10}"
@@ -244,6 +245,7 @@ PROCESS_PRIORITY=ionice(${IO_NICE_CLASS},${IO_NICE_LEVEL}) nice(${CPU_NICE_LEVEL
 STAGE1_CKPT=${STAGE1_CKPT:-N/A}
 SWANLAB_RUN=${RUN_NAME}
 SWANLAB_PROJECT=${SWANLAB_PROJECT}
+SWANLAB_MODE=${SWANLAB_MODE}
 ========================================
 EOF
 
@@ -327,4 +329,5 @@ ionice -c "${IO_NICE_CLASS}" -n "${IO_NICE_LEVEL}" \
   --swanlab_log_every_steps "${SWANLAB_LOG_EVERY_STEPS}" \
   --swanlab_detail_every_steps "${SWANLAB_DETAIL_EVERY_STEPS}" \
   --swanlab_project "${SWANLAB_PROJECT}" \
+  --swanlab_mode "${SWANLAB_MODE}" \
   --val_split 0

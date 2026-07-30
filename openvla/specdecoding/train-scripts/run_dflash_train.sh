@@ -11,8 +11,8 @@ set -euo pipefail
 # minimal 是与主实验完全隔离的简化对照：只保留一层并行 Draft、完整目标上下文、
 # multi-anchor 覆盖、Hidden/Cos 与轻量 Soft-KL；不创建 Action-RNN，也不启用跨
 # Anchor 蒸馏、Domino 交接、hard CE、L1 或 Prefix Survival。
-# 当前 Minimal 正式协议固定为 100 epoch、2 卡、每卡 batch 16、梯度累积 2，
-# 保持旧四卡实验的 global batch=64；TASK_SUITE_NAME 选择四个 LIBERO 子集。
+# 当前 Minimal 正式协议固定为 100 epoch、2 卡、每卡 batch 16、不做梯度累积，
+# 即 global batch=32；TASK_SUITE_NAME 选择四个 LIBERO 子集。
 # stage1/stage2 仅保留用于复现实验历程，不再是推荐主线。
 
 PHASE="${1:-joint}"
@@ -78,7 +78,7 @@ DATAPATH="${DATAPATH:-${DEFAULT_DATAPATH}}"
 CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1}"
 NPROC_PER_NODE="${NPROC_PER_NODE:-2}"
 BATCH_SIZE="${BATCH_SIZE:-16}"
-GRAD_ACCUM_STEPS="${GRAD_ACCUM_STEPS:-2}"
+GRAD_ACCUM_STEPS="${GRAD_ACCUM_STEPS:-1}"
 NUM_DRAFT_LAYERS="${NUM_DRAFT_LAYERS:-1}"
 SAVE_EVERY="${SAVE_EVERY:-10}"
 SEED="${SEED:-7}"

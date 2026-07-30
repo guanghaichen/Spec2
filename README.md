@@ -483,10 +483,10 @@ L_minimal = 1.00 * SmoothL1(hidden_draft, hidden_teacher)
           + 0.05 * KL(teacher_action_distribution || draft_action_distribution)
 ```
 
-正式协议固定为 100 epoch、两卡、每卡 batch 16、梯度累积 2、每 rank 一个 DataLoader worker；global batch
-仍为 64，因此少卡不会顺手改变优化尺度。学习率 `2e-5`、warmup 1000 step、slot decay、位置平衡、hidden
+正式协议固定为 100 epoch、两卡、每卡 batch 16、梯度累积 1、每 rank 一个 DataLoader worker；global batch
+为 32。学习率 `2e-5`、warmup 1000 step、slot decay、位置平衡、hidden
 noise、packed sampler 和每 10 epoch checkpoint 间隔保持不变。新输出目录按子集隔离，例如 Goal 为
-`ckpt_goal_dflash_minimal_1layer_hidden_soft_b16x2_2gpu_packedv2`，绝不复用 Golden 或旧四卡目录。
+`ckpt_goal_dflash_minimal_1layer_hidden_soft_b16x1_2gpu_packedv2`，绝不复用 Golden 或旧四卡目录。
 
 ### 4.5 SwanLab 指标怎样读
 
@@ -1490,7 +1490,7 @@ TASK_SUITE_NAME=libero_10 GPU_ID=7 KEEP_RAW=False \
 
 ### 7.2 3090 两卡、100-epoch Minimal 训练
 
-当前四个子集统一使用 `minimal`。默认每卡 batch 16、梯度累积 2、global batch 64、`NUM_WORKERS=1`、
+当前四个子集统一使用 `minimal`。默认每卡 batch 16、梯度累积 1、global batch 32、`NUM_WORKERS=1`、
 100 epoch；只需选择两张可用卡和子集：
 
 ```bash
@@ -1508,17 +1508,18 @@ TASK_SUITE_NAME=libero_10 CUDA_VISIBLE_DEVICES=0,1 \
 ```
 
 `CUDA_VISIBLE_DEVICES` 可以换成任意两张空闲卡；脚本会检查卡数必须与默认 `NPROC_PER_NODE=2` 一致。
-两卡时用梯度累积 2 是为了保持旧四卡 `16*1*4=64` 的全局 batch，不是增加有效 batch。每个 DDP rank 使用
-一个 worker，因此系统中共有两个只读 worker；`prefetch_factor=1` 和低优先级 IO 继续保护共享磁盘。
+两卡 `16x1` 表示每个 DDP rank 每次读取 16 条、每个 micro-batch 立即更新，所以 global batch 为
+`16*1*2=32`。每个 rank 使用一个 worker，因此系统中共有两个只读 worker；`prefetch_factor=1`
+和低优先级 IO 继续保护共享磁盘。
 
 四个默认数据/输出会按 `TASK_SUITE_NAME` 自动绑定：
 
 | suite | packed v2 | 默认输出目录 |
 | --- | --- | --- |
-| `libero_goal` | `dflash_goal_dataset_envfix_20260714_packed_v2.h5` | `ckpt_goal_dflash_minimal_1layer_hidden_soft_b16x2_2gpu_packedv2` |
-| `libero_object` | `dflash_object_dataset_packed_v2.h5` | `ckpt_object_dflash_minimal_1layer_hidden_soft_b16x2_2gpu_packedv2` |
-| `libero_spatial` | `dflash_spatial_dataset_packed_v2.h5` | `ckpt_spatial_dflash_minimal_1layer_hidden_soft_b16x2_2gpu_packedv2` |
-| `libero_10` | `dflash_10_dataset_packed_v2.h5` | `ckpt_10_dflash_minimal_1layer_hidden_soft_b16x2_2gpu_packedv2` |
+| `libero_goal` | `dflash_goal_dataset_envfix_20260714_packed_v2.h5` | `ckpt_goal_dflash_minimal_1layer_hidden_soft_b16x1_2gpu_packedv2` |
+| `libero_object` | `dflash_object_dataset_packed_v2.h5` | `ckpt_object_dflash_minimal_1layer_hidden_soft_b16x1_2gpu_packedv2` |
+| `libero_spatial` | `dflash_spatial_dataset_packed_v2.h5` | `ckpt_spatial_dflash_minimal_1layer_hidden_soft_b16x1_2gpu_packedv2` |
+| `libero_10` | `dflash_10_dataset_packed_v2.h5` | `ckpt_10_dflash_minimal_1layer_hidden_soft_b16x1_2gpu_packedv2` |
 
 Goal 已有权重已整理到 `Draft_checkpoint/goal/epoch_100_step_044800`，继续作为正式 e100，不需要按新目录重训。其它子集的
 新 HDF5 会携带 `task_suite_name`；训练入口同时检查数据元数据与 OpenVLA `norm_stats`，错配会在训练前报错。
@@ -1848,7 +1849,7 @@ AR、strict、relaxed 必须同机、同 GPU、串行执行。4090 是正式速�
 | `pack_dflash_hdf5.py` | 将既有 v1 数据一次性迁移为 packed v2；日常无需单独调用 |
 | `benchmark_dflash_hdf5.py` | 四进程只读 A/B 测试 legacy v1 与 packed v2 的真实数据吞吐 |
 | `run_dflash_train.sh joint` | Golden 兼容入口：200 epoch 高维主导 Base/Final 线性交接 |
-| `run_dflash_train.sh minimal` | 当前训练主线：四子集统一 100 epoch、两卡 global batch 64、一层 Draft + multi-anchor + Hidden/Cos/Soft KL |
+| `run_dflash_train.sh minimal` | 当前训练主线：四子集统一 100 epoch、两卡 global batch 32、一层 Draft + multi-anchor + Hidden/Cos/Soft KL |
 | `run_dflash_train.sh stage1/stage2` | 仅用于复现已废弃的两阶段消融 |
 
 `train_dflash_libero_goal.py` 是底层训练实现，不建议日常手写几十个 CLI 参数。历史单次课程仍保留在 Python

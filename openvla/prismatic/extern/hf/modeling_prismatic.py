@@ -10,6 +10,7 @@ OpenVLAForActionPrediction token → bin index → action value（可选返回 h
 spec在原本的代码上做了什么：在基类里指定了本地的SpeculativeGenerationMixin（指定generate函数，以免库不一致）；语言模型换了本地的LlamaSpecForCausalLM；在VLM中增加了树验证的分支；增加了保存首尾层hidden states的功能，生成数据
 """
 
+import inspect
 import logging
 from dataclasses import dataclass
 from functools import partial
@@ -265,11 +266,63 @@ class PrismaticForConditionalGeneration(PrismaticPreTrainedModel):
                 config.text_config, attn_implementation=config._attn_implementation
             )
 
+        language_forward_parameters = inspect.signature(self.language_model.forward).parameters
+        self._language_forward_parameters = frozenset(language_forward_parameters)
+        self._language_forward_accepts_kwargs = any(
+            parameter.kind == inspect.Parameter.VAR_KEYWORD
+            for parameter in language_forward_parameters.values()
+        )
+
         self.vocab_size = config.text_config.vocab_size
         self.pad_token_id = config.pad_token_id
 
         # HF 标准调用，会触发 _init_weights 并设置 gradient checkpointing
         self.post_init()
+
+    def _run_language_model(
+        self,
+        *,
+        num_logits_to_keep: int = 0,
+        logit_token_range: Optional[Tuple[int, int]] = None,
+        **kwargs: Any,
+    ) -> Any:
+        """Call either the stock HF LLM or the speculative LLM with compatible kwargs."""
+        supports_num_logits = (
+            self._language_forward_accepts_kwargs
+            or "num_logits_to_keep" in self._language_forward_parameters
+        )
+        supports_token_range = (
+            self._language_forward_accepts_kwargs
+            or "logit_token_range" in self._language_forward_parameters
+        )
+        if supports_num_logits:
+            kwargs["num_logits_to_keep"] = num_logits_to_keep
+        if supports_token_range:
+            kwargs["logit_token_range"] = logit_token_range
+
+        output = self.language_model(**kwargs)
+        needs_num_logits_fallback = num_logits_to_keep > 0 and not supports_num_logits
+        needs_token_range_fallback = logit_token_range is not None and not supports_token_range
+        if not (needs_num_logits_fallback or needs_token_range_fallback):
+            return output
+        if not hasattr(output, "logits"):
+            raise RuntimeError(
+                "Reduced-logit fallback requires return_dict=True from the language model."
+            )
+
+        logits = output.logits
+        if needs_num_logits_fallback:
+            logits = logits[:, -num_logits_to_keep:, :]
+        if needs_token_range_fallback:
+            token_start, token_end = (int(value) for value in logit_token_range)
+            if not 0 <= token_start < token_end <= logits.shape[-1]:
+                raise ValueError(
+                    "logit_token_range must be inside the language-model vocabulary: "
+                    f"got [{token_start}, {token_end}) for vocab_size={logits.shape[-1]}."
+                )
+            logits = logits[..., token_start:token_end]
+        output.logits = logits
+        return output
 
     # === `PreTrainedModel` 样板方法 ===
     def get_input_embeddings(self) -> nn.Module:
@@ -354,7 +407,7 @@ class PrismaticForConditionalGeneration(PrismaticPreTrainedModel):
             # === 核心是LlamaSpecForCausalLM
             # === 传入 tree 结构的 inputs_embeds + position_ids + 自定义 attention_mask ，让 LLM 一次 forward 验证整棵树，输出所有候选位置的 logits ===
             # === 后续的逻辑（在 eagenerate 、 tree_decoding 等函数中）会根据这些 logits 决定接受/拒绝哪些草稿 token ===
-            language_model_output = self.language_model(
+            language_model_output = self._run_language_model(
                 input_ids=None,# 不传 input_ids ，只传 inputs_embeds （草稿 token 的 embedding 是手动算好的）
                 attention_mask=attention_mask,# attention_mask 是树结构的 mask，不是简单的 causal mask
                 position_ids=position_ids,# 传 position_ids （手动指定位置编码）
@@ -378,7 +431,7 @@ class PrismaticForConditionalGeneration(PrismaticPreTrainedModel):
             assert labels is None, "Unexpected key `labels` provided during cached generation!"
 
 
-            language_model_output = self.language_model(
+            language_model_output = self._run_language_model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 position_ids=None,
@@ -399,7 +452,7 @@ class PrismaticForConditionalGeneration(PrismaticPreTrainedModel):
             assert (input_ids is not None) and (inputs_embeds is None), "Missing `input_ids` in language-only forward!"
             assert past_key_values is None, "Unexpected key `past_key_values` provided during language-only forward!"
 
-            language_model_output = self.language_model(
+            language_model_output = self._run_language_model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 position_ids=None,
@@ -486,7 +539,7 @@ class PrismaticForConditionalGeneration(PrismaticPreTrainedModel):
                 )
                 multimodal_labels = torch.cat([labels[:, :1], projected_patch_labels, labels[:, 1:]], dim=1)
             # 送入语言模型
-            language_model_output = self.language_model(
+            language_model_output = self._run_language_model(
                 input_ids=None,
                 attention_mask=multimodal_attention_mask,
                 position_ids=multimodal_position_ids,

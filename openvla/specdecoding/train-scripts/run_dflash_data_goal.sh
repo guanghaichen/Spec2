@@ -86,9 +86,32 @@ for path in "${VLA_PATH}" "${RLDS_ROOT}" "${RLDS_ROOT}/${DATASET_NAME}"; do
 done
 mkdir -p "$(dirname "${OUT_FILE}")"
 KEEP_RAW="${KEEP_RAW:-False}"
+KEEP_FAILED_OUTPUTS="${KEEP_FAILED_OUTPUTS:-False}"
 PACK_COPY_BATCH_SIZE="${PACK_COPY_BATCH_SIZE:-16}"
 SERIALIZE_PACKING="${SERIALIZE_PACKING:-True}"
 PACK_LOCK_FILE="${PACK_LOCK_FILE:-${DEFAULT_DATA_ROOT}/.dflash_hdf5_pack.lock}"
+
+# A failed generator can leave a valid HDF5 header with zero samples. Such a
+# file is not resumable and used to look like a real dataset in the data root.
+RAW_OUT_EXISTED_BEFORE=False
+OUT_EXISTED_BEFORE=False
+[[ -e "${RAW_OUT_FILE}" ]] && RAW_OUT_EXISTED_BEFORE=True
+[[ -e "${OUT_FILE}" ]] && OUT_EXISTED_BEFORE=True
+cleanup_failed_outputs() {
+  local exit_code=$?
+  trap - EXIT
+  if [[ "${exit_code}" -ne 0 && "${KEEP_FAILED_OUTPUTS}" != "True" ]]; then
+    if [[ "${RAW_OUT_EXISTED_BEFORE}" == "False" ]]; then
+      rm -f "${RAW_OUT_FILE}"
+    fi
+    if [[ "${OUT_EXISTED_BEFORE}" == "False" ]]; then
+      rm -f "${OUT_FILE}"
+    fi
+    echo "数据生成失败；已清理本次产生的不完整文件。" >&2
+  fi
+  exit "${exit_code}"
+}
+trap cleanup_failed_outputs EXIT
 
 echo "========== DFlash ${TASK_SUITE_NAME} 数据生成 =========="
 echo "MODE=${MODE}"
@@ -100,6 +123,7 @@ echo "DATASET_NAME=${DATASET_NAME}"
 echo "RAW_OUT_FILE=${RAW_OUT_FILE}"
 echo "OUT_FILE=${OUT_FILE} (packed v2，训练读取此文件)"
 echo "KEEP_RAW=${KEEP_RAW}"
+echo "KEEP_FAILED_OUTPUTS=${KEEP_FAILED_OUTPUTS}"
 echo "SERIALIZE_PACKING=${SERIALIZE_PACKING}"
 echo "SEED=${SEED}"
 echo "MAX_SAMPLES=${MAX_SAMPLES:-all}"

@@ -58,16 +58,16 @@ OUTPUT_STEM="dflash_${SUITE_SLUG}_dataset"
 
 case "${MODE}" in
   smoke)
-    RAW_OUT_FILE="${RAW_OUT_FILE:-${DEFAULT_DATA_ROOT}/${OUTPUT_STEM}_smoke_raw_v1.h5}"
+    RAW_OUT_FILE="${RAW_OUT_FILE:-${DEFAULT_DATA_ROOT}/.dflash_work/${OUTPUT_STEM}_smoke_raw_v1.h5}"
     OUT_FILE="${OUT_FILE:-${DEFAULT_DATA_ROOT}/${OUTPUT_STEM}_smoke_packed_v2.h5}"
     MAX_SAMPLES="${MAX_SAMPLES:-32}"
     ;;
   full)
     if [[ "${TASK_SUITE_NAME}" == "libero_goal" ]]; then
-      RAW_OUT_FILE="${RAW_OUT_FILE:-${DEFAULT_DATA_ROOT}/dflash_goal_dataset_envfix_20260714.h5}"
+      RAW_OUT_FILE="${RAW_OUT_FILE:-${DEFAULT_DATA_ROOT}/.dflash_work/dflash_goal_dataset_envfix_20260714_raw_v1.h5}"
       OUT_FILE="${OUT_FILE:-${DEFAULT_DATA_ROOT}/dflash_goal_dataset_envfix_20260714_packed_v2.h5}"
     else
-      RAW_OUT_FILE="${RAW_OUT_FILE:-${DEFAULT_DATA_ROOT}/${OUTPUT_STEM}_raw_v1.h5}"
+      RAW_OUT_FILE="${RAW_OUT_FILE:-${DEFAULT_DATA_ROOT}/.dflash_work/${OUTPUT_STEM}_raw_v1.h5}"
       OUT_FILE="${OUT_FILE:-${DEFAULT_DATA_ROOT}/${OUTPUT_STEM}_packed_v2.h5}"
     fi
     MAX_SAMPLES="${MAX_SAMPLES:-}"
@@ -84,7 +84,7 @@ for path in "${VLA_PATH}" "${RLDS_ROOT}" "${RLDS_ROOT}/${DATASET_NAME}"; do
     exit 1
   fi
 done
-mkdir -p "$(dirname "${OUT_FILE}")"
+mkdir -p "$(dirname "${RAW_OUT_FILE}")" "$(dirname "${OUT_FILE}")"
 KEEP_RAW="${KEEP_RAW:-False}"
 KEEP_FAILED_OUTPUTS="${KEEP_FAILED_OUTPUTS:-False}"
 PACK_COPY_BATCH_SIZE="${PACK_COPY_BATCH_SIZE:-16}"

@@ -13,7 +13,7 @@
 [OpenVLA](https://github.com/openvla/openvla)。当前仓库仍是研究代码，不是已经定稿的公开复现包。
 所有结论必须同时报告成功率、接受长度和速度；训练准确率不能替代在线 LIBERO 结果。
 
-截至 2026-07-29，最重要的正式结果来自同一个 Golden e200 checkpoint、同一台 RTX 4090、同一 seed 7 和
+截至 2026-07-30，最重要的正式结果来自同一个 Golden e200 checkpoint、同一台 RTX 4090、同一 seed 7 和
 同一 paper-wrapped AR 分母：
 
 | 方法 | 校验性质 | SR | mean step | Speedup | Length |
@@ -23,6 +23,10 @@
 | SpecVLA relaxed (`r=9`) | 近似接受 | 0.734 | 0.141228s | 1.294x | 2.361 |
 | **Golden + VTPF strict** | **target-verified** | **0.790** | **0.142036s** | **1.286x** | **2.422** |
 | **Golden + VTPF-TD-Fast** | **单步时序近似** | **0.754** | **0.070050s** | **2.608x** | **3.653** |
+
+独立 Minimal Draft 的 epoch 100 已完成相同的 500-episode 在线评测。它用远少于 Golden 的训练组件，仍得到
+`1.295x` 的 VTPF strict 和 `2.534x` 的 VTPF-TD-Fast；这证明当前主性能并不依赖 Action-RNN、跨 Anchor
+蒸馏或 Domino 交接。完整数字和训练时长结论见 6.13。
 
 原始日志、逐动作 timing、summary、launcher 快照、checkpoint 配置、环境身份和 SHA-256 已统一固化在
 [`artifacts/eval/curated_20260720_20260728`](artifacts/eval/curated_20260720_20260728)。该目录是当前论文
@@ -35,15 +39,16 @@
   launcher 不得覆盖。相同权重的 RNN-off 在线试验成功率近乎不变且更快，因此后续推理默认关闭 Action-RNN；
   这不抹去 golden，只把它作为可回退训练基线。
 - **Minimal Draft 对照**：新建的独立训练配方，只保留一层块并行 Draft、完整目标上下文、multi-anchor、
-  Hidden/Cos 和小权重 Soft KL。它用于验证 RNN、跨 Anchor 及多种低维辅助项是否真的必要，在正式在线结果
-  出来前不能替代 golden。
+  Hidden/Cos 和小权重 Soft KL。epoch 100 在线结果已基本复现 Golden 主性能，现作为后续各 LIBERO 子集的
+  默认干净训练基线；Golden 继续作为不可覆盖的回退证据。
 - **VTPF-TD relaxed**：只改推理，直接复用任意可用 DFlash checkpoint，不需要重训。保护档使用当前图像
   变化门控；速度档固定执行 `target -> hold -> target`。任何 hold 都不增加“已验证历史”，且下一步强制
   回到 target，避免误差连续传播。Goal 正式 500-episode 结果为 SR `0.754`、最后 task 口径 `2.608x`；
   相对 VTPF strict 的 SR 下降 3.6 个百分点、速度提高约 2.03 倍。
-- **VTPF-TD-Adaptive 候选**：与以上正式结果完全隔离。第一跳保持 TD-Fast，第二跳必须同时满足“至少两个
+- **VTPF-TD-Adaptive 消融**：与以上正式结果完全隔离。第一跳保持 TD-Fast，第二跳必须同时满足“至少两个
   target 关键帧给出完全相同的 7-token 动作”和“当前图像相对最近 target 锚点的累计相对 L2 不超过阈值”；
-  两次 hold 后强制 target。该分支尚未完成 50 trials/task，不能提前写入主结果表。
+  两次 hold 后强制 target。正式结果为 `2.599x / SR 0.746`：相对同一 Minimal TD-Fast 快约 2.6%，但少
+  4/500 个成功；相对 Golden TD-Fast 没有净速度优势，因此只保留为风险自适应消融，不替换主方案。
 
 ## 1. 阅读顺序和项目地图
 
@@ -328,7 +333,7 @@ DFlash transformer 仍只 forward 一次，但 Action-RNN 有最多 6 次很小�
 
 ### 4.1 正式离线数据
 
-当前 3090 正式数据：
+当前 3090 Goal 正式数据：
 
 ```text
 /data/wulin/c/specvla-data/dflash_goal_dataset_envfix_20260714.h5            # 原始 v1，保留作校验/回退
@@ -370,6 +375,16 @@ HDF5 不保存 `pixel_values`；final hidden 已在 selected prompt 中，也不
 
 历史 419 GiB、28,639 个小 `.ckpt` 的数据只用于解释旧实验。它会产生大量随机文件 IO，也与当前均匀选层
 格式不一致，禁止继续作为新主实验输入。
+
+同一个生成入口也支持 `libero_object`、`libero_spatial` 和 `libero_10`。`TASK_SUITE_NAME` 会同时决定对应的
+OpenVLA 微调权重、`*_no_noops` RLDS、动作反归一化 `norm_stats` 键和输出文件名；生成器会对这四者做强校验，
+不再允许用 Goal 的统计量静默生成其它子集。三个子集默认输出分别是：
+
+```text
+/data/wulin/c/specvla-data/dflash_object_dataset_packed_v2.h5
+/data/wulin/c/specvla-data/dflash_spatial_dataset_packed_v2.h5
+/data/wulin/c/specvla-data/dflash_10_dataset_packed_v2.h5
+```
 
 单文件并不自动等于顺序读。v1 内部仍有约二十万个 sample group/dataset；旧块采样又会让四个 rank 同时跳到
 四个无关物理区域。packed v2 对训练实际读取的 BF16 hidden/token 做**逐 bit 无损重排**：完整 prompt 使用一块
@@ -1223,7 +1238,7 @@ SEED=7 SYNC_CUDA_TIMING=False TIMING_SCOPE=last_task \
 当前结果已经达到“少量成功率代价、显著加速”的研发目标。后续需要多 seed、其它 suite 的独立 draft 和
 真机实验验证泛化，不能把单个 Goal seed 直接外推为全场景结论。
 
-### 6.11 2026-07-29 风险受限自适应降采样候选
+### 6.11 2026-07-30 风险受限自适应降采样消融
 
 固定 `T-H-T` 已把 target 比例压到约 50%，但所有稳定段和变化段都使用同一个保持预算。新增实验分支
 `VTPF-TD-Adaptive` 只尝试解决这个调度问题，不改 Draft、checkpoint、VTPF 校验或动作接受规则：
@@ -1247,7 +1262,11 @@ SEED=7 SYNC_CUDA_TIMING=False TIMING_SCOPE=last_task \
 
 输出 summary 新增 `generation.temporal_hold`：必须同时查看 `hold_rate`、
 `adaptive_extended_holds/adaptive_extension_candidates`、`target_prefill_actions`、拒绝原因直方图、SR 和 timing。
-在完整 50 trials/task 结束前，该分支保持“候选”状态，不能覆盖 6.10 的正式 TD-Fast 证据。
+Minimal e100 的完整 500-episode 结果为 SR `0.746`、最后 task mean `0.070320s`、Speedup `2.599x`、Length
+`3.544`。共做出 10,255 次时序决策，其中 5,505 次 hold；4,704 次第二跳候选中只有 779 次通过双重门，
+扩展率 `16.6%`。它相对同一 Minimal e100 TD-Fast 的 `0.072119s` 快约 `2.56%`，但少 4/500 个成功；同时
+仍略慢于 Golden TD-Fast 的 `0.070050s`。因此该机制证明风险门确实能选择性扩展 hold，却没有形成足以替代
+固定 TD-Fast 的净收益，论文中应作为调度消融而非主方法。
 
 ### 6.12 已废弃的旧余弦课程早期快照
 
@@ -1277,6 +1296,33 @@ Draft hidden，Action-RNN 本身几乎没有学到有效残差。该版随后在
 切换时产生表示冲突。后续 Golden 版本改为只有 Base/Final 路径比例线性变化，Soft 与 CE 同步交接，低维组只在启动前
 标定一次固定总尺度。旧余弦和两阶段输出目录均不得续训到新配方。
 
+### 6.13 2026-07-30 Minimal e100 在线结果与训练时长结论
+
+Minimal Draft 的 epoch 100 来自 200-epoch 线性学习率计划的中点，同一 checkpoint、seed 7、RTX 4090 和
+paper-wrapped AR 分母完成了四组 Goal 500-episode 评测：
+
+| Minimal e100 推理配置 | 校验性质 | SR | mean step | Speedup | Length | avg accept |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| 线性 DFlash strict | target-verified | **0.792** | 0.160411s | 1.139x | 2.172 | 1.111 |
+| VTPF strict | target-verified | **0.776** | 0.141044s | **1.295x** | 2.432 | 1.457 |
+| VTPF-TD-Fast | 单步时序近似 | **0.754** | 0.072119s | **2.534x** | 3.573 | 1.051 |
+| VTPF-TD-Adaptive | 最多双 hold 近似 | **0.746** | 0.070320s | **2.599x** | 3.544 | 0.906 |
+
+原始日志与配置快照固化在
+[`artifacts/eval/libero_goal/minimal_e100_20260729_30`](artifacts/eval/libero_goal/minimal_e100_20260729_30)。
+
+训练日志也显示明显的边际收益递减：epoch 100 到 200，Hidden loss 仅由 `0.79599` 降到 `0.79462`，Cosine
+由 `0.45355` 降到 `0.45187`，self-rollout accuracy 由 `0.9405` 升到 `0.9506`。在线结果进一步证明 e100
+已经保留主性能：VTPF strict 与 Golden e200 的 `1.286x` 相当，TD-Fast 比 Golden 的 `2.608x` 只低约
+2.8%，SR 则同为 `0.754`。
+
+因此后续其它 LIBERO 子集把 **100 epoch 作为默认训练预算**，保存 e60/e80/e100 做在线筛选；现阶段没有证据
+支持进一步降到 60 或 80。不要按离线 loss 或 teacher-forced accuracy 做自动早停，因为它们没有可靠预测
+在线 p2-p6、SR 或端到端速度。另一个关键复现细节是：当前 e100 使用的仍是 200-epoch scheduler 在中点的
+学习率（约 `1.01e-5`）；若只把 `NUM_EPOCHS` 改成 100，scheduler 会在 e100 提前衰减到零，并非同一训练
+轨迹。未增加独立 scheduler horizon 前，最严格的复现方式仍是保留 `NUM_EPOCHS=200`，在 e100 checkpoint
+完成后停止；后续应把“实际训练上限”和“学习率计划长度”显式拆开再固定新默认值。
+
 ## 7. 当前标准工作流
 
 固定分工：
@@ -1303,6 +1349,34 @@ cd /data/wulin/c/SpecVLA-DFLASH
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 \
+  bash openvla/specdecoding/train-scripts/run_dflash_data_goal.sh smoke
+```
+
+若本机尚无其它三个子集，优先通过镜像下载。模型与数据可以并行下载；日志中的 `EXIT_CODE=0` 才表示完整：
+
+```bash
+export HF_ENDPOINT=https://hf-mirror.com
+
+huggingface-cli download openvla/openvla-7b-finetuned-libero-object \
+  --local-dir /data/wulin/hf_files/openvla-7b-finetuned-libero-object --max-workers 2
+huggingface-cli download openvla/openvla-7b-finetuned-libero-spatial \
+  --local-dir /data/wulin/hf_files/openvla-7b-finetuned-libero-spatial --max-workers 2
+huggingface-cli download openvla/openvla-7b-finetuned-libero-10 \
+  --local-dir /data/wulin/hf_files/openvla-7b-finetuned-libero-10 --max-workers 2
+
+huggingface-cli download openvla/modified_libero_rlds --repo-type dataset \
+  --include 'libero_object_no_noops/**' 'libero_spatial_no_noops/**' 'libero_10_no_noops/**' \
+  --local-dir /data/wulin/c/datasets/modified_libero_rlds --max-workers 4
+```
+
+其它子集先逐一 smoke；下面三条可分别使用 GPU 4、5、7：
+
+```bash
+TASK_SUITE_NAME=libero_object GPU_ID=4 \
+  bash openvla/specdecoding/train-scripts/run_dflash_data_goal.sh smoke
+TASK_SUITE_NAME=libero_spatial GPU_ID=5 \
+  bash openvla/specdecoding/train-scripts/run_dflash_data_goal.sh smoke
+TASK_SUITE_NAME=libero_10 GPU_ID=7 \
   bash openvla/specdecoding/train-scripts/run_dflash_data_goal.sh smoke
 ```
 
@@ -1336,6 +1410,19 @@ PY
 ```
 
 只有 `complete=True`、`storage=dflash_hdf5_packed_v2` 才能作为当前正式训练输入。
+
+三个子集正式生成时可以三卡并行。每个进程独立生成 raw v1；脚本默认通过同一把 `flock` 锁串行执行最终
+packed v2 大文件重排，防止三个高吞吐打包任务同时打满共享磁盘。`KEEP_RAW=False` 会在各自打包成功后删除
+中间文件：
+
+```bash
+TASK_SUITE_NAME=libero_object GPU_ID=4 KEEP_RAW=False \
+  bash openvla/specdecoding/train-scripts/run_dflash_data_goal.sh full
+TASK_SUITE_NAME=libero_spatial GPU_ID=5 KEEP_RAW=False \
+  bash openvla/specdecoding/train-scripts/run_dflash_data_goal.sh full
+TASK_SUITE_NAME=libero_10 GPU_ID=7 KEEP_RAW=False \
+  bash openvla/specdecoding/train-scripts/run_dflash_data_goal.sh full
+```
 
 ### 7.2 3090 四卡训练
 
@@ -1681,7 +1768,7 @@ AR、strict、relaxed 必须同机、同 GPU、串行执行。4090 是正式速�
 
 | 脚本 | 用法 |
 | --- | --- |
-| `run_dflash_data_goal.sh` | `smoke` 或 `full` 生成 raw v1 并自动无损打包 packed v2 |
+| `run_dflash_data_goal.sh` | `TASK_SUITE_NAME` 选择四个 LIBERO 子集，`smoke/full` 生成 raw v1 并自动无损打包 packed v2 |
 | `pack_dflash_hdf5.py` | 将既有 v1 数据一次性迁移为 packed v2；日常无需单独调用 |
 | `benchmark_dflash_hdf5.py` | 四进程只读 A/B 测试 legacy v1 与 packed v2 的真实数据吞吐 |
 | `run_dflash_train.sh joint` | Golden 兼容入口：200 epoch 高维主导 Base/Final 线性交接 |
@@ -1777,11 +1864,10 @@ git pull --ff-only origin main
 
 按优先级：
 
-1. 3090 继续训练 Minimal Draft；Action-RNN 在线消融未显示净收益，不再重启复杂 joint 训练。
-2. 比较相同推理配置下 golden/minimal 的 SR、Length、Speedup；若相当，后续
-   训练消融以 minimal 为干净基线，若明显退化则直接回退 golden。
-3. VTPF-TD-Fast 已完成 50 trials/task；先按预注册阈值完成 Adaptive 单组正式评测，再决定是否进入主表。
-4. 消融固定/自适应 hold 深度、视觉门、PrefixCert 与 strict VTPF，明确收益来自整次 prefill 省略而非 Length 记账。
+1. 以 Minimal e100 为其它三个 LIBERO 子集的干净训练基线；保留 Golden tag 和权重，只作回退与消融。
+2. 为 object/spatial/10 分别生成同格式教师数据、训练独立 Draft，禁止跨子集混用 Draft 或动作统计量。
+3. 保存 e60/e80/e100，并用小规模在线 VTPF strict 筛选；不要用离线 loss 直接决定早停。
+4. 固定 TD-Fast 为 relaxed 主方案；Adaptive 已完成正式消融但没有净胜 Golden TD-Fast，不进入主表。
 5. 在其它 suite 的各自权重和真实机械臂上验证短时保持的稳定性。
 
 ### 11.2 论文需要的完整证据

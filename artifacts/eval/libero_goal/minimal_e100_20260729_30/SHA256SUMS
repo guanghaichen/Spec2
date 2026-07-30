@@ -1,0 +1,16 @@
+f4a4cdc0f20b450684750c7ee2094be4c02f132f23725dfd6132de5cf33c2ae2  EVAL-libero_goal-openvla-2026_07_29-13_59_30--dflash-minimal-goal-e100-s7-linear-strict-dflash_strict_summary.json
+4f4683062e13b2621804e4adfe13ca0465d13c0d5351a588f4106275f356a599  EVAL-libero_goal-openvla-2026_07_29-13_59_30--dflash-minimal-goal-e100-s7-linear-strict-dflash_strict_timing.json
+a7955b16b44798f158dd5aac847c3193049f6879d909aa5ecf1ebd819b2accf0  EVAL-libero_goal-openvla-2026_07_29-13_59_30--dflash-minimal-goal-e100-s7-linear-strict.txt
+a73ccf0dad3a4053d6c0171fb62d72c5f14b7086121de68e4c4b152bec20816d  EVAL-libero_goal-openvla-2026_07_29-17_58_54--dflash-minimal-goal-e100-s7-vtpf-strict-dflash_strict_summary.json
+62263a5624c6eb4a5b890bfb02788480912effae08558f012e69803147ce543a  EVAL-libero_goal-openvla-2026_07_29-17_58_54--dflash-minimal-goal-e100-s7-vtpf-strict-dflash_strict_timing.json
+3c62411c1277dabe271f77d5a584aa7ab5bd0e9f0004abfb0e87d70b35edfeb9  EVAL-libero_goal-openvla-2026_07_29-17_58_54--dflash-minimal-goal-e100-s7-vtpf-strict.txt
+d448b4480944e168a25307cec3d57b8358dc1442cae7abc4192a54582540d106  EVAL-libero_goal-openvla-2026_07_29-21_46_53--dflash-minimal-goal-e100-s7-vtpf-td-fast-dflash_relaxed_summary.json
+587c065bb673e31a092e63b05853631ef1aa78819f37ac1afdb45331d625fe66  EVAL-libero_goal-openvla-2026_07_29-21_46_53--dflash-minimal-goal-e100-s7-vtpf-td-fast-dflash_relaxed_timing.json
+180213af8fa16cc8591ba7290768c6ae2a4059c8e986caeb4c25a458529c979f  EVAL-libero_goal-openvla-2026_07_29-21_46_53--dflash-minimal-goal-e100-s7-vtpf-td-fast.txt
+be21e3e4bb79ffb652a3acbd86aa1ea924ecefb46df960b32eb0c986c20e4eaf  EVAL-libero_goal-openvla-2026_07_30-00_16_15--dflash-vtpf-td-adaptive-goal-e100-s7-vr2-p0.03-dflash_relaxed_summary.json
+92817e34a27316dba311c452fce161b26f2b548ba2bd61b72917f9947bf4afe6  EVAL-libero_goal-openvla-2026_07_30-00_16_15--dflash-vtpf-td-adaptive-goal-e100-s7-vr2-p0.03-dflash_relaxed_timing.json
+d54be71b0d45f423a6f9d4ddd67657f407c1ad961ce6fc9222c9842a543d7149  EVAL-libero_goal-openvla-2026_07_30-00_16_15--dflash-vtpf-td-adaptive-goal-e100-s7-vr2-p0.03.txt
+25447881d60479e88aee6cef77fa42e1e9fe270b2a729e836b1913832cbd3405  README.md
+10c03e7e0c081ee0f75aede461c1265ba64037a52d545024e2467f29ac1ca68f  checkpoint_dflash_config.json
+192b8af21244b93d6c320e0a68995f0471ddc74c9641e3a0d6966a9bee60aaf2  run_dflash_minimal_goal_3way_eval.sh
+76551edcc8e248738eca74f59b654641b1314e6b7547421dc6ecd38180f17236  run_dflash_vtpf_adaptive_decimation_goal_eval.sh

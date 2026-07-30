@@ -69,6 +69,13 @@ parser.add_argument('--outdir', type=str, default=None)# 输出目录；默认�
 parser.add_argument('--vla_path', type=str, default=None)
 parser.add_argument('--data_root_dir', type=str, default=None)
 parser.add_argument('--dataset_name', type=str, default='libero_goal_no_noops')
+parser.add_argument(
+    '--task_suite_name',
+    type=str,
+    choices=['libero_goal', 'libero_object', 'libero_spatial', 'libero_10'],
+    default='libero_goal',
+    help='动作反归一化所使用的 LIBERO 子集；必须与 dataset_name 和微调权重一致',
+)
 parser.add_argument('--seed', type=int, default=7, help='Python/NumPy/PyTorch/TensorFlow 随机种子')
 parser.add_argument('--max_samples', type=int, default=None, help='最多处理多少条 RLDS 样本；默认处理全部，用于 smoke test')
 parser.add_argument('--shuffle_buffer_size', type=int, default=100_000)
@@ -118,7 +125,7 @@ class GenerateConfig:
     #################################################################################################################
     # LIBERO environment-specific parameters
     #################################################################################################################
-    task_suite_name: str = "libero_goal"          # Task suite. Options: libero_spatial, libero_object, libero_goal, libero_10, libero_90
+    task_suite_name: str = args.task_suite_name      # 必须与 RLDS 子集和 OpenVLA 微调权重一致
     num_steps_wait: int = 10                         # 仿真环境初始化后等多少步让物体稳定
     num_trials_per_task: int = 50                    # 每个任务试多少次
 
@@ -197,9 +204,17 @@ torch.cuda.empty_cache()
 cfg=DataGenerationConfig()
 outdir = str(args.outdir or DEFAULT_OUTDIR)
 gen_model_cfg.pretrained_checkpoint = cfg.vla_path
+expected_dataset_name = f"{gen_model_cfg.task_suite_name}_no_noops"
+if cfg.dataset_name != expected_dataset_name:
+    raise ValueError(
+        "LIBERO 子集不一致："
+        f"task_suite_name={gen_model_cfg.task_suite_name} 要求 "
+        f"dataset_name={expected_dataset_name}，实际为 {cfg.dataset_name}。"
+    )
 print(f'repo root: {REPO_ROOT}')
 print(f'vla path: {cfg.vla_path}')
 print(f'rlds root: {cfg.data_root_dir}')
+print(f'task suite: {gen_model_cfg.task_suite_name}')
 print(f'output dir: {outdir}')
 print(f'output format: {args.output_format}, samples_per_shard: {args.samples_per_shard}')
 print(f'seed: {args.seed}, max_samples: {args.max_samples}, image_aug: {args.image_aug}')
@@ -212,6 +227,11 @@ quantization_config = None# 不量化
 print('正在加载 vla模型')
 model = get_model(gen_model_cfg)# 根据配置加载 OpenVLAForActionPrediction 到 GPU
 processor = get_processor(gen_model_cfg)# 再次获取 processor（和前面重复，但这里用的是 openvla_utils 里的封装版本，可能带额外配置）
+if gen_model_cfg.task_suite_name not in model.norm_stats:
+    raise KeyError(
+        f"模型 norm_stats 中没有 {gen_model_cfg.task_suite_name}；"
+        f"现有键为 {sorted(model.norm_stats)}。请检查是否使用了同一子集的微调权重。"
+    )
 num_target_layers = int(model.language_model.config.num_hidden_layers)
 gen_model_cfg.hidden_layer_ids = build_evenly_spaced_target_layer_ids(
     num_target_layers=num_target_layers,
@@ -355,6 +375,7 @@ if writer.h5 is not None:
     writer.h5.attrs["vla_path"] = str(cfg.vla_path)
     writer.h5.attrs["data_root_dir"] = str(cfg.data_root_dir)
     writer.h5.attrs["dataset_name"] = str(cfg.dataset_name)
+    writer.h5.attrs["task_suite_name"] = str(gen_model_cfg.task_suite_name)
     writer.h5.attrs["seed"] = int(args.seed)
     writer.h5.attrs["image_aug"] = bool(args.image_aug)
     writer.h5.attrs["save_pixel_values"] = bool(args.save_pixel_values)
@@ -362,7 +383,7 @@ if writer.h5 is not None:
 print(f'writer output: {writer.out_path}')
 
 #from transformers.modeling_outputs import CausalLMOutputWithPast
-gen_model_cfg.unnorm_key = gen_model_cfg.task_suite_name# 反归一化动作时用的 key，告诉模型这是 libero_goal 任务集的动作统计量（均值/方差）
+gen_model_cfg.unnorm_key = gen_model_cfg.task_suite_name  # 使用对应 LIBERO 子集的动作统计量反归一化
 dataset_samples = len(vla_dataset)
 total_samples = min(dataset_samples, args.max_samples) if args.max_samples is not None else dataset_samples
 if total_samples <= 0:

@@ -1,0 +1,3534 @@
+Task suite: libero_goal
+
+Task: open the middle drawer of the cabinet
+Starting episode 1...
+Success: False
+# episodes completed so far: 1
+# successes: 0 (0.0%)
+Speculative stats: length=2.111, avg_accept_length=1.109, num_blocks=995, overall_hit_rate=0.292
+
+Task: open the middle drawer of the cabinet
+Starting episode 2...
+Success: False
+# episodes completed so far: 2
+# successes: 0 (0.0%)
+Speculative stats: length=1.882, avg_accept_length=0.875, num_blocks=1116, overall_hit_rate=0.236
+
+Task: open the middle drawer of the cabinet
+Starting episode 3...
+Success: False
+# episodes completed so far: 3
+# successes: 0 (0.0%)
+Speculative stats: length=1.892, avg_accept_length=0.886, num_blocks=1110, overall_hit_rate=0.238
+
+Task: open the middle drawer of the cabinet
+Starting episode 4...
+Success: True
+# episodes completed so far: 4
+# successes: 1 (25.0%)
+Speculative stats: length=2.127, avg_accept_length=1.063, num_blocks=441, overall_hit_rate=0.280
+
+Task: open the middle drawer of the cabinet
+Starting episode 5...
+Success: True
+# episodes completed so far: 5
+# successes: 2 (40.0%)
+Speculative stats: length=2.096, avg_accept_length=1.074, num_blocks=394, overall_hit_rate=0.280
+
+Task: open the middle drawer of the cabinet
+Starting episode 6...
+Success: False
+# episodes completed so far: 6
+# successes: 2 (33.3%)
+Speculative stats: length=1.953, avg_accept_length=0.917, num_blocks=1075, overall_hit_rate=0.244
+
+Task: open the middle drawer of the cabinet
+Starting episode 7...
+Success: True
+# episodes completed so far: 7
+# successes: 3 (42.9%)
+Speculative stats: length=2.118, avg_accept_length=1.117, num_blocks=400, overall_hit_rate=0.301
+
+Task: open the middle drawer of the cabinet
+Starting episode 8...
+Success: True
+# episodes completed so far: 8
+# successes: 4 (50.0%)
+Speculative stats: length=2.120, avg_accept_length=1.118, num_blocks=482, overall_hit_rate=0.292
+
+Task: open the middle drawer of the cabinet
+Starting episode 9...
+Success: True
+# episodes completed so far: 9
+# successes: 5 (55.6%)
+Speculative stats: length=2.188, avg_accept_length=1.177, num_blocks=576, overall_hit_rate=0.300
+
+Task: open the middle drawer of the cabinet
+Starting episode 10...
+Success: False
+# episodes completed so far: 10
+# successes: 5 (50.0%)
+Speculative stats: length=2.178, avg_accept_length=1.170, num_blocks=964, overall_hit_rate=0.298
+
+Task: open the middle drawer of the cabinet
+Starting episode 11...
+Success: False
+# episodes completed so far: 11
+# successes: 5 (45.5%)
+Speculative stats: length=2.094, avg_accept_length=1.087, num_blocks=1003, overall_hit_rate=0.283
+
+Task: open the middle drawer of the cabinet
+Starting episode 12...
+Success: True
+# episodes completed so far: 12
+# successes: 6 (50.0%)
+Speculative stats: length=2.098, avg_accept_length=1.095, num_blocks=357, overall_hit_rate=0.286
+
+Task: open the middle drawer of the cabinet
+Starting episode 13...
+Success: True
+# episodes completed so far: 13
+# successes: 7 (53.8%)
+Speculative stats: length=2.049, avg_accept_length=1.049, num_blocks=509, overall_hit_rate=0.275
+
+Task: open the middle drawer of the cabinet
+Starting episode 14...
+Success: False
+# episodes completed so far: 14
+# successes: 7 (50.0%)
+Speculative stats: length=2.263, avg_accept_length=1.256, num_blocks=928, overall_hit_rate=0.341
+
+Task: open the middle drawer of the cabinet
+Starting episode 15...
+Success: True
+# episodes completed so far: 15
+# successes: 8 (53.3%)
+Speculative stats: length=2.124, avg_accept_length=1.113, num_blocks=468, overall_hit_rate=0.293
+
+Task: open the middle drawer of the cabinet
+Starting episode 16...
+Success: False
+# episodes completed so far: 16
+# successes: 8 (50.0%)
+Speculative stats: length=1.994, avg_accept_length=0.991, num_blocks=1053, overall_hit_rate=0.263
+
+Task: open the middle drawer of the cabinet
+Starting episode 17...
+Success: True
+# episodes completed so far: 17
+# successes: 9 (52.9%)
+Speculative stats: length=2.015, avg_accept_length=1.002, num_blocks=469, overall_hit_rate=0.271
+
+Task: open the middle drawer of the cabinet
+Starting episode 18...
+Success: False
+# episodes completed so far: 18
+# successes: 9 (50.0%)
+Speculative stats: length=1.934, avg_accept_length=0.930, num_blocks=1086, overall_hit_rate=0.244
+
+Task: open the middle drawer of the cabinet
+Starting episode 19...
+Success: True
+# episodes completed so far: 19
+# successes: 10 (52.6%)
+Speculative stats: length=2.128, avg_accept_length=1.113, num_blocks=477, overall_hit_rate=0.294
+
+Task: open the middle drawer of the cabinet
+Starting episode 20...
+Success: False
+# episodes completed so far: 20
+# successes: 10 (50.0%)
+Speculative stats: length=1.935, avg_accept_length=0.915, num_blocks=1085, overall_hit_rate=0.244
+
+Task: open the middle drawer of the cabinet
+Starting episode 21...
+Success: True
+# episodes completed so far: 21
+# successes: 11 (52.4%)
+Speculative stats: length=2.020, avg_accept_length=1.020, num_blocks=402, overall_hit_rate=0.276
+
+Task: open the middle drawer of the cabinet
+Starting episode 22...
+Success: True
+# episodes completed so far: 22
+# successes: 12 (54.5%)
+Speculative stats: length=2.080, avg_accept_length=1.075, num_blocks=414, overall_hit_rate=0.285
+
+Task: open the middle drawer of the cabinet
+Starting episode 23...
+Success: True
+# episodes completed so far: 23
+# successes: 13 (56.5%)
+Speculative stats: length=2.178, avg_accept_length=1.162, num_blocks=376, overall_hit_rate=0.306
+
+Task: open the middle drawer of the cabinet
+Starting episode 24...
+Success: True
+# episodes completed so far: 24
+# successes: 14 (58.3%)
+Speculative stats: length=2.211, avg_accept_length=1.206, num_blocks=665, overall_hit_rate=0.317
+
+Task: open the middle drawer of the cabinet
+Starting episode 25...
+Success: True
+# episodes completed so far: 25
+# successes: 15 (60.0%)
+Speculative stats: length=2.102, avg_accept_length=1.094, num_blocks=586, overall_hit_rate=0.292
+
+Task: open the middle drawer of the cabinet
+Starting episode 26...
+Success: True
+# episodes completed so far: 26
+# successes: 16 (61.5%)
+Speculative stats: length=2.267, avg_accept_length=1.229, num_blocks=423, overall_hit_rate=0.324
+
+Task: open the middle drawer of the cabinet
+Starting episode 27...
+Success: False
+# episodes completed so far: 27
+# successes: 16 (59.3%)
+Speculative stats: length=1.974, avg_accept_length=0.956, num_blocks=1064, overall_hit_rate=0.256
+
+Task: open the middle drawer of the cabinet
+Starting episode 28...
+Success: True
+# episodes completed so far: 28
+# successes: 17 (60.7%)
+Speculative stats: length=2.035, avg_accept_length=1.005, num_blocks=423, overall_hit_rate=0.268
+
+Task: open the middle drawer of the cabinet
+Starting episode 29...
+Success: True
+# episodes completed so far: 29
+# successes: 18 (62.1%)
+Speculative stats: length=2.120, avg_accept_length=1.106, num_blocks=350, overall_hit_rate=0.290
+
+Task: open the middle drawer of the cabinet
+Starting episode 30...
+Success: False
+# episodes completed so far: 30
+# successes: 18 (60.0%)
+Speculative stats: length=2.213, avg_accept_length=1.201, num_blocks=949, overall_hit_rate=0.313
+
+Task: open the middle drawer of the cabinet
+Starting episode 31...
+Success: False
+# episodes completed so far: 31
+# successes: 18 (58.1%)
+Speculative stats: length=1.953, avg_accept_length=0.940, num_blocks=1075, overall_hit_rate=0.257
+
+Task: open the middle drawer of the cabinet
+Starting episode 32...
+Success: True
+# episodes completed so far: 32
+# successes: 19 (59.4%)
+Speculative stats: length=2.019, avg_accept_length=0.998, num_blocks=832, overall_hit_rate=0.266
+
+Task: open the middle drawer of the cabinet
+Starting episode 33...
+Success: True
+# episodes completed so far: 33
+# successes: 20 (60.6%)
+Speculative stats: length=2.120, avg_accept_length=1.112, num_blocks=482, overall_hit_rate=0.290
+
+Task: open the middle drawer of the cabinet
+Starting episode 34...
+Success: True
+# episodes completed so far: 34
+# successes: 21 (61.8%)
+Speculative stats: length=2.157, avg_accept_length=1.142, num_blocks=451, overall_hit_rate=0.305
+
+Task: open the middle drawer of the cabinet
+Starting episode 35...
+Success: False
+# episodes completed so far: 35
+# successes: 21 (60.0%)
+Speculative stats: length=1.959, avg_accept_length=0.951, num_blocks=1072, overall_hit_rate=0.250
+
+Task: open the middle drawer of the cabinet
+Starting episode 36...
+Success: False
+# episodes completed so far: 36
+# successes: 21 (58.3%)
+Speculative stats: length=1.894, avg_accept_length=0.880, num_blocks=1109, overall_hit_rate=0.235
+
+Task: open the middle drawer of the cabinet
+Starting episode 37...
+Success: True
+# episodes completed so far: 37
+# successes: 22 (59.5%)
+Speculative stats: length=2.127, avg_accept_length=1.125, num_blocks=553, overall_hit_rate=0.297
+
+Task: open the middle drawer of the cabinet
+Starting episode 38...
+Success: False
+# episodes completed so far: 38
+# successes: 22 (57.9%)
+Speculative stats: length=1.981, avg_accept_length=0.963, num_blocks=1060, overall_hit_rate=0.256
+
+Task: open the middle drawer of the cabinet
+Starting episode 39...
+Success: True
+# episodes completed so far: 39
+# successes: 23 (59.0%)
+Speculative stats: length=2.034, avg_accept_length=1.023, num_blocks=888, overall_hit_rate=0.270
+
+Task: open the middle drawer of the cabinet
+Starting episode 40...
+Success: False
+# episodes completed so far: 40
+# successes: 23 (57.5%)
+Speculative stats: length=2.283, avg_accept_length=1.276, num_blocks=920, overall_hit_rate=0.323
+
+Task: open the middle drawer of the cabinet
+Starting episode 41...
+Success: True
+# episodes completed so far: 41
+# successes: 24 (58.5%)
+Speculative stats: length=2.108, avg_accept_length=1.086, num_blocks=372, overall_hit_rate=0.286
+
+Task: open the middle drawer of the cabinet
+Starting episode 42...
+Success: False
+# episodes completed so far: 42
+# successes: 24 (57.1%)
+Speculative stats: length=2.023, avg_accept_length=1.013, num_blocks=1038, overall_hit_rate=0.271
+
+Task: open the middle drawer of the cabinet
+Starting episode 43...
+Success: False
+# episodes completed so far: 43
+# successes: 24 (55.8%)
+Speculative stats: length=1.985, avg_accept_length=0.975, num_blocks=1058, overall_hit_rate=0.255
+
+Task: open the middle drawer of the cabinet
+Starting episode 44...
+Success: True
+# episodes completed so far: 44
+# successes: 25 (56.8%)
+Speculative stats: length=1.996, avg_accept_length=0.981, num_blocks=775, overall_hit_rate=0.260
+
+Task: open the middle drawer of the cabinet
+Starting episode 45...
+Success: False
+# episodes completed so far: 45
+# successes: 25 (55.6%)
+Speculative stats: length=1.950, avg_accept_length=0.946, num_blocks=1077, overall_hit_rate=0.244
+
+Task: open the middle drawer of the cabinet
+Starting episode 46...
+Success: False
+# episodes completed so far: 46
+# successes: 25 (54.3%)
+Speculative stats: length=1.972, avg_accept_length=0.959, num_blocks=1065, overall_hit_rate=0.255
+
+Task: open the middle drawer of the cabinet
+Starting episode 47...
+Success: True
+# episodes completed so far: 47
+# successes: 26 (55.3%)
+Speculative stats: length=2.111, avg_accept_length=1.095, num_blocks=398, overall_hit_rate=0.286
+
+Task: open the middle drawer of the cabinet
+Starting episode 48...
+Success: True
+# episodes completed so far: 48
+# successes: 27 (56.2%)
+Speculative stats: length=2.050, avg_accept_length=1.028, num_blocks=461, overall_hit_rate=0.279
+
+Task: open the middle drawer of the cabinet
+Starting episode 49...
+Success: True
+# episodes completed so far: 49
+# successes: 28 (57.1%)
+Speculative stats: length=2.087, avg_accept_length=1.079, num_blocks=369, overall_hit_rate=0.290
+
+Task: open the middle drawer of the cabinet
+Starting episode 50...
+Success: True
+# episodes completed so far: 50
+# successes: 29 (58.0%)
+Speculative stats: length=2.199, avg_accept_length=1.190, num_blocks=748, overall_hit_rate=0.309
+Current task success rate: 0.58
+Current total success rate: 0.58
+Current task speculative stats: length=2.049, avg_accept_length=1.037, num_blocks=36443, overall_hit_rate=0.274
+
+Task: put the bowl on the stove
+Starting episode 1...
+Success: True
+# episodes completed so far: 51
+# successes: 30 (58.8%)
+Speculative stats: length=2.233, avg_accept_length=1.210, num_blocks=257, overall_hit_rate=0.301
+
+Task: put the bowl on the stove
+Starting episode 2...
+Success: True
+# episodes completed so far: 52
+# successes: 31 (59.6%)
+Speculative stats: length=2.156, avg_accept_length=1.146, num_blocks=302, overall_hit_rate=0.291
+
+Task: put the bowl on the stove
+Starting episode 3...
+Success: True
+# episodes completed so far: 53
+# successes: 32 (60.4%)
+Speculative stats: length=2.221, avg_accept_length=1.193, num_blocks=249, overall_hit_rate=0.302
+
+Task: put the bowl on the stove
+Starting episode 4...
+Success: True
+# episodes completed so far: 54
+# successes: 33 (61.1%)
+Speculative stats: length=2.253, avg_accept_length=1.241, num_blocks=261, overall_hit_rate=0.309
+
+Task: put the bowl on the stove
+Starting episode 5...
+Success: True
+# episodes completed so far: 55
+# successes: 34 (61.8%)
+Speculative stats: length=2.171, avg_accept_length=1.151, num_blocks=258, overall_hit_rate=0.288
+
+Task: put the bowl on the stove
+Starting episode 6...
+Success: True
+# episodes completed so far: 56
+# successes: 35 (62.5%)
+Speculative stats: length=2.259, avg_accept_length=1.233, num_blocks=313, overall_hit_rate=0.304
+
+Task: put the bowl on the stove
+Starting episode 7...
+Success: True
+# episodes completed so far: 57
+# successes: 36 (63.2%)
+Speculative stats: length=2.550, avg_accept_length=1.515, num_blocks=398, overall_hit_rate=0.380
+
+Task: put the bowl on the stove
+Starting episode 8...
+Success: True
+# episodes completed so far: 58
+# successes: 37 (63.8%)
+Speculative stats: length=2.204, avg_accept_length=1.183, num_blocks=235, overall_hit_rate=0.299
+
+Task: put the bowl on the stove
+Starting episode 9...
+Success: True
+# episodes completed so far: 59
+# successes: 38 (64.4%)
+Speculative stats: length=2.277, avg_accept_length=1.261, num_blocks=249, overall_hit_rate=0.312
+
+Task: put the bowl on the stove
+Starting episode 10...
+Success: True
+# episodes completed so far: 60
+# successes: 39 (65.0%)
+Speculative stats: length=2.342, avg_accept_length=1.335, num_blocks=260, overall_hit_rate=0.327
+
+Task: put the bowl on the stove
+Starting episode 11...
+Success: True
+# episodes completed so far: 61
+# successes: 40 (65.6%)
+Speculative stats: length=2.188, avg_accept_length=1.176, num_blocks=272, overall_hit_rate=0.292
+
+Task: put the bowl on the stove
+Starting episode 12...
+Success: True
+# episodes completed so far: 62
+# successes: 41 (66.1%)
+Speculative stats: length=2.477, avg_accept_length=1.473, num_blocks=277, overall_hit_rate=0.358
+
+Task: put the bowl on the stove
+Starting episode 13...
+Success: True
+# episodes completed so far: 63
+# successes: 42 (66.7%)
+Speculative stats: length=3.052, avg_accept_length=2.031, num_blocks=610, overall_hit_rate=0.466
+
+Task: put the bowl on the stove
+Starting episode 14...
+Success: True
+# episodes completed so far: 64
+# successes: 43 (67.2%)
+Speculative stats: length=2.138, avg_accept_length=1.124, num_blocks=275, overall_hit_rate=0.289
+
+Task: put the bowl on the stove
+Starting episode 15...
+Success: True
+# episodes completed so far: 65
+# successes: 44 (67.7%)
+Speculative stats: length=2.150, avg_accept_length=1.129, num_blocks=280, overall_hit_rate=0.289
+
+Task: put the bowl on the stove
+Starting episode 16...
+Success: True
+# episodes completed so far: 66
+# successes: 45 (68.2%)
+Speculative stats: length=2.372, avg_accept_length=1.342, num_blocks=304, overall_hit_rate=0.332
+
+Task: put the bowl on the stove
+Starting episode 17...
+Success: True
+# episodes completed so far: 67
+# successes: 46 (68.7%)
+Speculative stats: length=2.290, avg_accept_length=1.272, num_blocks=272, overall_hit_rate=0.313
+
+Task: put the bowl on the stove
+Starting episode 18...
+Success: True
+# episodes completed so far: 68
+# successes: 47 (69.1%)
+Speculative stats: length=2.276, avg_accept_length=1.252, num_blocks=286, overall_hit_rate=0.308
+
+Task: put the bowl on the stove
+Starting episode 19...
+Success: True
+# episodes completed so far: 69
+# successes: 48 (69.6%)
+Speculative stats: length=2.232, avg_accept_length=1.221, num_blocks=276, overall_hit_rate=0.303
+
+Task: put the bowl on the stove
+Starting episode 20...
+Success: True
+# episodes completed so far: 70
+# successes: 49 (70.0%)
+Speculative stats: length=2.143, avg_accept_length=1.143, num_blocks=258, overall_hit_rate=0.289
+
+Task: put the bowl on the stove
+Starting episode 21...
+Success: True
+# episodes completed so far: 71
+# successes: 50 (70.4%)
+Speculative stats: length=2.206, avg_accept_length=1.197, num_blocks=238, overall_hit_rate=0.301
+
+Task: put the bowl on the stove
+Starting episode 22...
+Success: True
+# episodes completed so far: 72
+# successes: 51 (70.8%)
+Speculative stats: length=2.281, avg_accept_length=1.274, num_blocks=270, overall_hit_rate=0.324
+
+Task: put the bowl on the stove
+Starting episode 23...
+Success: True
+# episodes completed so far: 73
+# successes: 52 (71.2%)
+Speculative stats: length=2.254, avg_accept_length=1.231, num_blocks=264, overall_hit_rate=0.301
+
+Task: put the bowl on the stove
+Starting episode 24...
+Success: True
+# episodes completed so far: 74
+# successes: 53 (71.6%)
+Speculative stats: length=2.663, avg_accept_length=1.651, num_blocks=347, overall_hit_rate=0.408
+
+Task: put the bowl on the stove
+Starting episode 25...
+Success: True
+# episodes completed so far: 75
+# successes: 54 (72.0%)
+Speculative stats: length=2.326, avg_accept_length=1.270, num_blocks=307, overall_hit_rate=0.308
+
+Task: put the bowl on the stove
+Starting episode 26...
+Success: True
+# episodes completed so far: 76
+# successes: 55 (72.4%)
+Speculative stats: length=2.348, avg_accept_length=1.332, num_blocks=319, overall_hit_rate=0.332
+
+Task: put the bowl on the stove
+Starting episode 27...
+Success: True
+# episodes completed so far: 77
+# successes: 56 (72.7%)
+Speculative stats: length=2.250, avg_accept_length=1.226, num_blocks=252, overall_hit_rate=0.305
+
+Task: put the bowl on the stove
+Starting episode 28...
+Success: True
+# episodes completed so far: 78
+# successes: 57 (73.1%)
+Speculative stats: length=2.243, avg_accept_length=1.229, num_blocks=284, overall_hit_rate=0.307
+
+Task: put the bowl on the stove
+Starting episode 29...
+Success: True
+# episodes completed so far: 79
+# successes: 58 (73.4%)
+Speculative stats: length=2.252, avg_accept_length=1.252, num_blocks=286, overall_hit_rate=0.317
+
+Task: put the bowl on the stove
+Starting episode 30...
+Success: True
+# episodes completed so far: 80
+# successes: 59 (73.8%)
+Speculative stats: length=2.292, avg_accept_length=1.285, num_blocks=284, overall_hit_rate=0.317
+
+Task: put the bowl on the stove
+Starting episode 31...
+Success: True
+# episodes completed so far: 81
+# successes: 60 (74.1%)
+Speculative stats: length=2.403, avg_accept_length=1.380, num_blocks=303, overall_hit_rate=0.345
+
+Task: put the bowl on the stove
+Starting episode 32...
+Success: True
+# episodes completed so far: 82
+# successes: 61 (74.4%)
+Speculative stats: length=2.385, avg_accept_length=1.381, num_blocks=273, overall_hit_rate=0.342
+
+Task: put the bowl on the stove
+Starting episode 33...
+Success: False
+# episodes completed so far: 83
+# successes: 61 (73.5%)
+Speculative stats: length=4.403, avg_accept_length=3.403, num_blocks=477, overall_hit_rate=0.749
+
+Task: put the bowl on the stove
+Starting episode 34...
+Success: True
+# episodes completed so far: 84
+# successes: 62 (73.8%)
+Speculative stats: length=2.295, avg_accept_length=1.272, num_blocks=302, overall_hit_rate=0.319
+
+Task: put the bowl on the stove
+Starting episode 35...
+Success: True
+# episodes completed so far: 85
+# successes: 63 (74.1%)
+Speculative stats: length=2.220, avg_accept_length=1.190, num_blocks=268, overall_hit_rate=0.299
+
+Task: put the bowl on the stove
+Starting episode 36...
+Success: True
+# episodes completed so far: 86
+# successes: 64 (74.4%)
+Speculative stats: length=2.188, avg_accept_length=1.183, num_blocks=240, overall_hit_rate=0.300
+
+Task: put the bowl on the stove
+Starting episode 37...
+Success: True
+# episodes completed so far: 87
+# successes: 65 (74.7%)
+Speculative stats: length=2.314, avg_accept_length=1.286, num_blocks=245, overall_hit_rate=0.319
+
+Task: put the bowl on the stove
+Starting episode 38...
+Success: True
+# episodes completed so far: 88
+# successes: 66 (75.0%)
+Speculative stats: length=2.246, avg_accept_length=1.243, num_blocks=268, overall_hit_rate=0.312
+
+Task: put the bowl on the stove
+Starting episode 39...
+Success: True
+# episodes completed so far: 89
+# successes: 67 (75.3%)
+Speculative stats: length=2.378, avg_accept_length=1.371, num_blocks=315, overall_hit_rate=0.352
+
+Task: put the bowl on the stove
+Starting episode 40...
+Success: False
+# episodes completed so far: 90
+# successes: 67 (74.4%)
+Speculative stats: length=2.225, avg_accept_length=1.179, num_blocks=944, overall_hit_rate=0.303
+
+Task: put the bowl on the stove
+Starting episode 41...
+Success: False
+# episodes completed so far: 91
+# successes: 67 (73.6%)
+Speculative stats: length=2.580, avg_accept_length=1.443, num_blocks=814, overall_hit_rate=0.340
+
+Task: put the bowl on the stove
+Starting episode 42...
+Success: True
+# episodes completed so far: 92
+# successes: 68 (73.9%)
+Speculative stats: length=2.253, avg_accept_length=1.238, num_blocks=261, overall_hit_rate=0.311
+
+Task: put the bowl on the stove
+Starting episode 43...
+Success: True
+# episodes completed so far: 93
+# successes: 69 (74.2%)
+Speculative stats: length=2.164, avg_accept_length=1.153, num_blocks=262, overall_hit_rate=0.291
+
+Task: put the bowl on the stove
+Starting episode 44...
+Success: False
+# episodes completed so far: 94
+# successes: 69 (73.4%)
+Speculative stats: length=2.298, avg_accept_length=1.290, num_blocks=914, overall_hit_rate=0.324
+
+Task: put the bowl on the stove
+Starting episode 45...
+Success: True
+# episodes completed so far: 95
+# successes: 70 (73.7%)
+Speculative stats: length=2.325, avg_accept_length=1.314, num_blocks=274, overall_hit_rate=0.327
+
+Task: put the bowl on the stove
+Starting episode 46...
+Success: True
+# episodes completed so far: 96
+# successes: 71 (74.0%)
+Speculative stats: length=2.265, avg_accept_length=1.232, num_blocks=306, overall_hit_rate=0.306
+
+Task: put the bowl on the stove
+Starting episode 47...
+Success: True
+# episodes completed so far: 97
+# successes: 72 (74.2%)
+Speculative stats: length=2.796, avg_accept_length=1.779, num_blocks=393, overall_hit_rate=0.423
+
+Task: put the bowl on the stove
+Starting episode 48...
+Success: True
+# episodes completed so far: 98
+# successes: 73 (74.5%)
+Speculative stats: length=2.127, avg_accept_length=1.110, num_blocks=283, overall_hit_rate=0.279
+
+Task: put the bowl on the stove
+Starting episode 49...
+Success: True
+# episodes completed so far: 99
+# successes: 74 (74.7%)
+Speculative stats: length=2.267, avg_accept_length=1.253, num_blocks=281, overall_hit_rate=0.310
+
+Task: put the bowl on the stove
+Starting episode 50...
+Success: True
+# episodes completed so far: 100
+# successes: 75 (75.0%)
+Speculative stats: length=2.166, avg_accept_length=1.147, num_blocks=307, overall_hit_rate=0.296
+Current task success rate: 0.92
+Current total success rate: 0.75
+Current task speculative stats: length=2.395, avg_accept_length=1.372, num_blocks=16473, overall_hit_rate=0.340
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 1...
+Success: True
+# episodes completed so far: 101
+# successes: 76 (75.2%)
+Speculative stats: length=2.144, avg_accept_length=1.129, num_blocks=333, overall_hit_rate=0.289
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 2...
+Success: True
+# episodes completed so far: 102
+# successes: 77 (75.5%)
+Speculative stats: length=2.201, avg_accept_length=1.132, num_blocks=318, overall_hit_rate=0.287
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 3...
+Success: True
+# episodes completed so far: 103
+# successes: 78 (75.7%)
+Speculative stats: length=2.265, avg_accept_length=1.238, num_blocks=374, overall_hit_rate=0.316
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 4...
+Success: True
+# episodes completed so far: 104
+# successes: 79 (76.0%)
+Speculative stats: length=2.545, avg_accept_length=1.527, num_blocks=330, overall_hit_rate=0.383
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 5...
+Success: True
+# episodes completed so far: 105
+# successes: 80 (76.2%)
+Speculative stats: length=2.103, avg_accept_length=1.076, num_blocks=263, overall_hit_rate=0.274
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 6...
+Success: True
+# episodes completed so far: 106
+# successes: 81 (76.4%)
+Speculative stats: length=2.134, avg_accept_length=1.120, num_blocks=292, overall_hit_rate=0.283
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 7...
+Success: True
+# episodes completed so far: 107
+# successes: 82 (76.6%)
+Speculative stats: length=2.117, avg_accept_length=1.085, num_blocks=248, overall_hit_rate=0.281
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 8...
+Success: True
+# episodes completed so far: 108
+# successes: 83 (76.9%)
+Speculative stats: length=2.220, avg_accept_length=1.199, num_blocks=287, overall_hit_rate=0.303
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 9...
+Success: False
+# episodes completed so far: 109
+# successes: 83 (76.1%)
+Speculative stats: length=2.692, avg_accept_length=1.692, num_blocks=780, overall_hit_rate=0.439
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 10...
+Success: True
+# episodes completed so far: 110
+# successes: 84 (76.4%)
+Speculative stats: length=2.150, avg_accept_length=1.130, num_blocks=254, overall_hit_rate=0.288
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 11...
+Success: True
+# episodes completed so far: 111
+# successes: 85 (76.6%)
+Speculative stats: length=2.194, avg_accept_length=1.129, num_blocks=402, overall_hit_rate=0.291
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 12...
+Success: True
+# episodes completed so far: 112
+# successes: 86 (76.8%)
+Speculative stats: length=2.255, avg_accept_length=1.191, num_blocks=267, overall_hit_rate=0.302
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 13...
+Success: True
+# episodes completed so far: 113
+# successes: 87 (77.0%)
+Speculative stats: length=2.181, avg_accept_length=1.152, num_blocks=276, overall_hit_rate=0.291
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 14...
+Success: True
+# episodes completed so far: 114
+# successes: 88 (77.2%)
+Speculative stats: length=2.322, avg_accept_length=1.269, num_blocks=416, overall_hit_rate=0.318
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 15...
+Success: True
+# episodes completed so far: 115
+# successes: 89 (77.4%)
+Speculative stats: length=2.148, avg_accept_length=1.094, num_blocks=277, overall_hit_rate=0.280
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 16...
+Success: True
+# episodes completed so far: 116
+# successes: 90 (77.6%)
+Speculative stats: length=2.428, avg_accept_length=1.407, num_blocks=519, overall_hit_rate=0.359
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 17...
+Success: True
+# episodes completed so far: 117
+# successes: 91 (77.8%)
+Speculative stats: length=2.404, avg_accept_length=1.367, num_blocks=332, overall_hit_rate=0.340
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 18...
+Success: True
+# episodes completed so far: 118
+# successes: 92 (78.0%)
+Speculative stats: length=2.110, avg_accept_length=1.087, num_blocks=743, overall_hit_rate=0.300
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 19...
+Success: True
+# episodes completed so far: 119
+# successes: 93 (78.2%)
+Speculative stats: length=2.183, avg_accept_length=1.116, num_blocks=311, overall_hit_rate=0.282
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 20...
+Success: True
+# episodes completed so far: 120
+# successes: 94 (78.3%)
+Speculative stats: length=2.166, avg_accept_length=1.125, num_blocks=265, overall_hit_rate=0.286
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 21...
+Success: True
+# episodes completed so far: 121
+# successes: 95 (78.5%)
+Speculative stats: length=2.199, avg_accept_length=1.159, num_blocks=296, overall_hit_rate=0.296
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 22...
+Success: True
+# episodes completed so far: 122
+# successes: 96 (78.7%)
+Speculative stats: length=2.199, avg_accept_length=1.115, num_blocks=312, overall_hit_rate=0.284
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 23...
+Success: False
+# episodes completed so far: 123
+# successes: 96 (78.0%)
+Speculative stats: length=2.675, avg_accept_length=1.647, num_blocks=785, overall_hit_rate=0.448
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 24...
+Success: False
+# episodes completed so far: 124
+# successes: 96 (77.4%)
+Speculative stats: length=2.724, avg_accept_length=1.724, num_blocks=771, overall_hit_rate=0.432
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 25...
+Success: True
+# episodes completed so far: 125
+# successes: 97 (77.6%)
+Speculative stats: length=2.176, avg_accept_length=1.112, num_blocks=267, overall_hit_rate=0.281
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 26...
+Success: True
+# episodes completed so far: 126
+# successes: 98 (77.8%)
+Speculative stats: length=2.201, avg_accept_length=1.178, num_blocks=264, overall_hit_rate=0.302
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 27...
+Success: True
+# episodes completed so far: 127
+# successes: 99 (78.0%)
+Speculative stats: length=2.152, avg_accept_length=1.066, num_blocks=335, overall_hit_rate=0.271
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 28...
+Success: True
+# episodes completed so far: 128
+# successes: 100 (78.1%)
+Speculative stats: length=2.165, avg_accept_length=1.116, num_blocks=346, overall_hit_rate=0.281
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 29...
+Success: False
+# episodes completed so far: 129
+# successes: 100 (77.5%)
+Speculative stats: length=3.494, avg_accept_length=2.493, num_blocks=601, overall_hit_rate=0.623
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 30...
+Success: True
+# episodes completed so far: 130
+# successes: 101 (77.7%)
+Speculative stats: length=2.123, avg_accept_length=1.055, num_blocks=310, overall_hit_rate=0.270
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 31...
+Success: True
+# episodes completed so far: 131
+# successes: 102 (77.9%)
+Speculative stats: length=2.068, avg_accept_length=1.049, num_blocks=325, overall_hit_rate=0.272
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 32...
+Success: True
+# episodes completed so far: 132
+# successes: 103 (78.0%)
+Speculative stats: length=2.364, avg_accept_length=1.328, num_blocks=305, overall_hit_rate=0.341
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 33...
+Success: True
+# episodes completed so far: 133
+# successes: 104 (78.2%)
+Speculative stats: length=2.296, avg_accept_length=1.268, num_blocks=250, overall_hit_rate=0.316
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 34...
+Success: True
+# episodes completed so far: 134
+# successes: 105 (78.4%)
+Speculative stats: length=2.227, avg_accept_length=1.174, num_blocks=264, overall_hit_rate=0.295
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 35...
+Success: False
+# episodes completed so far: 135
+# successes: 105 (77.8%)
+Speculative stats: length=2.405, avg_accept_length=1.371, num_blocks=873, overall_hit_rate=0.339
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 36...
+Success: True
+# episodes completed so far: 136
+# successes: 106 (77.9%)
+Speculative stats: length=2.320, avg_accept_length=1.243, num_blocks=341, overall_hit_rate=0.318
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 37...
+Success: True
+# episodes completed so far: 137
+# successes: 107 (78.1%)
+Speculative stats: length=2.254, avg_accept_length=1.217, num_blocks=323, overall_hit_rate=0.309
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 38...
+Success: True
+# episodes completed so far: 138
+# successes: 108 (78.3%)
+Speculative stats: length=2.385, avg_accept_length=1.349, num_blocks=358, overall_hit_rate=0.339
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 39...
+Success: True
+# episodes completed so far: 139
+# successes: 109 (78.4%)
+Speculative stats: length=2.404, avg_accept_length=1.313, num_blocks=332, overall_hit_rate=0.334
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 40...
+Success: False
+# episodes completed so far: 140
+# successes: 109 (77.9%)
+Speculative stats: length=2.752, avg_accept_length=1.752, num_blocks=763, overall_hit_rate=0.487
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 41...
+Success: True
+# episodes completed so far: 141
+# successes: 110 (78.0%)
+Speculative stats: length=2.094, avg_accept_length=1.082, num_blocks=244, overall_hit_rate=0.281
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 42...
+Success: True
+# episodes completed so far: 142
+# successes: 111 (78.2%)
+Speculative stats: length=2.224, avg_accept_length=1.202, num_blocks=277, overall_hit_rate=0.304
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 43...
+Success: True
+# episodes completed so far: 143
+# successes: 112 (78.3%)
+Speculative stats: length=2.222, avg_accept_length=1.194, num_blocks=315, overall_hit_rate=0.297
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 44...
+Success: True
+# episodes completed so far: 144
+# successes: 113 (78.5%)
+Speculative stats: length=2.061, avg_accept_length=0.991, num_blocks=343, overall_hit_rate=0.256
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 45...
+Success: True
+# episodes completed so far: 145
+# successes: 114 (78.6%)
+Speculative stats: length=2.163, avg_accept_length=1.130, num_blocks=246, overall_hit_rate=0.288
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 46...
+Success: True
+# episodes completed so far: 146
+# successes: 115 (78.8%)
+Speculative stats: length=2.116, avg_accept_length=1.105, num_blocks=258, overall_hit_rate=0.284
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 47...
+Success: True
+# episodes completed so far: 147
+# successes: 116 (78.9%)
+Speculative stats: length=2.144, avg_accept_length=1.106, num_blocks=320, overall_hit_rate=0.287
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 48...
+Success: True
+# episodes completed so far: 148
+# successes: 117 (79.1%)
+Speculative stats: length=2.175, avg_accept_length=1.117, num_blocks=309, overall_hit_rate=0.281
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 49...
+Success: True
+# episodes completed so far: 149
+# successes: 118 (79.2%)
+Speculative stats: length=2.395, avg_accept_length=1.368, num_blocks=304, overall_hit_rate=0.342
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 50...
+Success: True
+# episodes completed so far: 150
+# successes: 119 (79.3%)
+Speculative stats: length=2.237, avg_accept_length=1.225, num_blocks=316, overall_hit_rate=0.315
+Current task success rate: 0.88
+Current total success rate: 0.7933333333333333
+Current task speculative stats: length=2.353, avg_accept_length=1.320, num_blocks=18640, overall_hit_rate=0.338
+
+Task: open the top drawer and put the bowl inside
+Starting episode 1...
+Success: True
+# episodes completed so far: 151
+# successes: 120 (79.5%)
+Speculative stats: length=2.174, avg_accept_length=1.154, num_blocks=557, overall_hit_rate=0.297
+
+Task: open the top drawer and put the bowl inside
+Starting episode 2...
+Success: True
+# episodes completed so far: 152
+# successes: 121 (79.6%)
+Speculative stats: length=2.275, avg_accept_length=1.245, num_blocks=600, overall_hit_rate=0.313
+
+Task: open the top drawer and put the bowl inside
+Starting episode 3...
+Success: True
+# episodes completed so far: 153
+# successes: 122 (79.7%)
+Speculative stats: length=2.250, avg_accept_length=1.236, num_blocks=563, overall_hit_rate=0.314
+
+Task: open the top drawer and put the bowl inside
+Starting episode 4...
+Success: False
+# episodes completed so far: 154
+# successes: 122 (79.2%)
+Speculative stats: length=2.163, avg_accept_length=1.159, num_blocks=971, overall_hit_rate=0.296
+
+Task: open the top drawer and put the bowl inside
+Starting episode 5...
+Success: False
+# episodes completed so far: 155
+# successes: 122 (78.7%)
+Speculative stats: length=2.239, avg_accept_length=1.216, num_blocks=938, overall_hit_rate=0.297
+
+Task: open the top drawer and put the bowl inside
+Starting episode 6...
+Success: True
+# episodes completed so far: 156
+# successes: 123 (78.8%)
+Speculative stats: length=2.283, avg_accept_length=1.249, num_blocks=598, overall_hit_rate=0.313
+
+Task: open the top drawer and put the bowl inside
+Starting episode 7...
+Success: True
+# episodes completed so far: 157
+# successes: 124 (79.0%)
+Speculative stats: length=2.131, avg_accept_length=1.114, num_blocks=588, overall_hit_rate=0.285
+
+Task: open the top drawer and put the bowl inside
+Starting episode 8...
+Success: False
+# episodes completed so far: 158
+# successes: 124 (78.5%)
+Speculative stats: length=2.298, avg_accept_length=1.254, num_blocks=914, overall_hit_rate=0.307
+
+Task: open the top drawer and put the bowl inside
+Starting episode 9...
+Success: False
+# episodes completed so far: 159
+# successes: 124 (78.0%)
+Speculative stats: length=2.147, avg_accept_length=1.112, num_blocks=978, overall_hit_rate=0.285
+
+Task: open the top drawer and put the bowl inside
+Starting episode 10...
+Success: True
+# episodes completed so far: 160
+# successes: 125 (78.1%)
+Speculative stats: length=2.281, avg_accept_length=1.267, num_blocks=715, overall_hit_rate=0.314
+
+Task: open the top drawer and put the bowl inside
+Starting episode 11...
+Success: False
+# episodes completed so far: 161
+# successes: 125 (77.6%)
+Speculative stats: length=2.163, avg_accept_length=1.157, num_blocks=971, overall_hit_rate=0.300
+
+Task: open the top drawer and put the bowl inside
+Starting episode 12...
+Success: True
+# episodes completed so far: 162
+# successes: 126 (77.8%)
+Speculative stats: length=2.156, avg_accept_length=1.125, num_blocks=646, overall_hit_rate=0.289
+
+Task: open the top drawer and put the bowl inside
+Starting episode 13...
+Success: False
+# episodes completed so far: 163
+# successes: 126 (77.3%)
+Speculative stats: length=2.194, avg_accept_length=1.149, num_blocks=957, overall_hit_rate=0.298
+
+Task: open the top drawer and put the bowl inside
+Starting episode 14...
+Success: True
+# episodes completed so far: 164
+# successes: 127 (77.4%)
+Speculative stats: length=2.210, avg_accept_length=1.177, num_blocks=700, overall_hit_rate=0.296
+
+Task: open the top drawer and put the bowl inside
+Starting episode 15...
+Success: False
+# episodes completed so far: 165
+# successes: 127 (77.0%)
+Speculative stats: length=2.192, avg_accept_length=1.159, num_blocks=958, overall_hit_rate=0.296
+
+Task: open the top drawer and put the bowl inside
+Starting episode 16...
+Success: False
+# episodes completed so far: 166
+# successes: 127 (76.5%)
+Speculative stats: length=2.218, avg_accept_length=1.192, num_blocks=947, overall_hit_rate=0.301
+
+Task: open the top drawer and put the bowl inside
+Starting episode 17...
+Success: False
+# episodes completed so far: 167
+# successes: 127 (76.0%)
+Speculative stats: length=2.130, avg_accept_length=1.101, num_blocks=986, overall_hit_rate=0.293
+
+Task: open the top drawer and put the bowl inside
+Starting episode 18...
+Success: False
+# episodes completed so far: 168
+# successes: 127 (75.6%)
+Speculative stats: length=2.542, avg_accept_length=1.533, num_blocks=826, overall_hit_rate=0.360
+
+Task: open the top drawer and put the bowl inside
+Starting episode 19...
+Success: True
+# episodes completed so far: 169
+# successes: 128 (75.7%)
+Speculative stats: length=2.199, avg_accept_length=1.193, num_blocks=710, overall_hit_rate=0.308
+
+Task: open the top drawer and put the bowl inside
+Starting episode 20...
+Success: False
+# episodes completed so far: 170
+# successes: 128 (75.3%)
+Speculative stats: length=2.283, avg_accept_length=1.274, num_blocks=920, overall_hit_rate=0.317
+
+Task: open the top drawer and put the bowl inside
+Starting episode 21...
+Success: False
+# episodes completed so far: 171
+# successes: 128 (74.9%)
+Speculative stats: length=2.119, avg_accept_length=1.075, num_blocks=991, overall_hit_rate=0.275
+
+Task: open the top drawer and put the bowl inside
+Starting episode 22...
+Success: False
+# episodes completed so far: 172
+# successes: 128 (74.4%)
+Speculative stats: length=2.138, avg_accept_length=1.093, num_blocks=982, overall_hit_rate=0.283
+
+Task: open the top drawer and put the bowl inside
+Starting episode 23...
+Success: False
+# episodes completed so far: 173
+# successes: 128 (74.0%)
+Speculative stats: length=2.192, avg_accept_length=1.154, num_blocks=958, overall_hit_rate=0.297
+
+Task: open the top drawer and put the bowl inside
+Starting episode 24...
+Success: True
+# episodes completed so far: 174
+# successes: 129 (74.1%)
+Speculative stats: length=2.196, avg_accept_length=1.175, num_blocks=526, overall_hit_rate=0.295
+
+Task: open the top drawer and put the bowl inside
+Starting episode 25...
+Success: True
+# episodes completed so far: 175
+# successes: 130 (74.3%)
+Speculative stats: length=2.137, avg_accept_length=1.122, num_blocks=760, overall_hit_rate=0.286
+
+Task: open the top drawer and put the bowl inside
+Starting episode 26...
+Success: True
+# episodes completed so far: 176
+# successes: 131 (74.4%)
+Speculative stats: length=2.156, avg_accept_length=1.131, num_blocks=711, overall_hit_rate=0.291
+
+Task: open the top drawer and put the bowl inside
+Starting episode 27...
+Success: False
+# episodes completed so far: 177
+# successes: 131 (74.0%)
+Speculative stats: length=2.239, avg_accept_length=1.206, num_blocks=938, overall_hit_rate=0.297
+
+Task: open the top drawer and put the bowl inside
+Starting episode 28...
+Success: False
+# episodes completed so far: 178
+# successes: 131 (73.6%)
+Speculative stats: length=2.246, avg_accept_length=1.221, num_blocks=935, overall_hit_rate=0.307
+
+Task: open the top drawer and put the bowl inside
+Starting episode 29...
+Success: False
+# episodes completed so far: 179
+# successes: 131 (73.2%)
+Speculative stats: length=2.115, avg_accept_length=1.094, num_blocks=993, overall_hit_rate=0.280
+
+Task: open the top drawer and put the bowl inside
+Starting episode 30...
+Success: False
+# episodes completed so far: 180
+# successes: 131 (72.8%)
+Speculative stats: length=2.344, avg_accept_length=1.175, num_blocks=896, overall_hit_rate=0.294
+
+Task: open the top drawer and put the bowl inside
+Starting episode 31...
+Success: True
+# episodes completed so far: 181
+# successes: 132 (72.9%)
+Speculative stats: length=2.355, avg_accept_length=1.334, num_blocks=770, overall_hit_rate=0.329
+
+Task: open the top drawer and put the bowl inside
+Starting episode 32...
+Success: True
+# episodes completed so far: 182
+# successes: 133 (73.1%)
+Speculative stats: length=2.164, avg_accept_length=1.143, num_blocks=621, overall_hit_rate=0.291
+
+Task: open the top drawer and put the bowl inside
+Starting episode 33...
+Success: False
+# episodes completed so far: 183
+# successes: 133 (72.7%)
+Speculative stats: length=2.176, avg_accept_length=1.139, num_blocks=965, overall_hit_rate=0.296
+
+Task: open the top drawer and put the bowl inside
+Starting episode 34...
+Success: True
+# episodes completed so far: 184
+# successes: 134 (72.8%)
+Speculative stats: length=2.439, avg_accept_length=1.410, num_blocks=620, overall_hit_rate=0.345
+
+Task: open the top drawer and put the bowl inside
+Starting episode 35...
+Success: True
+# episodes completed so far: 185
+# successes: 135 (73.0%)
+Speculative stats: length=2.251, avg_accept_length=1.231, num_blocks=541, overall_hit_rate=0.306
+
+Task: open the top drawer and put the bowl inside
+Starting episode 36...
+Success: True
+# episodes completed so far: 186
+# successes: 136 (73.1%)
+Speculative stats: length=2.255, avg_accept_length=1.243, num_blocks=742, overall_hit_rate=0.312
+
+Task: open the top drawer and put the bowl inside
+Starting episode 37...
+Success: True
+# episodes completed so far: 187
+# successes: 137 (73.3%)
+Speculative stats: length=2.274, avg_accept_length=1.261, num_blocks=594, overall_hit_rate=0.314
+
+Task: open the top drawer and put the bowl inside
+Starting episode 38...
+Success: True
+# episodes completed so far: 188
+# successes: 138 (73.4%)
+Speculative stats: length=2.143, avg_accept_length=1.120, num_blocks=650, overall_hit_rate=0.286
+
+Task: open the top drawer and put the bowl inside
+Starting episode 39...
+Success: True
+# episodes completed so far: 189
+# successes: 139 (73.5%)
+Speculative stats: length=2.122, avg_accept_length=1.099, num_blocks=729, overall_hit_rate=0.284
+
+Task: open the top drawer and put the bowl inside
+Starting episode 40...
+Success: False
+# episodes completed so far: 190
+# successes: 139 (73.2%)
+Speculative stats: length=2.222, avg_accept_length=1.192, num_blocks=945, overall_hit_rate=0.299
+
+Task: open the top drawer and put the bowl inside
+Starting episode 41...
+Success: True
+# episodes completed so far: 191
+# successes: 140 (73.3%)
+Speculative stats: length=2.268, avg_accept_length=1.242, num_blocks=608, overall_hit_rate=0.314
+
+Task: open the top drawer and put the bowl inside
+Starting episode 42...
+Success: False
+# episodes completed so far: 192
+# successes: 140 (72.9%)
+Speculative stats: length=2.156, avg_accept_length=1.149, num_blocks=974, overall_hit_rate=0.295
+
+Task: open the top drawer and put the bowl inside
+Starting episode 43...
+Success: True
+# episodes completed so far: 193
+# successes: 141 (73.1%)
+Speculative stats: length=2.255, avg_accept_length=1.236, num_blocks=534, overall_hit_rate=0.309
+
+Task: open the top drawer and put the bowl inside
+Starting episode 44...
+Success: True
+# episodes completed so far: 194
+# successes: 142 (73.2%)
+Speculative stats: length=2.186, avg_accept_length=1.179, num_blocks=570, overall_hit_rate=0.299
+
+Task: open the top drawer and put the bowl inside
+Starting episode 45...
+Success: False
+# episodes completed so far: 195
+# successes: 142 (72.8%)
+Speculative stats: length=2.090, avg_accept_length=1.082, num_blocks=1005, overall_hit_rate=0.286
+
+Task: open the top drawer and put the bowl inside
+Starting episode 46...
+Success: False
+# episodes completed so far: 196
+# successes: 142 (72.4%)
+Speculative stats: length=2.227, avg_accept_length=1.212, num_blocks=943, overall_hit_rate=0.321
+
+Task: open the top drawer and put the bowl inside
+Starting episode 47...
+Success: False
+# episodes completed so far: 197
+# successes: 142 (72.1%)
+Speculative stats: length=1.944, avg_accept_length=0.900, num_blocks=1080, overall_hit_rate=0.229
+
+Task: open the top drawer and put the bowl inside
+Starting episode 48...
+Success: False
+# episodes completed so far: 198
+# successes: 142 (71.7%)
+Speculative stats: length=2.152, avg_accept_length=1.129, num_blocks=976, overall_hit_rate=0.291
+
+Task: open the top drawer and put the bowl inside
+Starting episode 49...
+Success: True
+# episodes completed so far: 199
+# successes: 143 (71.9%)
+Speculative stats: length=2.252, avg_accept_length=1.229, num_blocks=485, overall_hit_rate=0.310
+
+Task: open the top drawer and put the bowl inside
+Starting episode 50...
+Success: True
+# episodes completed so far: 200
+# successes: 144 (72.0%)
+Speculative stats: length=2.213, avg_accept_length=1.192, num_blocks=582, overall_hit_rate=0.303
+Current task success rate: 0.5
+Current total success rate: 0.72
+Current task speculative stats: length=2.205, avg_accept_length=1.178, num_blocks=39667, overall_hit_rate=0.299
+
+Task: put the bowl on top of the cabinet
+Starting episode 1...
+Success: True
+# episodes completed so far: 201
+# successes: 145 (72.1%)
+Speculative stats: length=2.316, avg_accept_length=1.312, num_blocks=272, overall_hit_rate=0.334
+
+Task: put the bowl on top of the cabinet
+Starting episode 2...
+Success: True
+# episodes completed so far: 202
+# successes: 146 (72.3%)
+Speculative stats: length=2.300, avg_accept_length=1.277, num_blocks=347, overall_hit_rate=0.321
+
+Task: put the bowl on top of the cabinet
+Starting episode 3...
+Success: True
+# episodes completed so far: 203
+# successes: 147 (72.4%)
+Speculative stats: length=2.451, avg_accept_length=1.428, num_blocks=297, overall_hit_rate=0.352
+
+Task: put the bowl on top of the cabinet
+Starting episode 4...
+Success: True
+# episodes completed so far: 204
+# successes: 148 (72.5%)
+Speculative stats: length=2.268, avg_accept_length=1.262, num_blocks=321, overall_hit_rate=0.321
+
+Task: put the bowl on top of the cabinet
+Starting episode 5...
+Success: True
+# episodes completed so far: 205
+# successes: 149 (72.7%)
+Speculative stats: length=2.333, avg_accept_length=1.306, num_blocks=255, overall_hit_rate=0.331
+
+Task: put the bowl on top of the cabinet
+Starting episode 6...
+Success: True
+# episodes completed so far: 206
+# successes: 150 (72.8%)
+Speculative stats: length=2.286, avg_accept_length=1.252, num_blocks=294, overall_hit_rate=0.323
+
+Task: put the bowl on top of the cabinet
+Starting episode 7...
+Success: True
+# episodes completed so far: 207
+# successes: 151 (72.9%)
+Speculative stats: length=2.281, avg_accept_length=1.278, num_blocks=270, overall_hit_rate=0.320
+
+Task: put the bowl on top of the cabinet
+Starting episode 8...
+Success: True
+# episodes completed so far: 208
+# successes: 152 (73.1%)
+Speculative stats: length=2.520, avg_accept_length=1.504, num_blocks=250, overall_hit_rate=0.367
+
+Task: put the bowl on top of the cabinet
+Starting episode 9...
+Success: True
+# episodes completed so far: 209
+# successes: 153 (73.2%)
+Speculative stats: length=2.382, avg_accept_length=1.366, num_blocks=238, overall_hit_rate=0.340
+
+Task: put the bowl on top of the cabinet
+Starting episode 10...
+Success: True
+# episodes completed so far: 210
+# successes: 154 (73.3%)
+Speculative stats: length=2.446, avg_accept_length=1.426, num_blocks=249, overall_hit_rate=0.360
+
+Task: put the bowl on top of the cabinet
+Starting episode 11...
+Success: True
+# episodes completed so far: 211
+# successes: 155 (73.5%)
+Speculative stats: length=2.248, avg_accept_length=1.238, num_blocks=302, overall_hit_rate=0.318
+
+Task: put the bowl on top of the cabinet
+Starting episode 12...
+Success: True
+# episodes completed so far: 212
+# successes: 156 (73.6%)
+Speculative stats: length=2.456, avg_accept_length=1.435, num_blocks=248, overall_hit_rate=0.352
+
+Task: put the bowl on top of the cabinet
+Starting episode 13...
+Success: True
+# episodes completed so far: 213
+# successes: 157 (73.7%)
+Speculative stats: length=2.399, avg_accept_length=1.383, num_blocks=248, overall_hit_rate=0.347
+
+Task: put the bowl on top of the cabinet
+Starting episode 14...
+Success: True
+# episodes completed so far: 214
+# successes: 158 (73.8%)
+Speculative stats: length=2.249, avg_accept_length=1.242, num_blocks=277, overall_hit_rate=0.316
+
+Task: put the bowl on top of the cabinet
+Starting episode 15...
+Success: True
+# episodes completed so far: 215
+# successes: 159 (74.0%)
+Speculative stats: length=2.565, avg_accept_length=1.513, num_blocks=464, overall_hit_rate=0.362
+
+Task: put the bowl on top of the cabinet
+Starting episode 16...
+Success: True
+# episodes completed so far: 216
+# successes: 160 (74.1%)
+Speculative stats: length=2.398, avg_accept_length=1.378, num_blocks=251, overall_hit_rate=0.349
+
+Task: put the bowl on top of the cabinet
+Starting episode 17...
+Success: True
+# episodes completed so far: 217
+# successes: 161 (74.2%)
+Speculative stats: length=2.206, avg_accept_length=1.202, num_blocks=257, overall_hit_rate=0.310
+
+Task: put the bowl on top of the cabinet
+Starting episode 18...
+Success: True
+# episodes completed so far: 218
+# successes: 162 (74.3%)
+Speculative stats: length=2.481, avg_accept_length=1.477, num_blocks=285, overall_hit_rate=0.366
+
+Task: put the bowl on top of the cabinet
+Starting episode 19...
+Success: True
+# episodes completed so far: 219
+# successes: 163 (74.4%)
+Speculative stats: length=2.288, avg_accept_length=1.276, num_blocks=312, overall_hit_rate=0.317
+
+Task: put the bowl on top of the cabinet
+Starting episode 20...
+Success: True
+# episodes completed so far: 220
+# successes: 164 (74.5%)
+Speculative stats: length=2.124, avg_accept_length=1.112, num_blocks=267, overall_hit_rate=0.288
+
+Task: put the bowl on top of the cabinet
+Starting episode 21...
+Success: True
+# episodes completed so far: 221
+# successes: 165 (74.7%)
+Speculative stats: length=2.342, avg_accept_length=1.316, num_blocks=263, overall_hit_rate=0.327
+
+Task: put the bowl on top of the cabinet
+Starting episode 22...
+Success: True
+# episodes completed so far: 222
+# successes: 166 (74.8%)
+Speculative stats: length=2.346, avg_accept_length=1.338, num_blocks=376, overall_hit_rate=0.332
+
+Task: put the bowl on top of the cabinet
+Starting episode 23...
+Success: True
+# episodes completed so far: 223
+# successes: 167 (74.9%)
+Speculative stats: length=2.362, avg_accept_length=1.341, num_blocks=246, overall_hit_rate=0.333
+
+Task: put the bowl on top of the cabinet
+Starting episode 24...
+Success: True
+# episodes completed so far: 224
+# successes: 168 (75.0%)
+Speculative stats: length=2.373, avg_accept_length=1.369, num_blocks=236, overall_hit_rate=0.343
+
+Task: put the bowl on top of the cabinet
+Starting episode 25...
+Success: True
+# episodes completed so far: 225
+# successes: 169 (75.1%)
+Speculative stats: length=2.215, avg_accept_length=1.196, num_blocks=275, overall_hit_rate=0.306
+
+Task: put the bowl on top of the cabinet
+Starting episode 26...
+Success: True
+# episodes completed so far: 226
+# successes: 170 (75.2%)
+Speculative stats: length=2.879, avg_accept_length=1.867, num_blocks=445, overall_hit_rate=0.436
+
+Task: put the bowl on top of the cabinet
+Starting episode 27...
+Success: True
+# episodes completed so far: 227
+# successes: 171 (75.3%)
+Speculative stats: length=2.427, avg_accept_length=1.420, num_blocks=300, overall_hit_rate=0.351
+
+Task: put the bowl on top of the cabinet
+Starting episode 28...
+Success: True
+# episodes completed so far: 228
+# successes: 172 (75.4%)
+Speculative stats: length=2.203, avg_accept_length=1.190, num_blocks=305, overall_hit_rate=0.303
+
+Task: put the bowl on top of the cabinet
+Starting episode 29...
+Success: False
+# episodes completed so far: 229
+# successes: 172 (75.1%)
+Speculative stats: length=3.271, avg_accept_length=2.271, num_blocks=642, overall_hit_rate=0.559
+
+Task: put the bowl on top of the cabinet
+Starting episode 30...
+Success: True
+# episodes completed so far: 230
+# successes: 173 (75.2%)
+Speculative stats: length=2.370, avg_accept_length=1.366, num_blocks=254, overall_hit_rate=0.344
+
+Task: put the bowl on top of the cabinet
+Starting episode 31...
+Success: False
+# episodes completed so far: 231
+# successes: 173 (74.9%)
+Speculative stats: length=3.627, avg_accept_length=2.627, num_blocks=579, overall_hit_rate=0.645
+
+Task: put the bowl on top of the cabinet
+Starting episode 32...
+Success: True
+# episodes completed so far: 232
+# successes: 174 (75.0%)
+Speculative stats: length=2.565, avg_accept_length=1.541, num_blocks=292, overall_hit_rate=0.382
+
+Task: put the bowl on top of the cabinet
+Starting episode 33...
+Success: True
+# episodes completed so far: 233
+# successes: 175 (75.1%)
+Speculative stats: length=2.368, avg_accept_length=1.361, num_blocks=266, overall_hit_rate=0.344
+
+Task: put the bowl on top of the cabinet
+Starting episode 34...
+Success: True
+# episodes completed so far: 234
+# successes: 176 (75.2%)
+Speculative stats: length=2.306, avg_accept_length=1.306, num_blocks=252, overall_hit_rate=0.327
+
+Task: put the bowl on top of the cabinet
+Starting episode 35...
+Success: True
+# episodes completed so far: 235
+# successes: 177 (75.3%)
+Speculative stats: length=2.429, avg_accept_length=1.410, num_blocks=268, overall_hit_rate=0.345
+
+Task: put the bowl on top of the cabinet
+Starting episode 36...
+Success: True
+# episodes completed so far: 236
+# successes: 178 (75.4%)
+Speculative stats: length=2.260, avg_accept_length=1.243, num_blocks=288, overall_hit_rate=0.313
+
+Task: put the bowl on top of the cabinet
+Starting episode 37...
+Success: True
+# episodes completed so far: 237
+# successes: 179 (75.5%)
+Speculative stats: length=2.360, avg_accept_length=1.348, num_blocks=264, overall_hit_rate=0.335
+
+Task: put the bowl on top of the cabinet
+Starting episode 38...
+Success: True
+# episodes completed so far: 238
+# successes: 180 (75.6%)
+Speculative stats: length=2.315, avg_accept_length=1.311, num_blocks=251, overall_hit_rate=0.331
+
+Task: put the bowl on top of the cabinet
+Starting episode 39...
+Success: True
+# episodes completed so far: 239
+# successes: 181 (75.7%)
+Speculative stats: length=2.213, avg_accept_length=1.153, num_blocks=541, overall_hit_rate=0.291
+
+Task: put the bowl on top of the cabinet
+Starting episode 40...
+Success: True
+# episodes completed so far: 240
+# successes: 182 (75.8%)
+Speculative stats: length=2.330, avg_accept_length=1.243, num_blocks=613, overall_hit_rate=0.300
+
+Task: put the bowl on top of the cabinet
+Starting episode 41...
+Success: True
+# episodes completed so far: 241
+# successes: 183 (75.9%)
+Speculative stats: length=3.011, avg_accept_length=1.994, num_blocks=351, overall_hit_rate=0.473
+
+Task: put the bowl on top of the cabinet
+Starting episode 42...
+Success: True
+# episodes completed so far: 242
+# successes: 184 (76.0%)
+Speculative stats: length=2.289, avg_accept_length=1.278, num_blocks=263, overall_hit_rate=0.332
+
+Task: put the bowl on top of the cabinet
+Starting episode 43...
+Success: True
+# episodes completed so far: 243
+# successes: 185 (76.1%)
+Speculative stats: length=2.186, avg_accept_length=1.177, num_blocks=237, overall_hit_rate=0.309
+
+Task: put the bowl on top of the cabinet
+Starting episode 44...
+Success: True
+# episodes completed so far: 244
+# successes: 186 (76.2%)
+Speculative stats: length=2.244, avg_accept_length=1.229, num_blocks=262, overall_hit_rate=0.316
+
+Task: put the bowl on top of the cabinet
+Starting episode 45...
+Success: True
+# episodes completed so far: 245
+# successes: 187 (76.3%)
+Speculative stats: length=2.352, avg_accept_length=1.344, num_blocks=250, overall_hit_rate=0.342
+
+Task: put the bowl on top of the cabinet
+Starting episode 46...
+Success: True
+# episodes completed so far: 246
+# successes: 188 (76.4%)
+Speculative stats: length=2.615, avg_accept_length=1.612, num_blocks=273, overall_hit_rate=0.394
+
+Task: put the bowl on top of the cabinet
+Starting episode 47...
+Success: True
+# episodes completed so far: 247
+# successes: 189 (76.5%)
+Speculative stats: length=2.217, avg_accept_length=1.203, num_blocks=300, overall_hit_rate=0.303
+
+Task: put the bowl on top of the cabinet
+Starting episode 48...
+Success: False
+# episodes completed so far: 248
+# successes: 189 (76.2%)
+Speculative stats: length=2.134, avg_accept_length=1.083, num_blocks=984, overall_hit_rate=0.281
+
+Task: put the bowl on top of the cabinet
+Starting episode 49...
+Success: True
+# episodes completed so far: 249
+# successes: 190 (76.3%)
+Speculative stats: length=2.426, avg_accept_length=1.426, num_blocks=251, overall_hit_rate=0.353
+
+Task: put the bowl on top of the cabinet
+Starting episode 50...
+Success: True
+# episodes completed so far: 250
+# successes: 191 (76.4%)
+Speculative stats: length=2.171, avg_accept_length=1.167, num_blocks=287, overall_hit_rate=0.302
+Current task success rate: 0.94
+Current total success rate: 0.764
+Current task speculative stats: length=2.439, avg_accept_length=1.419, num_blocks=16118, overall_hit_rate=0.355
+
+Task: push the plate to the front of the stove
+Starting episode 1...
+Success: True
+# episodes completed so far: 251
+# successes: 192 (76.5%)
+Speculative stats: length=2.194, avg_accept_length=1.174, num_blocks=453, overall_hit_rate=0.292
+
+Task: push the plate to the front of the stove
+Starting episode 2...
+Success: True
+# episodes completed so far: 252
+# successes: 193 (76.6%)
+Speculative stats: length=2.087, avg_accept_length=1.034, num_blocks=473, overall_hit_rate=0.255
+
+Task: push the plate to the front of the stove
+Starting episode 3...
+Success: True
+# episodes completed so far: 253
+# successes: 194 (76.7%)
+Speculative stats: length=2.556, avg_accept_length=1.493, num_blocks=586, overall_hit_rate=0.365
+
+Task: push the plate to the front of the stove
+Starting episode 4...
+Success: True
+# episodes completed so far: 254
+# successes: 195 (76.8%)
+Speculative stats: length=2.148, avg_accept_length=1.107, num_blocks=440, overall_hit_rate=0.273
+
+Task: push the plate to the front of the stove
+Starting episode 5...
+Success: True
+# episodes completed so far: 255
+# successes: 196 (76.9%)
+Speculative stats: length=2.176, avg_accept_length=1.119, num_blocks=444, overall_hit_rate=0.276
+
+Task: push the plate to the front of the stove
+Starting episode 6...
+Success: False
+# episodes completed so far: 256
+# successes: 196 (76.6%)
+Speculative stats: length=2.113, avg_accept_length=1.092, num_blocks=994, overall_hit_rate=0.275
+
+Task: push the plate to the front of the stove
+Starting episode 7...
+Success: True
+# episodes completed so far: 257
+# successes: 197 (76.7%)
+Speculative stats: length=2.209, avg_accept_length=1.181, num_blocks=393, overall_hit_rate=0.289
+
+Task: push the plate to the front of the stove
+Starting episode 8...
+Success: True
+# episodes completed so far: 258
+# successes: 198 (76.7%)
+Speculative stats: length=2.226, avg_accept_length=1.146, num_blocks=412, overall_hit_rate=0.282
+
+Task: push the plate to the front of the stove
+Starting episode 9...
+Success: False
+# episodes completed so far: 259
+# successes: 198 (76.4%)
+Speculative stats: length=3.312, avg_accept_length=2.312, num_blocks=634, overall_hit_rate=0.578
+
+Task: push the plate to the front of the stove
+Starting episode 10...
+Success: True
+# episodes completed so far: 260
+# successes: 199 (76.5%)
+Speculative stats: length=2.215, avg_accept_length=1.122, num_blocks=493, overall_hit_rate=0.278
+
+Task: push the plate to the front of the stove
+Starting episode 11...
+Success: True
+# episodes completed so far: 261
+# successes: 200 (76.6%)
+Speculative stats: length=2.248, avg_accept_length=1.211, num_blocks=545, overall_hit_rate=0.298
+
+Task: push the plate to the front of the stove
+Starting episode 12...
+Success: True
+# episodes completed so far: 262
+# successes: 201 (76.7%)
+Speculative stats: length=2.300, avg_accept_length=1.273, num_blocks=414, overall_hit_rate=0.306
+
+Task: push the plate to the front of the stove
+Starting episode 13...
+Success: True
+# episodes completed so far: 263
+# successes: 202 (76.8%)
+Speculative stats: length=2.038, avg_accept_length=0.983, num_blocks=584, overall_hit_rate=0.249
+
+Task: push the plate to the front of the stove
+Starting episode 14...
+Success: True
+# episodes completed so far: 264
+# successes: 203 (76.9%)
+Speculative stats: length=2.095, avg_accept_length=1.055, num_blocks=401, overall_hit_rate=0.267
+
+Task: push the plate to the front of the stove
+Starting episode 15...
+Success: True
+# episodes completed so far: 265
+# successes: 204 (77.0%)
+Speculative stats: length=2.120, avg_accept_length=1.019, num_blocks=426, overall_hit_rate=0.253
+
+Task: push the plate to the front of the stove
+Starting episode 16...
+Success: True
+# episodes completed so far: 266
+# successes: 205 (77.1%)
+Speculative stats: length=2.216, avg_accept_length=1.155, num_blocks=458, overall_hit_rate=0.287
+
+Task: push the plate to the front of the stove
+Starting episode 17...
+Success: True
+# episodes completed so far: 267
+# successes: 206 (77.2%)
+Speculative stats: length=2.091, avg_accept_length=1.015, num_blocks=462, overall_hit_rate=0.256
+
+Task: push the plate to the front of the stove
+Starting episode 18...
+Success: True
+# episodes completed so far: 268
+# successes: 207 (77.2%)
+Speculative stats: length=2.134, avg_accept_length=1.098, num_blocks=807, overall_hit_rate=0.276
+
+Task: push the plate to the front of the stove
+Starting episode 19...
+Success: True
+# episodes completed so far: 269
+# successes: 208 (77.3%)
+Speculative stats: length=2.179, avg_accept_length=1.127, num_blocks=408, overall_hit_rate=0.281
+
+Task: push the plate to the front of the stove
+Starting episode 20...
+Success: True
+# episodes completed so far: 270
+# successes: 209 (77.4%)
+Speculative stats: length=2.200, avg_accept_length=1.106, num_blocks=404, overall_hit_rate=0.276
+
+Task: push the plate to the front of the stove
+Starting episode 21...
+Success: True
+# episodes completed so far: 271
+# successes: 210 (77.5%)
+Speculative stats: length=2.198, avg_accept_length=1.118, num_blocks=449, overall_hit_rate=0.273
+
+Task: push the plate to the front of the stove
+Starting episode 22...
+Success: True
+# episodes completed so far: 272
+# successes: 211 (77.6%)
+Speculative stats: length=2.119, avg_accept_length=1.031, num_blocks=446, overall_hit_rate=0.253
+
+Task: push the plate to the front of the stove
+Starting episode 23...
+Success: True
+# episodes completed so far: 273
+# successes: 212 (77.7%)
+Speculative stats: length=2.233, avg_accept_length=1.177, num_blocks=417, overall_hit_rate=0.281
+
+Task: push the plate to the front of the stove
+Starting episode 24...
+Success: True
+# episodes completed so far: 274
+# successes: 213 (77.7%)
+Speculative stats: length=2.140, avg_accept_length=1.094, num_blocks=556, overall_hit_rate=0.269
+
+Task: push the plate to the front of the stove
+Starting episode 25...
+Success: True
+# episodes completed so far: 275
+# successes: 214 (77.8%)
+Speculative stats: length=2.233, avg_accept_length=1.173, num_blocks=417, overall_hit_rate=0.288
+
+Task: push the plate to the front of the stove
+Starting episode 26...
+Success: True
+# episodes completed so far: 276
+# successes: 215 (77.9%)
+Speculative stats: length=2.157, avg_accept_length=1.133, num_blocks=503, overall_hit_rate=0.284
+
+Task: push the plate to the front of the stove
+Starting episode 27...
+Success: True
+# episodes completed so far: 277
+# successes: 216 (78.0%)
+Speculative stats: length=2.149, avg_accept_length=1.083, num_blocks=456, overall_hit_rate=0.268
+
+Task: push the plate to the front of the stove
+Starting episode 28...
+Success: True
+# episodes completed so far: 278
+# successes: 217 (78.1%)
+Speculative stats: length=2.134, avg_accept_length=1.087, num_blocks=469, overall_hit_rate=0.269
+
+Task: push the plate to the front of the stove
+Starting episode 29...
+Success: False
+# episodes completed so far: 279
+# successes: 217 (77.8%)
+Speculative stats: length=2.239, avg_accept_length=1.120, num_blocks=938, overall_hit_rate=0.280
+
+Task: push the plate to the front of the stove
+Starting episode 30...
+Success: True
+# episodes completed so far: 280
+# successes: 218 (77.9%)
+Speculative stats: length=2.100, avg_accept_length=1.026, num_blocks=500, overall_hit_rate=0.258
+
+Task: push the plate to the front of the stove
+Starting episode 31...
+Success: True
+# episodes completed so far: 281
+# successes: 219 (77.9%)
+Speculative stats: length=2.222, avg_accept_length=1.179, num_blocks=526, overall_hit_rate=0.293
+
+Task: push the plate to the front of the stove
+Starting episode 32...
+Success: True
+# episodes completed so far: 282
+# successes: 220 (78.0%)
+Speculative stats: length=2.237, avg_accept_length=1.222, num_blocks=388, overall_hit_rate=0.297
+
+Task: push the plate to the front of the stove
+Starting episode 33...
+Success: True
+# episodes completed so far: 283
+# successes: 221 (78.1%)
+Speculative stats: length=2.272, avg_accept_length=1.208, num_blocks=453, overall_hit_rate=0.295
+
+Task: push the plate to the front of the stove
+Starting episode 34...
+Success: False
+# episodes completed so far: 284
+# successes: 221 (77.8%)
+Speculative stats: length=5.785, avg_accept_length=4.785, num_blocks=363, overall_hit_rate=0.902
+
+Task: push the plate to the front of the stove
+Starting episode 35...
+Success: True
+# episodes completed so far: 285
+# successes: 222 (77.9%)
+Speculative stats: length=2.198, avg_accept_length=1.177, num_blocks=481, overall_hit_rate=0.288
+
+Task: push the plate to the front of the stove
+Starting episode 36...
+Success: True
+# episodes completed so far: 286
+# successes: 223 (78.0%)
+Speculative stats: length=2.119, avg_accept_length=1.051, num_blocks=469, overall_hit_rate=0.264
+
+Task: push the plate to the front of the stove
+Starting episode 37...
+Success: True
+# episodes completed so far: 287
+# successes: 224 (78.0%)
+Speculative stats: length=2.191, avg_accept_length=1.099, num_blocks=444, overall_hit_rate=0.274
+
+Task: push the plate to the front of the stove
+Starting episode 38...
+Success: True
+# episodes completed so far: 288
+# successes: 225 (78.1%)
+Speculative stats: length=2.155, avg_accept_length=1.107, num_blocks=523, overall_hit_rate=0.276
+
+Task: push the plate to the front of the stove
+Starting episode 39...
+Success: True
+# episodes completed so far: 289
+# successes: 226 (78.2%)
+Speculative stats: length=2.223, avg_accept_length=1.172, num_blocks=466, overall_hit_rate=0.284
+
+Task: push the plate to the front of the stove
+Starting episode 40...
+Success: True
+# episodes completed so far: 290
+# successes: 227 (78.3%)
+Speculative stats: length=2.232, avg_accept_length=1.199, num_blocks=367, overall_hit_rate=0.291
+
+Task: push the plate to the front of the stove
+Starting episode 41...
+Success: True
+# episodes completed so far: 291
+# successes: 228 (78.4%)
+Speculative stats: length=2.181, avg_accept_length=1.130, num_blocks=430, overall_hit_rate=0.279
+
+Task: push the plate to the front of the stove
+Starting episode 42...
+Success: True
+# episodes completed so far: 292
+# successes: 229 (78.4%)
+Speculative stats: length=2.245, avg_accept_length=1.164, num_blocks=396, overall_hit_rate=0.281
+
+Task: push the plate to the front of the stove
+Starting episode 43...
+Success: True
+# episodes completed so far: 293
+# successes: 230 (78.5%)
+Speculative stats: length=2.182, avg_accept_length=1.156, num_blocks=417, overall_hit_rate=0.283
+
+Task: push the plate to the front of the stove
+Starting episode 44...
+Success: True
+# episodes completed so far: 294
+# successes: 231 (78.6%)
+Speculative stats: length=2.174, avg_accept_length=1.090, num_blocks=454, overall_hit_rate=0.270
+
+Task: push the plate to the front of the stove
+Starting episode 45...
+Success: False
+# episodes completed so far: 295
+# successes: 231 (78.3%)
+Speculative stats: length=2.842, avg_accept_length=1.805, num_blocks=739, overall_hit_rate=0.446
+
+Task: push the plate to the front of the stove
+Starting episode 46...
+Success: False
+# episodes completed so far: 296
+# successes: 231 (78.0%)
+Speculative stats: length=2.002, avg_accept_length=0.960, num_blocks=1049, overall_hit_rate=0.244
+
+Task: push the plate to the front of the stove
+Starting episode 47...
+Success: True
+# episodes completed so far: 297
+# successes: 232 (78.1%)
+Speculative stats: length=2.129, avg_accept_length=1.078, num_blocks=434, overall_hit_rate=0.264
+
+Task: push the plate to the front of the stove
+Starting episode 48...
+Success: True
+# episodes completed so far: 298
+# successes: 233 (78.2%)
+Speculative stats: length=2.133, avg_accept_length=1.018, num_blocks=502, overall_hit_rate=0.253
+
+Task: push the plate to the front of the stove
+Starting episode 49...
+Success: False
+# episodes completed so far: 299
+# successes: 233 (77.9%)
+Speculative stats: length=2.031, avg_accept_length=1.015, num_blocks=1034, overall_hit_rate=0.256
+
+Task: push the plate to the front of the stove
+Starting episode 50...
+Success: True
+# episodes completed so far: 300
+# successes: 234 (78.0%)
+Speculative stats: length=2.144, avg_accept_length=1.060, num_blocks=382, overall_hit_rate=0.268
+Current task success rate: 0.86
+Current total success rate: 0.78
+Current task speculative stats: length=2.267, avg_accept_length=1.214, num_blocks=25699, overall_hit_rate=0.300
+
+Task: put the cream cheese in the bowl
+Starting episode 1...
+Success: True
+# episodes completed so far: 301
+# successes: 235 (78.1%)
+Speculative stats: length=2.360, avg_accept_length=1.314, num_blocks=608, overall_hit_rate=0.324
+
+Task: put the cream cheese in the bowl
+Starting episode 2...
+Success: True
+# episodes completed so far: 302
+# successes: 236 (78.1%)
+Speculative stats: length=2.422, avg_accept_length=1.402, num_blocks=393, overall_hit_rate=0.349
+
+Task: put the cream cheese in the bowl
+Starting episode 3...
+Success: False
+# episodes completed so far: 303
+# successes: 236 (77.9%)
+Speculative stats: length=2.638, avg_accept_length=1.619, num_blocks=796, overall_hit_rate=0.384
+
+Task: put the cream cheese in the bowl
+Starting episode 4...
+Success: True
+# episodes completed so far: 304
+# successes: 237 (78.0%)
+Speculative stats: length=2.462, avg_accept_length=1.441, num_blocks=236, overall_hit_rate=0.344
+
+Task: put the cream cheese in the bowl
+Starting episode 5...
+Success: True
+# episodes completed so far: 305
+# successes: 238 (78.0%)
+Speculative stats: length=2.240, avg_accept_length=1.218, num_blocks=325, overall_hit_rate=0.314
+
+Task: put the cream cheese in the bowl
+Starting episode 6...
+Success: False
+# episodes completed so far: 306
+# successes: 238 (77.8%)
+Speculative stats: length=2.392, avg_accept_length=1.366, num_blocks=878, overall_hit_rate=0.333
+
+Task: put the cream cheese in the bowl
+Starting episode 7...
+Success: True
+# episodes completed so far: 307
+# successes: 239 (77.9%)
+Speculative stats: length=2.383, avg_accept_length=1.370, num_blocks=235, overall_hit_rate=0.333
+
+Task: put the cream cheese in the bowl
+Starting episode 8...
+Success: True
+# episodes completed so far: 308
+# successes: 240 (77.9%)
+Speculative stats: length=2.151, avg_accept_length=1.122, num_blocks=345, overall_hit_rate=0.283
+
+Task: put the cream cheese in the bowl
+Starting episode 9...
+Success: True
+# episodes completed so far: 309
+# successes: 241 (78.0%)
+Speculative stats: length=2.180, avg_accept_length=1.149, num_blocks=289, overall_hit_rate=0.287
+
+Task: put the cream cheese in the bowl
+Starting episode 10...
+Success: True
+# episodes completed so far: 310
+# successes: 242 (78.1%)
+Speculative stats: length=2.349, avg_accept_length=1.329, num_blocks=298, overall_hit_rate=0.337
+
+Task: put the cream cheese in the bowl
+Starting episode 11...
+Success: True
+# episodes completed so far: 311
+# successes: 243 (78.1%)
+Speculative stats: length=2.435, avg_accept_length=1.428, num_blocks=276, overall_hit_rate=0.353
+
+Task: put the cream cheese in the bowl
+Starting episode 12...
+Success: True
+# episodes completed so far: 312
+# successes: 244 (78.2%)
+Speculative stats: length=2.961, avg_accept_length=1.943, num_blocks=383, overall_hit_rate=0.443
+
+Task: put the cream cheese in the bowl
+Starting episode 13...
+Success: True
+# episodes completed so far: 313
+# successes: 245 (78.3%)
+Speculative stats: length=2.306, avg_accept_length=1.265, num_blocks=340, overall_hit_rate=0.316
+
+Task: put the cream cheese in the bowl
+Starting episode 14...
+Success: False
+# episodes completed so far: 314
+# successes: 245 (78.0%)
+Speculative stats: length=2.065, avg_accept_length=1.054, num_blocks=1017, overall_hit_rate=0.281
+
+Task: put the cream cheese in the bowl
+Starting episode 15...
+Success: True
+# episodes completed so far: 315
+# successes: 246 (78.1%)
+Speculative stats: length=3.749, avg_accept_length=2.732, num_blocks=463, overall_hit_rate=0.597
+
+Task: put the cream cheese in the bowl
+Starting episode 16...
+Success: False
+# episodes completed so far: 316
+# successes: 246 (77.8%)
+Speculative stats: length=2.400, avg_accept_length=1.390, num_blocks=875, overall_hit_rate=0.341
+
+Task: put the cream cheese in the bowl
+Starting episode 17...
+Success: True
+# episodes completed so far: 317
+# successes: 247 (77.9%)
+Speculative stats: length=2.416, avg_accept_length=1.401, num_blocks=339, overall_hit_rate=0.341
+
+Task: put the cream cheese in the bowl
+Starting episode 18...
+Success: True
+# episodes completed so far: 318
+# successes: 248 (78.0%)
+Speculative stats: length=2.293, avg_accept_length=1.252, num_blocks=290, overall_hit_rate=0.316
+
+Task: put the cream cheese in the bowl
+Starting episode 19...
+Success: True
+# episodes completed so far: 319
+# successes: 249 (78.1%)
+Speculative stats: length=2.290, avg_accept_length=1.287, num_blocks=272, overall_hit_rate=0.324
+
+Task: put the cream cheese in the bowl
+Starting episode 20...
+Success: True
+# episodes completed so far: 320
+# successes: 250 (78.1%)
+Speculative stats: length=2.299, avg_accept_length=1.274, num_blocks=274, overall_hit_rate=0.319
+
+Task: put the cream cheese in the bowl
+Starting episode 21...
+Success: True
+# episodes completed so far: 321
+# successes: 251 (78.2%)
+Speculative stats: length=2.292, avg_accept_length=1.247, num_blocks=336, overall_hit_rate=0.309
+
+Task: put the cream cheese in the bowl
+Starting episode 22...
+Success: True
+# episodes completed so far: 322
+# successes: 252 (78.3%)
+Speculative stats: length=2.333, avg_accept_length=1.277, num_blocks=372, overall_hit_rate=0.321
+
+Task: put the cream cheese in the bowl
+Starting episode 23...
+Success: True
+# episodes completed so far: 323
+# successes: 253 (78.3%)
+Speculative stats: length=2.403, avg_accept_length=1.363, num_blocks=300, overall_hit_rate=0.335
+
+Task: put the cream cheese in the bowl
+Starting episode 24...
+Success: False
+# episodes completed so far: 324
+# successes: 253 (78.1%)
+Speculative stats: length=5.072, avg_accept_length=4.072, num_blocks=414, overall_hit_rate=0.824
+
+Task: put the cream cheese in the bowl
+Starting episode 25...
+Success: True
+# episodes completed so far: 325
+# successes: 254 (78.2%)
+Speculative stats: length=2.286, avg_accept_length=1.250, num_blocks=392, overall_hit_rate=0.315
+
+Task: put the cream cheese in the bowl
+Starting episode 26...
+Success: True
+# episodes completed so far: 326
+# successes: 255 (78.2%)
+Speculative stats: length=2.301, avg_accept_length=1.287, num_blocks=216, overall_hit_rate=0.317
+
+Task: put the cream cheese in the bowl
+Starting episode 27...
+Success: True
+# episodes completed so far: 327
+# successes: 256 (78.3%)
+Speculative stats: length=2.494, avg_accept_length=1.485, num_blocks=233, overall_hit_rate=0.361
+
+Task: put the cream cheese in the bowl
+Starting episode 28...
+Success: True
+# episodes completed so far: 328
+# successes: 257 (78.4%)
+Speculative stats: length=2.272, avg_accept_length=1.235, num_blocks=302, overall_hit_rate=0.313
+
+Task: put the cream cheese in the bowl
+Starting episode 29...
+Success: True
+# episodes completed so far: 329
+# successes: 258 (78.4%)
+Speculative stats: length=2.294, avg_accept_length=1.280, num_blocks=293, overall_hit_rate=0.325
+
+Task: put the cream cheese in the bowl
+Starting episode 30...
+Success: False
+# episodes completed so far: 330
+# successes: 258 (78.2%)
+Speculative stats: length=2.285, avg_accept_length=1.283, num_blocks=919, overall_hit_rate=0.317
+
+Task: put the cream cheese in the bowl
+Starting episode 31...
+Success: True
+# episodes completed so far: 331
+# successes: 259 (78.2%)
+Speculative stats: length=2.415, avg_accept_length=1.393, num_blocks=313, overall_hit_rate=0.340
+
+Task: put the cream cheese in the bowl
+Starting episode 32...
+Success: True
+# episodes completed so far: 332
+# successes: 260 (78.3%)
+Speculative stats: length=2.257, avg_accept_length=1.236, num_blocks=428, overall_hit_rate=0.323
+
+Task: put the cream cheese in the bowl
+Starting episode 33...
+Success: True
+# episodes completed so far: 333
+# successes: 261 (78.4%)
+Speculative stats: length=2.342, avg_accept_length=1.317, num_blocks=281, overall_hit_rate=0.325
+
+Task: put the cream cheese in the bowl
+Starting episode 34...
+Success: True
+# episodes completed so far: 334
+# successes: 262 (78.4%)
+Speculative stats: length=2.295, avg_accept_length=1.281, num_blocks=363, overall_hit_rate=0.326
+
+Task: put the cream cheese in the bowl
+Starting episode 35...
+Success: True
+# episodes completed so far: 335
+# successes: 263 (78.5%)
+Speculative stats: length=2.347, avg_accept_length=1.329, num_blocks=331, overall_hit_rate=0.333
+
+Task: put the cream cheese in the bowl
+Starting episode 36...
+Success: True
+# episodes completed so far: 336
+# successes: 264 (78.6%)
+Speculative stats: length=2.419, avg_accept_length=1.398, num_blocks=327, overall_hit_rate=0.338
+
+Task: put the cream cheese in the bowl
+Starting episode 37...
+Success: True
+# episodes completed so far: 337
+# successes: 265 (78.6%)
+Speculative stats: length=2.353, avg_accept_length=1.315, num_blocks=241, overall_hit_rate=0.321
+
+Task: put the cream cheese in the bowl
+Starting episode 38...
+Success: True
+# episodes completed so far: 338
+# successes: 266 (78.7%)
+Speculative stats: length=2.318, avg_accept_length=1.298, num_blocks=299, overall_hit_rate=0.328
+
+Task: put the cream cheese in the bowl
+Starting episode 39...
+Success: True
+# episodes completed so far: 339
+# successes: 267 (78.8%)
+Speculative stats: length=2.289, avg_accept_length=1.267, num_blocks=315, overall_hit_rate=0.315
+
+Task: put the cream cheese in the bowl
+Starting episode 40...
+Success: True
+# episodes completed so far: 340
+# successes: 268 (78.8%)
+Speculative stats: length=2.277, avg_accept_length=1.260, num_blocks=292, overall_hit_rate=0.316
+
+Task: put the cream cheese in the bowl
+Starting episode 41...
+Success: False
+# episodes completed so far: 341
+# successes: 268 (78.6%)
+Speculative stats: length=2.346, avg_accept_length=1.299, num_blocks=895, overall_hit_rate=0.329
+
+Task: put the cream cheese in the bowl
+Starting episode 42...
+Success: True
+# episodes completed so far: 342
+# successes: 269 (78.7%)
+Speculative stats: length=2.382, avg_accept_length=1.365, num_blocks=285, overall_hit_rate=0.331
+
+Task: put the cream cheese in the bowl
+Starting episode 43...
+Success: False
+# episodes completed so far: 343
+# successes: 269 (78.4%)
+Speculative stats: length=2.178, avg_accept_length=1.166, num_blocks=964, overall_hit_rate=0.308
+
+Task: put the cream cheese in the bowl
+Starting episode 44...
+Success: True
+# episodes completed so far: 344
+# successes: 270 (78.5%)
+Speculative stats: length=2.349, avg_accept_length=1.336, num_blocks=441, overall_hit_rate=0.354
+
+Task: put the cream cheese in the bowl
+Starting episode 45...
+Success: True
+# episodes completed so far: 345
+# successes: 271 (78.6%)
+Speculative stats: length=2.276, avg_accept_length=1.269, num_blocks=286, overall_hit_rate=0.316
+
+Task: put the cream cheese in the bowl
+Starting episode 46...
+Success: True
+# episodes completed so far: 346
+# successes: 272 (78.6%)
+Speculative stats: length=2.343, avg_accept_length=1.322, num_blocks=233, overall_hit_rate=0.324
+
+Task: put the cream cheese in the bowl
+Starting episode 47...
+Success: True
+# episodes completed so far: 347
+# successes: 273 (78.7%)
+Speculative stats: length=2.370, avg_accept_length=1.357, num_blocks=322, overall_hit_rate=0.338
+
+Task: put the cream cheese in the bowl
+Starting episode 48...
+Success: False
+# episodes completed so far: 348
+# successes: 273 (78.4%)
+Speculative stats: length=2.834, avg_accept_length=1.818, num_blocks=741, overall_hit_rate=0.430
+
+Task: put the cream cheese in the bowl
+Starting episode 49...
+Success: False
+# episodes completed so far: 349
+# successes: 273 (78.2%)
+Speculative stats: length=2.445, avg_accept_length=1.409, num_blocks=859, overall_hit_rate=0.337
+
+Task: put the cream cheese in the bowl
+Starting episode 50...
+Success: True
+# episodes completed so far: 350
+# successes: 274 (78.3%)
+Speculative stats: length=2.477, avg_accept_length=1.477, num_blocks=308, overall_hit_rate=0.368
+Current task success rate: 0.8
+Current total success rate: 0.7828571428571428
+Current task speculative stats: length=2.447, avg_accept_length=1.425, num_blocks=21233, overall_hit_rate=0.352
+
+Task: turn on the stove
+Starting episode 1...
+Success: True
+# episodes completed so far: 351
+# successes: 275 (78.3%)
+Speculative stats: length=2.209, avg_accept_length=1.171, num_blocks=339, overall_hit_rate=0.293
+
+Task: turn on the stove
+Starting episode 2...
+Success: True
+# episodes completed so far: 352
+# successes: 276 (78.4%)
+Speculative stats: length=2.201, avg_accept_length=1.194, num_blocks=283, overall_hit_rate=0.302
+
+Task: turn on the stove
+Starting episode 3...
+Success: False
+# episodes completed so far: 353
+# successes: 276 (78.2%)
+Speculative stats: length=2.465, avg_accept_length=1.465, num_blocks=852, overall_hit_rate=0.344
+
+Task: turn on the stove
+Starting episode 4...
+Success: True
+# episodes completed so far: 354
+# successes: 277 (78.2%)
+Speculative stats: length=2.313, avg_accept_length=1.288, num_blocks=233, overall_hit_rate=0.316
+
+Task: turn on the stove
+Starting episode 5...
+Success: True
+# episodes completed so far: 355
+# successes: 278 (78.3%)
+Speculative stats: length=2.263, avg_accept_length=1.246, num_blocks=232, overall_hit_rate=0.306
+
+Task: turn on the stove
+Starting episode 6...
+Success: True
+# episodes completed so far: 356
+# successes: 279 (78.4%)
+Speculative stats: length=2.282, avg_accept_length=1.250, num_blocks=316, overall_hit_rate=0.307
+
+Task: turn on the stove
+Starting episode 7...
+Success: True
+# episodes completed so far: 357
+# successes: 280 (78.4%)
+Speculative stats: length=2.765, avg_accept_length=1.748, num_blocks=405, overall_hit_rate=0.437
+
+Task: turn on the stove
+Starting episode 8...
+Success: True
+# episodes completed so far: 358
+# successes: 281 (78.5%)
+Speculative stats: length=2.241, avg_accept_length=1.201, num_blocks=303, overall_hit_rate=0.304
+
+Task: turn on the stove
+Starting episode 9...
+Success: True
+# episodes completed so far: 359
+# successes: 282 (78.6%)
+Speculative stats: length=2.279, avg_accept_length=1.256, num_blocks=258, overall_hit_rate=0.316
+
+Task: turn on the stove
+Starting episode 10...
+Success: True
+# episodes completed so far: 360
+# successes: 283 (78.6%)
+Speculative stats: length=2.269, avg_accept_length=1.242, num_blocks=219, overall_hit_rate=0.308
+
+Task: turn on the stove
+Starting episode 11...
+Success: True
+# episodes completed so far: 361
+# successes: 284 (78.7%)
+Speculative stats: length=2.225, avg_accept_length=1.199, num_blocks=302, overall_hit_rate=0.300
+
+Task: turn on the stove
+Starting episode 12...
+Success: True
+# episodes completed so far: 362
+# successes: 285 (78.7%)
+Speculative stats: length=2.314, avg_accept_length=1.293, num_blocks=239, overall_hit_rate=0.323
+
+Task: turn on the stove
+Starting episode 13...
+Success: True
+# episodes completed so far: 363
+# successes: 286 (78.8%)
+Speculative stats: length=2.267, avg_accept_length=1.244, num_blocks=176, overall_hit_rate=0.308
+
+Task: turn on the stove
+Starting episode 14...
+Success: True
+# episodes completed so far: 364
+# successes: 287 (78.8%)
+Speculative stats: length=2.168, avg_accept_length=1.124, num_blocks=226, overall_hit_rate=0.282
+
+Task: turn on the stove
+Starting episode 15...
+Success: True
+# episodes completed so far: 365
+# successes: 288 (78.9%)
+Speculative stats: length=2.333, avg_accept_length=1.303, num_blocks=231, overall_hit_rate=0.325
+
+Task: turn on the stove
+Starting episode 16...
+Success: True
+# episodes completed so far: 366
+# successes: 289 (79.0%)
+Speculative stats: length=2.311, avg_accept_length=1.292, num_blocks=212, overall_hit_rate=0.321
+
+Task: turn on the stove
+Starting episode 17...
+Success: True
+# episodes completed so far: 367
+# successes: 290 (79.0%)
+Speculative stats: length=2.343, avg_accept_length=1.311, num_blocks=251, overall_hit_rate=0.319
+
+Task: turn on the stove
+Starting episode 18...
+Success: True
+# episodes completed so far: 368
+# successes: 291 (79.1%)
+Speculative stats: length=2.366, avg_accept_length=1.347, num_blocks=213, overall_hit_rate=0.337
+
+Task: turn on the stove
+Starting episode 19...
+Success: True
+# episodes completed so far: 369
+# successes: 292 (79.1%)
+Speculative stats: length=2.324, avg_accept_length=1.290, num_blocks=238, overall_hit_rate=0.321
+
+Task: turn on the stove
+Starting episode 20...
+Success: True
+# episodes completed so far: 370
+# successes: 293 (79.2%)
+Speculative stats: length=2.184, avg_accept_length=1.154, num_blocks=234, overall_hit_rate=0.289
+
+Task: turn on the stove
+Starting episode 21...
+Success: True
+# episodes completed so far: 371
+# successes: 294 (79.2%)
+Speculative stats: length=2.308, avg_accept_length=1.289, num_blocks=273, overall_hit_rate=0.320
+
+Task: turn on the stove
+Starting episode 22...
+Success: True
+# episodes completed so far: 372
+# successes: 295 (79.3%)
+Speculative stats: length=2.445, avg_accept_length=1.402, num_blocks=229, overall_hit_rate=0.334
+
+Task: turn on the stove
+Starting episode 23...
+Success: True
+# episodes completed so far: 373
+# successes: 296 (79.4%)
+Speculative stats: length=2.287, avg_accept_length=1.248, num_blocks=202, overall_hit_rate=0.303
+
+Task: turn on the stove
+Starting episode 24...
+Success: True
+# episodes completed so far: 374
+# successes: 297 (79.4%)
+Speculative stats: length=2.314, avg_accept_length=1.301, num_blocks=239, overall_hit_rate=0.318
+
+Task: turn on the stove
+Starting episode 25...
+Success: True
+# episodes completed so far: 375
+# successes: 298 (79.5%)
+Speculative stats: length=2.315, avg_accept_length=1.300, num_blocks=257, overall_hit_rate=0.321
+
+Task: turn on the stove
+Starting episode 26...
+Success: True
+# episodes completed so far: 376
+# successes: 299 (79.5%)
+Speculative stats: length=2.333, avg_accept_length=1.320, num_blocks=228, overall_hit_rate=0.328
+
+Task: turn on the stove
+Starting episode 27...
+Success: True
+# episodes completed so far: 377
+# successes: 300 (79.6%)
+Speculative stats: length=2.224, avg_accept_length=1.215, num_blocks=214, overall_hit_rate=0.310
+
+Task: turn on the stove
+Starting episode 28...
+Success: True
+# episodes completed so far: 378
+# successes: 301 (79.6%)
+Speculative stats: length=2.373, avg_accept_length=1.360, num_blocks=236, overall_hit_rate=0.333
+
+Task: turn on the stove
+Starting episode 29...
+Success: True
+# episodes completed so far: 379
+# successes: 302 (79.7%)
+Speculative stats: length=2.186, avg_accept_length=1.159, num_blocks=301, overall_hit_rate=0.294
+
+Task: turn on the stove
+Starting episode 30...
+Success: True
+# episodes completed so far: 380
+# successes: 303 (79.7%)
+Speculative stats: length=2.239, avg_accept_length=1.221, num_blocks=222, overall_hit_rate=0.303
+
+Task: turn on the stove
+Starting episode 31...
+Success: True
+# episodes completed so far: 381
+# successes: 304 (79.8%)
+Speculative stats: length=2.168, avg_accept_length=1.138, num_blocks=268, overall_hit_rate=0.289
+
+Task: turn on the stove
+Starting episode 32...
+Success: True
+# episodes completed so far: 382
+# successes: 305 (79.8%)
+Speculative stats: length=2.178, avg_accept_length=1.170, num_blocks=270, overall_hit_rate=0.297
+
+Task: turn on the stove
+Starting episode 33...
+Success: True
+# episodes completed so far: 383
+# successes: 306 (79.9%)
+Speculative stats: length=2.323, avg_accept_length=1.306, num_blocks=232, overall_hit_rate=0.325
+
+Task: turn on the stove
+Starting episode 34...
+Success: False
+# episodes completed so far: 384
+# successes: 306 (79.7%)
+Speculative stats: length=1.890, avg_accept_length=0.878, num_blocks=1111, overall_hit_rate=0.240
+
+Task: turn on the stove
+Starting episode 35...
+Success: True
+# episodes completed so far: 385
+# successes: 307 (79.7%)
+Speculative stats: length=2.268, avg_accept_length=1.254, num_blocks=213, overall_hit_rate=0.309
+
+Task: turn on the stove
+Starting episode 36...
+Success: True
+# episodes completed so far: 386
+# successes: 308 (79.8%)
+Speculative stats: length=2.136, avg_accept_length=1.114, num_blocks=236, overall_hit_rate=0.282
+
+Task: turn on the stove
+Starting episode 37...
+Success: True
+# episodes completed so far: 387
+# successes: 309 (79.8%)
+Speculative stats: length=2.387, avg_accept_length=1.304, num_blocks=217, overall_hit_rate=0.319
+
+Task: turn on the stove
+Starting episode 38...
+Success: True
+# episodes completed so far: 388
+# successes: 310 (79.9%)
+Speculative stats: length=2.371, avg_accept_length=1.323, num_blocks=186, overall_hit_rate=0.315
+
+Task: turn on the stove
+Starting episode 39...
+Success: True
+# episodes completed so far: 389
+# successes: 311 (79.9%)
+Speculative stats: length=2.275, avg_accept_length=1.270, num_blocks=200, overall_hit_rate=0.320
+
+Task: turn on the stove
+Starting episode 40...
+Success: True
+# episodes completed so far: 390
+# successes: 312 (80.0%)
+Speculative stats: length=2.207, avg_accept_length=1.182, num_blocks=203, overall_hit_rate=0.300
+
+Task: turn on the stove
+Starting episode 41...
+Success: True
+# episodes completed so far: 391
+# successes: 313 (80.1%)
+Speculative stats: length=2.178, avg_accept_length=1.141, num_blocks=270, overall_hit_rate=0.285
+
+Task: turn on the stove
+Starting episode 42...
+Success: True
+# episodes completed so far: 392
+# successes: 314 (80.1%)
+Speculative stats: length=2.290, avg_accept_length=1.265, num_blocks=272, overall_hit_rate=0.312
+
+Task: turn on the stove
+Starting episode 43...
+Success: True
+# episodes completed so far: 393
+# successes: 315 (80.2%)
+Speculative stats: length=2.176, avg_accept_length=1.134, num_blocks=238, overall_hit_rate=0.287
+
+Task: turn on the stove
+Starting episode 44...
+Success: True
+# episodes completed so far: 394
+# successes: 316 (80.2%)
+Speculative stats: length=2.362, avg_accept_length=1.346, num_blocks=243, overall_hit_rate=0.336
+
+Task: turn on the stove
+Starting episode 45...
+Success: True
+# episodes completed so far: 395
+# successes: 317 (80.3%)
+Speculative stats: length=2.172, avg_accept_length=1.146, num_blocks=377, overall_hit_rate=0.292
+
+Task: turn on the stove
+Starting episode 46...
+Success: True
+# episodes completed so far: 396
+# successes: 318 (80.3%)
+Speculative stats: length=2.408, avg_accept_length=1.385, num_blocks=218, overall_hit_rate=0.338
+
+Task: turn on the stove
+Starting episode 47...
+Success: True
+# episodes completed so far: 397
+# successes: 319 (80.4%)
+Speculative stats: length=2.220, avg_accept_length=1.209, num_blocks=268, overall_hit_rate=0.312
+
+Task: turn on the stove
+Starting episode 48...
+Success: True
+# episodes completed so far: 398
+# successes: 320 (80.4%)
+Speculative stats: length=2.240, avg_accept_length=1.164, num_blocks=250, overall_hit_rate=0.289
+
+Task: turn on the stove
+Starting episode 49...
+Success: True
+# episodes completed so far: 399
+# successes: 321 (80.5%)
+Speculative stats: length=2.333, avg_accept_length=1.280, num_blocks=189, overall_hit_rate=0.311
+
+Task: turn on the stove
+Starting episode 50...
+Success: True
+# episodes completed so far: 400
+# successes: 322 (80.5%)
+Speculative stats: length=2.188, avg_accept_length=1.188, num_blocks=240, overall_hit_rate=0.304
+Current task success rate: 0.96
+Current total success rate: 0.805
+Current task speculative stats: length=2.264, avg_accept_length=1.240, num_blocks=13864, overall_hit_rate=0.310
+
+Task: put the bowl on the plate
+Starting episode 1...
+Success: True
+# episodes completed so far: 401
+# successes: 323 (80.5%)
+Speculative stats: length=2.280, avg_accept_length=1.264, num_blocks=261, overall_hit_rate=0.320
+
+Task: put the bowl on the plate
+Starting episode 2...
+Success: True
+# episodes completed so far: 402
+# successes: 324 (80.6%)
+Speculative stats: length=2.387, avg_accept_length=1.387, num_blocks=217, overall_hit_rate=0.354
+
+Task: put the bowl on the plate
+Starting episode 3...
+Success: True
+# episodes completed so far: 403
+# successes: 325 (80.6%)
+Speculative stats: length=2.355, avg_accept_length=1.341, num_blocks=211, overall_hit_rate=0.340
+
+Task: put the bowl on the plate
+Starting episode 4...
+Success: True
+# episodes completed so far: 404
+# successes: 326 (80.7%)
+Speculative stats: length=2.250, avg_accept_length=1.237, num_blocks=224, overall_hit_rate=0.317
+
+Task: put the bowl on the plate
+Starting episode 5...
+Success: True
+# episodes completed so far: 405
+# successes: 327 (80.7%)
+Speculative stats: length=2.193, avg_accept_length=1.167, num_blocks=233, overall_hit_rate=0.294
+
+Task: put the bowl on the plate
+Starting episode 6...
+Success: True
+# episodes completed so far: 406
+# successes: 328 (80.8%)
+Speculative stats: length=2.387, avg_accept_length=1.373, num_blocks=217, overall_hit_rate=0.345
+
+Task: put the bowl on the plate
+Starting episode 7...
+Success: True
+# episodes completed so far: 407
+# successes: 329 (80.8%)
+Speculative stats: length=2.313, avg_accept_length=1.300, num_blocks=227, overall_hit_rate=0.330
+
+Task: put the bowl on the plate
+Starting episode 8...
+Success: True
+# episodes completed so far: 408
+# successes: 330 (80.9%)
+Speculative stats: length=2.812, avg_accept_length=1.795, num_blocks=336, overall_hit_rate=0.441
+
+Task: put the bowl on the plate
+Starting episode 9...
+Success: False
+# episodes completed so far: 409
+# successes: 330 (80.7%)
+Speculative stats: length=3.120, avg_accept_length=2.111, num_blocks=673, overall_hit_rate=0.510
+
+Task: put the bowl on the plate
+Starting episode 10...
+Success: True
+# episodes completed so far: 410
+# successes: 331 (80.7%)
+Speculative stats: length=2.403, avg_accept_length=1.393, num_blocks=201, overall_hit_rate=0.340
+
+Task: put the bowl on the plate
+Starting episode 11...
+Success: True
+# episodes completed so far: 411
+# successes: 332 (80.8%)
+Speculative stats: length=2.244, avg_accept_length=1.226, num_blocks=234, overall_hit_rate=0.322
+
+Task: put the bowl on the plate
+Starting episode 12...
+Success: False
+# episodes completed so far: 412
+# successes: 332 (80.6%)
+Speculative stats: length=2.625, avg_accept_length=1.615, num_blocks=800, overall_hit_rate=0.380
+
+Task: put the bowl on the plate
+Starting episode 13...
+Success: True
+# episodes completed so far: 413
+# successes: 333 (80.6%)
+Speculative stats: length=2.207, avg_accept_length=1.203, num_blocks=241, overall_hit_rate=0.317
+
+Task: put the bowl on the plate
+Starting episode 14...
+Success: True
+# episodes completed so far: 414
+# successes: 334 (80.7%)
+Speculative stats: length=2.281, avg_accept_length=1.263, num_blocks=224, overall_hit_rate=0.313
+
+Task: put the bowl on the plate
+Starting episode 15...
+Success: True
+# episodes completed so far: 415
+# successes: 335 (80.7%)
+Speculative stats: length=2.302, avg_accept_length=1.262, num_blocks=225, overall_hit_rate=0.327
+
+Task: put the bowl on the plate
+Starting episode 16...
+Success: True
+# episodes completed so far: 416
+# successes: 336 (80.8%)
+Speculative stats: length=2.255, avg_accept_length=1.243, num_blocks=239, overall_hit_rate=0.307
+
+Task: put the bowl on the plate
+Starting episode 17...
+Success: True
+# episodes completed so far: 417
+# successes: 337 (80.8%)
+Speculative stats: length=2.296, avg_accept_length=1.281, num_blocks=253, overall_hit_rate=0.330
+
+Task: put the bowl on the plate
+Starting episode 18...
+Success: True
+# episodes completed so far: 418
+# successes: 338 (80.9%)
+Speculative stats: length=2.474, avg_accept_length=1.465, num_blocks=215, overall_hit_rate=0.362
+
+Task: put the bowl on the plate
+Starting episode 19...
+Success: False
+# episodes completed so far: 419
+# successes: 338 (80.7%)
+Speculative stats: length=2.497, avg_accept_length=1.488, num_blocks=841, overall_hit_rate=0.398
+
+Task: put the bowl on the plate
+Starting episode 20...
+Success: True
+# episodes completed so far: 420
+# successes: 339 (80.7%)
+Speculative stats: length=2.092, avg_accept_length=1.080, num_blocks=251, overall_hit_rate=0.290
+
+Task: put the bowl on the plate
+Starting episode 21...
+Success: True
+# episodes completed so far: 421
+# successes: 340 (80.8%)
+Speculative stats: length=2.433, avg_accept_length=1.433, num_blocks=210, overall_hit_rate=0.359
+
+Task: put the bowl on the plate
+Starting episode 22...
+Success: False
+# episodes completed so far: 422
+# successes: 340 (80.6%)
+Speculative stats: length=2.456, avg_accept_length=1.435, num_blocks=855, overall_hit_rate=0.350
+
+Task: put the bowl on the plate
+Starting episode 23...
+Success: True
+# episodes completed so far: 423
+# successes: 341 (80.6%)
+Speculative stats: length=2.358, avg_accept_length=1.185, num_blocks=475, overall_hit_rate=0.299
+
+Task: put the bowl on the plate
+Starting episode 24...
+Success: True
+# episodes completed so far: 424
+# successes: 342 (80.7%)
+Speculative stats: length=2.459, avg_accept_length=1.442, num_blocks=242, overall_hit_rate=0.356
+
+Task: put the bowl on the plate
+Starting episode 25...
+Success: True
+# episodes completed so far: 425
+# successes: 343 (80.7%)
+Speculative stats: length=2.333, avg_accept_length=1.315, num_blocks=213, overall_hit_rate=0.328
+
+Task: put the bowl on the plate
+Starting episode 26...
+Success: True
+# episodes completed so far: 426
+# successes: 344 (80.8%)
+Speculative stats: length=2.431, avg_accept_length=1.431, num_blocks=216, overall_hit_rate=0.354
+
+Task: put the bowl on the plate
+Starting episode 27...
+Success: True
+# episodes completed so far: 427
+# successes: 345 (80.8%)
+Speculative stats: length=3.805, avg_accept_length=2.794, num_blocks=344, overall_hit_rate=0.611
+
+Task: put the bowl on the plate
+Starting episode 28...
+Success: True
+# episodes completed so far: 428
+# successes: 346 (80.8%)
+Speculative stats: length=2.323, avg_accept_length=1.310, num_blocks=226, overall_hit_rate=0.334
+
+Task: put the bowl on the plate
+Starting episode 29...
+Success: True
+# episodes completed so far: 429
+# successes: 347 (80.9%)
+Speculative stats: length=2.323, avg_accept_length=1.297, num_blocks=232, overall_hit_rate=0.324
+
+Task: put the bowl on the plate
+Starting episode 30...
+Success: False
+# episodes completed so far: 430
+# successes: 347 (80.7%)
+Speculative stats: length=2.227, avg_accept_length=1.217, num_blocks=943, overall_hit_rate=0.313
+
+Task: put the bowl on the plate
+Starting episode 31...
+Success: True
+# episodes completed so far: 431
+# successes: 348 (80.7%)
+Speculative stats: length=2.314, avg_accept_length=1.301, num_blocks=236, overall_hit_rate=0.327
+
+Task: put the bowl on the plate
+Starting episode 32...
+Success: True
+# episodes completed so far: 432
+# successes: 349 (80.8%)
+Speculative stats: length=2.275, avg_accept_length=1.262, num_blocks=240, overall_hit_rate=0.323
+
+Task: put the bowl on the plate
+Starting episode 33...
+Success: False
+# episodes completed so far: 433
+# successes: 349 (80.6%)
+Speculative stats: length=2.609, avg_accept_length=1.574, num_blocks=805, overall_hit_rate=0.382
+
+Task: put the bowl on the plate
+Starting episode 34...
+Success: True
+# episodes completed so far: 434
+# successes: 350 (80.6%)
+Speculative stats: length=2.333, avg_accept_length=1.320, num_blocks=222, overall_hit_rate=0.334
+
+Task: put the bowl on the plate
+Starting episode 35...
+Success: False
+# episodes completed so far: 435
+# successes: 350 (80.5%)
+Speculative stats: length=6.402, avg_accept_length=5.402, num_blocks=328, overall_hit_rate=0.925
+
+Task: put the bowl on the plate
+Starting episode 36...
+Success: True
+# episodes completed so far: 436
+# successes: 351 (80.5%)
+Speculative stats: length=2.224, avg_accept_length=1.210, num_blocks=214, overall_hit_rate=0.297
+
+Task: put the bowl on the plate
+Starting episode 37...
+Success: True
+# episodes completed so far: 437
+# successes: 352 (80.5%)
+Speculative stats: length=2.353, avg_accept_length=1.336, num_blocks=241, overall_hit_rate=0.345
+
+Task: put the bowl on the plate
+Starting episode 38...
+Success: False
+# episodes completed so far: 438
+# successes: 352 (80.4%)
+Speculative stats: length=2.270, avg_accept_length=1.230, num_blocks=925, overall_hit_rate=0.314
+
+Task: put the bowl on the plate
+Starting episode 39...
+Success: True
+# episodes completed so far: 439
+# successes: 353 (80.4%)
+Speculative stats: length=2.303, avg_accept_length=1.286, num_blocks=231, overall_hit_rate=0.329
+
+Task: put the bowl on the plate
+Starting episode 40...
+Success: True
+# episodes completed so far: 440
+# successes: 354 (80.5%)
+Speculative stats: length=2.303, avg_accept_length=1.285, num_blocks=228, overall_hit_rate=0.332
+
+Task: put the bowl on the plate
+Starting episode 41...
+Success: False
+# episodes completed so far: 441
+# successes: 354 (80.3%)
+Speculative stats: length=2.414, avg_accept_length=1.401, num_blocks=870, overall_hit_rate=0.349
+
+Task: put the bowl on the plate
+Starting episode 42...
+Success: True
+# episodes completed so far: 442
+# successes: 355 (80.3%)
+Speculative stats: length=2.225, avg_accept_length=1.217, num_blocks=258, overall_hit_rate=0.310
+
+Task: put the bowl on the plate
+Starting episode 43...
+Success: True
+# episodes completed so far: 443
+# successes: 356 (80.4%)
+Speculative stats: length=2.715, avg_accept_length=1.696, num_blocks=263, overall_hit_rate=0.410
+
+Task: put the bowl on the plate
+Starting episode 44...
+Success: True
+# episodes completed so far: 444
+# successes: 357 (80.4%)
+Speculative stats: length=2.362, avg_accept_length=1.342, num_blocks=240, overall_hit_rate=0.333
+
+Task: put the bowl on the plate
+Starting episode 45...
+Success: True
+# episodes completed so far: 445
+# successes: 358 (80.4%)
+Speculative stats: length=2.276, avg_accept_length=1.258, num_blocks=283, overall_hit_rate=0.316
+
+Task: put the bowl on the plate
+Starting episode 46...
+Success: False
+# episodes completed so far: 446
+# successes: 358 (80.3%)
+Speculative stats: length=5.691, avg_accept_length=4.691, num_blocks=369, overall_hit_rate=0.816
+
+Task: put the bowl on the plate
+Starting episode 47...
+Success: True
+# episodes completed so far: 447
+# successes: 359 (80.3%)
+Speculative stats: length=2.281, avg_accept_length=1.271, num_blocks=221, overall_hit_rate=0.315
+
+Task: put the bowl on the plate
+Starting episode 48...
+Success: True
+# episodes completed so far: 448
+# successes: 360 (80.4%)
+Speculative stats: length=2.350, avg_accept_length=1.332, num_blocks=274, overall_hit_rate=0.343
+
+Task: put the bowl on the plate
+Starting episode 49...
+Success: True
+# episodes completed so far: 449
+# successes: 361 (80.4%)
+Speculative stats: length=2.351, avg_accept_length=1.317, num_blocks=262, overall_hit_rate=0.330
+
+Task: put the bowl on the plate
+Starting episode 50...
+Success: True
+# episodes completed so far: 450
+# successes: 362 (80.4%)
+Speculative stats: length=2.349, avg_accept_length=1.332, num_blocks=295, overall_hit_rate=0.344
+Current task success rate: 0.8
+Current total success rate: 0.8044444444444444
+Current task speculative stats: length=2.583, avg_accept_length=1.563, num_blocks=17284, overall_hit_rate=0.384
+
+Task: put the wine bottle on the rack
+Starting episode 1...
+Success: False
+# episodes completed so far: 451
+# successes: 362 (80.3%)
+Speculative stats: length=2.527, avg_accept_length=1.310, num_blocks=831, overall_hit_rate=0.332
+
+Task: put the wine bottle on the rack
+Starting episode 2...
+Success: True
+# episodes completed so far: 452
+# successes: 363 (80.3%)
+Speculative stats: length=2.059, avg_accept_length=1.022, num_blocks=408, overall_hit_rate=0.271
+
+Task: put the wine bottle on the rack
+Starting episode 3...
+Success: True
+# episodes completed so far: 453
+# successes: 364 (80.4%)
+Speculative stats: length=2.254, avg_accept_length=1.232, num_blocks=410, overall_hit_rate=0.318
+
+Task: put the wine bottle on the rack
+Starting episode 4...
+Success: True
+# episodes completed so far: 454
+# successes: 365 (80.4%)
+Speculative stats: length=2.125, avg_accept_length=1.076, num_blocks=471, overall_hit_rate=0.279
+
+Task: put the wine bottle on the rack
+Starting episode 5...
+Success: True
+# episodes completed so far: 455
+# successes: 366 (80.4%)
+Speculative stats: length=2.081, avg_accept_length=1.040, num_blocks=471, overall_hit_rate=0.273
+
+Task: put the wine bottle on the rack
+Starting episode 6...
+Success: True
+# episodes completed so far: 456
+# successes: 367 (80.5%)
+Speculative stats: length=2.252, avg_accept_length=1.074, num_blocks=889, overall_hit_rate=0.275
+
+Task: put the wine bottle on the rack
+Starting episode 7...
+Success: False
+# episodes completed so far: 457
+# successes: 367 (80.3%)
+Speculative stats: length=2.143, avg_accept_length=1.081, num_blocks=980, overall_hit_rate=0.279
+
+Task: put the wine bottle on the rack
+Starting episode 8...
+Success: False
+# episodes completed so far: 458
+# successes: 367 (80.1%)
+Speculative stats: length=2.473, avg_accept_length=1.309, num_blocks=849, overall_hit_rate=0.314
+
+Task: put the wine bottle on the rack
+Starting episode 9...
+Success: False
+# episodes completed so far: 459
+# successes: 367 (80.0%)
+Speculative stats: length=2.085, avg_accept_length=0.990, num_blocks=1007, overall_hit_rate=0.265
+
+Task: put the wine bottle on the rack
+Starting episode 10...
+Success: True
+# episodes completed so far: 460
+# successes: 368 (80.0%)
+Speculative stats: length=2.005, avg_accept_length=0.964, num_blocks=419, overall_hit_rate=0.254
+
+Task: put the wine bottle on the rack
+Starting episode 11...
+Success: True
+# episodes completed so far: 461
+# successes: 369 (80.0%)
+Speculative stats: length=2.043, avg_accept_length=1.020, num_blocks=442, overall_hit_rate=0.270
+
+Task: put the wine bottle on the rack
+Starting episode 12...
+Success: True
+# episodes completed so far: 462
+# successes: 370 (80.1%)
+Speculative stats: length=2.173, avg_accept_length=1.104, num_blocks=393, overall_hit_rate=0.285
+
+Task: put the wine bottle on the rack
+Starting episode 13...
+Success: False
+# episodes completed so far: 463
+# successes: 370 (79.9%)
+Speculative stats: length=2.106, avg_accept_length=1.084, num_blocks=997, overall_hit_rate=0.288
+
+Task: put the wine bottle on the rack
+Starting episode 14...
+Success: True
+# episodes completed so far: 464
+# successes: 371 (80.0%)
+Speculative stats: length=2.031, avg_accept_length=0.984, num_blocks=555, overall_hit_rate=0.268
+
+Task: put the wine bottle on the rack
+Starting episode 15...
+Success: True
+# episodes completed so far: 465
+# successes: 372 (80.0%)
+Speculative stats: length=2.055, avg_accept_length=1.011, num_blocks=470, overall_hit_rate=0.268
+
+Task: put the wine bottle on the rack
+Starting episode 16...
+Success: True
+# episodes completed so far: 466
+# successes: 373 (80.0%)
+Speculative stats: length=1.923, avg_accept_length=0.889, num_blocks=495, overall_hit_rate=0.236
+
+Task: put the wine bottle on the rack
+Starting episode 17...
+Success: True
+# episodes completed so far: 467
+# successes: 374 (80.1%)
+Speculative stats: length=2.011, avg_accept_length=0.954, num_blocks=435, overall_hit_rate=0.251
+
+Task: put the wine bottle on the rack
+Starting episode 18...
+Success: True
+# episodes completed so far: 468
+# successes: 375 (80.1%)
+Speculative stats: length=2.170, avg_accept_length=1.134, num_blocks=500, overall_hit_rate=0.287
+
+Task: put the wine bottle on the rack
+Starting episode 19...
+Success: False
+# episodes completed so far: 469
+# successes: 375 (80.0%)
+Speculative stats: length=2.273, avg_accept_length=1.223, num_blocks=924, overall_hit_rate=0.307
+
+Task: put the wine bottle on the rack
+Starting episode 20...
+Success: True
+# episodes completed so far: 470
+# successes: 376 (80.0%)
+Speculative stats: length=2.272, avg_accept_length=1.199, num_blocks=795, overall_hit_rate=0.301
+
+Task: put the wine bottle on the rack
+Starting episode 21...
+Success: True
+# episodes completed so far: 471
+# successes: 377 (80.0%)
+Speculative stats: length=2.201, avg_accept_length=1.045, num_blocks=865, overall_hit_rate=0.277
+
+Task: put the wine bottle on the rack
+Starting episode 22...
+Success: True
+# episodes completed so far: 472
+# successes: 378 (80.1%)
+Speculative stats: length=1.996, avg_accept_length=0.949, num_blocks=491, overall_hit_rate=0.253
+
+Task: put the wine bottle on the rack
+Starting episode 23...
+Success: True
+# episodes completed so far: 473
+# successes: 379 (80.1%)
+Speculative stats: length=2.070, avg_accept_length=1.008, num_blocks=629, overall_hit_rate=0.264
+
+Task: put the wine bottle on the rack
+Starting episode 24...
+Success: True
+# episodes completed so far: 474
+# successes: 380 (80.2%)
+Speculative stats: length=2.022, avg_accept_length=0.995, num_blocks=578, overall_hit_rate=0.262
+
+Task: put the wine bottle on the rack
+Starting episode 25...
+Success: False
+# episodes completed so far: 475
+# successes: 380 (80.0%)
+Speculative stats: length=3.529, avg_accept_length=2.529, num_blocks=595, overall_hit_rate=0.604
+
+Task: put the wine bottle on the rack
+Starting episode 26...
+Success: False
+# episodes completed so far: 476
+# successes: 380 (79.8%)
+Speculative stats: length=2.197, avg_accept_length=1.115, num_blocks=956, overall_hit_rate=0.291
+
+Task: put the wine bottle on the rack
+Starting episode 27...
+Success: False
+# episodes completed so far: 477
+# successes: 380 (79.7%)
+Speculative stats: length=2.665, avg_accept_length=1.641, num_blocks=788, overall_hit_rate=0.396
+
+Task: put the wine bottle on the rack
+Starting episode 28...
+Success: False
+# episodes completed so far: 478
+# successes: 380 (79.5%)
+Speculative stats: length=2.323, avg_accept_length=1.288, num_blocks=904, overall_hit_rate=0.357
+
+Task: put the wine bottle on the rack
+Starting episode 29...
+Success: False
+# episodes completed so far: 479
+# successes: 380 (79.3%)
+Speculative stats: length=2.181, avg_accept_length=1.105, num_blocks=963, overall_hit_rate=0.289
+
+Task: put the wine bottle on the rack
+Starting episode 30...
+Success: True
+# episodes completed so far: 480
+# successes: 381 (79.4%)
+Speculative stats: length=2.029, avg_accept_length=1.012, num_blocks=521, overall_hit_rate=0.267
+
+Task: put the wine bottle on the rack
+Starting episode 31...
+Success: False
+# episodes completed so far: 481
+# successes: 381 (79.2%)
+Speculative stats: length=2.143, avg_accept_length=1.100, num_blocks=980, overall_hit_rate=0.322
+
+Task: put the wine bottle on the rack
+Starting episode 32...
+Success: False
+# episodes completed so far: 482
+# successes: 381 (79.0%)
+Speculative stats: length=2.111, avg_accept_length=1.064, num_blocks=995, overall_hit_rate=0.289
+
+Task: put the wine bottle on the rack
+Starting episode 33...
+Success: True
+# episodes completed so far: 483
+# successes: 382 (79.1%)
+Speculative stats: length=2.049, avg_accept_length=1.019, num_blocks=680, overall_hit_rate=0.280
+
+Task: put the wine bottle on the rack
+Starting episode 34...
+Success: True
+# episodes completed so far: 484
+# successes: 383 (79.1%)
+Speculative stats: length=2.046, avg_accept_length=1.017, num_blocks=479, overall_hit_rate=0.269
+
+Task: put the wine bottle on the rack
+Starting episode 35...
+Success: True
+# episodes completed so far: 485
+# successes: 384 (79.2%)
+Speculative stats: length=2.203, avg_accept_length=1.168, num_blocks=553, overall_hit_rate=0.303
+
+Task: put the wine bottle on the rack
+Starting episode 36...
+Success: False
+# episodes completed so far: 486
+# successes: 384 (79.0%)
+Speculative stats: length=2.204, avg_accept_length=1.170, num_blocks=953, overall_hit_rate=0.304
+
+Task: put the wine bottle on the rack
+Starting episode 37...
+Success: True
+# episodes completed so far: 487
+# successes: 385 (79.1%)
+Speculative stats: length=2.245, avg_accept_length=1.234, num_blocks=530, overall_hit_rate=0.319
+
+Task: put the wine bottle on the rack
+Starting episode 38...
+Success: False
+# episodes completed so far: 488
+# successes: 385 (78.9%)
+Speculative stats: length=2.017, avg_accept_length=0.988, num_blocks=1041, overall_hit_rate=0.258
+
+Task: put the wine bottle on the rack
+Starting episode 39...
+Success: True
+# episodes completed so far: 489
+# successes: 386 (78.9%)
+Speculative stats: length=2.082, avg_accept_length=1.038, num_blocks=474, overall_hit_rate=0.274
+
+Task: put the wine bottle on the rack
+Starting episode 40...
+Success: True
+# episodes completed so far: 490
+# successes: 387 (79.0%)
+Speculative stats: length=2.174, avg_accept_length=1.102, num_blocks=512, overall_hit_rate=0.284
+
+Task: put the wine bottle on the rack
+Starting episode 41...
+Success: True
+# episodes completed so far: 491
+# successes: 388 (79.0%)
+Speculative stats: length=1.970, avg_accept_length=0.936, num_blocks=501, overall_hit_rate=0.245
+
+Task: put the wine bottle on the rack
+Starting episode 42...
+Success: True
+# episodes completed so far: 492
+# successes: 389 (79.1%)
+Speculative stats: length=2.106, avg_accept_length=1.026, num_blocks=605, overall_hit_rate=0.279
+
+Task: put the wine bottle on the rack
+Starting episode 43...
+Success: False
+# episodes completed so far: 493
+# successes: 389 (78.9%)
+Speculative stats: length=1.878, avg_accept_length=0.828, num_blocks=1118, overall_hit_rate=0.223
+
+Task: put the wine bottle on the rack
+Starting episode 44...
+Success: True
+# episodes completed so far: 494
+# successes: 390 (78.9%)
+Speculative stats: length=2.150, avg_accept_length=1.066, num_blocks=762, overall_hit_rate=0.275
+
+Task: put the wine bottle on the rack
+Starting episode 45...
+Success: True
+# episodes completed so far: 495
+# successes: 391 (79.0%)
+Speculative stats: length=2.010, avg_accept_length=0.972, num_blocks=613, overall_hit_rate=0.269
+
+Task: put the wine bottle on the rack
+Starting episode 46...
+Success: True
+# episodes completed so far: 496
+# successes: 392 (79.0%)
+Speculative stats: length=2.018, avg_accept_length=0.981, num_blocks=569, overall_hit_rate=0.257
+
+Task: put the wine bottle on the rack
+Starting episode 47...
+Success: True
+# episodes completed so far: 497
+# successes: 393 (79.1%)
+Speculative stats: length=2.047, avg_accept_length=1.006, num_blocks=472, overall_hit_rate=0.268
+
+Task: put the wine bottle on the rack
+Starting episode 48...
+Success: True
+# episodes completed so far: 498
+# successes: 394 (79.1%)
+Speculative stats: length=2.147, avg_accept_length=1.104, num_blocks=414, overall_hit_rate=0.285
+
+Task: put the wine bottle on the rack
+Starting episode 49...
+Success: True
+# episodes completed so far: 499
+# successes: 395 (79.2%)
+Speculative stats: length=2.116, avg_accept_length=1.000, num_blocks=665, overall_hit_rate=0.265
+
+Task: put the wine bottle on the rack
+Starting episode 50...
+Success: True
+# episodes completed so far: 500
+# successes: 396 (79.2%)
+Speculative stats: length=2.131, avg_accept_length=1.084, num_blocks=404, overall_hit_rate=0.282
+Current task success rate: 0.68
+Current total success rate: 0.792
+Current task speculative stats: length=2.172, avg_accept_length=1.111, num_blocks=33351, overall_hit_rate=0.291
+Saved eval summary to: /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs/dflash_strict/简化版Draft-e100/dflash_strict/EVAL-libero_goal-openvla-2026_07_29-13_59_30--dflash-minimal-goal-e100-s7-linear-strict-dflash_strict_summary.json
+Total speculative stats: length=2.172, avg_accept_length=1.111, num_blocks=33351, overall_hit_rate=0.291
+Conditional prefix hit rate: p1=0.819, p2=0.282, p3=0.217, p4=0.208, p5=0.052, p6=0.444

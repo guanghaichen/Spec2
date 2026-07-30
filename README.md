@@ -391,8 +391,8 @@ OpenVLA 微调权重、`*_no_noops` RLDS、动作反归一化 `norm_stats` 键�
 连续数组加 offset，action hidden 与 token 使用固定形状连续数组；一个 local batch 只需一次 prompt hyperslab
 读取。它不量化、不压缩、不改变样本、selected layer、position id 或监督标签。
 
-当前 `DistributedBlockSampler` 以四卡相邻超级块为随机单位：默认每卡连续读取 64 个样本，四卡同一时刻处理
-同一个 256 样本物理区域的相邻切片；每轮打乱超级块并轮换 rank 切片，完整覆盖全体样本，仅尾部按 DDP 规则
+当前 `DistributedBlockSampler` 以两卡相邻超级块为随机单位：默认每卡连续读取 64 个样本，两卡同一时刻处理
+同一个 128 样本物理区域的相邻切片；每轮打乱超级块并轮换 rank 切片，完整覆盖全体样本，仅尾部按 DDP 规则
 少量补齐。启动脚本固定 `NUM_WORKERS=1`、`prefetch_factor=1` 并开启 persistent worker，使每个 rank 全程复用
 一个只读 HDF5 句柄。低优先级 `ionice/nice` 继续保护共享服务器。checkpoint 仍每 10 epoch 保存一次，但不保存
 约 1.2 GiB optimizer state，也不额外复制根目录 latest 权重。
@@ -446,8 +446,8 @@ CAD、旧 causal residual、旧 refined hidden、旧 residual CE 和 Action-RNN 
 
 ### 4.4 当前独立 Minimal Draft 主线
 
-Minimal 配方不是修改旧 joint 默认值，而是显式的 `minimal` 模式和独立输出目录。它是当前 3090 正在运行的
-训练主线，并保留：
+Minimal 配方不是修改旧 joint 默认值，而是显式的 `minimal` 模式和独立输出目录。它是当前后续四个 LIBERO
+子集统一使用的训练主线，并保留：
 
 ```text
 一层并行 DFlash + 完整 prompt hidden + 已验证 action-history hidden
@@ -471,9 +471,10 @@ L_minimal = 1.00 * SmoothL1(hidden_draft, hidden_teacher)
           + 0.05 * KL(teacher_action_distribution || draft_action_distribution)
 ```
 
-学习率、warmup、slot decay、位置平衡、hidden noise、packed sampler 和 checkpoint 间隔与 golden 主干保持
-一致，确保差异只来自被移除的训练组件。它会写入
-`ckpt_goal_dflash_minimal_1layer_hidden_soft_b16x1_4gpu_packedv2`，绝不复用 golden 目录。
+正式协议固定为 100 epoch、两卡、每卡 batch 16、梯度累积 2、每 rank 一个 DataLoader worker；global batch
+仍为 64，因此少卡不会顺手改变优化尺度。学习率 `2e-5`、warmup 1000 step、slot decay、位置平衡、hidden
+noise、packed sampler 和每 10 epoch checkpoint 间隔保持不变。新输出目录按子集隔离，例如 Goal 为
+`ckpt_goal_dflash_minimal_1layer_hidden_soft_b16x2_2gpu_packedv2`，绝不复用 Golden 或旧四卡目录。
 
 ### 4.5 SwanLab 指标怎样读
 
@@ -1268,6 +1269,13 @@ Minimal e100 的完整 500-episode 结果为 SR `0.746`、最后 task mean `0.07
 仍略慢于 Golden TD-Fast 的 `0.070050s`。因此该机制证明风险门确实能选择性扩展 hold，却没有形成足以替代
 固定 TD-Fast 的净收益，论文中应作为调度消融而非主方法。
 
+它没有达到 `3x` 的原因不是 4090 算力不足，而是 target 路径仍然太密：Adaptive 的 target-prefill 占比为
+`4750/10255=46.3%`，只比 TD-Fast 约 50% 的占比降低 3.7 个百分点。以当前 AR 分母计，`3x` 要求最后 task
+mean 不高于 `0.060906s`；在 hold 近乎免费但门控/环境开销仍存在的实测条件下，target 占比需要进一步降到
+约 38%-40%。当前第二跳仅 `779/4704=16.6%` 通过，主要拒绝原因是 3,842 次
+`insufficient_verified_run`，所以它理论上只能提供小幅增益。后续任何 `>3x` 候选都必须通过 paired 小实验
+同时证明 target 占比、实际 timing 和 SR，而不能只继续放宽阈值后按 Length 推测。
+
 ### 6.12 已废弃的旧余弦课程早期快照
 
 2026-07-15，旧 3090 主训练在 step 500、warmup 进行到一半时：
@@ -1316,19 +1324,18 @@ paper-wrapped AR 分母完成了四组 Goal 500-episode 评测：
 已经保留主性能：VTPF strict 与 Golden e200 的 `1.286x` 相当，TD-Fast 比 Golden 的 `2.608x` 只低约
 2.8%，SR 则同为 `0.754`。
 
-因此后续其它 LIBERO 子集把 **100 epoch 作为默认训练预算**，保存 e60/e80/e100 做在线筛选；现阶段没有证据
-支持进一步降到 60 或 80。不要按离线 loss 或 teacher-forced accuracy 做自动早停，因为它们没有可靠预测
-在线 p2-p6、SR 或端到端速度。另一个关键复现细节是：当前 e100 使用的仍是 200-epoch scheduler 在中点的
-学习率（约 `1.01e-5`）；若只把 `NUM_EPOCHS` 改成 100，scheduler 会在 e100 提前衰减到零，并非同一训练
-轨迹。未增加独立 scheduler horizon 前，最严格的复现方式仍是保留 `NUM_EPOCHS=200`，在 e100 checkpoint
-完成后停止；后续应把“实际训练上限”和“学习率计划长度”显式拆开再固定新默认值。
+因此后续四个 LIBERO 子集统一采用 **固定 100 epoch**，保存 e60/e80/e100 做在线筛选；不按离线 loss 或
+teacher-forced accuracy 自动早停，因为它们不能可靠预测在线 p2-p6、SR 或端到端速度。Goal 的现有 e100
+来自原 200-epoch scheduler 的中点，本项目将它作为本轮 Goal 的正式 100-epoch checkpoint，**不为统一目录名
+或 scheduler 形式重复消耗一次训练**；论文和 artifact 中继续如实保留它的历史来源。后续 object、spatial、10
+直接使用新的 100-epoch 完整退火协议。两者并非逐 step 完全相同，但当前决策优先避免没有在线收益证据的重复训练。
 
 ## 7. 当前标准工作流
 
 固定分工：
 
 ```text
-3090：生成离线数据，0-3 四卡训练
+3090：生成离线数据；Minimal 默认两卡训练
 本地：使用 scp -3 中转 checkpoint
 4090：单卡串行 LIBERO 推理评测
 GitHub：两台服务器之间唯一的代码同步基准
@@ -1424,49 +1431,48 @@ TASK_SUITE_NAME=libero_10 GPU_ID=7 KEEP_RAW=False \
   bash openvla/specdecoding/train-scripts/run_dflash_data_goal.sh full
 ```
 
-### 7.2 3090 四卡训练
+### 7.2 3090 两卡、100-epoch Minimal 训练
 
-已固化的复杂版 golden 复现入口保持不变：
-
-```bash
-CUDA_VISIBLE_DEVICES=0,1,2,3 \
-  bash openvla/specdecoding/train-scripts/run_dflash_train.sh joint
-```
-
-当前新增的简化 Draft 对照使用独立模式；它直接复用现有 packed v2，不需要重新生成数据：
+当前四个子集统一使用 `minimal`。默认每卡 batch 16、梯度累积 2、global batch 64、`NUM_WORKERS=1`、
+100 epoch；只需选择两张可用卡和子集：
 
 ```bash
-CUDA_VISIBLE_DEVICES=0,1,2,3 \
+TASK_SUITE_NAME=libero_goal CUDA_VISIBLE_DEVICES=0,1 \
+  bash openvla/specdecoding/train-scripts/run_dflash_train.sh minimal
+
+TASK_SUITE_NAME=libero_object CUDA_VISIBLE_DEVICES=0,1 \
+  bash openvla/specdecoding/train-scripts/run_dflash_train.sh minimal
+
+TASK_SUITE_NAME=libero_spatial CUDA_VISIBLE_DEVICES=0,1 \
+  bash openvla/specdecoding/train-scripts/run_dflash_train.sh minimal
+
+TASK_SUITE_NAME=libero_10 CUDA_VISIBLE_DEVICES=0,1 \
   bash openvla/specdecoding/train-scripts/run_dflash_train.sh minimal
 ```
 
-其默认输出为：
+`CUDA_VISIBLE_DEVICES` 可以换成任意两张空闲卡；脚本会检查卡数必须与默认 `NPROC_PER_NODE=2` 一致。
+两卡时用梯度累积 2 是为了保持旧四卡 `16*1*4=64` 的全局 batch，不是增加有效 batch。每个 DDP rank 使用
+一个 worker，因此系统中共有两个只读 worker；`prefetch_factor=1` 和低优先级 IO 继续保护共享磁盘。
 
-```text
-/data/wulin/c/specvla-data/ckpt_goal_dflash_minimal_1layer_hidden_soft_b16x1_4gpu_packedv2/
-```
+四个默认数据/输出会按 `TASK_SUITE_NAME` 自动绑定：
+
+| suite | packed v2 | 默认输出目录 |
+| --- | --- | --- |
+| `libero_goal` | `dflash_goal_dataset_envfix_20260714_packed_v2.h5` | `ckpt_goal_dflash_minimal_1layer_hidden_soft_b16x2_2gpu_packedv2` |
+| `libero_object` | `dflash_object_dataset_packed_v2.h5` | `ckpt_object_dflash_minimal_1layer_hidden_soft_b16x2_2gpu_packedv2` |
+| `libero_spatial` | `dflash_spatial_dataset_packed_v2.h5` | `ckpt_spatial_dflash_minimal_1layer_hidden_soft_b16x2_2gpu_packedv2` |
+| `libero_10` | `dflash_10_dataset_packed_v2.h5` | `ckpt_10_dflash_minimal_1layer_hidden_soft_b16x2_2gpu_packedv2` |
+
+Goal 已有的 `minimal-100epoch/epoch_100_step_044800` 继续作为正式 e100，不需要按新目录重训。其它子集的
+新 HDF5 会携带 `task_suite_name`；训练入口同时检查数据元数据与 OpenVLA `norm_stats`，错配会在训练前报错。
 
 `minimal` 在 Python 参数层还有显式配方校验：一旦误开 RNN、跨 Anchor、hard CE、L1、Prefix、CAD 或任一
 课程，会在加载训练前报错，避免一个目录名叫“minimal”而实际混入旧模块。
 
-默认输出：
-
-```text
-/data/wulin/c/specvla-data/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu_packedv2/
-├── metrics.jsonl
-├── run_config.json
-├── swanlog/
-├── latest_checkpoint.txt
-└── epoch_200_step_*/
-```
-
-只有 `joint` 会先执行默认 8 个只读 batch 的损失标定；`minimal` 使用固定损失权重，不做标定。要换 GPU 或
-新输出目录，只需覆盖环境变量：
+已固化的复杂版 Golden 仍可显式复现，但不是新子集默认训练协议：
 
 ```bash
-DATAPATH=/data/wulin/c/specvla-data/dflash_goal_dataset_new_packed_v2.h5 \
-OUTPUT_DIR=/data/wulin/c/specvla-data/ckpt_goal_dflash_joint_new \
-CUDA_VISIBLE_DEVICES=2,3,4,6 \
+TASK_SUITE_NAME=libero_goal CUDA_VISIBLE_DEVICES=0,1 NUM_EPOCHS=200 \
   bash openvla/specdecoding/train-scripts/run_dflash_train.sh joint
 ```
 
@@ -1772,7 +1778,7 @@ AR、strict、relaxed 必须同机、同 GPU、串行执行。4090 是正式速�
 | `pack_dflash_hdf5.py` | 将既有 v1 数据一次性迁移为 packed v2；日常无需单独调用 |
 | `benchmark_dflash_hdf5.py` | 四进程只读 A/B 测试 legacy v1 与 packed v2 的真实数据吞吐 |
 | `run_dflash_train.sh joint` | Golden 兼容入口：200 epoch 高维主导 Base/Final 线性交接 |
-| `run_dflash_train.sh minimal` | 当前训练主线：一层 Draft + multi-anchor + Hidden/Cos/Soft KL |
+| `run_dflash_train.sh minimal` | 当前训练主线：四子集统一 100 epoch、两卡 global batch 64、一层 Draft + multi-anchor + Hidden/Cos/Soft KL |
 | `run_dflash_train.sh stage1/stage2` | 仅用于复现已废弃的两阶段消融 |
 
 `train_dflash_libero_goal.py` 是底层训练实现，不建议日常手写几十个 CLI 参数。历史单次课程仍保留在 Python

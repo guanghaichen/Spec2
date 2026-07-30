@@ -77,6 +77,13 @@ def parse_args():
         help="离线数据路径（预计算的 .ckpt 文件）",
     )
     parser.add_argument(
+        "--task_suite_name",
+        type=str,
+        choices=["libero_goal", "libero_object", "libero_spatial", "libero_10"],
+        default="libero_goal",
+        help="当前训练所属的 LIBERO 子集；用于数据/模型一致性校验与实验记录",
+    )
+    parser.add_argument(
         "--dataset_format",
         type=str,
         choices=["auto", "files", "shards", "hdf5"],
@@ -116,7 +123,7 @@ def parse_args():
     )
     parser.add_argument("--pin_memory", action=argparse.BooleanOptionalAction, default=False, help="是否启用 DataLoader pinned memory；默认关闭以降低主机内存/IO 压力")
     parser.add_argument("--persistent_workers", action=argparse.BooleanOptionalAction, default=False, help="是否保持 DataLoader worker 常驻；默认关闭，避免训练结束后 worker/文件句柄残留")
-    parser.add_argument("--num_epochs", type=int, default=200, help="最大训练 epochs")
+    parser.add_argument("--num_epochs", type=int, default=100, help="最大训练 epochs；Minimal 正式协议固定为 100")
     parser.add_argument("--lr", type=float, default=2e-5, help="Draft Transformer 主干 AdamW 学习率；hidden 蒸馏默认使用较稳的 2e-5")
     parser.add_argument(
         "--action_head_lr",
@@ -1078,6 +1085,9 @@ class DataCollatorForOfflineDFlash:
 def build_dflash_config_dict(args) -> Dict[str, Any]:
     return {
         "run_name": args.run_name,
+        "task_suite_name": args.task_suite_name,
+        "vla_path": args.vla_path,
+        "datapath": args.datapath,
         "block_size": args.block_size,
         "num_draft_layers": args.num_draft_layers,
         "target_layer_ids": args.target_layer_ids,
@@ -3555,6 +3565,11 @@ def main():
         low_cpu_mem_usage=True,# 在加载模型时优化 CPU 内存使用
         trust_remote_code=False,# 使用本仓库已注册的本地 OpenVLA 类，避免联网拉 HF dynamic module
     )
+    if args.task_suite_name not in vla.norm_stats:
+        raise KeyError(
+            f"模型 norm_stats 中没有 {args.task_suite_name}；"
+            f"现有键为 {sorted(vla.norm_stats)}。请使用同一 LIBERO 子集的 OpenVLA 权重。"
+        )
     processor = AutoProcessor.from_pretrained(args.vla_path, trust_remote_code=False)# 加载本地 PrismaticProcessor，避免联网拉 HF dynamic module
     # 如果用户没有通过命令行参数指定噪声掩码
     if args.mask_token_id is None:
@@ -3690,6 +3705,22 @@ def main():
         if len(train_files) != 1:
             raise ValueError("HDF5 training expects exactly one dataset file entry.")
         hdf5_path = train_files[0]["path"]
+        import h5py
+
+        with h5py.File(hdf5_path, "r") as h5_file:
+            stored_suite = h5_file.attrs.get("task_suite_name")
+        if isinstance(stored_suite, bytes):
+            stored_suite = stored_suite.decode("utf-8")
+        if stored_suite is not None and str(stored_suite) != args.task_suite_name:
+            raise ValueError(
+                f"训练数据 task_suite_name={stored_suite}，"
+                f"但启动参数为 {args.task_suite_name}；禁止跨子集混用教师数据。"
+            )
+        if stored_suite is None and args.task_suite_name != "libero_goal":
+            raise ValueError(
+                f"{hdf5_path} 缺少 task_suite_name 元数据；非 Goal 新数据必须重新生成，"
+                "不能用旧格式文件推断子集。"
+            )
         hdf5_storage_format = get_hdf5_storage_format(hdf5_path)
         hdf5_dataset_class = (
             OfflineDFlashPackedHDF5Dataset if is_packed_hdf5(hdf5_path) else OfflineDFlashHDF5Dataset

@@ -11,6 +11,8 @@ set -euo pipefail
 # minimal 是与主实验完全隔离的简化对照：只保留一层并行 Draft、完整目标上下文、
 # multi-anchor 覆盖、Hidden/Cos 与轻量 Soft-KL；不创建 Action-RNN，也不启用跨
 # Anchor 蒸馏、Domino 交接、hard CE、L1 或 Prefix Survival。
+# 当前 Minimal 正式协议固定为 100 epoch、2 卡、每卡 batch 16、梯度累积 2，
+# 保持旧四卡实验的 global batch=64；TASK_SUITE_NAME 选择四个 LIBERO 子集。
 # stage1/stage2 仅保留用于复现实验历程，不再是推荐主线。
 
 PHASE="${1:-joint}"
@@ -39,42 +41,69 @@ cd "${REPO_ROOT}"
 
 if [[ -d "/data/wulin" ]]; then
   MACHINE_DATA_ROOT="/data/wulin/c/specvla-data"
-  DEFAULT_VLA_PATH="/data/wulin/hf_files/openvla-7b-finetuned-libero-goal"
+  DEFAULT_HF_ROOT="/data/wulin/hf_files"
 elif [[ -d "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh" ]]; then
   MACHINE_ROOT="/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh"
   MACHINE_DATA_ROOT="${MACHINE_ROOT}/specvla-data"
-  DEFAULT_VLA_PATH="${MACHINE_ROOT}/hf_files/openvla-7b-finetuned-libero-goal"
+  DEFAULT_HF_ROOT="${MACHINE_ROOT}/hf_files"
 elif [[ -d "/mnt/storage/cgh" ]]; then
   MACHINE_DATA_ROOT="/mnt/storage/cgh/specvla-data"
-  DEFAULT_VLA_PATH="/mnt/storage/cgh/hf_files/openvla-7b-finetuned-libero-goal"
+  DEFAULT_HF_ROOT="/mnt/storage/cgh/hf_files"
 else
   echo "无法识别机器路径；请显式设置 VLA_PATH、DATAPATH 和 OUTPUT_DIR。" >&2
   exit 1
 fi
 
-VLA_PATH="${VLA_PATH:-${DEFAULT_VLA_PATH}}"
-DATAPATH="${DATAPATH:-${MACHINE_DATA_ROOT}/dflash_goal_dataset_envfix_20260714_packed_v2.h5}"
-TWO_STAGE_ROOT="${TWO_STAGE_ROOT:-${MACHINE_DATA_ROOT}/ckpt_goal_dflash_two_stage_1layer_b16x1_4gpu}"
-STAGE1_OUTPUT_DIR="${STAGE1_OUTPUT_DIR:-${TWO_STAGE_ROOT}/stage1_representation}"
-STAGE2_OUTPUT_DIR="${STAGE2_OUTPUT_DIR:-${TWO_STAGE_ROOT}/stage2_refinement}"
-JOINT_OUTPUT_DIR="${JOINT_OUTPUT_DIR:-${MACHINE_DATA_ROOT}/ckpt_goal_dflash_joint_domino_1layer_b16x1_4gpu_packedv2}"
-MINIMAL_OUTPUT_DIR="${MINIMAL_OUTPUT_DIR:-${MACHINE_DATA_ROOT}/ckpt_goal_dflash_minimal_1layer_hidden_soft_b16x1_4gpu_packedv2}"
+TASK_SUITE_NAME="${TASK_SUITE_NAME:-libero_goal}"
+case "${TASK_SUITE_NAME}" in
+  libero_goal) SUITE_SLUG="goal" ;;
+  libero_object) SUITE_SLUG="object" ;;
+  libero_spatial) SUITE_SLUG="spatial" ;;
+  libero_10) SUITE_SLUG="10" ;;
+  *)
+    echo "不支持的 TASK_SUITE_NAME=${TASK_SUITE_NAME}；应为 libero_goal、libero_object、libero_spatial 或 libero_10。" >&2
+    exit 1
+    ;;
+esac
 
-CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3}"
-NPROC_PER_NODE="${NPROC_PER_NODE:-4}"
+DEFAULT_VLA_PATH="${DEFAULT_HF_ROOT}/openvla-7b-finetuned-libero-${SUITE_SLUG}"
+if [[ "${TASK_SUITE_NAME}" == "libero_goal" ]]; then
+  DEFAULT_DATAPATH="${MACHINE_DATA_ROOT}/dflash_goal_dataset_envfix_20260714_packed_v2.h5"
+else
+  DEFAULT_DATAPATH="${MACHINE_DATA_ROOT}/dflash_${SUITE_SLUG}_dataset_packed_v2.h5"
+fi
+VLA_PATH="${VLA_PATH:-${DEFAULT_VLA_PATH}}"
+DATAPATH="${DATAPATH:-${DEFAULT_DATAPATH}}"
+
+CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1}"
+NPROC_PER_NODE="${NPROC_PER_NODE:-2}"
 BATCH_SIZE="${BATCH_SIZE:-16}"
-GRAD_ACCUM_STEPS="${GRAD_ACCUM_STEPS:-1}"
+GRAD_ACCUM_STEPS="${GRAD_ACCUM_STEPS:-2}"
 NUM_DRAFT_LAYERS="${NUM_DRAFT_LAYERS:-1}"
 SAVE_EVERY="${SAVE_EVERY:-10}"
 SEED="${SEED:-7}"
 NUM_WORKERS="${NUM_WORKERS:-1}"
-# 每张卡连续读取64个样本；四卡在同一物理超级块内读取相邻切片。
+# 每张卡连续读取64个样本；两卡在同一物理超级块内读取相邻切片。
 HDF5_BLOCK_SIZE="${HDF5_BLOCK_SIZE:-64}"
 SWANLAB_LOG_EVERY_STEPS="${SWANLAB_LOG_EVERY_STEPS:-20}"
 SWANLAB_DETAIL_EVERY_STEPS="${SWANLAB_DETAIL_EVERY_STEPS:-200}"
 IO_NICE_CLASS="${IO_NICE_CLASS:-2}"
 IO_NICE_LEVEL="${IO_NICE_LEVEL:-7}"
 CPU_NICE_LEVEL="${CPU_NICE_LEVEL:-10}"
+SWANLAB_PROJECT="${SWANLAB_PROJECT:-dflash-libero-${SUITE_SLUG}}"
+
+IFS=',' read -r -a VISIBLE_GPU_IDS <<< "${CUDA_VISIBLE_DEVICES}"
+if [[ "${#VISIBLE_GPU_IDS[@]}" -ne "${NPROC_PER_NODE}" ]]; then
+  echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} 含 ${#VISIBLE_GPU_IDS[@]} 张卡，但 NPROC_PER_NODE=${NPROC_PER_NODE}。" >&2
+  exit 1
+fi
+
+TRAIN_SHAPE="b${BATCH_SIZE}x${GRAD_ACCUM_STEPS}_${NPROC_PER_NODE}gpu"
+TWO_STAGE_ROOT="${TWO_STAGE_ROOT:-${MACHINE_DATA_ROOT}/ckpt_${SUITE_SLUG}_dflash_two_stage_1layer_${TRAIN_SHAPE}}"
+STAGE1_OUTPUT_DIR="${STAGE1_OUTPUT_DIR:-${TWO_STAGE_ROOT}/stage1_representation}"
+STAGE2_OUTPUT_DIR="${STAGE2_OUTPUT_DIR:-${TWO_STAGE_ROOT}/stage2_refinement}"
+JOINT_OUTPUT_DIR="${JOINT_OUTPUT_DIR:-${MACHINE_DATA_ROOT}/ckpt_${SUITE_SLUG}_dflash_joint_domino_1layer_${TRAIN_SHAPE}_packedv2}"
+MINIMAL_OUTPUT_DIR="${MINIMAL_OUTPUT_DIR:-${MACHINE_DATA_ROOT}/ckpt_${SUITE_SLUG}_dflash_minimal_1layer_hidden_soft_${TRAIN_SHAPE}_packedv2}"
 
 # 两阶段共同的高维表征约束。
 HIDDEN_W="${HIDDEN_W:-1.00}"
@@ -88,7 +117,7 @@ ACTION_HEAD_TYPE="slot_rnn"
 MINIMAL_RECIPE_ARGS=(--no-minimal_draft_training)
 if [[ "${PHASE}" == "minimal" ]]; then
   OUTPUT_DIR="${OUTPUT_DIR:-${MINIMAL_OUTPUT_DIR}}"
-  NUM_EPOCHS="${NUM_EPOCHS:-200}"
+  NUM_EPOCHS="${NUM_EPOCHS:-100}"
   LR="${LR:-2e-5}"
   ACTION_HEAD_LR="${ACTION_HEAD_LR:-${LR}}"
   WARMUP_STEPS="${WARMUP_STEPS:-1000}"
@@ -104,7 +133,7 @@ if [[ "${PHASE}" == "minimal" ]]; then
   ACTION_HEAD_TYPE="action_only"
   MINIMAL_RECIPE_ARGS=(--minimal_draft_training)
   ACTION_HEAD_STATUS="disabled; frozen lm_head action rows only"
-  RUN_NAME="${RUN_NAME:-dflash-minimal-hidden-soft-packedv2-${NUM_DRAFT_LAYERS}layer-b${BATCH_SIZE}x${GRAD_ACCUM_STEPS}-${NPROC_PER_NODE}gpu}"
+  RUN_NAME="${RUN_NAME:-dflash-${SUITE_SLUG}-minimal-hidden-soft-packedv2-${NUM_DRAFT_LAYERS}layer-b${BATCH_SIZE}x${GRAD_ACCUM_STEPS}-${NPROC_PER_NODE}gpu}"
 elif [[ "${TRAINING_PHASE}" == "joint" ]]; then
   OUTPUT_DIR="${OUTPUT_DIR:-${JOINT_OUTPUT_DIR}}"
   NUM_EPOCHS="${NUM_EPOCHS:-200}"
@@ -122,7 +151,7 @@ elif [[ "${TRAINING_PHASE}" == "joint" ]]; then
   LOSS_SCALE_CALIBRATION_STEPS="${LOSS_SCALE_CALIBRATION_STEPS:-8}"
   ACTION_HEAD_STATUS="joint_trainable"
   CURRICULUM_ARGS=(--no-staged_training --no-unified_cosine_curriculum --domino_linear_curriculum)
-  RUN_NAME="${RUN_NAME:-dflash-joint-domino-packedv2-${NUM_DRAFT_LAYERS}layer-b${BATCH_SIZE}x${GRAD_ACCUM_STEPS}-${NPROC_PER_NODE}gpu}"
+  RUN_NAME="${RUN_NAME:-dflash-${SUITE_SLUG}-joint-domino-packedv2-${NUM_DRAFT_LAYERS}layer-b${BATCH_SIZE}x${GRAD_ACCUM_STEPS}-${NPROC_PER_NODE}gpu}"
 elif [[ "${TRAINING_PHASE}" == "representation" ]]; then
   OUTPUT_DIR="${OUTPUT_DIR:-${STAGE1_OUTPUT_DIR}}"
   NUM_EPOCHS="${NUM_EPOCHS:-100}"
@@ -139,7 +168,7 @@ elif [[ "${TRAINING_PHASE}" == "representation" ]]; then
   LOW_DIM_SCALE=1
   LOSS_SCALE_CALIBRATION_STEPS=8
   ACTION_HEAD_STATUS="frozen_and_skipped"
-  RUN_NAME="${RUN_NAME:-dflash-stage1-representation-${NUM_DRAFT_LAYERS}layer-b${BATCH_SIZE}x${GRAD_ACCUM_STEPS}-${NPROC_PER_NODE}gpu}"
+  RUN_NAME="${RUN_NAME:-dflash-${SUITE_SLUG}-stage1-representation-${NUM_DRAFT_LAYERS}layer-b${BATCH_SIZE}x${GRAD_ACCUM_STEPS}-${NPROC_PER_NODE}gpu}"
 else
   OUTPUT_DIR="${OUTPUT_DIR:-${STAGE2_OUTPUT_DIR}}"
   NUM_EPOCHS="${NUM_EPOCHS:-100}"
@@ -168,7 +197,7 @@ else
     exit 1
   fi
   INIT_ARGS=(--init_model_checkpoint "${STAGE1_CKPT}")
-  RUN_NAME="${RUN_NAME:-dflash-stage2-final-refinement-${NUM_DRAFT_LAYERS}layer-b${BATCH_SIZE}x${GRAD_ACCUM_STEPS}-${NPROC_PER_NODE}gpu}"
+  RUN_NAME="${RUN_NAME:-dflash-${SUITE_SLUG}-stage2-final-refinement-${NUM_DRAFT_LAYERS}layer-b${BATCH_SIZE}x${GRAD_ACCUM_STEPS}-${NPROC_PER_NODE}gpu}"
 fi
 
 for path in "${VLA_PATH}" "${DATAPATH}"; do
@@ -189,6 +218,7 @@ fi
 cat <<EOF
 ========== DFlash 训练 ==========
 PHASE=${PHASE} (${TRAINING_PHASE})
+TASK_SUITE_NAME=${TASK_SUITE_NAME}
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}
 GLOBAL_BATCH=${BATCH_SIZE} * ${GRAD_ACCUM_STEPS} * ${NPROC_PER_NODE}
 VLA_PATH=${VLA_PATH}
@@ -213,6 +243,7 @@ NUM_WORKERS=${NUM_WORKERS}
 PROCESS_PRIORITY=ionice(${IO_NICE_CLASS},${IO_NICE_LEVEL}) nice(${CPU_NICE_LEVEL})
 STAGE1_CKPT=${STAGE1_CKPT:-N/A}
 SWANLAB_RUN=${RUN_NAME}
+SWANLAB_PROJECT=${SWANLAB_PROJECT}
 ========================================
 EOF
 
@@ -232,6 +263,7 @@ ionice -c "${IO_NICE_CLASS}" -n "${IO_NICE_LEVEL}" \
   "${MINIMAL_RECIPE_ARGS[@]}" \
   "${INIT_ARGS[@]}" \
   --run_name "${RUN_NAME}" \
+  --task_suite_name "${TASK_SUITE_NAME}" \
   --vla_path "${VLA_PATH}" \
   --datapath "${DATAPATH}" \
   --dataset_format auto \
@@ -294,4 +326,5 @@ ionice -c "${IO_NICE_CLASS}" -n "${IO_NICE_LEVEL}" \
   --persistent_workers \
   --swanlab_log_every_steps "${SWANLAB_LOG_EVERY_STEPS}" \
   --swanlab_detail_every_steps "${SWANLAB_DETAIL_EVERY_STEPS}" \
+  --swanlab_project "${SWANLAB_PROJECT}" \
   --val_split 0

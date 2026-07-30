@@ -801,6 +801,15 @@ def summarize_generation_stats(step_stats_list):
                 len(temporal_hold_decision_records)
                 - len(temporal_hold_allowed_records)
             ),
+            "target_prefill_rate": (
+                (
+                    len(temporal_hold_decision_records)
+                    - len(temporal_hold_allowed_records)
+                )
+                / len(temporal_hold_decision_records)
+                if temporal_hold_decision_records
+                else None
+            ),
             "base_holds": sum(
                 int(record.get("hold_depth", 0) == 1)
                 for record in temporal_hold_allowed_records
@@ -810,6 +819,17 @@ def summarize_generation_stats(step_stats_list):
             ),
             "adaptive_extended_holds": len(temporal_hold_extended_records),
             "adaptive_extension_rate": (
+                len(temporal_hold_extended_records)
+                / len(temporal_hold_extension_candidates)
+                if temporal_hold_extension_candidates
+                else None
+            ),
+            # Policy-neutral names for Visual Budget and future schedulers.
+            # Keep the adaptive_* aliases above so historical analysis scripts
+            # remain readable without a migration.
+            "extension_candidates": len(temporal_hold_extension_candidates),
+            "extended_holds": len(temporal_hold_extended_records),
+            "extension_rate": (
                 len(temporal_hold_extended_records)
                 / len(temporal_hold_extension_candidates)
                 if temporal_hold_extension_candidates
@@ -1137,8 +1157,8 @@ def format_generation_summary(summary, prefix="Speculative stats"):
             "temporal_hold="
             f"policy={temporal_hold.get('policy')}"
             f"/base={temporal_hold.get('base_holds', 0)}"
-            f"/extended={temporal_hold.get('adaptive_extended_holds', 0)}"
-            f"/{temporal_hold.get('adaptive_extension_candidates', 0)}"
+            f"/extended={temporal_hold.get('extended_holds', temporal_hold.get('adaptive_extended_holds', 0))}"
+            f"/{temporal_hold.get('extension_candidates', temporal_hold.get('adaptive_extension_candidates', 0))}"
             f"/forced={temporal_hold.get('forced_target_after_hold', 0)}"
         )
     shadow = summary.get("verify_skip_shadow") or {}

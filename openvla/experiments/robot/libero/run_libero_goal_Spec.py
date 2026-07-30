@@ -121,6 +121,7 @@ class GenerateConfig:
     task_suite_name: str = "libero_goal"          # Task suite. Options: libero_spatial, libero_object, libero_goal, libero_10, libero_90
     num_steps_wait: int = 10                         # Number of steps to wait for objects to stabilize in sim
     num_trials_per_task: int = 50                    # Number of rollouts per task
+    trial_start_index: int = 0                       # Diagnostic offset into LIBERO's fixed initial-state list.
     max_eval_tasks: Optional[int] = None              # Diagnostic smoke limit; None evaluates all tasks.
 
     #################################################################################################################
@@ -219,6 +220,13 @@ def eval_libero(cfg: GenerateConfig) -> None:
 
         # Get default LIBERO initial states
         initial_states = task_suite.get_task_init_states(task_id)
+        trial_stop_index = cfg.trial_start_index + cfg.num_trials_per_task
+        if cfg.trial_start_index < 0 or trial_stop_index > len(initial_states):
+            raise ValueError(
+                "Requested LIBERO initial-state range is out of bounds: "
+                f"start={cfg.trial_start_index}, stop={trial_stop_index}, "
+                f"available={len(initial_states)}."
+            )
 
         # Initialize LIBERO environment and task description
         env, task_description = get_libero_env(task, cfg.model_family, resolution=256)
@@ -227,7 +235,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
         task_episodes, task_successes = 0, 0
         task_episode_time = []
         task_generation_step_stats = []
-        for episode_idx in tqdm.tqdm(range(cfg.num_trials_per_task)):
+        episode_indices = range(cfg.trial_start_index, trial_stop_index)
+        for episode_idx in tqdm.tqdm(episode_indices):
             total_time = []
             episode_generation_stats = []
             print(f"\nTask: {task_description}")
@@ -258,6 +267,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
 
             print(f"Starting episode {task_episodes+1}...")
             log_file.write(f"Starting episode {task_episodes+1}...\n")
+            print(f"LIBERO initial-state index: {episode_idx}")
+            log_file.write(f"LIBERO initial-state index: {episode_idx}\n")
             while t < max_steps + cfg.num_steps_wait:
                 try:
                     # IMPORTANT: Do nothing for the first few timesteps because the simulator drops objects

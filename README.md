@@ -5,9 +5,11 @@
 
 当前训练主线是独立的一层 Minimal Draft：保留完整目标上下文、multi-anchor、Hidden/Cos 和小权重 Soft KL，
 不再默认依赖 Action-RNN。当前推理主线分为两档：strict 使用验证式时序 Prefill 融合（VTPF）；relaxed 使用
-目标锚定时序降采样（VTPF-TD），在 target 关键帧之间最多保持一次最近的 target-verified 动作，从而直接省掉
-整次多模态 prefill。动作组宽松校验、DDTree、时序多候选 Prefill 树和短前缀认证均保留为消融，但当前证据
-没有证明它们是最佳路径。所有模块仍必须同时接受成功率、Length 和端到端 Speedup 检验。
+目标锚定时序降采样（VTPF-TD）。正式 Fast 档在 target 关键帧之间保持一次最近的 target-verified 动作；
+Visual Budget 候选档只在相对最近 target 锚点的累计视觉漂移未超预算时增加第二次保持，并在之后强制回到
+target。两者都直接省掉整次多模态 prefill。动作组宽松校验、DDTree、时序多候选 Prefill 树和短前缀认证
+均保留为消融，但当前证据没有证明它们是最佳路径。所有模块仍必须同时接受成功率、Length 和端到端
+Speedup 检验。
 
 代码基于 [SpecVLA](https://github.com/PineTreeWss/SpecVLA)，而 SpecVLA 又基于
 [OpenVLA](https://github.com/openvla/openvla)。当前仓库仍是研究代码，不是已经定稿的公开复现包。
@@ -23,6 +25,11 @@
 | SpecVLA relaxed (`r=9`) | 近似接受 | 0.734 | 0.141228s | 1.294x | 2.361 |
 | **Golden + VTPF strict** | **target-verified** | **0.790** | **0.142036s** | **1.286x** | **2.422** |
 | **Golden + VTPF-TD-Fast** | **单步时序近似** | **0.754** | **0.070050s** | **2.608x** | **3.653** |
+
+新的 Minimal e100 `VTPF-TD-VisualBudget` 目前完成了两批错开的 3-trial/task 小试验，而非 50-trial/task
+正式结果。两批合并为 `45/60=0.750`，最后 task 的 6 条轨迹合并 mean 为 `0.054848s`，对应 **3.331x**；
+所有 6 条逐轨迹 speedup 都超过 3x。它是当前最有把握的 `>3x` 候选，但在跑满 500 episodes 前不得写成
+正式 SOTA 数字。原始证据见 6.14。
 
 独立 Minimal Draft 的 epoch 100 已完成相同的 500-episode 在线评测。它用远少于 Golden 的训练组件，仍得到
 `1.295x` 的 VTPF strict 和 `2.534x` 的 VTPF-TD-Fast；这证明当前主性能并不依赖 Action-RNN、跨 Anchor
@@ -49,6 +56,10 @@
   target 关键帧给出完全相同的 7-token 动作”和“当前图像相对最近 target 锚点的累计相对 L2 不超过阈值”；
   两次 hold 后强制 target。正式结果为 `2.599x / SR 0.746`：相对同一 Minimal TD-Fast 快约 2.6%，但少
   4/500 个成功；相对 Golden TD-Fast 没有净速度优势，因此只保留为风险自适应消融，不替换主方案。
+- **VTPF-TD-VisualBudget 候选**：去掉导致覆盖率过低的“两个 target 动作必须逐 token 完全相同”前置条件，
+  第一跳仍沿用 Fast；第二跳只由相对最近 target 锚点的累计低频视觉漂移预算控制，最多连续保持两次。
+  `0.15` 工作点在错开的 60 个 Goal 初始状态上得到 `45/60` 和合并 `3.331x`，无需重训 Draft；它与旧
+  Adaptive 分入口、分日志保存，等待正式 500-episode 评测。
 
 ## 1. 阅读顺序和项目地图
 
@@ -79,6 +90,7 @@
 | VTPF-TD 速度档 | `openvla/specdecoding/decode-scripts/run_dflash_vtpf_temporal_decimation_goal_eval.sh` | target 与单步 hold 交替，跳过整次 prefill |
 | VTPF-TD 保护档 | `openvla/specdecoding/decode-scripts/run_dflash_vtpf_guarded_bypass_goal_eval.sh` | 在单步 hold 前增加当前图像变化门 |
 | VTPF-TD 自适应档 | `openvla/specdecoding/decode-scripts/run_dflash_vtpf_adaptive_decimation_goal_eval.sh` | 仅在双重证据成立时把一次 hold 扩为两次；独立实验入口 |
+| VTPF-TD 视觉预算档 | `openvla/specdecoding/decode-scripts/run_dflash_vtpf_visual_budget_goal_eval.sh` | 累计视觉漂移预算决定第二次 hold；当前 `>3x` 候选入口 |
 | 自适应 hold 决策 | `openvla/specdecoding/model/temporal_hold.py` | 无 CUDA 依赖的固定/风险受限策略与硬上限，可独立单测 |
 | 短前缀认证消融 | `openvla/specdecoding/decode-scripts/run_dflash_vtpf_prefix_cert_goal_eval.sh` | target 精确认证短前缀后信任尾部；当前净收益很小 |
 | 时序门校准 | `openvla/specdecoding/test-speed/analyze_dflash_temporal_shadow.py` | 从 shadow summary 统计覆盖、错误和 95% 风险上界 |
@@ -1330,6 +1342,33 @@ teacher-forced accuracy 自动早停，因为它们不能可靠预测在线 p2-p
 或 scheduler 形式重复消耗一次训练**；论文和 artifact 中继续如实保留它的历史来源。后续 object、spatial、10
 直接使用新的 100-epoch 完整退火协议。两者并非逐 step 完全相同，但当前决策优先避免没有在线收益证据的重复训练。
 
+### 6.14 2026-07-30 VTPF-TD-VisualBudget：稳定越过 3x 的小试验
+
+6.11 的旧 Adaptive 被“最近两个 target 必须给出逐 token 完全相同动作”卡住，第二跳覆盖率只有 `16.6%`。
+VisualBudget 保留更重要的安全结构，但把这个低覆盖条件移除：第一跳与 TD-Fast 相同；准备第二跳时，计算当前
+processor 图像相对最近一次真实 target 图像的 `16x16` 低频特征相对 L2。漂移不超过预算才复用上一条
+target-verified 动作；hold 从不增加 verified run，target 图像锚点也不会被 hold 更新；连续两次 hold 后
+无条件强制 target。它不改变 Draft、权重、token 校验或动作接受规则，也不需要重训。
+
+为避免再次用失败长轨迹制造“假 3x”，筛选时同时检查总 SR、最后 task 汇总 timing 和每条轨迹 timing：
+
+| 视觉预算 | 初始状态 | SR | last-task mean | Speedup | target 比例 | 第二跳覆盖 | 结论 |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| 0.06 | 每任务 0-2 | 24/30 | 0.054955s | 3.325x | 40.0% | 50.2% | 汇总过 3x，但两条成功轨迹仅 2.57x/2.38x，否决 |
+| 0.10 | 每任务 0-2 | 25/30 | 0.063563s | 2.875x | 38.1% | 62.7% | SR 最好，但未稳定过 3x |
+| **0.15** | **每任务 0-2** | **23/30** | **0.056270s** | **3.247x** | **34.7%** | **89.3%** | 三条逐轨迹均超过 3x |
+| **0.15** | **每任务 3-5** | **22/30** | **0.053744s** | **3.400x** | **34.2%** | **93.8%** | 错开初始状态复核；三条逐轨迹均超过 3x |
+
+两个 `0.15` 批次合并为 `45/60=0.750`；最后 task 共 6 条轨迹、1,359 个动作的加权 mean 为
+`0.054848s`，相对同机 paper-wrapped AR `0.182718s` 为 **3.331x**。相同 60 个固定初始状态上，Minimal
+TD-Fast 为 `43/60`，旧 Adaptive 为 `44/60`，因此当前没有观察到 VisualBudget 为跨过 3x 额外牺牲成功率。
+这仍是阈值筛选后的小试验，不是正式 500-episode 结果；正式评测必须固定 `0.15`，不可继续看结果调阈值。
+
+LIBERO 的 `SEED` 不改变 `initial_states[episode_idx]`。为做不重复的小试验，strict/relaxed 评测入口新增
+`trial_start_index`，默认 0；`TRIAL_START_INDEX=3, NUM_TRIALS_PER_TASK=3` 才真正选择每任务第 4-6 个初始
+状态。该参数只改变评测样本范围，不改变模型或动作逻辑。两批原始文本、逐动作 timing 和完整 summary 固化在
+[`artifacts/eval/libero_goal/vtpf_visual_budget_e100_20260730`](artifacts/eval/libero_goal/vtpf_visual_budget_e100_20260730)。
+
 ## 7. 当前标准工作流
 
 固定分工：
@@ -1463,7 +1502,7 @@ TASK_SUITE_NAME=libero_10 CUDA_VISIBLE_DEVICES=0,1 \
 | `libero_spatial` | `dflash_spatial_dataset_packed_v2.h5` | `ckpt_spatial_dflash_minimal_1layer_hidden_soft_b16x2_2gpu_packedv2` |
 | `libero_10` | `dflash_10_dataset_packed_v2.h5` | `ckpt_10_dflash_minimal_1layer_hidden_soft_b16x2_2gpu_packedv2` |
 
-Goal 已有的 `minimal-100epoch/epoch_100_step_044800` 继续作为正式 e100，不需要按新目录重训。其它子集的
+Goal 已有权重已整理到 `Draft_checkpoint/goal/epoch_100_step_044800`，继续作为正式 e100，不需要按新目录重训。其它子集的
 新 HDF5 会携带 `task_suite_name`；训练入口同时检查数据元数据与 OpenVLA `norm_stats`，错配会在训练前报错。
 
 `minimal` 在 Python 参数层还有显式配方校验：一旦误开 RNN、跨 Anchor、hard CE、L1、Prefix、CAD 或任一
@@ -1602,7 +1641,7 @@ CUDA_VISIBLE_DEVICES=0 EVAL_EPOCH=200 NUM_TRIALS_PER_TASK=50 \
 epoch 100 的 50 trials/task 命令；它不会顺带运行线性、VTPF strict 或旧 TD-Fast：
 
 ```bash
-SPEC_CKPT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/minimal-100epoch/epoch_100_step_044800 \
+SPEC_CKPT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/Draft_checkpoint/goal/epoch_100_step_044800 \
 EVAL_EPOCH=100 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
 SEED=7 SYNC_CUDA_TIMING=False TIMING_SCOPE=last_task \
   bash openvla/specdecoding/decode-scripts/run_dflash_vtpf_adaptive_decimation_goal_eval.sh
@@ -1611,6 +1650,17 @@ SEED=7 SYNC_CUDA_TIMING=False TIMING_SCOPE=last_task \
 默认预注册参数为 `min_verified_run=2`、`anchor_pixel_relative_l2<=0.03`、`max_consecutive=2`。如需后续消融，
 只能显式覆盖 `DFLASH_TEMPORAL_ADAPTIVE_MIN_VERIFIED_RUN` 或
 `DFLASH_TEMPORAL_ADAPTIVE_MAX_ANCHOR_PIXEL_RELATIVE_L2`，并在 run id 中保留参数；不得用正式结果反向挑阈值。
+
+VisualBudget 使用独立入口，不会覆盖旧 Adaptive。`0.15` 已由 6.14 的小试验固定，下一步正式评测直接运行：
+
+```bash
+SPEC_CKPT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/Draft_checkpoint/goal/epoch_100_step_044800 \
+EVAL_EPOCH=100 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+SEED=7 SYNC_CUDA_TIMING=False TIMING_SCOPE=last_task \
+  bash openvla/specdecoding/decode-scripts/run_dflash_vtpf_visual_budget_goal_eval.sh
+```
+
+仅做不重复的诊断批次时可附加 `TRIAL_START_INDEX=3`；论文正式 50-trial/task 必须保持默认 0。
 PrefixCert 仅用于固定成本消融：
 
 ```bash
@@ -1623,7 +1673,7 @@ VTPF-TD-Fast。它会强制三路使用同一个 checkpoint、RNN-off、seed 和
 标识的独立目录；中断后可用 `START_CASE=2` 或 `3` 续跑。e100 示例：
 
 ```bash
-SPEC_CKPT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/minimal-100epoch/epoch_100_step_044800 \
+SPEC_CKPT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/Draft_checkpoint/goal/epoch_100_step_044800 \
 EVAL_EPOCH=100 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
   bash openvla/specdecoding/decode-scripts/run_dflash_minimal_goal_3way_eval.sh
 ```
@@ -1799,6 +1849,7 @@ AR、strict、relaxed 必须同机、同 GPU、串行执行。4090 是正式速�
 | `run_dflash_vtpf_temporal_decimation_goal_eval.sh` | VTPF-TD 速度档：target 与单步 hold 交替 |
 | `run_dflash_vtpf_guarded_bypass_goal_eval.sh` | VTPF-TD 保护档：图像变化门控的单步 hold |
 | `run_dflash_vtpf_adaptive_decimation_goal_eval.sh` | 单组 VTPF-TD 自适应档：双重证据才扩展第二次 hold，随后强制 target |
+| `run_dflash_vtpf_visual_budget_goal_eval.sh` | 单组 VTPF-TD 视觉预算档：累计视觉漂移控制第二次 hold；当前 `>3x` 候选 |
 | `run_dflash_vtpf_prefix_cert_goal_eval.sh` | PrefixCert 固定成本消融，不是推荐主线 |
 | `analyze_dflash_temporal_shadow.py` | 汇总时序门覆盖率、错误率和 Wilson 风险上界 |
 | `run_dflash_action_rnn_goal_4way_eval.sh` | 同一 Goal checkpoint 的 RNN/树 × strict/动作组四路消融 |

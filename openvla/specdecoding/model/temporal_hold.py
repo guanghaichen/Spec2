@@ -20,10 +20,13 @@ def normalize_temporal_hold_policy(value) -> str:
         "adaptive": "adaptive",
         "risk_bounded": "adaptive",
         "risk-bounded": "adaptive",
+        "visual_budget": "visual_budget",
+        "visual-budget": "visual_budget",
     }
     if normalized not in aliases:
         raise ValueError(
-            "dflash_temporal_hold_policy must be 'fixed' or 'adaptive'."
+            "dflash_temporal_hold_policy must be 'fixed', 'adaptive', or "
+            "'visual_budget'."
         )
     return aliases[normalized]
 
@@ -68,6 +71,12 @@ def decide_temporal_hold(
     allowed only when two independent online signals agree: multiple target
     keyframes produced the same complete action, and the current image remains
     close to the last target keyframe.  A third hold is never allowed.
+
+    ``visual_budget`` is an isolated speed-oriented policy.  It preserves the
+    first hold and spends a second hold only while cumulative image drift from
+    the last target keyframe remains within a registered budget.  It does not
+    reinterpret that hold as target-verified evidence, and still forces target
+    after at most two holds.
     """
     policy = normalize_temporal_hold_policy(policy)
     consecutive_holds = max(0, int(consecutive_holds))
@@ -93,7 +102,10 @@ def decide_temporal_hold(
         return TemporalHoldDecision(
             False, "adaptive_hard_limit", hold_depth, False, anchor_pixel_relative_l2
         )
-    if int(verified_action_run_length) < int(adaptive_min_verified_run):
+    if (
+        policy == "adaptive"
+        and int(verified_action_run_length) < int(adaptive_min_verified_run)
+    ):
         return TemporalHoldDecision(
             False, "insufficient_verified_run", hold_depth, False, anchor_pixel_relative_l2
         )
@@ -107,6 +119,11 @@ def decide_temporal_hold(
         return TemporalHoldDecision(
             False, "anchor_visual_drift", hold_depth, False, anchor_pixel_relative_l2
         )
+    reason = (
+        "adaptive_extension"
+        if policy == "adaptive"
+        else "visual_budget_extension"
+    )
     return TemporalHoldDecision(
-        True, "adaptive_extension", hold_depth, True, anchor_pixel_relative_l2
+        True, reason, hold_depth, True, anchor_pixel_relative_l2
     )

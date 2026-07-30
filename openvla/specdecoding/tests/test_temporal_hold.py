@@ -25,6 +25,9 @@ class TemporalHoldPolicyTest(unittest.TestCase):
         self.assertEqual(normalize_temporal_hold_policy(None), "fixed")
         self.assertEqual(normalize_temporal_hold_policy("legacy"), "fixed")
         self.assertEqual(normalize_temporal_hold_policy("risk-bounded"), "adaptive")
+        self.assertEqual(
+            normalize_temporal_hold_policy("visual-budget"), "visual_budget"
+        )
         with self.assertRaises(ValueError):
             normalize_temporal_hold_policy("unbounded")
 
@@ -59,6 +62,27 @@ class TemporalHoldPolicyTest(unittest.TestCase):
         decision = self._decide(consecutive_holds=2)
         self.assertFalse(decision.allow)
         self.assertEqual(decision.reason, "max_consecutive_reached")
+
+    def test_visual_budget_uses_drift_without_exact_action_run(self):
+        accepted = self._decide(
+            policy="visual_budget",
+            consecutive_holds=1,
+            verified_action_run_length=1,
+            anchor_pixel_relative_l2=0.03,
+            adaptive_max_anchor_pixel_relative_l2=0.05,
+        )
+        self.assertTrue(accepted.allow)
+        self.assertEqual(accepted.reason, "visual_budget_extension")
+
+        rejected = self._decide(
+            policy="visual_budget",
+            consecutive_holds=1,
+            verified_action_run_length=1,
+            anchor_pixel_relative_l2=0.051,
+            adaptive_max_anchor_pixel_relative_l2=0.05,
+        )
+        self.assertFalse(rejected.allow)
+        self.assertEqual(rejected.reason, "anchor_visual_drift")
 
     def test_fixed_policy_keeps_existing_budget_semantics(self):
         decision = self._decide(

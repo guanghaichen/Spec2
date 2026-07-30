@@ -738,9 +738,17 @@ class SpecVLAforActionPrediction(nn.Module):
         self.dflash_temporal_adaptive_max_anchor_pixel_relative_l2 = float(
             dflash_temporal_adaptive_max_anchor_pixel_relative_l2
         )
-        if self.dflash_temporal_adaptive_min_verified_run < 2:
+        if (
+            self.dflash_temporal_hold_policy == "adaptive"
+            and self.dflash_temporal_adaptive_min_verified_run < 2
+        ):
             raise ValueError(
-                "dflash_temporal_adaptive_min_verified_run must be >= 2."
+                "adaptive hold policy requires "
+                "dflash_temporal_adaptive_min_verified_run >= 2."
+            )
+        if self.dflash_temporal_adaptive_min_verified_run < 1:
+            raise ValueError(
+                "dflash_temporal_adaptive_min_verified_run must be >= 1."
             )
         if self.dflash_temporal_adaptive_max_anchor_pixel_relative_l2 <= 0.0:
             raise ValueError(
@@ -2238,7 +2246,7 @@ class SpecVLAforActionPrediction(nn.Module):
         )
         collect_pixel_signature = bool(
             collect_previous_pixel_diagnostics
-            or self.dflash_temporal_hold_policy == "adaptive"
+            or self.dflash_temporal_hold_policy in {"adaptive", "visual_budget"}
         )
         current_pixel_signature = (
             self._dflash_pixel_signature(model_inputs.get("pixel_values"))
@@ -2275,7 +2283,7 @@ class SpecVLAforActionPrediction(nn.Module):
                 )[0].item()
             )
         if (
-            self.dflash_temporal_hold_policy == "adaptive"
+            self.dflash_temporal_hold_policy in {"adaptive", "visual_budget"}
             and self._dflash_consecutive_verify_skips == 1
             and current_pixel_signature is not None
             and self._dflash_last_target_pixel_signature is not None

@@ -106,6 +106,7 @@ fi
 echo "DFLASH_PROFILE_STAGES=${DFLASH_PROFILE_STAGES}"
 echo "DFLASH_DEBUG_COMPARE_TARGET_AR=${DFLASH_DEBUG_COMPARE_TARGET_AR}"
 echo "MAX_EVAL_TASKS=${MAX_EVAL_TASKS:-all}"
+echo "TRIAL_START_INDEX=${TRIAL_START_INDEX:-0}"
 
 if [[ "${DRY_RUN:-False}" == "True" ]]; then
   echo "DRY_RUN=True：路径、checkpoint 和配置检查通过，不启动 LIBERO。"
@@ -126,6 +127,7 @@ python "${EVAL_ENTRY}" \
   --parallel_draft False \
   --task_suite_name libero_goal \
   --num_trials_per_task "${NUM_TRIALS_PER_TASK}" \
+  --trial_start_index "${TRIAL_START_INDEX:-0}" \
   --center_crop True \
   --accept_threshold "${ACCEPT_THRESHOLD}" \
   --dflash_block_size 7 \

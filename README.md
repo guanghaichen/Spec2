@@ -26,10 +26,10 @@ Speedup 检验。
 | **Golden + VTPF strict** | **target-verified** | **0.790** | **0.142036s** | **1.286x** | **2.422** |
 | **Golden + VTPF-TD-Fast** | **单步时序近似** | **0.754** | **0.070050s** | **2.608x** | **3.653** |
 
-新的 Minimal e100 `VTPF-TD-VisualBudget` 目前完成了两批错开的 3-trial/task 小试验，而非 50-trial/task
-正式结果。两批合并为 `45/60=0.750`，最后 task 的 6 条轨迹合并 mean 为 `0.054848s`，对应 **3.331x**；
-所有 6 条逐轨迹 speedup 都超过 3x。它是当前最有把握的 `>3x` 候选，但在跑满 500 episodes 前不得写成
-正式 SOTA 数字。原始证据见 6.14。
+Minimal e100 `VTPF-TD-VisualBudget(p=0.15)` 已完成 500-episode 正式评测：SR `0.672`、mean
+`0.049670s`、**3.679x**、Length `4.230`。成功轨迹单独仍有 `3.168x`，证明速度收益真实；但相对
+Minimal TD-Fast 的 SR `0.754` 显著下降，配对 McNemar `p=0.00115`。因此 `0.15` 只能作为 aggressive
+Pareto 点，不能作为默认主方法。完整诊断见 6.14。
 
 独立 Minimal Draft 的 epoch 100 已完成相同的 500-episode 在线评测。它用远少于 Golden 的训练组件，仍得到
 `1.295x` 的 VTPF strict 和 `2.534x` 的 VTPF-TD-Fast；这证明当前主性能并不依赖 Action-RNN、跨 Anchor
@@ -56,10 +56,10 @@ Speedup 检验。
   target 关键帧给出完全相同的 7-token 动作”和“当前图像相对最近 target 锚点的累计相对 L2 不超过阈值”；
   两次 hold 后强制 target。正式结果为 `2.599x / SR 0.746`：相对同一 Minimal TD-Fast 快约 2.6%，但少
   4/500 个成功；相对 Golden TD-Fast 没有净速度优势，因此只保留为风险自适应消融，不替换主方案。
-- **VTPF-TD-VisualBudget 候选**：去掉导致覆盖率过低的“两个 target 动作必须逐 token 完全相同”前置条件，
+- **VTPF-TD-VisualBudget 速度消融**：去掉导致覆盖率过低的“两个 target 动作必须逐 token 完全相同”前置条件，
   第一跳仍沿用 Fast；第二跳只由相对最近 target 锚点的累计低频视觉漂移预算控制，最多连续保持两次。
-  `0.15` 工作点在错开的 60 个 Goal 初始状态上得到 `45/60` 和合并 `3.331x`，无需重训 Draft；它与旧
-  Adaptive 分入口、分日志保存，等待正式 500-episode 评测。
+  `0.15` 正式结果为 `3.679x / SR 0.672`：跨过 3x，但成功率代价不可忽略。它与旧 Adaptive 分入口、
+  分日志保存，当前保留为 aggressive speed 点而不是默认替代方案。
 
 ## 1. 阅读顺序和项目地图
 
@@ -1342,7 +1342,7 @@ teacher-forced accuracy 自动早停，因为它们不能可靠预测在线 p2-p
 或 scheduler 形式重复消耗一次训练**；论文和 artifact 中继续如实保留它的历史来源。后续 object、spatial、10
 直接使用新的 100-epoch 完整退火协议。两者并非逐 step 完全相同，但当前决策优先避免没有在线收益证据的重复训练。
 
-### 6.14 2026-07-30 VTPF-TD-VisualBudget：稳定越过 3x 的小试验
+### 6.14 2026-07-30 VTPF-TD-VisualBudget：3x 成立，但 `0.15` 过于激进
 
 6.11 的旧 Adaptive 被“最近两个 target 必须给出逐 token 完全相同动作”卡住，第二跳覆盖率只有 `16.6%`。
 VisualBudget 保留更重要的安全结构，但把这个低覆盖条件移除：第一跳与 TD-Fast 相同；准备第二跳时，计算当前
@@ -1358,11 +1358,29 @@ target-verified 动作；hold 从不增加 verified run，target 图像锚点也
 | 0.10 | 每任务 0-2 | 25/30 | 0.063563s | 2.875x | 38.1% | 62.7% | SR 最好，但未稳定过 3x |
 | **0.15** | **每任务 0-2** | **23/30** | **0.056270s** | **3.247x** | **34.7%** | **89.3%** | 三条逐轨迹均超过 3x |
 | **0.15** | **每任务 3-5** | **22/30** | **0.053744s** | **3.400x** | **34.2%** | **93.8%** | 错开初始状态复核；三条逐轨迹均超过 3x |
+| **0.15** | **正式 0-49** | **336/500** | **0.049670s** | **3.679x** | **34.3%** | **92.3%** | 速度成立，但 SR 显著退化 |
 
-两个 `0.15` 批次合并为 `45/60=0.750`；最后 task 共 6 条轨迹、1,359 个动作的加权 mean 为
-`0.054848s`，相对同机 paper-wrapped AR `0.182718s` 为 **3.331x**。相同 60 个固定初始状态上，Minimal
-TD-Fast 为 `43/60`，旧 Adaptive 为 `44/60`，因此当前没有观察到 VisualBudget 为跨过 3x 额外牺牲成功率。
-这仍是阈值筛选后的小试验，不是正式 500-episode 结果；正式评测必须固定 `0.15`，不可继续看结果调阈值。
+两个 `0.15` pilot 合并为 `45/60=0.750`、`3.331x`，但小样本没有暴露正式结果的 SR 退化。正式 500 条中，
+VisualBudget 为 `336/500`，Minimal TD-Fast 为 `377/500`；配对结果是共同成功 280、VisualBudget 独赢 56、
+TD-Fast 独赢 97、共同失败 67，McNemar 精确检验 `p=0.00115`。7/10 个任务下降，所以不能解释为随机波动。
+
+| Goal task id | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| VisualBudget 成功数 | 21 | 39 | 41 | 11 | 47 | 36 | 29 | 46 | 37 | 29 |
+| TD-Fast 成功数 | 21 | 47 | 39 | 20 | 49 | 40 | 36 | 48 | 42 | 35 |
+| 差值 | 0 | -8 | +2 | -9 | -2 | -4 | -7 | -2 | -5 | -6 |
+
+正式最后 task 汇总为 `0.049670s / 3.679x`；29 条成功轨迹单独为 `0.057676s / 3.168x`，21 条失败轨迹
+为 `0.044138s / 4.140x`。失败长轨迹确实放大了总 speedup，但成功轨迹自身也稳定超过 3x。正确结论是：
+**把 target 比例压到约 34% 足以跨过 3x，但纯视觉预算不能可靠约束陈旧动作风险。** `0.15` 应作为速度上界
+和 aggressive Pareto 点，不能写成无精度退化的默认方案。
+
+正式结果后又检查了更保守的全局阈值。`0.10` 的两批 pilot 合并为 `46/60`、表面 `3.251x`，但第一批最后
+task 三条全成功却只有 `2.875x`，第二批三条全失败才达到 `3.475x`，仍受失败轨迹构成偏置影响。`0.12`
+在同一组 0-5 初始状态上跑到前 30 条时只有 `22/30`，低于 `0.15` 对应的 `25/30`，因此提前终止。闭环控制
+会因为一次 hold 决策改变后续整条状态轨迹，SR 不随视觉阈值单调变化；继续微调一个全局 L2 数字既不严谨，
+也不能根治风险。当前应保留 TD-Fast 作为 balanced 主档，把 `0.15` 作为 aggressive speed 档；下一步若要
+同时保持 3x 与 SR，必须引入比全局图像漂移更具任务语义的风险证据，而不是继续扫阈值。
 
 LIBERO 的 `SEED` 不改变 `initial_states[episode_idx]`。为做不重复的小试验，strict/relaxed 评测入口新增
 `trial_start_index`，默认 0；`TRIAL_START_INDEX=3, NUM_TRIALS_PER_TASK=3` 才真正选择每任务第 4-6 个初始
@@ -1651,12 +1669,14 @@ SEED=7 SYNC_CUDA_TIMING=False TIMING_SCOPE=last_task \
 只能显式覆盖 `DFLASH_TEMPORAL_ADAPTIVE_MIN_VERIFIED_RUN` 或
 `DFLASH_TEMPORAL_ADAPTIVE_MAX_ANCHOR_PIXEL_RELATIVE_L2`，并在 run id 中保留参数；不得用正式结果反向挑阈值。
 
-VisualBudget 使用独立入口，不会覆盖旧 Adaptive。`0.15` 已由 6.14 的小试验固定，下一步正式评测直接运行：
+VisualBudget 使用独立入口，不会覆盖旧 Adaptive。下面命令复现已经完成的 `0.15` aggressive 正式结果；
+它不是当前默认 balanced 方案，运行和汇报时必须同时保留 SR：
 
 ```bash
 SPEC_CKPT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/Draft_checkpoint/goal/epoch_100_step_044800 \
 EVAL_EPOCH=100 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
 SEED=7 SYNC_CUDA_TIMING=False TIMING_SCOPE=last_task \
+DFLASH_TEMPORAL_VISUAL_BUDGET=0.15 \
   bash openvla/specdecoding/decode-scripts/run_dflash_vtpf_visual_budget_goal_eval.sh
 ```
 

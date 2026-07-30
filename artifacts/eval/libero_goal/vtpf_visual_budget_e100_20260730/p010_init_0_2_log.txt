@@ -1,0 +1,274 @@
+Task suite: libero_goal
+
+Task: open the middle drawer of the cabinet
+Starting episode 1...
+Success: True
+# episodes completed so far: 1
+# successes: 1 (100.0%)
+Speculative stats: length=3.500, avg_accept_length=0.708, num_blocks=274, overall_hit_rate=0.265, verify_skipped_blocks=81, verify_skipped_tokens=567, prefill_bypass=81, temporal_hold=policy=visual_budget/base=56/extended=25/55/forced=55
+DFlash per-position hit rate: p1=0.772, p2=0.220, p3=0.045, p4=0.009, p5=0.013, p6=0.018
+
+Task: open the middle drawer of the cabinet
+Starting episode 2...
+Success: True
+# episodes completed so far: 2
+# successes: 2 (100.0%)
+Speculative stats: length=3.581, avg_accept_length=0.742, num_blocks=217, overall_hit_rate=0.276, verify_skipped_blocks=66, verify_skipped_tokens=462, prefill_bypass=66, temporal_hold=policy=visual_budget/base=45/extended=21/44/forced=44
+DFlash per-position hit rate: p1=0.828, p2=0.254, p3=0.019, p4=0.000, p5=0.000, p6=0.000
+
+Task: open the middle drawer of the cabinet
+Starting episode 3...
+Success: False
+# episodes completed so far: 3
+# successes: 2 (66.7%)
+Speculative stats: length=3.578, avg_accept_length=0.625, num_blocks=587, overall_hit_rate=0.248, verify_skipped_blocks=191, verify_skipped_tokens=1337, prefill_fused_actions=3, prefill_full_matches=1, prefill_accept=3.000, prefill_bypass=191, temporal_hold=policy=visual_budget/base=109/extended=82/108/forced=108
+DFlash per-position hit rate: p1=0.728, p2=0.191, p3=0.027, p4=0.005, p5=0.000, p6=0.000
+Current task success rate: 0.6666666666666666
+Current total success rate: 0.6666666666666666
+Current task speculative stats: length=3.558, avg_accept_length=0.670, num_blocks=1078, overall_hit_rate=0.258, verify_skipped_blocks=338, verify_skipped_tokens=2366, prefill_fused_actions=3, prefill_full_matches=1, prefill_accept=3.000, prefill_bypass=338, temporal_hold=policy=visual_budget/base=210/extended=128/207/forced=207
+
+Task: put the bowl on the stove
+Starting episode 1...
+Success: True
+# episodes completed so far: 4
+# successes: 3 (75.0%)
+Speculative stats: length=3.725, avg_accept_length=0.895, num_blocks=171, overall_hit_rate=0.315, verify_skipped_blocks=52, verify_skipped_tokens=364, prefill_bypass=52, temporal_hold=policy=visual_budget/base=38/extended=14/38/forced=38
+DFlash per-position hit rate: p1=0.840, p2=0.339, p3=0.124, p4=0.064, p5=0.000, p6=0.000
+
+Task: put the bowl on the stove
+Starting episode 2...
+Success: True
+# episodes completed so far: 5
+# successes: 4 (80.0%)
+Speculative stats: length=3.610, avg_accept_length=0.824, num_blocks=159, overall_hit_rate=0.293, verify_skipped_blocks=47, verify_skipped_tokens=329, prefill_bypass=47, temporal_hold=policy=visual_budget/base=34/extended=13/34/forced=34
+DFlash per-position hit rate: p1=0.821, p2=0.275, p3=0.098, p4=0.029, p5=0.022, p6=0.000
+
+Task: put the bowl on the stove
+Starting episode 3...
+Success: True
+# episodes completed so far: 6
+# successes: 5 (83.3%)
+Speculative stats: length=3.654, avg_accept_length=0.824, num_blocks=159, overall_hit_rate=0.291, verify_skipped_blocks=48, verify_skipped_tokens=336, prefill_bypass=48, temporal_hold=policy=visual_budget/base=35/extended=13/34/forced=34
+DFlash per-position hit rate: p1=0.802, p2=0.294, p3=0.108, p4=0.042, p5=0.000, p6=0.000
+Current task success rate: 1.0
+Current total success rate: 0.8333333333333334
+Current task speculative stats: length=3.665, avg_accept_length=0.849, num_blocks=489, overall_hit_rate=0.300, verify_skipped_blocks=147, verify_skipped_tokens=1029, prefill_bypass=147, temporal_hold=policy=visual_budget/base=107/extended=40/106/forced=106
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 1...
+Success: True
+# episodes completed so far: 7
+# successes: 6 (85.7%)
+Speculative stats: length=3.630, avg_accept_length=0.833, num_blocks=162, overall_hit_rate=0.305, verify_skipped_blocks=48, verify_skipped_tokens=336, prefill_bypass=48, temporal_hold=policy=visual_budget/base=36/extended=12/35/forced=35
+DFlash per-position hit rate: p1=0.877, p2=0.301, p3=0.050, p4=0.000, p5=0.000, p6=0.000
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 2...
+Success: True
+# episodes completed so far: 8
+# successes: 7 (87.5%)
+Speculative stats: length=3.657, avg_accept_length=0.706, num_blocks=201, overall_hit_rate=0.255, verify_skipped_blocks=63, verify_skipped_tokens=441, prefill_bypass=63, temporal_hold=policy=visual_budget/base=42/extended=21/41/forced=41
+DFlash per-position hit rate: p1=0.768, p2=0.202, p3=0.059, p4=0.034, p5=0.018, p6=0.000
+
+Task: put the wine bottle on top of the cabinet
+Starting episode 3...
+Success: True
+# episodes completed so far: 9
+# successes: 8 (88.9%)
+Speculative stats: length=3.740, avg_accept_length=0.790, num_blocks=219, overall_hit_rate=0.295, verify_skipped_blocks=71, verify_skipped_tokens=497, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=0.000, prefill_bypass=71, temporal_hold=policy=visual_budget/base=46/extended=25/46/forced=45
+DFlash per-position hit rate: p1=0.837, p2=0.304, p3=0.070, p4=0.011, p5=0.000, p6=0.000
+Current task success rate: 1.0
+Current total success rate: 0.8888888888888888
+Current task speculative stats: length=3.680, avg_accept_length=0.773, num_blocks=582, overall_hit_rate=0.284, verify_skipped_blocks=182, verify_skipped_tokens=1274, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=0.000, prefill_bypass=182, temporal_hold=policy=visual_budget/base=124/extended=58/122/forced=121
+
+Task: open the top drawer and put the bowl inside
+Starting episode 1...
+Success: True
+# episodes completed so far: 10
+# successes: 9 (90.0%)
+Speculative stats: length=3.745, avg_accept_length=0.787, num_blocks=357, overall_hit_rate=0.294, verify_skipped_blocks=115, verify_skipped_tokens=805, prefill_bypass=115, temporal_hold=policy=visual_budget/base=75/extended=40/75/forced=75
+DFlash per-position hit rate: p1=0.843, p2=0.249, p3=0.077, p4=0.038, p5=0.032, p6=0.000
+
+Task: open the top drawer and put the bowl inside
+Starting episode 2...
+Success: False
+# episodes completed so far: 11
+# successes: 9 (81.8%)
+Speculative stats: length=3.903, avg_accept_length=0.764, num_blocks=538, overall_hit_rate=0.307, verify_skipped_blocks=190, verify_skipped_tokens=1330, prefill_bypass=190, temporal_hold=policy=visual_budget/base=109/extended=81/109/forced=109
+DFlash per-position hit rate: p1=0.836, p2=0.321, p3=0.069, p4=0.037, p5=0.000, p6=0.000
+
+Task: open the top drawer and put the bowl inside
+Starting episode 3...
+Success: True
+# episodes completed so far: 12
+# successes: 10 (83.3%)
+Speculative stats: length=3.729, avg_accept_length=0.772, num_blocks=473, overall_hit_rate=0.292, verify_skipped_blocks=154, verify_skipped_tokens=1078, prefill_fused_actions=4, prefill_full_matches=3, prefill_accept=5.250, prefill_bypass=154, temporal_hold=policy=visual_budget/base=98/extended=56/98/forced=97
+DFlash per-position hit rate: p1=0.810, p2=0.275, p3=0.038, p4=0.005, p5=0.008, p6=0.011
+Current task success rate: 0.6666666666666666
+Current total success rate: 0.8333333333333334
+Current task speculative stats: length=3.802, avg_accept_length=0.773, num_blocks=1368, overall_hit_rate=0.298, verify_skipped_blocks=459, verify_skipped_tokens=3213, prefill_fused_actions=4, prefill_full_matches=3, prefill_accept=5.250, prefill_bypass=459, temporal_hold=policy=visual_budget/base=282/extended=177/282/forced=281
+
+Task: put the bowl on top of the cabinet
+Starting episode 1...
+Success: True
+# episodes completed so far: 13
+# successes: 11 (84.6%)
+Speculative stats: length=3.606, avg_accept_length=0.843, num_blocks=198, overall_hit_rate=0.304, verify_skipped_blocks=58, verify_skipped_tokens=406, prefill_bypass=58, temporal_hold=policy=visual_budget/base=44/extended=14/43/forced=43
+DFlash per-position hit rate: p1=0.807, p2=0.339, p3=0.091, p4=0.024, p5=0.000, p6=0.000
+
+Task: put the bowl on top of the cabinet
+Starting episode 2...
+Success: False
+# episodes completed so far: 14
+# successes: 11 (78.6%)
+Speculative stats: length=4.516, avg_accept_length=1.108, num_blocks=465, overall_hit_rate=0.427, verify_skipped_blocks=189, verify_skipped_tokens=1323, temporal_route_rejects=5, temporal_fallback_blocks=8, temporal_fused_blocks=16, prefill_fused_actions=19, prefill_full_matches=13, prefill_accept=4.947, prefill_bypass=189, temporal_hold=policy=visual_budget/base=110/extended=79/110/forced=110
+DFlash per-position hit rate: p1=0.868, p2=0.397, p3=0.244, p4=0.189, p5=0.121, p6=0.116
+
+Task: put the bowl on top of the cabinet
+Starting episode 3...
+Success: True
+# episodes completed so far: 15
+# successes: 12 (80.0%)
+Speculative stats: length=3.847, avg_accept_length=0.906, num_blocks=202, overall_hit_rate=0.336, verify_skipped_blocks=65, verify_skipped_tokens=455, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=2.000, prefill_bypass=65, temporal_hold=policy=visual_budget/base=46/extended=19/45/forced=45
+DFlash per-position hit rate: p1=0.882, p2=0.339, p3=0.137, p4=0.057, p5=0.000, p6=0.000
+Current task success rate: 0.6666666666666666
+Current total success rate: 0.8
+Current task speculative stats: length=4.151, avg_accept_length=1.000, num_blocks=865, overall_hit_rate=0.376, verify_skipped_blocks=312, verify_skipped_tokens=2184, temporal_route_rejects=5, temporal_fallback_blocks=8, temporal_fused_blocks=16, prefill_fused_actions=20, prefill_full_matches=13, prefill_accept=4.800, prefill_bypass=312, temporal_hold=policy=visual_budget/base=200/extended=112/198/forced=198
+
+Task: push the plate to the front of the stove
+Starting episode 1...
+Success: True
+# episodes completed so far: 16
+# successes: 13 (81.2%)
+Speculative stats: length=3.731, avg_accept_length=0.746, num_blocks=394, overall_hit_rate=0.274, verify_skipped_blocks=128, verify_skipped_tokens=896, prefill_fused_actions=1, prefill_full_matches=0, prefill_accept=0.000, prefill_bypass=128, temporal_hold=policy=visual_budget/base=82/extended=46/81/forced=81
+DFlash per-position hit rate: p1=0.819, p2=0.259, p3=0.052, p4=0.018, p5=0.000, p6=0.000
+
+Task: push the plate to the front of the stove
+Starting episode 2...
+Success: True
+# episodes completed so far: 17
+# successes: 14 (82.4%)
+Speculative stats: length=3.725, avg_accept_length=0.773, num_blocks=295, overall_hit_rate=0.275, verify_skipped_blocks=95, verify_skipped_tokens=665, prefill_bypass=95, temporal_hold=policy=visual_budget/base=61/extended=34/61/forced=61
+DFlash per-position hit rate: p1=0.775, p2=0.255, p3=0.116, p4=0.045, p5=0.011, p6=0.000
+
+Task: push the plate to the front of the stove
+Starting episode 3...
+Success: True
+# episodes completed so far: 18
+# successes: 15 (83.3%)
+Speculative stats: length=4.073, avg_accept_length=0.955, num_blocks=287, overall_hit_rate=0.346, verify_skipped_blocks=101, verify_skipped_tokens=707, prefill_fused_actions=7, prefill_full_matches=5, prefill_accept=5.000, prefill_bypass=101, temporal_hold=policy=visual_budget/base=65/extended=36/65/forced=65
+DFlash per-position hit rate: p1=0.793, p2=0.401, p3=0.185, p4=0.026, p5=0.000, p6=0.000
+Current task success rate: 1.0
+Current total success rate: 0.8333333333333334
+Current task speculative stats: length=3.830, avg_accept_length=0.816, num_blocks=976, overall_hit_rate=0.295, verify_skipped_blocks=324, verify_skipped_tokens=2268, prefill_fused_actions=8, prefill_full_matches=5, prefill_accept=4.375, prefill_bypass=324, temporal_hold=policy=visual_budget/base=208/extended=116/207/forced=207
+
+Task: put the cream cheese in the bowl
+Starting episode 1...
+Success: True
+# episodes completed so far: 19
+# successes: 16 (84.2%)
+Speculative stats: length=4.184, avg_accept_length=1.050, num_blocks=261, overall_hit_rate=0.384, verify_skipped_blocks=94, verify_skipped_tokens=658, temporal_fused_blocks=3, prefill_fused_actions=9, prefill_full_matches=6, prefill_accept=5.111, prefill_bypass=94, temporal_hold=policy=visual_budget/base=61/extended=33/61/forced=61
+DFlash per-position hit rate: p1=0.854, p2=0.354, p3=0.169, p4=0.138, p5=0.046, p6=0.056
+
+Task: put the cream cheese in the bowl
+Starting episode 2...
+Success: True
+# episodes completed so far: 20
+# successes: 17 (85.0%)
+Speculative stats: length=3.742, avg_accept_length=0.885, num_blocks=260, overall_hit_rate=0.318, verify_skipped_blocks=80, verify_skipped_tokens=560, prefill_bypass=80, temporal_hold=policy=visual_budget/base=58/extended=22/58/forced=58
+DFlash per-position hit rate: p1=0.800, p2=0.355, p3=0.140, p4=0.070, p5=0.000, p6=0.000
+
+Task: put the cream cheese in the bowl
+Starting episode 3...
+Success: False
+# episodes completed so far: 21
+# successes: 17 (81.0%)
+Speculative stats: length=4.646, avg_accept_length=1.155, num_blocks=452, overall_hit_rate=0.464, verify_skipped_blocks=190, verify_skipped_tokens=1330, temporal_fused_blocks=1, prefill_fused_actions=28, prefill_full_matches=27, prefill_accept=6.750, prefill_bypass=190, temporal_hold=policy=visual_budget/base=110/extended=80/110/forced=109
+DFlash per-position hit rate: p1=0.846, p2=0.325, p3=0.167, p4=0.122, p5=0.126, p6=0.120
+Current task success rate: 0.6666666666666666
+Current total success rate: 0.8095238095238095
+Current task speculative stats: length=4.281, avg_accept_length=1.054, num_blocks=973, overall_hit_rate=0.400, verify_skipped_blocks=364, verify_skipped_tokens=2548, temporal_fused_blocks=4, prefill_fused_actions=37, prefill_full_matches=33, prefill_accept=6.351, prefill_bypass=364, temporal_hold=policy=visual_budget/base=229/extended=135/229/forced=228
+
+Task: turn on the stove
+Starting episode 1...
+Success: True
+# episodes completed so far: 22
+# successes: 18 (81.8%)
+Speculative stats: length=4.851, avg_accept_length=1.171, num_blocks=316, overall_hit_rate=0.485, verify_skipped_blocks=146, verify_skipped_tokens=1022, temporal_fused_blocks=2, prefill_fused_actions=29, prefill_full_matches=27, prefill_accept=6.690, prefill_bypass=146, temporal_hold=policy=visual_budget/base=73/extended=73/73/forced=72
+DFlash per-position hit rate: p1=0.801, p2=0.361, p3=0.074, p4=0.044, p5=0.034, p6=0.045
+
+Task: turn on the stove
+Starting episode 2...
+Success: True
+# episodes completed so far: 23
+# successes: 19 (82.6%)
+Speculative stats: length=3.957, avg_accept_length=0.714, num_blocks=161, overall_hit_rate=0.292, verify_skipped_blocks=60, verify_skipped_tokens=420, prefill_bypass=60, temporal_hold=policy=visual_budget/base=31/extended=29/30/forced=30
+DFlash per-position hit rate: p1=0.842, p2=0.272, p3=0.029, p4=0.016, p5=0.026, p6=0.032
+
+Task: turn on the stove
+Starting episode 3...
+Success: True
+# episodes completed so far: 24
+# successes: 20 (83.3%)
+Speculative stats: length=4.266, avg_accept_length=0.858, num_blocks=169, overall_hit_rate=0.355, verify_skipped_blocks=68, verify_skipped_tokens=476, temporal_fused_blocks=1, prefill_fused_actions=4, prefill_full_matches=1, prefill_accept=4.500, prefill_bypass=68, temporal_hold=policy=visual_budget/base=34/extended=34/34/forced=34
+DFlash per-position hit rate: p1=0.845, p2=0.356, p3=0.116, p4=0.052, p5=0.028, p6=0.032
+Current task success rate: 1.0
+Current total success rate: 0.8333333333333334
+Current task speculative stats: length=4.475, avg_accept_length=0.975, num_blocks=646, overall_hit_rate=0.402, verify_skipped_blocks=274, verify_skipped_tokens=1918, temporal_fused_blocks=3, prefill_fused_actions=33, prefill_full_matches=28, prefill_accept=6.424, prefill_bypass=274, temporal_hold=policy=visual_budget/base=138/extended=136/137/forced=136
+
+Task: put the bowl on the plate
+Starting episode 1...
+Success: True
+# episodes completed so far: 25
+# successes: 21 (84.0%)
+Speculative stats: length=3.803, avg_accept_length=0.815, num_blocks=173, overall_hit_rate=0.311, verify_skipped_blocks=57, verify_skipped_tokens=399, prefill_bypass=57, temporal_hold=policy=visual_budget/base=37/extended=20/36/forced=36
+DFlash per-position hit rate: p1=0.802, p2=0.324, p3=0.134, p4=0.056, p5=0.000, p6=0.000
+
+Task: put the bowl on the plate
+Starting episode 2...
+Success: False
+# episodes completed so far: 26
+# successes: 21 (80.8%)
+Speculative stats: length=4.094, avg_accept_length=0.815, num_blocks=513, overall_hit_rate=0.326, verify_skipped_blocks=193, verify_skipped_tokens=1351, prefill_fused_actions=4, prefill_full_matches=2, prefill_accept=4.750, prefill_bypass=193, temporal_hold=policy=visual_budget/base=107/extended=86/107/forced=106
+DFlash per-position hit rate: p1=0.864, p2=0.305, p3=0.107, p4=0.045, p5=0.017, p6=0.010
+
+Task: put the bowl on the plate
+Starting episode 3...
+Success: True
+# episodes completed so far: 27
+# successes: 22 (81.5%)
+Speculative stats: length=4.000, avg_accept_length=0.918, num_blocks=147, overall_hit_rate=0.352, verify_skipped_blocks=51, verify_skipped_tokens=357, prefill_bypass=51, temporal_hold=policy=visual_budget/base=33/extended=18/32/forced=32
+DFlash per-position hit rate: p1=0.854, p2=0.395, p3=0.164, p4=0.082, p5=0.049, p6=0.030
+Current task success rate: 0.6666666666666666
+Current total success rate: 0.8148148148148148
+Current task speculative stats: length=4.017, avg_accept_length=0.833, num_blocks=833, overall_hit_rate=0.327, verify_skipped_blocks=301, verify_skipped_tokens=2107, prefill_fused_actions=4, prefill_full_matches=2, prefill_accept=4.750, prefill_bypass=301, temporal_hold=policy=visual_budget/base=177/extended=124/175/forced=174
+
+Task: put the wine bottle on the rack
+Starting episode 1...
+Success: True
+# episodes completed so far: 28
+# successes: 23 (82.1%)
+Speculative stats: length=3.763, avg_accept_length=0.709, num_blocks=333, overall_hit_rate=0.275, verify_skipped_blocks=113, verify_skipped_tokens=791, temporal_fused_blocks=1, prefill_bypass=113, temporal_hold=policy=visual_budget/base=66/extended=47/66/forced=65
+DFlash per-position hit rate: p1=0.764, p2=0.269, p3=0.064, p4=0.023, p5=0.012, p6=0.015
+
+Task: put the wine bottle on the rack
+Starting episode 2...
+Success: True
+# episodes completed so far: 29
+# successes: 24 (82.8%)
+Speculative stats: length=3.567, avg_accept_length=0.673, num_blocks=263, overall_hit_rate=0.262, verify_skipped_blocks=82, verify_skipped_tokens=574, prefill_bypass=82, temporal_hold=policy=visual_budget/base=52/extended=30/51/forced=51
+DFlash per-position hit rate: p1=0.812, p2=0.191, p3=0.000, p4=0.000, p5=0.000, p6=0.000
+
+Task: put the wine bottle on the rack
+Starting episode 3...
+Success: True
+# episodes completed so far: 30
+# successes: 25 (83.3%)
+Speculative stats: length=3.754, avg_accept_length=0.782, num_blocks=248, overall_hit_rate=0.304, verify_skipped_blocks=81, verify_skipped_tokens=567, prefill_bypass=81, temporal_hold=policy=visual_budget/base=52/extended=29/52/forced=51
+DFlash per-position hit rate: p1=0.868, p2=0.287, p3=0.045, p4=0.010, p5=0.000, p6=0.000
+Current task success rate: 1.0
+Current total success rate: 0.8333333333333334
+Current task speculative stats: length=3.699, avg_accept_length=0.719, num_blocks=844, overall_hit_rate=0.280, verify_skipped_blocks=276, verify_skipped_tokens=1932, temporal_fused_blocks=1, prefill_bypass=276, temporal_hold=policy=visual_budget/base=170/extended=106/169/forced=167
+Saved eval summary to: /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs/adaptive_search/p010_n3/dflash_relaxed/简化版Draft+VTPF-TD-VisualBudget-e100/dflash_relaxed/EVAL-libero_goal-openvla-2026_07_30-16_01_00--visual-budget-p010-n3-s7-dflash_relaxed_summary.json
+Total speculative stats: length=3.699, avg_accept_length=0.719, num_blocks=844, overall_hit_rate=0.280, verify_skipped_blocks=276, verify_skipped_tokens=1932, temporal_fused_blocks=1, prefill_bypass=276, temporal_hold=policy=visual_budget/base=170/extended=106/169/forced=167
+Conditional prefix hit rate: p1=0.545, p2=0.274, p3=0.119, p4=0.267, p5=0.250, p6=1.000

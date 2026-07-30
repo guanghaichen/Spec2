@@ -1,8 +1,8 @@
-# VTPF-TD-VisualBudget e100 pilots (2026-07-30)
+# VTPF-TD-VisualBudget e100 evaluation (2026-07-30)
 
 This directory freezes the two non-overlapping LIBERO Goal pilot batches used
-to select the Visual Budget working point. These are pilot results, not the
-final 50-trial-per-task paper result.
+to select the Visual Budget working point, followed by the complete
+50-trial-per-task evaluation at `0.15`.
 
 ## Fixed setup
 
@@ -24,6 +24,7 @@ final 50-trial-per-task paper result.
 | 0-2 | 30 | 23/30 | 0.056270 s | 3.247x | 34.7% | 89.3% |
 | 3-5 | 30 | 22/30 | 0.053744 s | 3.400x | 34.2% | 93.8% |
 | pooled | 60 | 45/60 | 0.054848 s | 3.331x | 34.4% | 91.8% |
+| **formal 0-49** | **500** | **336/500** | **0.049670 s** | **3.679x** | **34.3%** | **92.3%** |
 
 All six last-task trajectories individually exceeded 3x. The two successful
 trajectories in the first batch were 3.249x and 3.128x; the successful
@@ -31,9 +32,29 @@ trajectory in the second batch was 3.361x. This check prevents a failed,
 long-horizon rollout from being the sole source of an apparently high speedup.
 
 On the same 60 fixed initial states, the previously frozen Minimal TD-Fast log
-contains 43 successes and the old exact-action Adaptive log contains 44. No
-success-rate loss from Visual Budget was observed in this pilot, but the final
-500-episode evaluation is still required.
+contains 43 successes and the old exact-action Adaptive log contains 44. This
+pilot did not expose the eventual full-suite regression. In the formal paired
+evaluation, VisualBudget succeeded on 336/500 versus TD-Fast's 377/500. The
+paired outcomes were 280 both-success, 56 VisualBudget-only, 97 TD-Fast-only,
+and 67 both-failure; the exact two-sided McNemar p-value is `0.00115`.
+
+The speedup is real but the `0.15` operating point is too aggressive for the
+default method. Last-task successful trajectories alone averaged `0.057676 s`
+or `3.168x`, while failure trajectories averaged `0.044138 s` or `4.140x`.
+Thus failure-length bias amplifies the aggregate `3.679x`, but does not create
+the entire gain. Keep `0.15` as an aggressive Pareto point and report its SR;
+do not present it as a no-regression replacement for TD-Fast.
+
+## Post-formal threshold check
+
+Two non-overlapping `0.10` batches produced 46/60 successes and a pooled
+`3.251x`, but that aggregate is not sufficient evidence for a balanced 3x
+point: all three successful last-task trajectories were in the slower batch
+(`2.875x`), while all three trajectories in the `3.475x` batch failed. A
+`0.12` diagnostic was stopped after 30/60 episodes because it had only 22
+successes versus 25 for the corresponding `0.15` states. Closed-loop success
+is not monotonic in this global visual threshold, so further threshold tuning
+was rejected as a remedy for stale-action risk.
 
 ## Reproduction
 

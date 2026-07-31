@@ -3,6 +3,8 @@ import unittest
 from openvla.specdecoding.model.temporal_hold import (
     decide_temporal_hold,
     normalize_temporal_hold_policy,
+    settle_extension_debt,
+    temporal_hold_action_scale,
 )
 
 
@@ -28,6 +30,7 @@ class TemporalHoldPolicyTest(unittest.TestCase):
         self.assertEqual(
             normalize_temporal_hold_policy("visual-budget"), "visual_budget"
         )
+        self.assertEqual(normalize_temporal_hold_policy("paced-budget"), "paced_budget")
         with self.assertRaises(ValueError):
             normalize_temporal_hold_policy("unbounded")
 
@@ -94,6 +97,67 @@ class TemporalHoldPolicyTest(unittest.TestCase):
         self.assertTrue(decision.allow)
         self.assertEqual(decision.reason, "fixed_budget")
 
+    def test_paced_budget_requires_repaid_extension_credit(self):
+        accepted = self._decide(
+            policy="paced_budget",
+            consecutive_holds=1,
+            extension_budget_available=True,
+        )
+        self.assertTrue(accepted.allow)
+        self.assertEqual(accepted.reason, "visual_budget_extension")
+
+        rejected = self._decide(
+            policy="paced_budget",
+            consecutive_holds=1,
+            extension_budget_available=False,
+        )
+        self.assertFalse(rejected.allow)
+        self.assertEqual(rejected.reason, "extension_debt")
+
+        # The target immediately following T-H-H keeps the debt. After the
+        # subsequent T-H interval, its target keyframe repays it.
+        self.assertTrue(
+            settle_extension_debt(
+                policy="paced_budget", debt_active=True, holds_before_target=2
+            )
+        )
+        self.assertFalse(
+            settle_extension_debt(
+                policy="paced_budget", debt_active=True, holds_before_target=1
+            )
+        )
+
+    def test_paced_budget_repeats_two_one_hold_cadence(self):
+        debt_active = False
+        interval_holds = []
+        for _ in range(4):
+            holds = 0
+            while True:
+                decision = self._decide(
+                    policy="paced_budget",
+                    consecutive_holds=holds,
+                    extension_budget_available=not debt_active,
+                )
+                if not decision.allow:
+                    break
+                holds += 1
+                if decision.adaptive_extension:
+                    debt_active = True
+            interval_holds.append(holds)
+            debt_active = settle_extension_debt(
+                policy="paced_budget",
+                debt_active=debt_active,
+                holds_before_target=holds,
+            )
+
+        self.assertEqual(interval_holds, [2, 1, 2, 1])
+
+    def test_inverse_age_decay_preserves_first_hold_and_damps_second(self):
+        self.assertEqual(temporal_hold_action_scale("none", 2), 1.0)
+        self.assertEqual(temporal_hold_action_scale("inverse_age", 1), 1.0)
+        self.assertEqual(temporal_hold_action_scale("inverse_age", 2), 0.5)
+        with self.assertRaises(ValueError):
+            temporal_hold_action_scale("learned", 2)
 
 if __name__ == "__main__":
     unittest.main()

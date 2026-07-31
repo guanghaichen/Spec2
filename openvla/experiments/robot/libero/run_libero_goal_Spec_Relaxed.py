@@ -151,6 +151,7 @@ class GenerateConfig:
     dflash_temporal_hold_policy: str = "fixed"
     dflash_temporal_adaptive_min_verified_run: int = 2
     dflash_temporal_adaptive_max_anchor_pixel_relative_l2: float = 0.03
+    dflash_temporal_hold_action_decay: str = "none"
     dflash_temporal_prefill_tree: bool = False
     dflash_temporal_prefill_tree_max_candidates: int = 3
     dflash_temporal_prefill_tree_min_history: int = 2

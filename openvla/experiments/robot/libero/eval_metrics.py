@@ -842,6 +842,19 @@ def summarize_generation_stats(step_stats_list):
                 )
                 for record in temporal_hold_decision_records
             ),
+            "extension_debt_forced_targets": sum(
+                int(record.get("reason") == "extension_debt")
+                for record in temporal_hold_decision_records
+            ),
+            "executed_action_scale_histogram": dict(
+                sorted(
+                    Counter(
+                        f"{float(record['executed_continuous_action_scale']):.6g}"
+                        for record in temporal_hold_allowed_records
+                        if record.get("executed_continuous_action_scale") is not None
+                    ).items()
+                )
+            ),
             "allowed_depth_histogram": dict(
                 sorted(
                     Counter(
@@ -1030,6 +1043,9 @@ def write_eval_summary(
             "dflash_temporal_adaptive_max_anchor_pixel_relative_l2",
             None,
         ),
+        "dflash_temporal_hold_action_decay": getattr(
+            cfg, "dflash_temporal_hold_action_decay", None
+        ),
         "dflash_temporal_prefill_tree": getattr(
             cfg, "dflash_temporal_prefill_tree", None
         ),
@@ -1160,6 +1176,7 @@ def format_generation_summary(summary, prefix="Speculative stats"):
             f"/extended={temporal_hold.get('extended_holds', temporal_hold.get('adaptive_extended_holds', 0))}"
             f"/{temporal_hold.get('extension_candidates', temporal_hold.get('adaptive_extension_candidates', 0))}"
             f"/forced={temporal_hold.get('forced_target_after_hold', 0)}"
+            f"/debt={temporal_hold.get('extension_debt_forced_targets', 0)}"
         )
     shadow = summary.get("verify_skip_shadow") or {}
     if shadow:

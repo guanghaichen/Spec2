@@ -232,6 +232,7 @@ class DFlashEvalMetricsTest(unittest.TestCase):
                     "adaptive_extension": False,
                     "anchor_pixel_relative_l2": 0.01,
                     "consecutive_holds_before": 0,
+                    "executed_continuous_action_scale": 1.0,
                 },
             },
             {
@@ -243,6 +244,7 @@ class DFlashEvalMetricsTest(unittest.TestCase):
                     "adaptive_extension": True,
                     "anchor_pixel_relative_l2": 0.02,
                     "consecutive_holds_before": 1,
+                    "executed_continuous_action_scale": 0.5,
                 },
             },
             {
@@ -274,6 +276,11 @@ class DFlashEvalMetricsTest(unittest.TestCase):
         self.assertEqual(temporal_hold["extended_holds"], 1)
         self.assertEqual(temporal_hold["extension_rate"], 1.0)
         self.assertEqual(temporal_hold["forced_target_after_hold"], 1)
+        self.assertEqual(temporal_hold["extension_debt_forced_targets"], 0)
+        self.assertEqual(
+            temporal_hold["executed_action_scale_histogram"],
+            {"0.5": 1, "1": 1},
+        )
         self.assertEqual(temporal_hold["allowed_depth_histogram"], {1: 1, 2: 1})
         self.assertAlmostEqual(temporal_hold["avg_anchor_pixel_relative_l2"], 0.02)
 

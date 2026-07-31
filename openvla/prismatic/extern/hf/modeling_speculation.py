@@ -22,6 +22,8 @@ from openvla.specdecoding.model.dflash import (
 from openvla.specdecoding.model.temporal_hold import (
     decide_temporal_hold,
     normalize_temporal_hold_policy,
+    settle_extension_debt,
+    temporal_hold_action_scale,
 )
 from openvla.specdecoding.model.cnets import EConfig
 from transformers import AutoTokenizer
@@ -650,6 +652,7 @@ class SpecVLAforActionPrediction(nn.Module):
             dflash_temporal_hold_policy="fixed",
             dflash_temporal_adaptive_min_verified_run=2,
             dflash_temporal_adaptive_max_anchor_pixel_relative_l2=0.03,
+            dflash_temporal_hold_action_decay="none",
             dflash_temporal_prefill_tree=False,
             dflash_temporal_prefill_tree_max_candidates=3,
             dflash_temporal_prefill_tree_min_history=2,
@@ -738,6 +741,10 @@ class SpecVLAforActionPrediction(nn.Module):
         self.dflash_temporal_adaptive_max_anchor_pixel_relative_l2 = float(
             dflash_temporal_adaptive_max_anchor_pixel_relative_l2
         )
+        self.dflash_temporal_hold_action_decay = str(
+            dflash_temporal_hold_action_decay
+        ).strip().lower()
+        temporal_hold_action_scale(self.dflash_temporal_hold_action_decay, 1)
         if (
             self.dflash_temporal_hold_policy == "adaptive"
             and self.dflash_temporal_adaptive_min_verified_run < 2
@@ -903,6 +910,7 @@ class SpecVLAforActionPrediction(nn.Module):
         self._dflash_previous_verified_action_tokens = None
         self._dflash_verified_action_run_length = 0
         self._dflash_consecutive_verify_skips = 0
+        self._dflash_temporal_extension_debt = False
 
         # Compute action bins
         self.bins = base_model.bins
@@ -1116,6 +1124,7 @@ class SpecVLAforActionPrediction(nn.Module):
         self._dflash_previous_verified_action_tokens = None
         self._dflash_verified_action_run_length = 0
         self._dflash_consecutive_verify_skips = 0
+        self._dflash_temporal_extension_debt = False
 
     def _record_dflash_action_history(self, action_tokens: torch.LongTensor) -> None:
         """Keep two tiny CPU action records for the next temporal prefill."""
@@ -2246,7 +2255,12 @@ class SpecVLAforActionPrediction(nn.Module):
         )
         collect_pixel_signature = bool(
             collect_previous_pixel_diagnostics
-            or self.dflash_temporal_hold_policy in {"adaptive", "visual_budget"}
+            or self.dflash_temporal_hold_policy
+            in {
+                "adaptive",
+                "visual_budget",
+                "paced_budget",
+            }
         )
         current_pixel_signature = (
             self._dflash_pixel_signature(model_inputs.get("pixel_values"))
@@ -2283,7 +2297,12 @@ class SpecVLAforActionPrediction(nn.Module):
                 )[0].item()
             )
         if (
-            self.dflash_temporal_hold_policy in {"adaptive", "visual_budget"}
+            self.dflash_temporal_hold_policy
+            in {
+                "adaptive",
+                "visual_budget",
+                "paced_budget",
+            }
             and self._dflash_consecutive_verify_skips == 1
             and current_pixel_signature is not None
             and self._dflash_last_target_pixel_signature is not None
@@ -2302,7 +2321,6 @@ class SpecVLAforActionPrediction(nn.Module):
                     ).clamp_min(1e-6)
                 )[0].item()
             )
-
         base_temporal_hold_eligible = bool(
             self.dflash_verify_skip_mode == "active"
             and self.dflash_temporal_bypass_max_pixel_relative_l2 > 0.0
@@ -2332,6 +2350,9 @@ class SpecVLAforActionPrediction(nn.Module):
             adaptive_max_anchor_pixel_relative_l2=(
                 self.dflash_temporal_adaptive_max_anchor_pixel_relative_l2
             ),
+            extension_budget_available=(
+                not self._dflash_temporal_extension_debt
+            ),
         )
         temporal_hold_decision_record = temporal_hold_decision.as_record()
         temporal_hold_decision_record.update(
@@ -2349,6 +2370,9 @@ class SpecVLAforActionPrediction(nn.Module):
                 "adaptive_max_anchor_pixel_relative_l2": float(
                     self.dflash_temporal_adaptive_max_anchor_pixel_relative_l2
                 ),
+                "extension_debt_before": bool(
+                    self._dflash_temporal_extension_debt
+                ),
             }
         )
         temporal_prefill_bypass_active = temporal_hold_decision.allow
@@ -2361,6 +2385,12 @@ class SpecVLAforActionPrediction(nn.Module):
             ].detach().clone()
             self._dflash_previous_pixel_signature = current_pixel_signature
             self._dflash_consecutive_verify_skips += 1
+            if (
+                self.dflash_temporal_hold_policy
+                == "paced_budget"
+                and temporal_hold_decision.adaptive_extension
+            ):
+                self._dflash_temporal_extension_debt = True
             self._record_dflash_action_history(final_action_tokens)
             generation_stats = {
                 "backend": "dflash",
@@ -3981,6 +4011,11 @@ class SpecVLAforActionPrediction(nn.Module):
             # consecutive-skip budget before it can earn more temporal credit.
             self._dflash_consecutive_verify_skips += 1
         else:
+            self._dflash_temporal_extension_debt = settle_extension_debt(
+                policy=self.dflash_temporal_hold_policy,
+                debt_active=self._dflash_temporal_extension_debt,
+                holds_before_target=self._dflash_consecutive_verify_skips,
+            )
             if (
                 self._dflash_previous_verified_action_tokens is not None
                 and self._dflash_previous_verified_action_tokens.eq(
@@ -4053,6 +4088,7 @@ class SpecVLAforActionPrediction(nn.Module):
             "temporal_adaptive_max_anchor_pixel_relative_l2": (
                 self.dflash_temporal_adaptive_max_anchor_pixel_relative_l2
             ),
+            "temporal_hold_action_decay": self.dflash_temporal_hold_action_decay,
             "temporal_prefill_tree": self.dflash_temporal_prefill_tree,
             "temporal_prefill_tree_max_candidates": (
                 self.dflash_temporal_prefill_tree_max_candidates
@@ -4319,6 +4355,22 @@ class SpecVLAforActionPrediction(nn.Module):
             0.5 * (normalized_actions + 1) * (action_high - action_low) + action_low,
             normalized_actions,
         )
+        if generate_mode == "dflash" and self.last_dflash_stats is not None:
+            hold_record = self.last_dflash_stats.get(
+                "temporal_hold_decision_record"
+            )
+            if hold_record is not None and bool(hold_record.get("allow", False)):
+                hold_depth = int(hold_record.get("hold_depth", 1))
+                action_scale = temporal_hold_action_scale(
+                    self.dflash_temporal_hold_action_decay,
+                    hold_depth,
+                )
+                if action_scale != 1.0:
+                    actions = actions.copy()
+                    actions[: min(6, actions.shape[0])] *= action_scale
+                hold_record["executed_continuous_action_scale"] = float(
+                    action_scale
+                )
         
         # 如果需要返回隐藏状态
         if return_hidden_states:

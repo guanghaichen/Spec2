@@ -11,6 +11,17 @@ from dataclasses import dataclass
 from typing import Optional
 
 
+def settle_extension_debt(
+    *, policy: str, debt_active: bool, holds_before_target: int
+) -> bool:
+    """Update paced-budget debt when a real target keyframe is completed."""
+    if normalize_temporal_hold_policy(policy) != "paced_budget":
+        return bool(debt_active)
+    if debt_active and int(holds_before_target) < 2:
+        return False
+    return bool(debt_active)
+
+
 def normalize_temporal_hold_policy(value) -> str:
     """Normalize launcher aliases while keeping the legacy policy as default."""
     normalized = str(value or "fixed").strip().lower()
@@ -22,11 +33,13 @@ def normalize_temporal_hold_policy(value) -> str:
         "risk-bounded": "adaptive",
         "visual_budget": "visual_budget",
         "visual-budget": "visual_budget",
+        "paced_budget": "paced_budget",
+        "paced-budget": "paced_budget",
     }
     if normalized not in aliases:
         raise ValueError(
-            "dflash_temporal_hold_policy must be 'fixed', 'adaptive', or "
-            "'visual_budget'."
+            "dflash_temporal_hold_policy must be 'fixed', 'adaptive', "
+            "'visual_budget', or 'paced_budget'."
         )
     return aliases[normalized]
 
@@ -51,6 +64,18 @@ class TemporalHoldDecision:
         }
 
 
+def temporal_hold_action_scale(mode: str, hold_depth: int) -> float:
+    """Return a bounded continuous-action scale for an aged held command."""
+    normalized = str(mode or "none").strip().lower()
+    if normalized == "none":
+        return 1.0
+    if normalized != "inverse_age":
+        raise ValueError(
+            "dflash_temporal_hold_action_decay must be 'none' or 'inverse_age'."
+        )
+    return 1.0 / max(1, int(hold_depth))
+
+
 def decide_temporal_hold(
     *,
     policy: str,
@@ -61,6 +86,7 @@ def decide_temporal_hold(
     adaptive_min_verified_run: int,
     anchor_pixel_relative_l2: Optional[float],
     adaptive_max_anchor_pixel_relative_l2: float,
+    extension_budget_available: bool = True,
 ) -> TemporalHoldDecision:
     """Apply the fixed or risk-bounded hold policy.
 
@@ -77,6 +103,12 @@ def decide_temporal_hold(
     the last target keyframe remains within a registered budget.  It does not
     reinterpret that hold as target-verified evidence, and still forces target
     after at most two holds.
+
+    ``paced_budget`` keeps the same visual criterion but adds temporal debt:
+    after spending a second hold, the next target interval may contain only one
+    hold. This caps the long-run target cadence at T-H-H, T-H without relying
+    on a learned confidence score.
+
     """
     policy = normalize_temporal_hold_policy(policy)
     consecutive_holds = max(0, int(consecutive_holds))
@@ -101,6 +133,10 @@ def decide_temporal_hold(
     if hold_depth > 2:
         return TemporalHoldDecision(
             False, "adaptive_hard_limit", hold_depth, False, anchor_pixel_relative_l2
+        )
+    if policy == "paced_budget" and not bool(extension_budget_available):
+        return TemporalHoldDecision(
+            False, "extension_debt", hold_depth, False, anchor_pixel_relative_l2
         )
     if (
         policy == "adaptive"

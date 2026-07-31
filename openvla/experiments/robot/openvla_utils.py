@@ -128,6 +128,9 @@ def get_vla(cfg):
                 "dflash_temporal_adaptive_max_anchor_pixel_relative_l2",
                 0.03,
             ),
+            dflash_temporal_hold_action_decay=getattr(
+                cfg, "dflash_temporal_hold_action_decay", "none"
+            ),
             dflash_temporal_prefill_tree=getattr(
                 cfg, "dflash_temporal_prefill_tree", False
             ),

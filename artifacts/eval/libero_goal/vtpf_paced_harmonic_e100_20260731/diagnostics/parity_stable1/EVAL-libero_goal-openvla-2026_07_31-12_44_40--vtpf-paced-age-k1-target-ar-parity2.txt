@@ -1,0 +1,16 @@
+Task suite: libero_goal
+
+Task: open the middle drawer of the cabinet
+Starting episode 1...
+LIBERO initial-state index: 5
+Success: False
+# episodes completed so far: 1
+# successes: 0 (0.0%)
+Speculative stats: length=3.084, avg_accept_length=0.714, num_blocks=681, overall_hit_rate=0.221, verify_skipped_blocks=175, verify_skipped_tokens=1225, prefill_fused_actions=124, prefill_full_matches=3, prefill_accept=0.919, prefill_bypass=175, temporal_hold=policy=paced_budget/base=124/extended=51/124/forced=124
+DFlash per-position hit rate: p1=0.712, p2=0.258, p3=0.056, p4=0.005, p5=0.008, p6=0.000
+Current task success rate: 0.0
+Current total success rate: 0.0
+Current task speculative stats: length=3.084, avg_accept_length=0.714, num_blocks=681, overall_hit_rate=0.221, verify_skipped_blocks=175, verify_skipped_tokens=1225, prefill_fused_actions=124, prefill_full_matches=3, prefill_accept=0.919, prefill_bypass=175, temporal_hold=policy=paced_budget/base=124/extended=51/124/forced=124
+Saved eval summary to: /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs/paced_age_k1_parity2/dflash_relaxed/简化版Draft+VTPF-TD-PacedBudget-e100/dflash_relaxed/EVAL-libero_goal-openvla-2026_07_31-12_44_40--vtpf-paced-age-k1-target-ar-parity2-dflash_relaxed_summary.json
+Total speculative stats: length=3.084, avg_accept_length=0.714, num_blocks=681, overall_hit_rate=0.221, verify_skipped_blocks=175, verify_skipped_tokens=1225, prefill_fused_actions=124, prefill_full_matches=3, prefill_accept=0.919, prefill_bypass=175, temporal_hold=policy=paced_budget/base=124/extended=51/124/forced=124
+Conditional prefix hit rate: p1=0.483, p2=0.337, p3=0.243, p4=0.259, p5=0.857, p6=0.500, p7=1.000

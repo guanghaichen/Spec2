@@ -1,0 +1,16 @@
+Task suite: libero_goal
+
+Task: open the middle drawer of the cabinet
+Starting episode 1...
+LIBERO initial-state index: 0
+Success: False
+# episodes completed so far: 1
+# successes: 0 (0.0%)
+Speculative stats: length=3.120, avg_accept_length=0.718, num_blocks=673, overall_hit_rate=0.220, verify_skipped_blocks=177, verify_skipped_tokens=1239, prefill_fused_actions=122, prefill_full_matches=6, prefill_accept=0.844, prefill_bypass=177, temporal_hold=policy=paced_budget/base=123/extended=54/122/forced=122/debt=54
+DFlash per-position hit rate: p1=0.781, p2=0.229, p3=0.048, p4=0.010, p5=0.008, p6=0.012
+Current task success rate: 0.0
+Current total success rate: 0.0
+Current task speculative stats: length=3.120, avg_accept_length=0.718, num_blocks=673, overall_hit_rate=0.220, verify_skipped_blocks=177, verify_skipped_tokens=1239, prefill_fused_actions=122, prefill_full_matches=6, prefill_accept=0.844, prefill_bypass=177, temporal_hold=policy=paced_budget/base=123/extended=54/122/forced=122/debt=54
+Saved eval summary to: /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs/paced_harmonic_postcommit_smoke/dflash_relaxed/简化版Draft+VTPF-TD-PacedHarmonic-e100/dflash_relaxed/EVAL-libero_goal-openvla-2026_07_31-15_02_17--dflash-vtpf-paced-harmonic-e100-postcommit-smoke-dflash_relaxed_summary.json
+Total speculative stats: length=3.120, avg_accept_length=0.718, num_blocks=673, overall_hit_rate=0.220, verify_skipped_blocks=177, verify_skipped_tokens=1239, prefill_fused_actions=122, prefill_full_matches=6, prefill_accept=0.844, prefill_bypass=177, temporal_hold=policy=paced_budget/base=123/extended=54/122/forced=122/debt=54
+Conditional prefix hit rate: p1=0.489, p2=0.295, p3=0.258, p4=0.440, p5=0.727, p6=0.875, p7=0.857

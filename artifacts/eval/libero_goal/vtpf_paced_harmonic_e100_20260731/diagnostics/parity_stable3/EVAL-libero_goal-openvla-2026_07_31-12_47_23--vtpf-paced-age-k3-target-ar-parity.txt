@@ -1,0 +1,16 @@
+Task suite: libero_goal
+
+Task: open the middle drawer of the cabinet
+Starting episode 1...
+LIBERO initial-state index: 5
+Success: False
+# episodes completed so far: 1
+# successes: 0 (0.0%)
+Speculative stats: length=3.398, avg_accept_length=0.686, num_blocks=618, overall_hit_rate=0.258, verify_skipped_blocks=176, verify_skipped_tokens=1232, prefill_bypass=176, temporal_hold=policy=paced_budget/base=124/extended=52/123/forced=123
+DFlash per-position hit rate: p1=0.715, p2=0.238, p3=0.043, p4=0.021, p5=0.006, p6=0.000
+Current task success rate: 0.0
+Current total success rate: 0.0
+Current task speculative stats: length=3.398, avg_accept_length=0.686, num_blocks=618, overall_hit_rate=0.258, verify_skipped_blocks=176, verify_skipped_tokens=1232, prefill_bypass=176, temporal_hold=policy=paced_budget/base=124/extended=52/123/forced=123
+Saved eval summary to: /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs/paced_age_k3_parity/dflash_relaxed/简化版Draft+VTPF-TD-PacedBudget-e100/dflash_relaxed/EVAL-libero_goal-openvla-2026_07_31-12_47_23--vtpf-paced-age-k3-target-ar-parity-dflash_relaxed_summary.json
+Total speculative stats: length=3.398, avg_accept_length=0.686, num_blocks=618, overall_hit_rate=0.258, verify_skipped_blocks=176, verify_skipped_tokens=1232, prefill_bypass=176, temporal_hold=policy=paced_budget/base=124/extended=52/123/forced=123
+Conditional prefix hit rate: p1=0.511, p2=0.282, p3=0.146, p4=0.385, p5=0.200, p6=0.000

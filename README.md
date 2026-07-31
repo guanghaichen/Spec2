@@ -4,19 +4,18 @@
 前提下，提高 LIBERO 动作解码速度。
 
 当前训练主线是独立的一层 Minimal Draft：保留完整目标上下文、multi-anchor、Hidden/Cos 和小权重 Soft KL，
-不再默认依赖 Action-RNN。当前推理主线分为两档：strict 使用验证式时序 Prefill 融合（VTPF）；relaxed 使用
-目标锚定时序降采样（VTPF-TD）。正式 Fast 档在 target 关键帧之间保持一次最近的 target-verified 动作；
-Visual Budget 候选档只在相对最近 target 锚点的累计视觉漂移未超预算时增加第二次保持，并在之后强制回到
-target。两者都直接省掉整次多模态 prefill。动作组宽松校验、DDTree、时序多候选 Prefill 树和短前缀认证
-均保留为消融，但当前证据没有证明它们是最佳路径。所有模块仍必须同时接受成功率、Length 和端到端
-Speedup 检验。
+不再默认依赖 Action-RNN。当前推理主线分为三档：strict 使用验证式时序 Prefill 融合（VTPF）；balanced
+relaxed 使用单步目标锚定时序降采样（VTPF-TD-Fast）；high-speed relaxed 使用 VTPF-PacedHarmonic。
+PacedHarmonic 以 `T-H-H,T-H` 节拍约束长期 target 调用密度，并把第二次 hold 的连续动作增量缩放为一半，
+从而把“多久查询 target”和“陈旧动作执行多大”解耦。动作组宽松校验、DDTree、时序多候选 Prefill 树、
+短前缀认证和单独 VisualBudget 均保留为消融。所有模块仍必须同时接受成功率、Length 和端到端 Speedup 检验。
 
 代码基于 [SpecVLA](https://github.com/PineTreeWss/SpecVLA)，而 SpecVLA 又基于
 [OpenVLA](https://github.com/openvla/openvla)。当前仓库仍是研究代码，不是已经定稿的公开复现包。
 所有结论必须同时报告成功率、接受长度和速度；训练准确率不能替代在线 LIBERO 结果。
 
-截至 2026-07-30，最重要的正式结果来自同一个 Golden e200 checkpoint、同一台 RTX 4090、同一 seed 7 和
-同一 paper-wrapped AR 分母：
+截至 2026-07-31，最重要的正式结果均来自同一台 RTX 4090、同一 seed 7、Goal 500 episodes 和同一
+paper-wrapped AR 分母。Golden 行使用 e200，Minimal 行使用独立的一层 e100 checkpoint：
 
 | 方法 | 校验性质 | SR | mean step | Speedup | Length |
 | --- | --- | ---: | ---: | ---: | ---: |
@@ -25,21 +24,25 @@ Speedup 检验。
 | SpecVLA relaxed (`r=9`) | 近似接受 | 0.734 | 0.141228s | 1.294x | 2.361 |
 | **Golden + VTPF strict** | **target-verified** | **0.790** | **0.142036s** | **1.286x** | **2.422** |
 | **Golden + VTPF-TD-Fast** | **单步时序近似** | **0.754** | **0.070050s** | **2.608x** | **3.653** |
+| **Minimal e100 + VTPF-PacedHarmonic** | **节拍谐波时序近似** | **0.746** | **0.052448s** | **3.484x** | **3.614** |
 
-Minimal e100 `VTPF-TD-VisualBudget(p=0.15)` 已完成 500-episode 正式评测：SR `0.672`、mean
-`0.049670s`、**3.679x**、Length `4.230`。成功轨迹单独仍有 `3.168x`，证明速度收益真实；但相对
-Minimal TD-Fast 的 SR `0.754` 显著下降，配对 McNemar `p=0.00115`。因此 `0.15` 只能作为 aggressive
-Pareto 点，不能作为默认主方法。完整诊断见 6.14。
+Minimal e100 `VTPF-PacedHarmonic` 已完成 500-episode 正式评测：SR `373/500=0.746`、mean
+`0.052448s`、**3.484x**、Length `3.614`。相对相同 500 个初始状态上的 AR，成功率点估计为 `+0.4`
+个百分点，精确 McNemar `p=0.934`；严谨结论是“本次未观察到成功率下降”，不是等价性证明。相对
+VisualBudget `p=0.15`，成功率提高 `7.4` 个百分点且配对检验显著（`p=0.00215`），同时保留 3x 以上速度。
+完整方法、留出筛选和原始证据见 6.15。
 
 独立 Minimal Draft 的 epoch 100 已完成相同的 500-episode 在线评测。它用远少于 Golden 的训练组件，仍得到
 `1.295x` 的 VTPF strict 和 `2.534x` 的 VTPF-TD-Fast；这证明当前主性能并不依赖 Action-RNN、跨 Anchor
 蒸馏或 Domino 交接。完整数字和训练时长结论见 6.13。
 
-原始日志、逐动作 timing、summary、launcher 快照、checkpoint 配置、环境身份和 SHA-256 已统一固化在
-[`artifacts/eval/curated_20260720_20260728`](artifacts/eval/curated_20260720_20260728)。该目录是当前论文
-数字的首要证据源；README 中的表格只是其可读摘要。
+PacedHarmonic 的原始日志、逐动作 timing、summary、配对统计、筛选/留出诊断、launcher 快照、checkpoint
+配置、环境身份和 SHA-256 固化在
+[`artifacts/eval/libero_goal/vtpf_paced_harmonic_e100_20260731`](artifacts/eval/libero_goal/vtpf_paced_harmonic_e100_20260731)。
+此前 Golden、SpecVLA 和 AR 证据仍保存在
+[`artifacts/eval/curated_20260720_20260728`](artifacts/eval/curated_20260720_20260728)；README 表格只是可读摘要。
 
-当前有三条必须隔离理解的实验线：
+当前有六条必须隔离理解的实验线：
 
 - **Golden reference**：复杂版一层 Draft + Action-RNN + 跨 Anchor + Domino 交接，其 epoch 200 配合
   VTPF strict 得到目前已固化的最好正式结果。代码状态以 tag `golden-vtpf-e200-20260726` 为准，权重和旧
@@ -60,6 +63,9 @@ Pareto 点，不能作为默认主方法。完整诊断见 6.14。
   第一跳仍沿用 Fast；第二跳只由相对最近 target 锚点的累计低频视觉漂移预算控制，最多连续保持两次。
   `0.15` 正式结果为 `3.679x / SR 0.672`：跨过 3x，但成功率代价不可忽略。它与旧 Adaptive 分入口、
   分日志保存，当前保留为 aggressive speed 点而不是默认替代方案。
+- **VTPF-PacedHarmonic high-speed 主线**：在 VisualBudget 的两次 hold 上增加长期节拍预算和第二次 hold 的
+  谐波动作缩放，并把严格 VTPF prefill 候选稳定门槛降为 1。正式结果为 `3.484x / SR 0.746`；它没有
+  复用视觉特征、没有动作组 relaxed 接受，也没有候选树，是当前同时越过 3x 与 AR 成功率点估计的主结果。
 
 ## 1. 阅读顺序和项目地图
 
@@ -90,7 +96,10 @@ Pareto 点，不能作为默认主方法。完整诊断见 6.14。
 | VTPF-TD 速度档 | `openvla/specdecoding/decode-scripts/run_dflash_vtpf_temporal_decimation_goal_eval.sh` | target 与单步 hold 交替，跳过整次 prefill |
 | VTPF-TD 保护档 | `openvla/specdecoding/decode-scripts/run_dflash_vtpf_guarded_bypass_goal_eval.sh` | 在单步 hold 前增加当前图像变化门 |
 | VTPF-TD 自适应档 | `openvla/specdecoding/decode-scripts/run_dflash_vtpf_adaptive_decimation_goal_eval.sh` | 仅在双重证据成立时把一次 hold 扩为两次；独立实验入口 |
-| VTPF-TD 视觉预算档 | `openvla/specdecoding/decode-scripts/run_dflash_vtpf_visual_budget_goal_eval.sh` | 累计视觉漂移预算决定第二次 hold；当前 `>3x` 候选入口 |
+| VTPF-TD 视觉预算档 | `openvla/specdecoding/decode-scripts/run_dflash_vtpf_visual_budget_goal_eval.sh` | 累计视觉漂移预算决定第二次 hold；已完成的 aggressive 速度上界 |
+| VTPF-TD 谐波保持消融 | `openvla/specdecoding/decode-scripts/run_dflash_vtpf_age_decayed_goal_eval.sh` | VisualBudget 第二次 hold 的连续动作缩放为 `1/2`；只用于拆分消融 |
+| VTPF-TD 节拍预算消融 | `openvla/specdecoding/decode-scripts/run_dflash_vtpf_paced_budget_goal_eval.sh` | 第二次 hold 后偿还 target 债务，形成 `T-H-H,T-H` 节拍 |
+| **VTPF-PacedHarmonic 主入口** | `openvla/specdecoding/decode-scripts/run_dflash_vtpf_paced_harmonic_goal_eval.sh` | `stable=1` 严格 prefill 候选 + 节拍预算 + 第二 hold 谐波缩放 |
 | 自适应 hold 决策 | `openvla/specdecoding/model/temporal_hold.py` | 无 CUDA 依赖的固定/风险受限策略与硬上限，可独立单测 |
 | 短前缀认证消融 | `openvla/specdecoding/decode-scripts/run_dflash_vtpf_prefix_cert_goal_eval.sh` | target 精确认证短前缀后信任尾部；当前净收益很小 |
 | 时序门校准 | `openvla/specdecoding/test-speed/analyze_dflash_temporal_shadow.py` | 从 shadow summary 统计覆盖、错误和 95% 风险上界 |
@@ -193,6 +202,7 @@ parallel_draft=False
 | 验证式时序 Prefill 融合（VTPF） | 本项目 | 连续 3 次 target 确认相同动作后，把历史 `c0..c5` 附在当前 prompt 后；一次必做的多模态 prefill 同时严格校验 `c0..c6`，拒绝后裁掉错误 KV 并回退 DFlash | 降低 target 固定调用数的结构性增量 |
 | 目标锚定时序降采样（VTPF-TD） | 本项目 | target 关键帧与最多一次历史动作保持交替；保护档再加图像变化门，保持帧不积累已验证历史 | 当前 relaxed 主线，直接减少 target prefill 次数 |
 | 风险受限自适应降采样（VTPF-TD-Adaptive） | 本项目 | 保留第一跳；只有 target 动作重复证据和相对最近 target 的累计视觉变化同时通过时才增加第二跳；随后强制 target | 与正式 TD-Fast 隔离的候选推理模块，不需要重训 |
+| 节拍谐波时序策略（VTPF-PacedHarmonic） | 本项目 | 用 `T-H-H,T-H` 的长期 target 预算约束模型调用密度；第二 hold 只执行半幅连续增量；上一动作在每个 target prefill 中仍由 target 严格逐 token 校验 | 将“查询 target 的频率”和“陈旧控制量的幅度”解耦，不依赖任务标签或成功反馈 |
 | 固定成本无损优化 | 本项目的实现诊断 | 目标 `lm_head` 仅投影 256 个动作 token；首 proposal 已被 anchor 判错时不再验证无效后缀；已知历史 proposal 时把 anchor 与整块校验融合为一次 target forward | 当前默认开启 |
 
 因此，当前论文主线应表述为：**一层块并行 Draft 产生候选；strict VTPF 把可信历史 proposal 的校验并入
@@ -1387,6 +1397,73 @@ LIBERO 的 `SEED` 不改变 `initial_states[episode_idx]`。为做不重复的�
 状态。该参数只改变评测样本范围，不改变模型或动作逻辑。两批原始文本、逐动作 timing 和完整 summary 固化在
 [`artifacts/eval/libero_goal/vtpf_visual_budget_e100_20260730`](artifacts/eval/libero_goal/vtpf_visual_budget_e100_20260730)。
 
+### 6.15 2026-07-31 VTPF-PacedHarmonic：把速度预算与控制误差解耦
+
+VisualBudget 的正式结果说明，约 34% 的 target 比例足以超过 3x，但连续重复完整的旧动作会放大闭环过冲。
+本轮没有继续扫描任务相关阈值，而是把“多久询问一次 target”和“陈旧动作执行多大”拆成两个独立约束：
+
+1. **节拍预算（paced target budget）**：第二次 hold 使用后形成一笔 temporal debt；下一 target 周期只允许
+   一次 hold，得到确定的 `T-H-H, T-H` 节拍。它把长期 target 比例约束在 40% 左右，不依赖任务 id、阶段
+   标签或成功轨迹反馈。
+2. **谐波动作保持（harmonic action hold）**：第一次 hold 原样执行；第二次 hold 只把 6 个连续控制维度乘以
+   `1 / hold_depth = 0.5`，夹爪维度保持离散值不变，随后强制回到 target。它不改变 token、Draft proposal
+   或验证结论，只限制陈旧位姿增量的累计幅度。
+3. **常开严格 prefill 候选（`stable_actions=1`）**：每个 target 帧都允许上一条动作进入 VTPF prefill；候选
+   token 仍由 target 逐位置判断，错误前缀在首个不匹配位置得到 correction。相比旧 `stable_actions=3`，它
+   不增加免校验 hold，却显著增加单次 target prefill 直接推进动作的机会。
+
+这不是按任务阶段编写的状态机。若两次 target 之间最多允许 1 或 2 次 hold，而长期平均预算为 1.5 次，交替
+安排 2、1 次 hold 是最大间隔最小的均匀节拍；它对应约 40% 的 target 调用率。OpenVLA 前六维是连续增量控制，
+同一陈旧增量重复第 `d` 次时按 `1/d` 执行，可降低零阶保持造成的线性累计过冲；夹爪是离散状态，因而不缩放。
+`0.15` 仍只是此前 VisualBudget 已注册的第二 hold 视觉扩展上限，不能解释成形式化安全证书；本轮没有针对
+task、物体或成功轨迹新增阈值。
+
+筛选严格区分反复观察过的初始状态 0-4 与留出状态 5-9；只有后者用于决定是否启动正式评测：
+
+| 候选 | 状态范围 | SR | last-task mean | Speedup | 结论 |
+| --- | --- | ---: | ---: | ---: | --- |
+| 仅节拍预算，`stable=3`、无谐波保持 | 正式 0-49 | 353/500 | 0.057205s | 3.194x | 达到速度目标，但 SR 只有 0.706 |
+| VisualBudget + 谐波保持 | 0-4 | 41/50 | 0.057596s | 3.172x | 设计集很好，但不能据此定稿 |
+| VisualBudget + 谐波保持 | 5-9 | 33/50 | 0.054226s | 3.370x | 留出集未改善，单独使用被否决 |
+| 节拍预算 + 谐波保持，`stable=3` | 5-9 | 38/50 | 0.062375s | 2.929x | SR 达标但没有稳定超过 3x |
+| **VTPF-PacedHarmonic，`stable=1`** | **5-9** | **39/50** | **0.052489s** | **3.481x** | **唯一同时通过留出 SR 与 3x 门槛的候选** |
+
+同轮还排除了两条更复杂的路线：复用视觉表示的 50 条 pilot 为 `SR 0.600 / 3.198x`，目标动作变化证书为
+`SR 0.700 / 2.633x`。前者直接损伤视觉条件，后者没有速度收益；两者实现均已从正式工作树删除，只在实验
+日志中保留否定证据，避免失败原型继续污染模型接口。
+
+正确性影子诊断额外串行生成纯 target AR 参考链，不计入正式速度。在相同初始状态的单 episode 诊断中，原 `stable=3` DFlash
+target 路径有 `20/124=16.1%` 的整动作 token 链与 AR 不同；`stable=1` 为 `17/125=13.6%`。该单样本只
+排除了明显回归，不能充当等价性证明。这也限定了论文表述：VTPF 候选接受本身是逐 token target 校验，但当前 DFlash 整体实现不能被
+宣称为与纯 AR 逐动作位完全等价。正式评测必须关闭 `DFLASH_DEBUG_COMPARE_TARGET_AR` 和
+`DFLASH_PROFILE_STAGES`，否则额外 AR 链与 CUDA 同步会污染计时。
+
+实现身份为 commit `82cdffe`，独立复现入口为 `run_dflash_vtpf_paced_harmonic_goal_eval.sh`。e100、seed 7、
+Goal `50 trials/task` 的正式 500-episode 结果如下：
+
+| 指标 | 正式结果 |
+| --- | ---: |
+| 成功率 | **373/500 = 0.746** |
+| 各 task 成功数 | `[32, 44, 43, 23, 47, 38, 29, 48, 41, 28]` |
+| last-task mean step | **0.0524479s** |
+| 相对 paper-wrapped AR 的 Speedup | **3.4838x** |
+| Length / Table-1 Length | 3.6144 |
+| avg_accept_length | 0.9523 |
+| target prefill / hold 比例 | 0.4046 / 0.5954 |
+| 第一 / 第二 hold 次数 | 4707 / 2243 |
+| VTPF prefill fused / full-match | 4672 / 1036 |
+
+相同 500 个初始状态上，PacedHarmonic 相对 AR 的成功率差为 `+0.4` 个百分点；前者独赢 73 条、后者独赢
+71 条，精确 McNemar `p=0.9336`，配对 bootstrap 95% CI `[-4.4,+5.2]` 个百分点。这个结果支持“未观察
+到成功率下降”，但区间仍包含中等幅度变化，不能声称已经证明等价。相对 VisualBudget `p=0.15`，成功率
+提高 `7.4` 个百分点，配对 95% CI `[+2.8,+12.0]`，McNemar `p=0.00215`；说明谐波缩放并非只换来
+偶然的总体均值，而是显著修复了此前的闭环精度损失。
+
+完整原始证据、统计脚本输出、环境和 launcher 快照固化在
+[`artifacts/eval/libero_goal/vtpf_paced_harmonic_e100_20260731`](artifacts/eval/libero_goal/vtpf_paced_harmonic_e100_20260731)。
+当前 commit 的额外 1-episode smoke 已 `exit=0`；退出时仍会出现 robosuite 的已知 EGL 析构警告，但 summary
+在此前已经完整写盘。
+
 ## 7. 当前标准工作流
 
 固定分工：
@@ -1681,6 +1758,21 @@ DFLASH_TEMPORAL_VISUAL_BUDGET=0.15 \
   bash openvla/specdecoding/decode-scripts/run_dflash_vtpf_visual_budget_goal_eval.sh
 ```
 
+当前同时追求 3x 与成功率的主入口是 VTPF-PacedHarmonic。它固定使用 `stable_actions=1`、
+`T-H-H,T-H` 节拍和第二 hold 的 `0.5` 连续动作缩放；不启用视觉特征缓存、树或动作组 relaxed 校验：
+
+```bash
+SPEC_CKPT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/Draft_checkpoint/goal/epoch_100_step_044800 \
+EVAL_EPOCH=100 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+TRIAL_START_INDEX=0 SEED=7 SYNC_CUDA_TIMING=False TIMING_SCOPE=last_task \
+LOG_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs/paced_harmonic_formal \
+RUN_ID_NOTE=dflash-vtpf-paced-harmonic-goal-e100-s7-formal \
+  bash openvla/specdecoding/decode-scripts/run_dflash_vtpf_paced_harmonic_goal_eval.sh
+```
+
+正式论文结果只能使用默认 `TRIAL_START_INDEX=0` 的完整 500 episodes。`DFLASH_PROFILE_STAGES=True` 或
+`DFLASH_DEBUG_COMPARE_TARGET_AR=True` 只用于诊断，会额外同步 CUDA 或串行运行 AR，严禁用于速度表。
+
 仅做不重复的诊断批次时可附加 `TRIAL_START_INDEX=3`；论文正式 50-trial/task 必须保持默认 0。
 PrefixCert 仅用于固定成本消融：
 
@@ -1870,7 +1962,10 @@ AR、strict、relaxed 必须同机、同 GPU、串行执行。4090 是正式速�
 | `run_dflash_vtpf_temporal_decimation_goal_eval.sh` | VTPF-TD 速度档：target 与单步 hold 交替 |
 | `run_dflash_vtpf_guarded_bypass_goal_eval.sh` | VTPF-TD 保护档：图像变化门控的单步 hold |
 | `run_dflash_vtpf_adaptive_decimation_goal_eval.sh` | 单组 VTPF-TD 自适应档：双重证据才扩展第二次 hold，随后强制 target |
-| `run_dflash_vtpf_visual_budget_goal_eval.sh` | 单组 VTPF-TD 视觉预算档：累计视觉漂移控制第二次 hold；当前 `>3x` 候选 |
+| `run_dflash_vtpf_visual_budget_goal_eval.sh` | 单组 VTPF-TD 视觉预算档：累计视觉漂移控制第二次 hold；仅作为 aggressive 速度上界 |
+| `run_dflash_vtpf_paced_budget_goal_eval.sh` | `T-H-H,T-H` 固定节拍预算消融，不改变 hold 动作幅度 |
+| `run_dflash_vtpf_age_decayed_goal_eval.sh` | 第二 hold 连续动作按 `1/hold_depth` 衰减的单模块消融 |
+| `run_dflash_vtpf_paced_harmonic_goal_eval.sh` | 当前主线：节拍预算 + 谐波保持 + `stable_actions=1` 严格 prefill 候选 |
 | `run_dflash_vtpf_prefix_cert_goal_eval.sh` | PrefixCert 固定成本消融，不是推荐主线 |
 | `analyze_dflash_temporal_shadow.py` | 汇总时序门覆盖率、错误率和 Wilson 风险上界 |
 | `run_dflash_action_rnn_goal_4way_eval.sh` | 同一 Goal checkpoint 的 RNN/树 × strict/动作组四路消融 |

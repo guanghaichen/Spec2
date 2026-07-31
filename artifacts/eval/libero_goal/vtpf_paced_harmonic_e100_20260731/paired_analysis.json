@@ -1,0 +1,219 @@
+{
+  "protocol": {
+    "suite": "libero_goal",
+    "seed": 7,
+    "trials_per_task": 50,
+    "trial_start_index": 0,
+    "timing_scope": "last_task",
+    "sync_cuda_timing": false,
+    "checkpoint": "epoch_100_step_044800",
+    "paired_bootstrap_samples": 20000,
+    "paired_bootstrap_seed": 20260731
+  },
+  "metrics": {
+    "Paper-wrapped AR": {
+      "episodes": 500,
+      "successes": 371,
+      "success_rate": 0.742,
+      "successes_per_task": [
+        27,
+        42,
+        44,
+        22,
+        41,
+        41,
+        35,
+        48,
+        42,
+        29
+      ],
+      "timing_mean_seconds": 0.18271759773649937,
+      "speedup_vs_paper_wrapped_ar": 1.0,
+      "length": null,
+      "avg_accept_length": null,
+      "overall_hit_rate": null
+    },
+    "Minimal TD-Fast": {
+      "episodes": 500,
+      "successes": 377,
+      "success_rate": 0.754,
+      "successes_per_task": [
+        21,
+        47,
+        39,
+        20,
+        49,
+        40,
+        36,
+        48,
+        42,
+        35
+      ],
+      "timing_mean_seconds": 0.07211908365495878,
+      "speedup_vs_paper_wrapped_ar": 2.5335540674737347,
+      "length": 3.573134328358209,
+      "avg_accept_length": 1.0512522135087274,
+      "overall_hit_rate": 0.3534815671730661
+    },
+    "VisualBudget p=0.15": {
+      "episodes": 500,
+      "successes": 336,
+      "success_rate": 0.672,
+      "successes_per_task": [
+        21,
+        39,
+        41,
+        11,
+        47,
+        36,
+        29,
+        46,
+        37,
+        29
+      ],
+      "timing_mean_seconds": 0.049669825861759054,
+      "speedup_vs_paper_wrapped_ar": 3.678643815765301,
+      "length": 4.229777124109062,
+      "avg_accept_length": 0.8558660481954973,
+      "overall_hit_rate": 0.353868462905791
+    },
+    "PacedBudget no harmonic": {
+      "episodes": 500,
+      "successes": 353,
+      "success_rate": 0.706,
+      "successes_per_task": [
+        24,
+        45,
+        40,
+        16,
+        48,
+        38,
+        32,
+        48,
+        33,
+        29
+      ],
+      "timing_mean_seconds": 0.05720467373438857,
+      "speedup_vs_paper_wrapped_ar": 3.1941026110014987,
+      "length": 3.9968633006172216,
+      "avg_accept_length": 0.9741981179803704,
+      "overall_hit_rate": 0.36564570951142167
+    },
+    "VTPF-PacedHarmonic": {
+      "episodes": 500,
+      "successes": 373,
+      "success_rate": 0.746,
+      "successes_per_task": [
+        32,
+        44,
+        43,
+        23,
+        47,
+        38,
+        29,
+        48,
+        41,
+        28
+      ],
+      "timing_mean_seconds": 0.05244790365179148,
+      "speedup_vs_paper_wrapped_ar": 3.483792201678555,
+      "length": 3.614421588144216,
+      "avg_accept_length": 0.952267197522672,
+      "overall_hit_rate": 0.3039322273208613
+    }
+  },
+  "paced_harmonic_success_rate_wilson_95ci": [
+    0.7060690794081029,
+    0.7821797450848135
+  ],
+  "paired_comparisons": {
+    "Paper-wrapped AR": {
+      "success_rate_delta": 0.004,
+      "paced_harmonic_success_other_failure": 73,
+      "paced_harmonic_failure_other_success": 71,
+      "mcnemar_exact_two_sided_p": 0.9336249535488024,
+      "paired_bootstrap_95ci": [
+        -0.044,
+        0.052
+      ]
+    },
+    "Minimal TD-Fast": {
+      "success_rate_delta": -0.008,
+      "paced_harmonic_success_other_failure": 63,
+      "paced_harmonic_failure_other_success": 67,
+      "mcnemar_exact_two_sided_p": 0.7925825227940961,
+      "paired_bootstrap_95ci": [
+        -0.052,
+        0.036
+      ]
+    },
+    "VisualBudget p=0.15": {
+      "success_rate_delta": 0.074,
+      "paced_harmonic_success_other_failure": 88,
+      "paced_harmonic_failure_other_success": 51,
+      "mcnemar_exact_two_sided_p": 0.002147097386325104,
+      "paired_bootstrap_95ci": [
+        0.028,
+        0.12
+      ]
+    },
+    "PacedBudget no harmonic": {
+      "success_rate_delta": 0.04,
+      "paced_harmonic_success_other_failure": 77,
+      "paced_harmonic_failure_other_success": 57,
+      "mcnemar_exact_two_sided_p": 0.10036570149746177,
+      "paired_bootstrap_95ci": [
+        -0.004,
+        0.086
+      ]
+    }
+  },
+  "paced_harmonic_runtime": {
+    "target_prefill_rate": 0.40455791638108296,
+    "hold_rate": 0.595442083618917,
+    "base_holds": 4707,
+    "extended_holds": 2243,
+    "extension_rate": 0.4795809279452641,
+    "forced_target_after_hold": 4672,
+    "action_scale_histogram": {
+      "1.0": 4707,
+      "0.5": 2243
+    },
+    "temporal_prefill_fused_actions": 4672,
+    "temporal_prefill_full_match_actions": 1036,
+    "temporal_prefill_avg_accept_length": 2.2363013698630136,
+    "per_position_hit_rate": [
+      {
+        "position": 1,
+        "count": 10983,
+        "hit_rate": 0.7874897568970227
+      },
+      {
+        "position": 2,
+        "count": 9232,
+        "hit_rate": 0.21663778162911612
+      },
+      {
+        "position": 3,
+        "count": 7130,
+        "hit_rate": 0.0485273492286115
+      },
+      {
+        "position": 4,
+        "count": 5483,
+        "hit_rate": 0.013678643078606603
+      },
+      {
+        "position": 5,
+        "count": 3338,
+        "hit_rate": 0.002396644697423607
+      },
+      {
+        "position": 6,
+        "count": 1955,
+        "hit_rate": 0.0
+      }
+    ]
+  },
+  "interpretation": "The 500-episode run observed no success-rate loss versus matched AR (+0.4 pp), but the confidence interval includes moderate changes and does not prove equivalence. Harmonic scaling significantly improves success over VisualBudget while retaining >3x speed."
+}

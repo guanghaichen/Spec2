@@ -1773,6 +1773,22 @@ RUN_ID_NOTE=dflash-vtpf-paced-harmonic-goal-e100-s7-formal \
 正式论文结果只能使用默认 `TRIAL_START_INDEX=0` 的完整 500 episodes。`DFLASH_PROFILE_STAGES=True` 或
 `DFLASH_DEBUG_COMPARE_TARGET_AR=True` 只用于诊断，会额外同步 CUDA 或串行运行 AR，严禁用于速度表。
 
+四个 suite 的论文主表统一使用 `run_dflash_minimal_suite_main_3way_eval.sh`。它要求显式提供 suite-specific
+Draft，随后串行运行 `DFlash strict`、`DFlash + VTPF strict` 和
+`DFlash + VTPF + PacedHarmonic`；三路共享 checkpoint、seed 和计时协议。Spatial e100 正式命令为：
+
+```bash
+TASK_SUITE_NAME=libero_spatial \
+SPEC_CKPT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/Draft_checkpoint/spatial/epoch_100_step_062200 \
+EVAL_EPOCH=100 CUDA_VISIBLE_DEVICES=0 NUM_TRIALS_PER_TASK=50 \
+TRIAL_START_INDEX=0 SEED=7 SYNC_CUDA_TIMING=False TIMING_SCOPE=last_task \
+  bash openvla/specdecoding/decode-scripts/run_dflash_minimal_suite_main_3way_eval.sh
+```
+
+默认日志根目录为 `specvla-data/eval_logs/spatial/`。若前一组已经完成，可附加 `START_CASE=2` 或
+`START_CASE=3` 从对应组继续。脚本会根据 `TASK_SUITE_NAME` 自动选择 spatial OpenVLA 权重，但不会自动
+猜测 Draft；这项限制用于防止把 Goal Draft 误用于其它 suite。
+
 仅做不重复的诊断批次时可附加 `TRIAL_START_INDEX=3`；论文正式 50-trial/task 必须保持默认 0。
 PrefixCert 仅用于固定成本消融：
 
@@ -1955,8 +1971,9 @@ AR、strict、relaxed 必须同机、同 GPU、串行执行。4090 是正式速�
 | `run_specvla_eval.sh` | 一个 suite 的 strict/relaxed |
 | `run_specvla_goal_upstream_compatible_eval.sh` | Goal AR+strict+relaxed 一键复现 |
 | `run_specvla_main_table_eval.sh` | 四 suite strict/relaxed 自动续跑与汇总 |
-| `run_dflash_goal_eval.sh` | 当前 Goal DFlash 单项 strict/relaxed |
+| `run_dflash_goal_eval.sh` | DFlash 单项 strict/relaxed；默认 Goal，也可由 `TASK_SUITE_NAME` 显式选择 suite |
 | `run_dflash_minimal_goal_3way_eval.sh` | 同一 Minimal checkpoint 的线性 strict、VTPF strict、VTPF-TD-Fast 串行评测；支持断点续跑 |
+| `run_dflash_minimal_suite_main_3way_eval.sh` | 四 suite 主表入口：DFlash strict、VTPF strict、PacedHarmonic 串行评测；必须显式传 suite-specific Draft |
 | `run_dflash_temporal_cascade_goal_eval.sh` | strict VTPF 主线：`shadow`、严格 `route`、严格 `prefill`、旧 approximate `cascade` |
 | `run_dflash_temporal_prefill_tree_goal_eval.sh` | golden e200 的时序多候选 prefill 树，参数为 `strict` 或 `relaxed` |
 | `run_dflash_vtpf_temporal_decimation_goal_eval.sh` | VTPF-TD 速度档：target 与单步 hold 交替 |

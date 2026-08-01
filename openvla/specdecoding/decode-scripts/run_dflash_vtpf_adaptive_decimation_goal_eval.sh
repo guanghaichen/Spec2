@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# VTPF-TD-Adaptive（单组 Goal 评测）：
+# VTPF-TD-Adaptive（单 suite 评测；默认 Goal）：
 #   1. 第一帧 hold 完全复用已验证的 TD-Fast 行为；
 #   2. 第二帧 hold 仅在两个 target 关键帧给出完全相同动作，且当前图像
 #      相对最后 target 锚点的累计变化足够小时放行；
@@ -16,7 +16,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/libero_eval_common.sh"
 
 USER_LOG_DIR="${LOG_DIR:-}"
-init_libero_eval_env libero_goal
+REQUESTED_TASK_SUITE_NAME="${TASK_SUITE_NAME:-libero_goal}"
+init_libero_eval_env "${REQUESTED_TASK_SUITE_NAME}"
+export TASK_SUITE_NAME TASK_SUITE_SLUG
 
 if [[ -z "${SPEC_CKPT:-}" ]]; then
   echo "请显式设置 SPEC_CKPT=/absolute/path/to/epoch_xxx_step_xxxxxx。" >&2
@@ -80,6 +82,6 @@ export DFLASH_TEMPORAL_ADAPTIVE_MAX_ANCHOR_PIXEL_RELATIVE_L2="${DFLASH_TEMPORAL_
 
 export DFLASH_PROFILE_STAGES="${DFLASH_PROFILE_STAGES:-False}"
 export DFLASH_DEBUG_COMPARE_TARGET_AR="${DFLASH_DEBUG_COMPARE_TARGET_AR:-False}"
-export RUN_ID_NOTE="${RUN_ID_NOTE:-dflash-vtpf-td-adaptive-goal-e${EVAL_EPOCH}-s${SEED}-vr${DFLASH_TEMPORAL_ADAPTIVE_MIN_VERIFIED_RUN}-p${DFLASH_TEMPORAL_ADAPTIVE_MAX_ANCHOR_PIXEL_RELATIVE_L2}}"
+export RUN_ID_NOTE="${RUN_ID_NOTE:-dflash-vtpf-td-adaptive-${TASK_SUITE_SLUG}-e${EVAL_EPOCH}-s${SEED}-vr${DFLASH_TEMPORAL_ADAPTIVE_MIN_VERIFIED_RUN}-p${DFLASH_TEMPORAL_ADAPTIVE_MAX_ANCHOR_PIXEL_RELATIVE_L2}}"
 
 bash "${SCRIPT_DIR}/run_dflash_goal_eval.sh" relaxed

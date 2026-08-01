@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 当前 DFlash 只在 LIBERO-Goal 上训练，因此本入口故意不接受其它 suite。
-# 用法：EVAL_EPOCH=100 bash .../run_dflash_goal_eval.sh [strict|relaxed]
+# DFlash 单项评测底层入口。为兼容历史脚本，默认 suite 仍是 Goal；其它
+# suite 必须显式设置 TASK_SUITE_NAME，并提供该 suite 自己训练的 Draft。
+# 用法：
+#   EVAL_EPOCH=100 bash .../run_dflash_goal_eval.sh [strict|relaxed]
+#   TASK_SUITE_NAME=libero_spatial SPEC_CKPT=/path/to/spatial_draft \
+#     bash .../run_dflash_goal_eval.sh strict
 
 MODE="${1:-${EVAL_MODE:-strict}}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/libero_eval_common.sh"
 
-init_libero_eval_env libero_goal
+REQUESTED_TASK_SUITE_NAME="${TASK_SUITE_NAME:-libero_goal}"
+init_libero_eval_env "${REQUESTED_TASK_SUITE_NAME}"
+export TASK_SUITE_NAME TASK_SUITE_SLUG
 resolve_dflash_checkpoint
 
 case "${MODE}" in
@@ -59,7 +65,7 @@ DFLASH_VERIFY_SKIP_MAX_CONSECUTIVE="${DFLASH_VERIFY_SKIP_MAX_CONSECUTIVE:-1}"
 DFLASH_PROFILE_STAGES="${DFLASH_PROFILE_STAGES:-False}"
 DFLASH_DEBUG_COMPARE_TARGET_AR="${DFLASH_DEBUG_COMPARE_TARGET_AR:-False}"
 MAX_EVAL_TASKS="${MAX_EVAL_TASKS:-}"
-RUN_ID_NOTE="${RUN_ID_NOTE:-dflash-action-rnn-${MODE}-goal-e${EVAL_EPOCH}-r${ACCEPT_THRESHOLD}}"
+RUN_ID_NOTE="${RUN_ID_NOTE:-dflash-${MODE}-${TASK_SUITE_SLUG}-e${EVAL_EPOCH}-r${ACCEPT_THRESHOLD}}"
 
 print_common_eval_config
 echo "METHOD=dflash_action_rnn_${MODE}"
@@ -127,7 +133,7 @@ python "${EVAL_ENTRY}" \
   --draft_backend dflash \
   --use_spec True \
   --parallel_draft False \
-  --task_suite_name libero_goal \
+  --task_suite_name "${TASK_SUITE_NAME}" \
   --num_trials_per_task "${NUM_TRIALS_PER_TASK}" \
   --trial_start_index "${TRIAL_START_INDEX:-0}" \
   --center_crop True \

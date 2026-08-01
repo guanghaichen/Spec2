@@ -1,0 +1,995 @@
+SpecVLA-DFLASH 论文故事、理论框架与证据蓝图
+================================================
+
+文档性质
+--------
+
+这不是论文正文，也不是为了包装已有结果而写的宣传稿。它是一份供后续论文写作、实验设计和方法审查使用的内部研究蓝图。它必须同时回答四个问题：
+
+1. 我们究竟发现了什么此前容易被忽略的问题？
+2. DFlash、VTPF 和 PacedHarmonic 为什么会按这个顺序自然出现？
+3. 为什么这些设计在理论上可能有效，哪些部分已经被实验支持，哪些仍只是待证假设？
+4. 怎样用可证伪的实验，把一个看似工程化的加速系统提升为严谨的具身推理研究？
+
+本文档严格服从当前代码事实。当前正式实现身份为 commit 82cdffe35a64338ccbfd4c5e513e26883b1b646b；LIBERO-Goal、Minimal Draft epoch 100、seed 7 的 VTPF-PacedHarmonic 正式证据已由 tag vtpf-paced-harmonic-e100-20260731 固化。随着实现更新，论文中的算法表述必须重新与代码逐项核对。
+
+
+一、全文最核心的研究命题
+========================
+
+最凝练的主张不是“我们把 DFlash 用到了 VLA”，也不是“我们发现相邻动作经常相同”，而是：
+
+    VLA 的投机执行不是普通语言模型投机解码的缩小版。
+
+语言模型中的草稿 token 在目标模型验证前不会改变外部世界。错误草稿可以被直接丢弃，系统只需关心 token 是否被接受以及验证摊销是否划算。
+
+VLA 中的动作一旦在未验证状态下执行，就会改变机器人位姿、物体状态和下一时刻视觉观测。错误动作无法像错误 token 一样从缓存中删除。于是，VLA 推理加速同时包含两个不同的问题：
+
+1. 生成问题：怎样低成本地产生未来动作候选？
+2. 提交问题：什么时候可以在没有当前目标模型裁决的情况下，把候选动作真正提交给物理世界？如果提交，应该赋予它多大的控制权？
+
+现有投机解码主要解决第一个问题。我们的完整故事从动作块的并行生成出发，经过当前目标模型严格验证的跨时序复用，最终落到对不可回滚物理提交的显式管理。
+
+可以把整项工作概括为：
+
+    从 Parallel Action Speculation 到 Verified Temporal Speculation，
+    再到 Commit-Aware Embodied Speculation。
+
+中文可称为：
+
+    从动作块并行投机，到验证式时序投机，再到面向物理提交的具身投机执行。
+
+三项方法不是相互独立的技巧，而是逐层放松约束、逐层暴露新瓶颈的连续推导：
+
+1. DFlash 解决一个动作内部 7 个 token 的串行草稿瓶颈。
+2. VTPF 发现即使草稿很便宜，只要每个控制步仍要完成 target prefill，速度就存在严格上限，于是把历史动作的严格验证融合进当前必做的 prefill。
+3. PacedHarmonic 进一步发现，只要每帧都要求当前 target 裁决，就无法跨越 prefill 下界。它把问题从“当前 token 是否与 target 完全相同”提升为“一个最近由 target 确认的控制命令，在多短的时间内仍可作为行为上可接受的物理提交”，并用再锚定节拍与动作控制权衰减约束不可回滚风险。
+
+
+二、问题形式化：OpenVLA 的两个时间尺度
+========================================
+
+2.1 控制步内的动作 token 维度
+-----------------------------
+
+在控制时刻 t，OpenVLA 接收当前视觉观测 o_t 和语言指令 p，使用目标模型 M_T 生成 7 个离散动作 token：
+
+    A_t = [a_t^0, a_t^1, ..., a_t^6]
+
+它们经反量化后形成连续动作：
+
+    u_t = [dx, dy, dz, droll, dpitch, dyaw, gripper]
+
+前六维通常是当前控制周期要执行的增量控制量，最后一维是离散夹爪状态。目标模型采用 greedy 自回归生成：
+
+    a_t^j = argmax_a P_T(a | o_t, p, a_t^{0:j-1})
+
+因此，一个动作内部存在 token 维度的因果链。纯 AR 需要从 a_t^0 到 a_t^6 逐个推进。
+
+2.2 控制步之间的物理时间维度
+-----------------------------
+
+机器人执行 u_t 后，环境发生真实变化：
+
+    x_{t+1} = F(x_t, u_t, w_t)
+    o_{t+1} = H(x_{t+1})
+
+x_t 是不可完全观测的环境状态，w_t 表示动力学误差和外部扰动。这里存在第二条时间轴：动作 A_t、A_{t+1}、A_{t+2} 依次作用于同一个持续变化的物理系统。
+
+这两个时间尺度必须分开：
+
+- 动作内部：7 个 token 是一个动作向量的离散表示，目标是消除自回归串行生成。
+- 动作之间：每个控制步都会改变世界，目标是减少昂贵的目标模型调用，同时控制未验证动作的物理后果。
+
+本项目的三个方法正好沿这两个尺度展开。DFlash 首先处理动作内部并行性，VTPF 和 PacedHarmonic 再处理动作之间的时序冗余与物理提交。
+
+
+三、为什么直接照搬 LLM 投机解码不够
+====================================
+
+经典投机解码的一轮延迟可近似写为：
+
+    C_SD = C_draft + C_verify
+
+若一轮平均推进 tau 个 token，则每 token 平均成本为：
+
+    L_SD = (C_draft + C_verify) / tau
+
+自然语言通常需要生成数百乃至数千 token。一次草稿和验证的固定成本可以在长序列中被充分摊销。OpenVLA 每个控制步只有 7 个动作 token，存在三个更苛刻的事实：
+
+1. 可接受长度的绝对上限很小。即使 6 个后续 token 全部命中，也没有自然语言长块那样大的摊销空间。
+2. 动作 token 的 exact match 很难。不同 bin 的动作可能行为相近，但 greedy strict 要求 token id 完全一致。
+3. 当前图像的多模态 prefill 是固定大头。草稿再快，只要每个控制步都要运行一次完整视觉语言 target，速度就存在不可忽略的下界。
+
+4090 profiler 给出的量级进一步说明了这一点：
+
+    普通多模态 prefill               约 55.3 ms
+    VTPF 融合 prefill                约 54.9 ms
+    缓存后的 target anchor           约 17.9 ms
+    一层 Draft + Action-RNN          约 1.9 ms
+    缓存后的 target verify           约 18.8 ms
+
+附加 6 个动作 token 几乎不改变长 prompt 的 prefill 成本；相反，batch-1 的短 target forward 固定开销很高，处理 1 个 token 的 anchor 与处理约 5 个 token 的 verify 几乎同价。
+
+这意味着，VLA 加速不能只追求更高的 draft token accuracy。真正的问题是：怎样减少 target 的独立调用次数，以及在允许 relaxed 时怎样减少完整 target 控制帧的密度。
+
+
+四、第一步：动作块并行投机，而不是串行草稿
+============================================
+
+4.1 方法来源
+------------
+
+SpecVLA 使用 EAGLE 风格的轻量自回归 Draft。它虽然能让 target 并行验证多个 token，但 Draft 自己仍要按 token 顺序生成 proposal。DFlash 在自然语言中指出：当 block diffusion Draft 能用一次 forward 同时预测多个 mask 位置时，草稿成本不再随块长近似线性增长。
+
+将这一思想迁移到 OpenVLA 后，当前目标模型先通过多模态 prefill 得到绝对可信的 a_t^0 以及多层 target hidden context，随后一层 DFlash Draft 在一次 forward 中并行预测：
+
+    [d_t^1, d_t^2, ..., d_t^6]
+
+目标模型再沿因果前缀并行校验这 6 个 proposal。它保留了 speculative decoding 的核心正确性结构：Draft 只提议，target 负责接受与纠正。
+
+4.2 这一贡献真正解决什么
+-------------------------
+
+它解决的是 proposal 产生端的串行性：
+
+    自回归 Draft：C_draft(q) 约为 q * c_step
+    块并行 Draft：C_draft(q) 约为 c_parallel
+
+对于当前 q=6，DFlash 使草稿生成只需一次小模型 forward。它也允许 Draft 使用目标模型的完整 prompt hidden 和当前已验证 action prefix hidden，而不是仅凭低维 token 从头猜动作。
+
+4.3 为什么它是必要但不充分的
+-----------------------------
+
+当前正式结果恰好揭示了它的边界。Minimal e100 的线性 DFlash strict 约为 1.139x，说明并行 Draft 确实消除了草稿串行成本，但没有消除每帧 target prefill、anchor 和 verify 的固定成本。正式 PacedHarmonic 日志中 Draft overall hit rate 只有 0.3039，后续位置命中率迅速下降：
+
+    p1 约 0.7875
+    p2 约 0.2166
+    p3 约 0.0485
+    p4 约 0.0137
+    p5 约 0.0024
+    p6 为 0
+
+这里不能得出“Draft 没有价值”。正确结论是：短动作块中，提高后部 token accuracy 的收益会被固定 target 调用成本和短序列上限压制。DFlash 提供了低成本 fallback proposal，但它本身不足以跨过 per-frame target prefill 下界。
+
+4.4 第一项创新应怎样表述
+-------------------------
+
+严谨版本：
+
+    我们研究了 block-diffusion parallel drafting 在自回归 OpenVLA 动作生成中的适用性，证明它能以一次轻量 forward 生成完整动作块，并揭示短动作序列下“草稿成本已很低、目标调用成本仍占主导”的新瓶颈。
+
+投稿前必须重新进行系统文献检索，才能使用“首次”一词。当前可把“首次将 DFlash 迁移到 OpenVLA”作为待审计的新颖性假设，而不是已经证明的事实。
+
+
+五、从训练准确率转向系统瓶颈：关键研究转折
+============================================
+
+我们曾试图用 Action-RNN、跨 Anchor 蒸馏、复杂 token 级监督、树候选和动作组接受进一步提高 Draft。训练集上的位置准确率可以显著提高，但在线推理的弱位置命中和端到端速度没有同比改善。Action-RNN 关闭后，VTPF strict 的性能仍能保持；简化的一层 Draft 在 epoch 100 已保留主要在线性能。
+
+这段负结果非常重要。它把研究问题从“怎样把 Draft 训练到几乎等于 target”改写为：
+
+    当动作序列极短、target prefill 昂贵、物理控制跨帧连续时，
+    推理调度是否比继续堆叠 Draft 监督更能决定端到端速度？
+
+这不是放弃 Draft，而是明确系统优化中的边际收益：
+
+- DFlash 负责让新 proposal 足够便宜，保证历史候选失效时仍有高效 fallback。
+- 推理端负责避免重复支付不必要的 target 固定成本。
+- 整体性能来自 target、Draft、历史动作和执行器的协同，而不是把所有能力都压到 Draft 参数里。
+
+这一转折应通过正式消融证明，而不能只靠训练日志叙述。
+
+
+六、第二步：VTPF，把跨帧历史动作变成严格 proposal
+====================================================
+
+6.1 关键观察
+------------
+
+OpenVLA 的输出不是任意语言序列，而是高频闭环控制中的量化动作。相邻控制帧之间，视觉状态通常连续变化；同一局部操作阶段内，量化后的 7-token 动作可能连续重复，或者至少共享较长的前缀。
+
+因此，上一条由 target 确认的完整动作不是普通缓存，它是一个具有很低生成成本、且来自目标策略自身的时序 proposal。
+
+重要的是，VTPF 不直接信任这个 proposal。它只改变 proposal 的来源与验证位置，不改变 target 的裁决权。
+
+6.2 代码中的真实流程
+-------------------
+
+设上一条最终 target-verified 动作为：
+
+    C = [c0, c1, ..., c6]
+
+在当前控制步，正常多模态 prefill 本来只输入当前图像和指令 P_t，并在 prompt 最后位置产生当前 c0 的 target 答案。VTPF 改为把历史候选的前 6 个 token 附加到同一次输入：
+
+    [P_t, c0, c1, c2, c3, c4, c5]
+
+因果语言模型的 logits 对齐关系是：
+
+    P_t 最后位置的 logits 检验 c0
+    c0 位置的 logits 检验 c1
+    c1 位置的 logits 检验 c2
+    ...
+    c5 位置的 logits 检验 c6
+
+所以一次当前图像上的 target prefill 同时完成两件事：
+
+1. 对当前视觉语言 prompt 建立 target KV。
+2. 对历史完整动作 C 做逐位置、因果一致的当前 target 校验。
+
+若 7 个 token 全部匹配，系统直接提交 C，不再运行 target anchor、DFlash 和后续 target verify。若在第 j 个 token 首次失败，则只保留此前已验证的连续前缀，写入 target 在正确因果前缀下给出的 correction，裁掉错误候选对应的 KV，再让普通 DFlash 从新 anchor 补剩余位置。
+
+当前 PacedHarmonic launcher 使用 stable_actions=1，即只要存在上一条 target-verified 动作，每个 T 帧都允许它进入 strict VTPF prefill。它并不要求先连续相同三次。
+
+6.3 为什么 VTPF 在理论上是严格的组件
+-----------------------------------
+
+命题 1：在目标模型确定性、位置编码一致、因果 mask 正确、fused forward 与逐 token AR 数值等价的条件下，VTPF 接受的连续候选前缀与当前 target 的 greedy AR 前缀一致。
+
+证明思路：
+
+对第 0 个候选，prompt 最后位置给出的就是 P_t 条件下的 target greedy token。若 c0 匹配，则第 1 个位置的 logits 是在正确前缀 [P_t,c0] 下产生的。依次归纳，只有此前全部匹配时，第 j 个候选才会被接受。因此首次不匹配前的候选前缀与 target AR 完全一致；不匹配位置由 target correction 替代；其后的候选不再被直接接受。
+
+这是一条组件级性质，不等于当前整套 DFlash 实现已被证明与纯 AR 逐动作位完全等价。现有单 episode shadow 诊断中，完整 DFlash target 路径仍观察到与纯 AR 参考链的差异。论文必须区分：
+
+- VTPF 候选的逐 token 接受规则是 target-verified 的。
+- 整个实现是否 bitwise 或 action-wise 等价，需要更全面的 parity test，当前不能直接宣称 lossless。
+
+6.4 VTPF 的结构性收益
+---------------------
+
+普通 DFlash 首块完整流程近似为：
+
+    target prefill + target anchor + Draft + target verify
+
+VTPF 完整命中时变为：
+
+    target fused prefill
+
+由于在长多模态 prompt 后增加 6 个动作 token 的边际成本很小，VTPF 把本来分开的历史候选生成和验证，融合进当前必做的 target prefill。它不是少算几个神经网络层，而是减少独立 target forward 的数量。
+
+6.5 VTPF 的理论定位
+-------------------
+
+VTPF 可以被定义为 Verified Temporal Proposal Fusion：
+
+- Temporal：proposal 来自上一控制时刻，而不是当前 Draft。
+- Proposal：历史动作只是一条候选，不拥有自动执行权。
+- Verified：当前视觉条件下的 target 逐 token 裁决。
+- Fusion：验证被并入本来必做的多模态 prefill。
+
+它连接了两个此前分离的冗余来源：动作 token 内部的可并行性，以及控制时间上的动作持续性。
+
+
+七、VTPF 仍然存在不可突破的速度下界
+====================================
+
+令 C_P 表示当前帧完整 target prefill 成本，C_R 表示 prefill 后剩余的 anchor、Draft 和 verify 成本。即使 VTPF 每次都完整命中，每个控制步仍至少支付：
+
+    C_strict >= C_P
+
+因此，相对纯 AR 每步成本 C_AR，所有“每帧都询问 target”的 strict 方法，其理想加速上限近似受制于：
+
+    S_strict <= C_AR / C_P
+
+这不是某个 Draft 不够准造成的，而是推理图本身的结构下界。只要当前图像每帧都进入完整目标模型，target prefill 就无法被 Draft acceptance length 消除。
+
+VTPF strict 的正式结果约为 1.295x，说明融合验证有效，但也验证了这个上限确实严苛。要获得 3x 以上速度，研究问题必须从“如何减少一次 target 内部的额外工作”转向“哪些控制时刻可以不调用当前 target”。
+
+一旦这样做，问题性质发生根本变化：系统不再是 verification-before-commit，而开始出现 commit-before-verification。
+
+
+八、VLA 与语言模型的根本差别：动作提交不可回滚
+=================================================
+
+8.1 普通 speculative decoding 的语义
+------------------------------------
+
+在语言模型中，Draft 产生的 token 在 target 验证前只是内存中的假设。错误候选被拒绝后，缓存可以裁剪，用户不会看到错误 token 对后续世界造成的影响。
+
+8.2 具身 speculative execution 的语义
+-------------------------------------
+
+若 VLA 在时刻 t 跳过 target，直接执行历史动作 u_k，则：
+
+    x_{t+1} = F(x_t, u_k, w_t)
+
+下一次 target 看到的 o_{t+1} 已经由这次未验证动作塑造。即使下一帧 target 发现此前动作并非自己会选择的动作，也不能把机器人和物体恢复到未执行之前。
+
+因此，每个免校验 H 帧都是一次物理提交，而不是一次可撤销的 token 猜测。连续 H 帧会带来三种耦合风险：
+
+1. 陈旧性：历史动作对应的是旧观测，而非当前状态。
+2. 累积性：前六维是增量控制，同一增量重复执行会产生累计位移或旋转。
+3. 分布反馈：未验证动作改变下一观测，使后续 target 在一个不同的状态上重新规划。
+
+这正是本工作的理论升华点。VLA 投机执行的核心不只是 acceptance，而是 physical commitment。
+
+8.3 两种等价性
+--------------
+
+需要明确区分：
+
+Token equivalence：
+
+    A_t^proposal == A_t^target
+
+Behavioral equivalence：
+
+    即使 proposal 与当前 target token 不完全相同，执行后仍保持在任务可恢复、可成功的闭环状态区域内。
+
+可以概念性地定义目标 g 下的可恢复集合 R_g：若 x 属于 R_g，则从 x 开始继续调用目标策略，有较高概率完成任务。一次未验证提交在行为上可接受，不要求它复现 target token，只要求：
+
+    F(x_t, u_hold) 仍位于或接近 R_g
+
+R_g 在当前系统中不可直接计算，PacedHarmonic 也不是安全证书。这个概念的作用是指出：target token 完全一致是任务成功的充分条件，但在闭环控制中未必是必要条件。论文需要用 shadow target、状态偏移和任务成功实验去验证这一行为等价假设，而不能把它当作已知事实。
+
+
+九、第三步：面向物理提交的 PacedHarmonic
+=======================================
+
+9.1 基本符号
+------------
+
+把运行 target 的控制时刻记为 T，把跳过当前 target、复用最近 target-verified 动作的控制时刻记为 H。
+
+必须注意：
+
+- T 表示当前帧调用 target。T 内部会优先尝试 strict VTPF；若历史候选失败，再回退 DFlash。
+- H 表示当前帧完全跳过 target prefill、DFlash 和 verify，直接执行最近保存的最终动作。
+- VTPF 不是 T 的同义词，而是 T 帧内部减少额外 target forward 的机制。
+
+9.2 当前代码的完整状态机
+-----------------------
+
+在每个 episode 开始时，系统没有历史动作，必须先运行 T。
+
+在 T 帧：
+
+1. 读取当前图像和语言指令。
+2. 若存在上一条 target-verified 动作，则把它作为 stable=1 的 VTPF 候选并入当前 prefill。
+3. 候选完全匹配时直接得到最终动作；部分匹配时保留 target-verified 前缀和 correction；否则回退普通 DFlash。
+4. 保存本次最终动作与当前 target 图像签名，重置连续 hold 深度。
+
+在 H1 帧：
+
+1. 必须存在上一条完整动作和至少一次 target-verified 历史。
+2. 当前代码不使用像素门否决第一跳。
+3. 跳过 target、Draft 和 verify。
+4. 复用上一条动作，前六维动作幅度乘 1，夹爪不变。
+
+在 H2 帧：
+
+1. H1 已发生，且当前周期没有未偿还的 extension debt。
+2. 当前 16x16 池化图像签名相对最近 T 帧的 relative L2 不超过 0.15。
+3. 跳过 target、Draft 和 verify。
+4. 复用上一条动作，但前六维乘 1/2，夹爪不变。
+5. 产生一笔 extension debt，并在下一帧强制回到 T。
+
+债务约束：
+
+发生 T-H-H 后，下一 target 周期最多只允许 T-H，随后再次回到 T。于是理想节拍为：
+
+    T-H-H, T-H, T-H-H, T-H, ...
+
+正式运行中，视觉门和 episode 边界会使实际比例略有偏离，记录到的 target prefill rate 为 0.4046，hold rate 为 0.5954。
+
+
+十、Paced 的理论意义：管理深提交，而不只是固定跳帧
+===================================================
+
+10.1 为什么仅限制“最多连续两次 hold”还不够
+--------------------------------------------
+
+两个调度器可以拥有相同的长期 target 调用率和相同的最大 hold 深度，却具有不同的风险分布。例如，长间隔集中出现会让多个深提交连续聚集，导致 target 的重锚定在时间上不均匀。
+
+所以需要同时约束：
+
+1. 平均 target 预算。
+2. 最大连续未验证深度。
+3. 深提交在时间轴上的聚集程度。
+
+10.2 为什么是 T-H-H, T-H
+-------------------------
+
+若希望长期 target 比例为 2/5，即平均每 2.5 个控制步调用一次 target，并且每两个 target 之间只允许 1 或 2 个 H，则 target 间隔只能取 2 或 3。
+
+在固定平均间隔 2.5 下，交替安排 3 和 2 是一种最小差异的平衡序列：
+
+    interval = 3, 2, 3, 2, ...
+
+它具有三个性质：
+
+1. 平均 target 密度严格接近 0.4。
+2. 最大 target 间隔不超过 3 个控制步。
+3. 两个长度为 3 的深周期不会相邻，避免 H2 风险成簇出现。
+
+可以把前 n 个控制步中实际 target 次数与理想预算 rho*n 的偏差写为：
+
+    D(n) = |N_T(n) - rho*n|,  rho = 0.4
+
+交替 3/2 的周期序列让前缀预算偏差保持有界，并在允许的整数间隔中均匀分配 target 调用。它不是根据某个 task 的成功轨迹手写阶段规则，而是给定 target 预算和最大未验证深度后的低差异离散调度。
+
+需要严谨限定：这种调度只解决“何时重新询问 target”的分布问题，不保证每个 H 都正确，也不证明 rho=0.4 对所有任务最优。rho=0.4 是当前速度目标与最大深度 2 下的工作点，跨 suite 应固定后验证泛化。
+
+10.3 temporal debt 的含义
+-------------------------
+
+debt 不是抽象置信度，而是一种物理提交记账：H2 使用了更深一级的未验证预算，下一周期必须缩短为只有 H1，以偿还重锚定密度。它把“最大连续风险”和“长期平均算力”统一在一个无需训练的状态变量里。
+
+论文中可以把它称为 re-grounding debt 或 physical commit debt，但必须明确它在代码中就是一个布尔状态，不应包装成复杂的学习模型。
+
+
+十一、Harmonic 的理论意义：控制陈旧动作的物理控制权
+=====================================================
+
+11.1 为什么重复 delta action 会过冲
+----------------------------------
+
+OpenVLA 前六维不是“到达某个绝对位姿”的静态标签，而是当前控制周期执行的增量。若一个旧增量 u 被连续完整执行两次，忽略动力学非线性时，它对位姿的累计贡献近似为：
+
+    u + u = 2u
+
+但 target 原本只在旧状态 x_k 上选择了 u。第二次执行时状态已经改变，旧命令的适用性下降。完整重复会让末端执行器继续沿旧方向移动或旋转，可能越过接触点、抓取窗口或精细操作区域。这里的危险不只是 token 错，而是同一错误方向被物理积分。
+
+11.2 为什么第二次 hold 缩放为 1/2
+--------------------------------
+
+PacedHarmonic 使用与 hold age 对应的无参数控制权：
+
+    alpha(d) = 1/d
+
+当前最大深度为 2，因此：
+
+    H1: alpha(1) = 1
+    H2: alpha(2) = 1/2
+
+若连续控制动作范数有界 ||u|| <= U，m 次陈旧 hold 对状态造成的控制输入总量上界与下式成正比：
+
+    unscaled:  U * m
+    harmonic:  U * sum_{d=1}^m 1/d
+
+后者随 m 为调和级数增长，而不是线性增长。当前 m=2 时，两个 hold 的连续动作累计权威从 2U 降为 1.5U，降低 25%。
+
+这是“陈旧动作对物理世界能施加多大影响”的上界，不是“它与当前 target 动作误差一定更小”的证明。如果当前目标策略确实希望完全重复相同增量，缩放会造成欠执行；如果状态已接近目标或接触边界，缩放可能避免过冲。二者的权衡必须由 clean factorial ablation 和 shadow-target 误差实验验证。
+
+11.3 为什么称为 Harmonic，而不是经验性 0.5
+--------------------------------------------
+
+只写“第二次乘 0.5”很像工程调参。写成 alpha(d)=1/d 后，设计体现出三个一般原则：
+
+1. 新鲜动作保留完整控制权，alpha(1)=1。
+2. 动作越陈旧，未验证控制权单调下降。
+3. 连续陈旧动作的累计物理影响从线性增长变为次线性增长。
+
+当前实现只使用 d=1,2，因此不能宣称已经验证了任意长 horizon 的调和控制。论文应把一般公式作为设计原则，把两级实现作为保守实例。
+
+11.4 为什么夹爪不缩放
+---------------------
+
+gripper 是离散语义状态。对“开”或“关”的 token 乘 1/2 没有一致的物理含义，还可能把明确状态变成无效中间量。因此 Harmonic 只作用于 6 个连续控制维度，夹爪沿用最近动作的离散值。这个异质处理来自动作空间语义，不是位置特调。
+
+
+十二、视觉变化门的准确定位
+==========================
+
+当前 H2 还要求当前图像相对最近 T 帧的 16x16 池化像素签名 relative L2 不超过 0.15。它的正确论文定位是：
+
+    一个计算极便宜的 grounding-drift veto。
+
+它只在视觉变化已经明显时阻止更深的第二次提交。它不是：
+
+- 任务成功概率；
+- target 置信度；
+- 语义状态相似度；
+- 形式化安全证书。
+
+H1 当前不受这个像素门控制，H2 才使用相对最近 target keyframe 的累计视觉变化。阈值 0.15 来自此前 VisualBudget 研发阶段，应在其它 suite 上固定使用，不能重新逐任务调参。若固定阈值不能迁移，说明它只是一条 Goal 工程规则，需要降级为实现细节或替换为更普适的表征。
+
+
+十三、三项方法怎样形成一个闭环，而不是三个拼盘
+================================================
+
+可以用一张二维图概括整个系统。
+
+横轴：单个动作内部的 token 维度。
+纵轴：机器人控制过程中的时间维度。
+
+1. DFlash 沿横轴并行：从 target 的当前上下文一次预测 t1 到 t6。
+2. VTPF 沿纵轴取 proposal，但仍回到当前 target 做严格因果验证。
+3. PacedHarmonic 在纵轴上有界地省略 target，把最近 target-verified 动作暂时提交给环境，并控制提交深度、重新锚定节拍和动作权威。
+
+这三层对应三种越来越宽松的语义：
+
+    Level 1：proposal parallelism
+    Level 2：verification fusion
+    Level 3：bounded physical commitment
+
+对应的失败恢复也逐层变化：
+
+- DFlash 错误：target 在执行前纠正，无物理副作用。
+- VTPF 错误：target 在 fused prefill 中纠正，无物理副作用。
+- H 错误：动作已经执行，只能在后续 T 中重新感知和修正，无法回滚。
+
+因此，完整方法不是“让普通 Draft 变得与 target 一样聪明”。更准确的说法是：
+
+    通过低成本块 proposal、严格时序验证融合和受约束的物理提交，
+    让 target-Draft-执行器这一闭环系统在减少 target 调用的同时，维持目标策略级别的任务能力。
+
+
+十四、统一优化目标：从接受率最大化到延迟-提交风险联合优化
+==========================================================
+
+传统 speculative decoding 常把目标写成提高平均接受长度 tau，同时降低 C_draft。对具身系统，这个目标不完整。
+
+令 q_t 属于 {0,1} 表示当前控制步是否调用 target：
+
+    q_t = 1 为 T
+    q_t = 0 为 H
+
+每步平均计算成本近似为：
+
+    E[C] = rho * E[C_T] + (1-rho) * C_H
+
+其中 rho=E[q_t] 是 target 调用率，C_H 只包含很小的状态判断、动作复用和环境执行成本。T 帧内部，VTPF 又通过历史候选完整命中概率 p_fuse 降低 C_T：
+
+    E[C_T] = C_prefill
+             + (1-p_fuse) * E[C_fallback]
+
+C_fallback 包含 target anchor、DFlash 和 target verify 的部分或全部成本。
+
+端到端加速近似为：
+
+    Speedup = C_AR / E[C]
+
+这解释了三个方法的乘法式互补：
+
+- DFlash 降低 C_fallback。
+- VTPF 提高 p_fuse，降低每个 T 帧的附加成本。
+- PacedHarmonic 降低 rho，直接减少完整 target 帧。
+
+但 rho 越低，未验证物理提交越多。真正的研究目标应写为约束优化：
+
+    minimize    E[C]
+    subject to  J(policy) >= J(target) - epsilon
+                max consecutive unverified commits <= D
+                stale-action authority obeys alpha(d)
+
+J 可以是任务成功率或长期回报，D 当前固定为 2。这个表达把速度、任务性能和物理提交风险放在同一问题中，比单纯优化 token acceptance 更符合 VLA 本质。
+
+当前代码并没有在线求解这个优化问题。PacedHarmonic 是一个无需训练、可复现的可行策略实例。论文可以用该形式解释设计空间，但不能声称代码实现了一个最优控制器。
+
+
+十五、当前最重要的实验证据
+==========================
+
+LIBERO-Goal、同机 RTX 4090、paper-wrapped AR 计时口径下，当前关键结果为：
+
+    方法                                  SR       Speedup    Length
+    ----------------------------------------------------------------
+    Paper-wrapped OpenVLA AR              0.742    1.000x     -
+    Minimal e100 DFlash linear strict     0.792    1.139x     -
+    Minimal e100 VTPF strict              0.776    1.295x     2.432
+    Minimal e100 VTPF-TD-Fast             0.754    2.534x     3.573
+    VisualBudget p=0.15                   0.672    3.679x     4.230
+    PacedBudget no harmonic               0.706    3.194x     3.997
+    VTPF-PacedHarmonic                    0.746    3.484x     3.614
+
+VTPF-PacedHarmonic 正式运行：
+
+    500 episodes
+    373/500 success = 0.746
+    last-task mean action time = 0.0524479 s
+    AR mean = 0.1827176 s
+    speedup = 3.4838x
+    target prefill rate = 0.4046
+    hold rate = 0.5954
+    H1 count = 4707
+    H2 count = 2243
+    VTPF fused actions = 4672
+    VTPF full matches = 1036
+    VTPF average prefill accept length = 2.2363
+
+同一 500 个初始状态与 AR 配对比较：
+
+    PH 独赢 73 条
+    AR 独赢 71 条
+    成功率差 +0.4 个百分点
+    McNemar exact p = 0.9336
+    paired bootstrap 95% CI = [-4.4, +5.2] 个百分点
+
+这支持“本次实验未观察到成功率下降”，不支持“已经证明与 AR 等价”。
+
+相对 VisualBudget p=0.15：
+
+    成功率从 0.672 提高到 0.746
+    提高 7.4 个百分点
+    paired bootstrap 95% CI = [+2.8, +12.0]
+    McNemar p = 0.00215
+
+这一对比说明，把第二次陈旧动作完整执行的 aggressive 方案改为 PacedHarmonic 后，闭环精度显著恢复，同时仍保持 3x 以上速度。但由于 Paced、Harmonic、stable=1 共同变化，当前证据还不能把收益完全归因于某一个组件。
+
+
+十六、必须验证的理论假设与可证伪预测
+====================================
+
+下面每个假设都必须对应实验。若实验不支持，应修改故事，而不是只修改图表措辞。
+
+假设 H1：OpenVLA 动作具有可利用的短时持续性
+------------------------------------------
+
+预测：在纯 target AR 轨迹中，P(A_t=A_{t-1})、连续前缀长度和动作向量距离在相邻控制步显著优于随机跨时刻配对；连续重复 run length 越长，下一帧完整匹配概率越高。
+
+证伪条件：相邻动作的匹配率与随机时间差配对无显著差异，或该规律只存在于单个 Goal task。
+
+所需实验：
+
+1. 在四个 LIBERO suite 的纯 AR rollout 上保存每帧完整 7-token 动作。
+2. 绘制时间间隔 delta=1,2,3,... 下的完整动作相等概率、平均 token 前缀长度和连续动作 L2。
+3. 按上一动作已连续稳定 1、2、3 次分组，统计下一帧匹配概率。
+4. 使用 episode 内时间打乱作为随机对照。
+
+假设 H2：VTPF 能把历史动作验证融合进 prefill，且边际成本接近零
+---------------------------------------------------------
+
+预测：普通 prefill 与附加 6 个候选 token 的 fused prefill 延迟接近；完整命中时，VTPF 显著减少 target forward 次数；被接受前缀与纯 target AR 一致。
+
+证伪条件：fused prefill 在目标硬件上明显更慢，或大规模 parity test 出现不能由数值误差解释的候选接受错误。
+
+所需实验：
+
+1. 至少 1000 个控制步的 CUDA profiler，报告 prefill、fused prefill、anchor、Draft、verify 的分布而不只是均值。
+2. 对每个 VTPF accepted token 运行 shadow AR，核对 token、logits argmax、position id 和 KV 裁剪。
+3. 统计 full match、partial match、首 token reject 三种路径的真实端到端耗时。
+
+假设 H3：token 不一致不必然意味着行为失败
+--------------------------------------
+
+预测：在 H 帧上，shadow target 动作与 held action 经常 token 不同，但许多轨迹仍能完成任务；任务成功与连续动作偏差、末端位姿偏移、下一 T 的 correction magnitude 之间存在比 exact token match 更平滑的关系。
+
+证伪条件：所有 token 不匹配几乎都导致失败，或行为偏差指标不能解释任何成功率变化。
+
+所需实验：
+
+1. 正式计时之外的 shadow-target run，在每个 H1/H2 额外计算当前 target 动作，但不用于执行。
+2. 记录 exact token match、每维 bin 差、反量化动作 L1/L2、gripper mismatch。
+3. 记录下一 T 相对 held trajectory 的 target correction magnitude。
+4. 按最终成功/失败、H1/H2、任务阶段分组，但任务阶段只能用于分析，不能反过来调线上规则。
+
+假设 H4：风险不仅取决于 target 平均频率，还取决于深提交的时间聚集
+----------------------------------------------------------
+
+预测：在相同 target 次数、相同 H1/H2 数量、相同最大深度 2 下，均匀的 3/2 间隔比 H2 成簇的调度具有更小的下一 T correction spike 和更高的成功率。
+
+关键 clean control：
+
+    paced schedule:    3,2,3,2,...
+    clustered schedule:3,3,2,2,...
+
+二者平均间隔都是 2.5，target 比例相同，差别只是深周期的排列。
+
+证伪条件：两种调度的控制偏差和 SR 无差异，或 clustered 更好。若如此，temporal debt 只是实现 target 比例的工程状态机，不能作为理论贡献。
+
+假设 H5：第二次 hold 的完整陈旧增量是主要过冲来源
+------------------------------------------------
+
+预测：在完全相同的 T/H 调度和 VTPF 设置下，H2 scale=1/2 相比 scale=1 能降低下一 T 的 correction magnitude、末端位姿突变和失败率，而速度几乎不变。
+
+必须做干净 2x2 消融，所有其它参数固定，包括 stable_actions=1：
+
+    Pace off, Harmonic off
+    Pace on,  Harmonic off
+    Pace off, Harmonic on
+    Pace on,  Harmonic on
+
+当前已有结果不构成这个 2x2，因为旧实验中的 stable 和调度条件并不完全一致。
+
+证伪条件：Harmonic 只降低动作幅度却不改善 correction 或 SR，或在精细任务中明显造成欠执行。
+
+假设 H6：三层方法真正互补，而不是 PacedHarmonic 单独贡献全部速度
+----------------------------------------------------------
+
+必须比较：
+
+    AR target + 同一 PacedHarmonic 调度
+    DFlash + PacedHarmonic，VTPF off
+    DFlash + VTPF + PacedHarmonic
+
+三组必须固定相同 target/hold 序列或报告实际 target rate。若 AR+PH 与完整方法几乎一样快，则 DFlash/VTPF 不能被描述为主性能来源，只能作为 T 帧优化或 fallback 组件。若完整方法显著更快，才能证明三者是乘法式互补。
+
+
+十七、建议设计的核心图与表
+==========================
+
+图 1：两维投机空间图
+-------------------
+
+横轴为 action-token dimension，纵轴为 control-time dimension。
+
+- OpenVLA AR 位于两个维度都串行的位置。
+- SpecVLA/EAGLE 主要沿 token 维度投机，但 Draft 仍自回归。
+- DFlash 沿 token 维度一次并行完整动作块。
+- VTPF 沿时间维度重用历史 proposal，但仍由当前 target 严格验证。
+- PacedHarmonic 进入有界 commit-before-verification 区域。
+
+这张图承担全文总览，不画成普通模块框图。
+
+图 2：从 verification-before-commit 到 commit-before-verification
+---------------------------------------------------------------
+
+上半部分画 LLM speculative decoding：Draft -> Verify -> Commit，错误 token 可丢弃。
+
+下半部分画 VLA：T -> H1 -> 环境变化 -> H2 -> 环境再次变化 -> T re-ground。标出动作执行改变下一观测、不可回滚，以及 Harmonic 对 H2 控制权的限制。
+
+这张图解释为何本工作是 VLA 特有问题，而不是普通 frame skip。
+
+图 3：动作持续性的动机实验
+-------------------------
+
+建议做三联图：
+
+1. x 轴为时间间隔，y 轴为完整动作相等概率。
+2. x 轴为历史稳定 run length，y 轴为下一帧 full match / prefix length。
+3. 相邻帧动作距离与随机跨时刻动作距离的分布。
+
+这张图应来自纯 AR 数据，避免用我们的方法生成的数据自证。
+
+图 4：固定 target 预算下的提交风险
+---------------------------------
+
+比较 paced 3/2 与 clustered 3/3/2/2。横轴为控制步，画出 target keyframe、hold depth、下一 T correction magnitude。右侧汇总 SR、target rate、最大 correction 和 95% 分位数。
+
+这张图是 Paced 从工程节拍升格为“深提交去聚集”的关键证据。
+
+图 5：动作 age、控制权和纠正幅度
+--------------------------------
+
+横轴为 age=0/T、H1、H2；纵轴分别画：
+
+- shadow target token disagreement；
+- continuous action L2；
+- next-target correction magnitude；
+- end-effector displacement；
+- failure probability。
+
+叠加 scale=1 与 scale=1/d。若 Harmonic 合理，H2 的 correction 尾部和失败风险应明显收缩。
+
+图 6：速度-成功率 Pareto
+-----------------------
+
+统一硬件、统一计时、统一 seed，放入 AR、SpecVLA strict/relaxed、DFlash、VTPF、TD-Fast、VisualBudget、Paced no harmonic、PacedHarmonic。点大小可表示 target rate，颜色表示是否 current-target-verified。
+
+该图应直观看到：VisualBudget 进入高速度低成功率区域，PacedHarmonic 把点推回高成功率 Pareto 前沿。
+
+表 1：四 suite 主结果
+--------------------
+
+每个 suite 报告 SR、mean action latency、Speedup、Length、target rate、VTPF full-match rate。PacedHarmonic 参数固定，不逐 suite 调整。所有 Draft 必须使用对应 suite 数据训练。
+
+表 2：组件级 2x2 和组合消融
+-------------------------
+
+至少包含：
+
+- block Draft on/off；
+- VTPF on/off；
+- Pace on/off；
+- Harmonic on/off；
+- visual H2 veto on/off；
+- Minimal vs 复杂 Draft；
+- AR+PH、DFlash+PH、DFlash+VTPF+PH。
+
+表 3：计算分解
+--------------
+
+报告每条路径的调用次数与时间：prefill、fused prefill、anchor、Draft、verify、hold policy、环境 step。必须同时给 mean、median、p95，避免只看均值。
+
+
+十八、最重要的统计规范
+====================
+
+1. 所有方法使用相同初始状态和 seed，优先做 episode-level paired comparison。
+2. SR 不只报点估计，至少报 paired bootstrap CI 和 McNemar exact test。
+3. 若要宣称非劣或等价，必须预先设定可接受 margin，例如 3 个百分点，并使用相应的单侧非劣检验或 TOST。p>0.05 不能证明等价。
+4. 筛选集与正式集分离。当前 Goal 使用 0-4 做设计、5-9 做留出检查的经验可以保留，但最终论文还要独立 seed 或 suite 验证。
+5. speedup 必须同机、同环境、同计时范围、同 CUDA 同步策略。跨论文数字只作背景，不直接声称公平胜负。
+6. 报告成功轨迹与失败轨迹各自的延迟，排除“更快是因为更早失败”的假象。
+7. PH 的正式结果要同时报告 target rate 和 H1/H2 数量，否则 3.48x 无法解释或复现。
+
+
+十九、审稿人最可能的攻击与我们的自我审查
+==========================================
+
+攻击 1：这只是固定 frame skipping
+-------------------------------
+
+弱回答：我们每隔几帧跳过一次模型，所以更快。
+
+强回答必须有三层：
+
+1. H 复用的不是任意旧动作，而是最近 target-verified 的完整动作。
+2. T 帧使用 strict VTPF 在当前视觉条件下验证历史 proposal，并在失败时回退 DFlash。
+3. 调度显式限制最大未验证深度和深提交聚集，Harmonic 显式限制陈旧 delta action 的物理权威。
+
+但若相同 target rate 的随机/聚集调度与 Paced 没有差异，这个攻击仍成立。
+
+攻击 2：T-H-H,T-H 是人工拍出来的节拍
+--------------------------------------
+
+必须用固定 40% target budget、最大深度 2 下的低差异调度解释，并用 paced 对 clustered 的相同计算预算实验支撑。不能再用“我们试了 T-H 好、T-H-H 差，所以折中”作为主理由。
+
+攻击 3：1/2 是经验超参数
+----------------------
+
+必须把它放在 alpha(d)=1/d 的 age-decayed action authority 中，并验证 H2 scale=1/2 确实减少 next-target correction 和闭环失败。当前 paired result 支持但不能单独证明机制。
+
+攻击 4：成功率没有证明与 AR 等价
+---------------------------------
+
+这个攻击是正确的。当前 CI 为 [-4.4,+5.2]pp，不能宣称等价。论文应写“在本次 500-episode 评测中未观察到退化”，随后通过四 suite、多 seed 和预注册非劣 margin 补强。
+
+攻击 5：真正加速来自跳 target，DFlash 是装饰
+------------------------------------------
+
+必须做 AR+PH、DFlash+PH、DFlash+VTPF+PH 三组组合消融。若 DFlash 的边际收益确实很小，就诚实调整贡献顺序：把 DFlash 定位为低成本动作块 proposal 和 fallback，而把核心贡献聚焦于 target invocation 与 physical commitment。
+
+攻击 6：低频像素 L2 阈值是 Goal 特调
+-----------------------------------
+
+固定 0.15 跨 suite 使用；报告门触发率和性能。若不能泛化，应把它降为次要保护实现，避免作为理论核心。更高级的未来替代方案可以是无需额外 target forward 的状态变化上界，但不能在当前论文里虚构。
+
+攻击 7：重复动作相同不代表重复执行安全
+-----------------------------------
+
+这正是 PacedHarmonic 要回答的问题。动作 token 的时序重复只支撑 VTPF proposal，不自动支撑 H。H 的合理性必须通过不可回滚提交、age、累计动作权威和 re-grounding 实验单独证明。
+
+攻击 8：方法依赖 OpenVLA 的 7-token 表示，泛化性有限
+----------------------------------------------
+
+DFlash 的 block proposal 和 VTPF 的 causal prefill fusion 依赖自回归动作 token；PacedHarmonic 更一般地依赖增量动作和闭环 target keyframe。论文应明确适用范围，并把 OpenVLA-OFT 早退扩展作为未来工作或额外章节，而不是假装当前方法已适配并行动作头。
+
+攻击 9：物理提交理论只是漂亮比喻
+---------------------------------
+
+如果没有 H1/H2 shadow target、下一 T correction、同预算调度和末端位姿偏移实验，这个攻击成立。理论语言必须由可观测诊断落地。
+
+
+二十、哪些结论现在可以说，哪些暂时不能说
+==========================================
+
+现在可以说：
+
+1. 一层 block-parallel Draft 能在一次 forward 中产生 OpenVLA 后续动作 token proposal。
+2. VTPF 能把历史动作 proposal 的当前 target 校验并入多模态 prefill，完整命中时消除 anchor、Draft 和后续 verify。
+3. 当前 Goal 正式实验中，PacedHarmonic 达到 3.4838x，SR 为 0.746，AR SR 为 0.742，未观察到点估计退化。
+4. 相比 aggressive VisualBudget，PacedHarmonic 显著恢复成功率且保持 3x 以上速度。
+5. 当前主要速度收益来自减少 target 调用与融合 target 工作，而不只是提高 Draft token hit rate。
+
+暂时不能说：
+
+1. 当前系统已经被证明与 AR 统计等价或形式化安全。
+2. 3.48x 能在所有 LIBERO suite、真实机器人和不同硬件上稳定复现。
+3. Paced 或 Harmonic 单独造成了全部成功率收益。
+4. 0.15 像素阈值具有语义或安全意义。
+5. PacedHarmonic 在线识别了任务阶段、动作不确定性或真实可恢复集合。
+6. Draft 本身获得了 target 级决策能力。H 帧根本不运行 Draft。
+7. 整套当前 DFlash 实现已经 lossless。
+
+
+二十一、建议的论文叙事顺序
+==========================
+
+Introduction 第 1 段：
+
+VLA 的大模型与自回归动作 token 生成造成控制延迟。已有 speculative decoding 看似自然，但 VLA 每步只有 7 个 token，短序列难以摊销固定 target 成本。
+
+第 2 段：
+
+现有 VLA speculative decoding 主要沿用语言模型的 proposal-verify 逻辑。我们首先引入 block-parallel action Draft，消除 proposal 自身的串行性，却发现 strict 加速仍有限。微观 profiler 表明瓶颈已经从 Draft 转移到每帧 target prefill 和短 target forward。
+
+第 3 段：
+
+这一负结果引出第一项观察：VLA 不只是 token 生成器，也是高频闭环控制器。相邻帧中，最近 target-verified 动作经常仍是当前动作的强 proposal。VTPF 将它附加到当前必做 prefill，使 target 在当前视觉条件下严格验证整条历史动作，从而融合感知和校验。
+
+第 4 段：
+
+但任何每帧都查询 target 的 strict 方法都受 prefill 下界限制。进一步加速要求暂时跳过 target。此时普通 speculative decoding 的安全语义不再成立，因为未验证动作会在验证之前改变世界。
+
+第 5 段：
+
+我们据此提出 Commit-Aware Embodied Speculation。它不把免校验理解为免费 token 接受，而把每个 H 视作不可回滚的物理提交。Paced 用低差异 target 节拍限制深提交的时间聚集；Harmonic 让陈旧增量动作的物理控制权随 age 衰减；视觉变化只作为第二级提交的廉价否决信号。
+
+第 6 段：
+
+三层方法构成统一成本分解：DFlash 降低 fallback proposal cost，VTPF 降低每个 target 帧的附加成本，PacedHarmonic 降低 target frame rate 并控制 closed-loop commit risk。
+
+第 7 段：
+
+报告结果、统计边界与贡献。避免只写最高 speedup，必须同时写 500-episode SR、paired CI、target rate，并明确未证明等价。
+
+
+二十二、建议的三项贡献表述
+==========================
+
+贡献 1：Block-Parallel Action Speculation
+
+    我们将由 target 多层上下文条件化的轻量 block-diffusion Draft 引入自回归 OpenVLA，使一个动作中后续 6 个 token 在一次 forward 内并行产生，并系统揭示短动作块下 target 固定调用成为新主瓶颈。
+
+贡献 2：Verified Temporal Prefill Fusion
+
+    我们把最近 target-verified 动作视作零生成成本的时序 proposal，将其因果验证融合进当前必做的多模态 prefill，在不放松该候选 target 裁决的情况下，完整命中时消除独立 anchor、Draft 和 verify。
+
+贡献 3：Commit-Aware Paced Harmonic Execution
+
+    我们指出 VLA 免校验不是可撤销 token 猜测，而是改变未来观测的物理提交。为此，我们用均匀再锚定节拍限制深提交聚集，并用随动作 age 衰减的连续控制权约束陈旧增量的累计影响，在 Goal 上达到 3.4838x，同时本次 500-episode 评测未观察到相对 AR 的成功率下降。
+
+这三个贡献的逻辑关系是：先让 proposal 并行，再让 verification 融合，最后在 target verification 本身成为下界时，对物理 commit 做有界放松。
+
+
+二十三、建议的论文总标题方向
+============================
+
+优先方向：
+
+    Beyond Token Verification: Commit-Aware Speculative Execution for Vision-Language-Action Models
+
+    From Parallel Drafting to Physical Commitment: Accelerating Autoregressive Vision-Language-Action Models
+
+    Commit-Aware Embodied Speculation: Block-Parallel Drafting and Paced Temporal Re-Grounding for OpenVLA
+
+不建议把标题只写成 DFlash for VLA，因为当前最强贡献已经超出 Draft 模型；也不建议只写 Frame Skipping，因为这会主动抹掉 VTPF 的严格验证融合和物理提交约束。
+
+
+二十四、后续实验执行优先级
+==========================
+
+最高优先级，决定故事是否成立：
+
+1. 四 suite、suite-specific Minimal Draft 的三路主表：DFlash strict、VTPF strict、VTPF-PacedHarmonic。
+2. 同预算 paced 3/2 对 clustered 3/3/2/2。
+3. stable=1 下 Pace x Harmonic 的干净 2x2。
+4. H 帧 shadow target，记录 age-disagreement-correction-success 链。
+5. AR+PH、DFlash+PH、DFlash+VTPF+PH 组合消融。
+
+第二优先级，提升理论可信度：
+
+6. 纯 AR 时序动作持续性统计。
+7. 全量 VTPF parity 和计算分解。
+8. 多 seed 非劣检验。
+9. 固定 0.15 视觉门跨 suite 泛化。
+
+第三优先级，形成顶会完整度：
+
+10. ALICIA-D 真机实验，预先设置 workspace、速度、碰撞和急停约束。
+11. 不同 GPU 的 latency decomposition，解释方法对 prefill/短 forward 成本比的敏感性。
+12. 与 SpecVLA、HeiSD 等方法严格统一硬件、计时和 Length/AL 定义。
+
+
+二十五、最终自我审判
+====================
+
+这套故事达到高水平会议审美的关键，不在于给 T-H-H,T-H 或 1/2 缩放起一个高级名字，而在于证明以下因果链：
+
+1. 短动作块使传统 acceptance-centric speculative decoding 的收益受限。
+2. target-verified 动作在控制时间上具有可复用性，VTPF 能以近零边际 prefill 成本严格利用它。
+3. 若要突破 per-frame target 下界，必须允许少量 commit-before-verification。
+4. 在物理世界中，风险由动作 age、累计控制权和深提交聚集共同决定，而不仅由平均 target rate 决定。
+5. Paced 与 Harmonic 分别控制重新锚定时序和陈旧动作权威，因此能在相近算力预算下改善闭环成功率。
+
+当前第 1、2、3 点已有较强的代码与结果支持；第 4、5 点已有正式性能迹象，但缺少最关键的机制实验。只要这些实验成立，这项工作的理论中心就不再是“几个推理 trick”，而是一个 VLA 特有的新问题：
+
+    如何在不可回滚的物理世界中进行受约束的投机提交。
+
+反之，如果同 target 预算下不同节拍没有差异、Harmonic 不降低 correction、AR+PH 与完整方法完全相同，那么我们必须诚实收缩理论主张，不能依靠写作把失败的机制包装成贡献。
+
+真正有说服力的 ICLR 故事，应当让实验有能力推翻理论，也让理论能够预先预测实验。本文档的全部作用，就是保证后续论文沿着这条标准继续推进。
+
+
+参考起点
+========
+
+1. Spec-VLA: Speculative Decoding for Vision-Language-Action Models with Relaxed Acceptance, arXiv:2507.22424.
+2. DFlash: Block Diffusion for Flash Speculative Decoding, arXiv:2602.06036.
+3. HeiSD: Hybrid Speculative Decoding for Embodied Vision-Language-Action Models with Kinematic Awareness, arXiv:2603.17573.
+4. OpenVLA: An Open-Source Vision-Language-Action Model.
+5. Domino：其训练课程与 base/final 协同经验只作为本项目历史训练设计参考，不是当前 Minimal Draft + VTPF + PacedHarmonic 推理主线的理论来源。
+

@@ -14,6 +14,10 @@ PacedHarmonic 以 `T-H-H,T-H` 节拍约束长期 target 调用密度，并把第
 [OpenVLA](https://github.com/openvla/openvla)。当前仓库仍是研究代码，不是已经定稿的公开复现包。
 所有结论必须同时报告成功率、接受长度和速度；训练准确率不能替代在线 LIBERO 结果。
 
+论文立论、理论命题、反例边界与后续证据实验的完整内部蓝图见
+[`docs/paper_story_theory_blueprint_zh.txt`](docs/paper_story_theory_blueprint_zh.txt)。该文档用于约束后续写作，
+其中“已有证据”和“待验证假设”必须始终分开，不能直接当作论文结论引用。
+
 截至 2026-07-31，最重要的正式结果均来自同一台 RTX 4090、同一 seed 7、Goal 500 episodes 和同一
 paper-wrapped AR 分母。Golden 行使用 e200，Minimal 行使用独立的一层 e100 checkpoint：
 

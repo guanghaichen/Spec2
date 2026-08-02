@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-08-02T08:10:39.672123+00:00",
+  "suite": "libero_spatial",
+  "git_commit": "042ad773bf5ddb9f01074a9b01853a5883c09a8d",
+  "git_status_porcelain": "?? artifacts/evidence/",
+  "python": "3.10.20 (main, Jun 11 2026, 15:17:37) [GCC 14.3.0]",
+  "platform": "Linux-7.0.0-28-generic-x86_64-with-glibc2.39",
+  "inputs": [
+    {
+      "source": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/evidence/p0/spatial/20260802T_p0_spatial_ar_n6b/raw_runs/shadow/openvla_ar/EVAL-libero_spatial-openvla-2026_08_02-15_49_38--p0-spatial-20260802T_p0_spatial_ar_n6b-wrapped-ar-trace-openvla_ar_summary.json",
+      "archived": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH/artifacts/evidence/p0/spatial/20260802T_p0_spatial_ar_n6b/raw/shadow/openvla_ar/EVAL-libero_spatial-openvla-2026_08_02-15_49_38--p0-spatial-20260802T_p0_spatial_ar_n6b-wrapped-ar-trace-openvla_ar_summary.json.gz",
+      "source_bytes": 9350872,
+      "source_sha256": "e2aa727d4fca68b1894d283b3ea4969327c4c3077214cf02c51d019395374c6f",
+      "archive_bytes": 300104,
+      "archive_sha256": "009d6b5f47cb2a33cd107bcf9ab1290343cbe0b2c9e3cf293ced4914c89a8b4d"
+    },
+    {
+      "source": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/evidence/p0/spatial/20260802T_p0_spatial_ar_n6b/raw_runs/shadow/openvla_ar/EVAL-libero_spatial-openvla-2026_08_02-15_49_38--p0-spatial-20260802T_p0_spatial_ar_n6b-wrapped-ar-trace-openvla_ar_timing.json",
+      "archived": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH/artifacts/evidence/p0/spatial/20260802T_p0_spatial_ar_n6b/raw/shadow/openvla_ar/EVAL-libero_spatial-openvla-2026_08_02-15_49_38--p0-spatial-20260802T_p0_spatial_ar_n6b-wrapped-ar-trace-openvla_ar_timing.json.gz",
+      "source_bytes": 28008,
+      "source_sha256": "741333856f558a82d19b98166fc54658909e595e8ac7044673d424c5e252cf8c",
+      "archive_bytes": 7982,
+      "archive_sha256": "e41d029c5c804ecb95029c8c02ebeab4394078b8adda80b8013270f457b4d007"
+    },
+    {
+      "source": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/evidence/p0/spatial/20260802T_p0_spatial_ar_n6b/raw_runs/shadow/openvla_ar/EVAL-libero_spatial-openvla-2026_08_02-15_49_38--p0-spatial-20260802T_p0_spatial_ar_n6b-wrapped-ar-trace.txt",
+      "archived": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH/artifacts/evidence/p0/spatial/20260802T_p0_spatial_ar_n6b/raw/shadow/openvla_ar/EVAL-libero_spatial-openvla-2026_08_02-15_49_38--p0-spatial-20260802T_p0_spatial_ar_n6b-wrapped-ar-trace.txt.gz",
+      "source_bytes": 1495,
+      "source_sha256": "4259984c5b8e4292180a9143b89a2dc84b6e0c364d65236285f082fe444e928c",
+      "archive_bytes": 438,
+      "archive_sha256": "cb586f1634a8274c7900ba2bfc33de586863a8fc39e4e0ca7c6b2bce9bf93ee8"
+    },
+    {
+      "source": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/evidence/p0/spatial/20260802T_p0_spatial_n3/raw_runs/profile/dflash_strict/EVAL-libero_spatial-openvla-2026_08_02-15_27_20--p0-spatial-20260802T_p0_spatial_n3-profile-dflash_strict_summary.json",
+      "archived": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH/artifacts/evidence/p0/spatial/20260802T_p0_spatial_ar_n6b/raw/EVAL-libero_spatial-openvla-2026_08_02-15_27_20--p0-spatial-20260802T_p0_spatial_n3-profile-dflash_strict_summary.json.gz",
+      "source_bytes": 189894,
+      "source_sha256": "e8bfb4884f7300ba777372b3031e5c8869f1f23fca26ff806e3163de6caee22a",
+      "archive_bytes": 6526,
+      "archive_sha256": "57b6f836b05af7894e8d4e226f1224104a911eea1f81932c8c0f1bd1534073a5"
+    },
+    {
+      "source": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/evidence/p0/spatial/20260802T_p0_spatial_n3/raw_runs/parity/dflash_strict/EVAL-libero_spatial-openvla-2026_08_02-15_30_37--p0-spatial-20260802T_p0_spatial_n3-vtpf-parity-dflash_strict_summary.json",
+      "archived": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH/artifacts/evidence/p0/spatial/20260802T_p0_spatial_ar_n6b/raw/EVAL-libero_spatial-openvla-2026_08_02-15_30_37--p0-spatial-20260802T_p0_spatial_n3-vtpf-parity-dflash_strict_summary.json.gz",
+      "source_bytes": 821002,
+      "source_sha256": "ad7585753c64f6a5cfc6ac1a6ad989205ba0c9d5bdc493398af9e0c8dd581a6c",
+      "archive_bytes": 33598,
+      "archive_sha256": "2013b73179bbad155d0429430fad576dd035f562a1d99a18887546cb4e6f2cc8"
+    },
+    {
+      "source": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs/baseline/openvla_ar/EVAL-libero_spatial-openvla-2026_07_20-22_53_00--specvla-paper-ar-spatial-openvla_ar_summary.json",
+      "archived": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH/artifacts/evidence/p0/spatial/20260802T_p0_spatial_ar_n6b/raw/EVAL-libero_spatial-openvla-2026_07_20-22_53_00--specvla-paper-ar-spatial-openvla_ar_summary.json.gz",
+      "source_bytes": 1455,
+      "source_sha256": "ef675ba4765e45aa43bc704cb4af179f7cb12748788741ce5d5ec931fe05bce0",
+      "archive_bytes": 651,
+      "archive_sha256": "53e25f833b1ff4addc47904f4e1c65fa718cea77a77bba35cf3caa6230196e20"
+    },
+    {
+      "source": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs/spatial/dflash_strict/DFlash+VTPF-e100/dflash_strict/EVAL-libero_spatial-openvla-2026_08_01-16_33_58--dflash-minimal-spatial-e100-s7-vtpf-strict-dflash_strict_summary.json",
+      "archived": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH/artifacts/evidence/p0/spatial/20260802T_p0_spatial_ar_n6b/raw/EVAL-libero_spatial-openvla-2026_08_01-16_33_58--dflash-minimal-spatial-e100-s7-vtpf-strict-dflash_strict_summary.json.gz",
+      "source_bytes": 3668033,
+      "source_sha256": "cb6e379796d7a65fdea08a5da5b1e44e87e4d7e08547815b45bd5a240feb3303",
+      "archive_bytes": 22181,
+      "archive_sha256": "a7dfd01447b315317b34bb46c3735fc54281f1bcfbd1a23882cd8e5b1c7fdca4"
+    },
+    {
+      "source": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs/spatial/dflash_relaxed/简化版Draft+VTPF-TD-PacedHarmonic-e100/dflash_relaxed/EVAL-libero_spatial-openvla-2026_08_01-19_50_33--dflash-minimal-spatial-e100-s7-vtpf-paced-harmonic-dflash_relaxed_summary.json",
+      "archived": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH/artifacts/evidence/p0/spatial/20260802T_p0_spatial_ar_n6b/raw/EVAL-libero_spatial-openvla-2026_08_01-19_50_33--dflash-minimal-spatial-e100-s7-vtpf-paced-harmonic-dflash_relaxed_summary.json.gz",
+      "source_bytes": 5493839,
+      "source_sha256": "eb36d4278252a66b4794fb32c4d654c1d6a228fca7e30dad6e14420f45ec2d5d",
+      "archive_bytes": 78599,
+      "archive_sha256": "4f8f6e331bec682f840e4c405fe4c060b01ca94ce144f0644ce45ce47ee3297b"
+    }
+  ],
+  "counts": {
+    "temporal_transitions": 674,
+    "temporal_lag_rows": 2660,
+    "vtpf_parity_positions": 824
+  },
+  "claim_boundaries": {
+    "profile": "Synchronized diagnostic stages; not paper-style end-to-end timing.",
+    "temporal": "Descriptive persistence evidence; not a recoverability guarantee.",
+    "parity": "Only causally comparable fused/serial positions are tested; finite-precision disagreements are reported, not hidden."
+  }
+}

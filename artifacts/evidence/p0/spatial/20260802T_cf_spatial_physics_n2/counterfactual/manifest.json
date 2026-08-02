@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-08-02T08:15:19.532926+00:00",
+  "git_commit": "042ad773bf5ddb9f01074a9b01853a5883c09a8d",
+  "git_status_porcelain": "?? artifacts/evidence/",
+  "run_manifest": {
+    "schema_version": 1,
+    "config": {
+      "pretrained_checkpoint": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-spatial",
+      "output_dir": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/evidence/p0/spatial/20260802T_cf_spatial_physics_n2/counterfactual",
+      "task_suite_name": "libero_spatial",
+      "task_id": 0,
+      "trial_start_index": 0,
+      "num_reference_episodes": 1,
+      "max_reference_attempts": 6,
+      "require_reference_success": true,
+      "num_steps_wait": 10,
+      "num_forks_per_episode": 2,
+      "hold_depths": [
+        1,
+        2,
+        3
+      ],
+      "max_recovery_steps": 0,
+      "seed": 7,
+      "center_crop": true,
+      "load_in_8bit": false,
+      "load_in_4bit": false,
+      "model_family": "openvla",
+      "use_spec": false,
+      "accept_threshold": 0,
+      "run_id_note": "p0-spatial-20260802T_cf_spatial_physics_n2"
+    },
+    "task_description": "pick up the black bowl between the plate and the ramekin and place it on the plate",
+    "output_jsonl": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/evidence/p0/spatial/20260802T_cf_spatial_physics_n2/counterfactual/counterfactual-p0-spatial-20260802T_cf_spatial_physics_n2.jsonl",
+    "status": "complete",
+    "started_at_unix": 1785658079.0910144,
+    "records": 39,
+    "last_record": {
+      "record_type": "counterfactual",
+      "suite": "libero_spatial",
+      "task_id": 0,
+      "episode_index": 0,
+      "episode_seed": 7,
+      "fork_step": 66,
+      "candidate": "lag1_harmonic",
+      "hold_depth": 3,
+      "executed_holds": 3,
+      "reference_success": true,
+      "branch_success": true,
+      "one_sided_harm": false,
+      "recovery_steps": 14,
+      "correction_l2": 0.4950471671472401,
+      "minimum_reference_robot_l2": 0.048344111337805834,
+      "post_hold_state_l2": 0.040454851103574524,
+      "post_hold_eef_position_l2": 0.00737980474688981,
+      "post_hold_eef_rotation_l2": 0.03977603201631661,
+      "post_hold_gripper_l2": 2.714308611550814e-05,
+      "post_hold_robot_state": [
+        -0.014990363711709623,
+        0.16597219314776934,
+        1.0289324526223613,
+        3.1121885738178516,
+        -0.37352850412943156,
+        -0.1278373447317454,
+        0.0022967014942877344,
+        -0.0023312372533031015
+      ],
+      "post_hold_reference_robot_state": [
+        -0.007708854844682947,
+        0.16515696295838608,
+        1.029813671357947,
+        3.1149640243842853,
+        -0.38428947523752366,
+        -0.08964531548574783,
+        0.0023092074675353817,
+        -0.002307146845315626
+      ],
+      "fork_state_linf": 0.0,
+      "candidate_actions": [
+        [
+          0.6438046748719962,
+          -0.0013865477898541423,
+          0.7598424338826946,
+          4.831982009551039e-05,
+          0.08878991200643427,
+          -0.10987395091968424,
+          1.0
+        ],
+        [
+          0.3219023374359981,
+          -0.0006932738949270711,
+          0.3799212169413473,
+          2.4159910047755195e-05,
+          0.044394956003217134,
+          -0.05493697545984212,
+          1.0
+        ],
+        [
+          0.2146015582906654,
+          -0.0004621825966180474,
+          0.2532808112942315,
+          1.6106606698503462e-05,
+          0.02959663733547809,
+          -0.03662465030656141,
+          1.0
+        ]
+      ],
+      "continuous_action_scales": [
+        1.0,
+        0.5,
+        0.3333333333333333
+      ],
+      "mean_action_norm": 0.6147069559226873,
+      "reference_trajectory_steps": 83
+    },
+    "finished_at_unix": 1785658517.985654,
+    "attempted_reference_episodes": 1,
+    "selected_reference_episodes": 1
+  },
+  "inputs": [
+    {
+      "source": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/evidence/p0/spatial/20260802T_cf_spatial_physics_n2/counterfactual/counterfactual-p0-spatial-20260802T_cf_spatial_physics_n2.jsonl",
+      "source_bytes": 50078,
+      "source_sha256": "6c8ae6edc068e6c56d7b9d37c5030ba0486e32b0f9c661783077bd40cb13f6be",
+      "archive": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH/artifacts/evidence/p0/spatial/20260802T_cf_spatial_physics_n2/counterfactual/raw/counterfactual-p0-spatial-20260802T_cf_spatial_physics_n2.jsonl.gz",
+      "archive_bytes": 6705,
+      "archive_sha256": "975d69148fbf6cf81a430df832054575fba0ad61d273e27932ee5a64def1161b"
+    },
+    {
+      "source": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/evidence/p0/spatial/20260802T_cf_spatial_physics_n2/counterfactual/counterfactual-p0-spatial-20260802T_cf_spatial_physics_n2-manifest.json",
+      "source_bytes": 3479,
+      "source_sha256": "378fa9f578d56869559dea9904dc02c917abae1c73845865f60de020e2213929",
+      "archive": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH/artifacts/evidence/p0/spatial/20260802T_cf_spatial_physics_n2/counterfactual/raw/counterfactual-p0-spatial-20260802T_cf_spatial_physics_n2-manifest.json.gz",
+      "archive_bytes": 1381,
+      "archive_sha256": "3ecd638913fc2e1fa67720a1e2def84e5f2841c43e25d1d400da7a9c3e611683"
+    }
+  ],
+  "counts": {
+    "all_records": 39,
+    "counterfactual_branches": 36,
+    "positive_controls": 6,
+    "positive_control_failures": 0,
+    "maximum_fork_state_linf": 0.0
+  },
+  "validity": {
+    "same_state_positive_control_passed": true,
+    "interpretation": "Task harm is conditional on a successful frozen-target reference. This pilot does not establish a population-level risk bound."
+  }
+}

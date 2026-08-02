@@ -2125,6 +2125,19 @@ VTPF 应准确称为 `target-verifier strict`；它对 fused 序列执行 target
 AR 的 bitwise 等价。正式主张仍需扩展到更多 task、seed，并补齐同 target 预算的 Paced 消融、同 schedule 的
 Harmonic 消融和独立 calibration/test 风险上界。
 
+Spatial task-0 还完成了一轮确定性同状态分叉 pilot：选取 1 条 target 成功轨迹、2 个冻结状态，对
+6 种候选和深度 1–3 共执行 36 个分支。`current_target_path` 的 6 个正对照全部通过，重放到分叉点的
+simulator-state 最大误差为 0。滞后一步 target 动作在该轨迹的所有分支上仍可恢复，但这只是存在性
+证据，不是群体风险上界。更关键的是，`1, 1/2, 1/3` 逆年龄缩放没有降低位姿偏差：深度 3 时，
+常幅滞后动作的末端位置/旋转偏差为 `0.00592/0.02231`，谐波缩放为 `0.00838/0.02875`。
+因此当前 P0 支持“短时可恢复域值得研究”，却暂不支持“Harmonic 必然降低物理偏移”。该负证据已原样
+固化在 `artifacts/evidence/p0/spatial/20260802T_cf_spatial_physics_n2/counterfactual/`。
+
+本轮两个主证据包分别位于
+`artifacts/evidence/p0/goal/20260802T_p0_goal_ar_n6b/` 和
+`artifacts/evidence/p0/spatial/20260802T_p0_spatial_ar_n6b/`。每个目录中的 `manifest.json` 记录源文件哈希、配置、
+Git commit 和有效性边界；`raw/`、`tables/`、`figures/` 分别保存压缩原始证据、作图数据和论文图。
+
 ### 11.3 OpenVLA-OFT 后续扩展
 
 OpenVLA-OFT 已经并行输出动作，不适合直接套用 action-token speculative decoding。后续可把“弱计算路径追强

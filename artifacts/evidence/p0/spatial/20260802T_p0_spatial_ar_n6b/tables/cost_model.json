@@ -1,0 +1,31 @@
+{
+  "prefill_ms": 53.08546650127345,
+  "dflash_tail_ms": 102.26403413015225,
+  "target_ar_tail_ms": 105.94807736472927,
+  "ar_mean_ms": 183.459120037175,
+  "estimated_wrapper_overhead_ms": 24.42557617117228,
+  "measured_points": [
+    {
+      "label": "VTPF",
+      "measured_speedup": 1.167236403817353,
+      "target_frame_rate": 1.0,
+      "vtpf_full_match_rate": 0.7385321100917431,
+      "tail_work_elimination_rate": -0.04727128247140655,
+      "hold_cost_ms": 171.01120948791504,
+      "target_frames": 7767,
+      "tail_blocks": 24325,
+      "predicted_speedup": 0.9928200612843736
+    },
+    {
+      "label": "PacedHarmonic",
+      "measured_speedup": 2.923013188457313,
+      "target_frame_rate": 0.41795770666063553,
+      "vtpf_full_match_rate": 0.05019199122325837,
+      "tail_work_elimination_rate": 0.02676244933410532,
+      "hold_cost_ms": 0.36215782165527344,
+      "target_frames": 3696,
+      "tail_blocks": 10757,
+      "predicted_speedup": 2.4850377230754184
+    }
+  ]
+}

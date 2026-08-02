@@ -81,6 +81,9 @@ class GenerateConfig:
     task_suite_name: str = "libero_goal"          # Task suite. Options: libero_spatial, libero_object, libero_goal, libero_10, libero_90
     num_steps_wait: int = 10                         # Number of steps to wait for objects to stabilize in sim
     num_trials_per_task: int = 50                    # Number of rollouts per task
+    trial_start_index: int = 0                       # First LIBERO initial state used per task
+    max_eval_tasks: Optional[int] = None             # Optional task cap for mechanism pilots
+    ar_evidence_trace: bool = False                  # Record compact per-step evidence only when requested
 
     #################################################################################################################
     # Utils
@@ -171,7 +174,13 @@ def eval_libero(cfg: GenerateConfig) -> None:
     total_episodes, total_successes = 0, 0
     total_episode_time = []
     last_task_episode_time = []
-    for task_id in tqdm.tqdm(range(num_tasks_in_suite)):
+    evidence_trace = []
+    task_limit = (
+        num_tasks_in_suite
+        if cfg.max_eval_tasks is None
+        else min(num_tasks_in_suite, int(cfg.max_eval_tasks))
+    )
+    for task_id in tqdm.tqdm(range(task_limit)):
         # Get task
         task = task_suite.get_task(task_id)
 
@@ -184,7 +193,13 @@ def eval_libero(cfg: GenerateConfig) -> None:
         # Start episodes
         task_episodes, task_successes = 0, 0
         task_episode_time = []
-        for episode_idx in tqdm.tqdm(range(cfg.num_trials_per_task)):
+        episode_stop = min(
+            cfg.trial_start_index + cfg.num_trials_per_task,
+            len(initial_states),
+        )
+        for episode_idx in tqdm.tqdm(
+            range(cfg.trial_start_index, episode_stop)
+        ):
             total_time = []
             print(f"\nTask: {task_description}")
             log_file.write(f"\nTask: {task_description}\n")
@@ -198,6 +213,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
             # Setup
             t = 0
             replay_images = []
+            episode_evidence = []
             if cfg.task_suite_name == "libero_spatial":
                 max_steps = 220  # longest training demo has 193 steps
             elif cfg.task_suite_name == "libero_object":
@@ -235,6 +251,18 @@ def eval_libero(cfg: GenerateConfig) -> None:
                         ),
                     }
 
+                    if cfg.ar_evidence_trace:
+                        image_array = np.asarray(img)
+                        y_index = np.linspace(
+                            0, image_array.shape[0] - 1, 16
+                        ).round().astype(np.int64)
+                        x_index = np.linspace(
+                            0, image_array.shape[1] - 1, 16
+                        ).round().astype(np.int64)
+                        image_signature = image_array[
+                            np.ix_(y_index, x_index)
+                        ]
+
                     # Query model to get action
                     action,time = get_action(# 获取动作与模型推理耗时
                         cfg,
@@ -251,6 +279,28 @@ def eval_libero(cfg: GenerateConfig) -> None:
                     # (0 = close, 1 = open), so flip it back (-1 = open, +1 = close) before executing the action
                     if cfg.model_family == "openvla":
                         action = invert_gripper_action(action)
+
+                    if cfg.ar_evidence_trace:
+                        episode_evidence.append(
+                            {
+                                "source": "specvla_paper_wrapped_ar",
+                                "task_id": int(task_id),
+                                "episode_index": int(episode_idx),
+                                "control_step": int(t - cfg.num_steps_wait),
+                                "environment_action": np.asarray(
+                                    action, dtype=np.float64
+                                ).tolist(),
+                                "robot_state": np.asarray(
+                                    observation["state"], dtype=np.float64
+                                ).tolist(),
+                                "image_signature_shape": list(
+                                    image_signature.shape
+                                ),
+                                "image_signature": image_signature.reshape(
+                                    -1
+                                ).astype(np.float32).tolist(),
+                            }
+                        )
 
                     # Execute action in environment
                     obs, reward, done, info = env.step(action.tolist())
@@ -272,6 +322,11 @@ def eval_libero(cfg: GenerateConfig) -> None:
             total_episodes += 1
             total_episode_time.append(total_time)# episode级别,保存每个 episode 中所有推理步的耗时
             task_episode_time.append(total_time)
+            if cfg.ar_evidence_trace:
+                for record in episode_evidence:
+                    record["episode_success"] = bool(done)
+                    record["episode_control_steps"] = len(episode_evidence)
+                evidence_trace.extend(episode_evidence)
 
             # Save a replay video of the episode
             # save_rollout_video(
@@ -301,6 +356,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
                 }
             )
         last_task_episode_time = task_episode_time
+        env.close()
     timing_episode_time = last_task_episode_time if cfg.timing_scope == "last_task" else total_episode_time
     with open(local_log_timefilepath,mode='w') as f:
         json.dump(timing_episode_time,f)
@@ -313,6 +369,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
         total_successes=total_successes,
         episode_times=timing_episode_time,
         generation_stats=None,
+        evidence_trace=evidence_trace,
     )
     print(f"Saved eval summary to: {local_log_summaryfilepath}")
     log_file.write(f"Saved eval summary to: {local_log_summaryfilepath}\n")

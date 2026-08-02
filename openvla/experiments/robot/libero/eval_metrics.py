@@ -224,6 +224,53 @@ def summarize_generation_stats(step_stats_list):
         for stage_name, total_ms in stage_profile_totals.items()
     }
 
+    vtpf_parity_records = [
+        item["vtpf_parity_record"]
+        for item in valid_stats
+        if item.get("vtpf_parity_record") is not None
+    ]
+    vtpf_parity_positions = [
+        position
+        for record in vtpf_parity_records
+        for position in record.get("per_position", [])
+    ]
+    vtpf_parity = None
+    if vtpf_parity_records:
+        comparable_positions = sum(
+            int(record.get("causal_comparable_positions", 0))
+            for record in vtpf_parity_records
+        )
+        vtpf_parity = {
+            "num_records": len(vtpf_parity_records),
+            "causal_comparable_positions": comparable_positions,
+            "top1_mismatches": sum(
+                int(record.get("top1_mismatches", 0))
+                for record in vtpf_parity_records
+            ),
+            "serial_divergent_accepted_tokens": sum(
+                int(record.get("serial_divergent_accepted_tokens", 0))
+                for record in vtpf_parity_records
+            ),
+            "strict_accepted_tokens": sum(
+                int(record.get("strict_accepted_prefix_length", 0))
+                for record in vtpf_parity_records
+            ),
+            "max_abs_logit_difference": max(
+                float(record.get("max_abs_logit_difference", 0.0))
+                for record in vtpf_parity_records
+            ),
+            "mean_abs_logit_difference": (
+                sum(
+                    float(position.get("mean_abs_logit_difference", 0.0))
+                    for position in vtpf_parity_positions
+                )
+                / len(vtpf_parity_positions)
+                if vtpf_parity_positions
+                else None
+            ),
+            "records": vtpf_parity_records,
+        }
+
     verify_skip_records = []
     for item in valid_stats:
         verify_skip_records.extend(item.get("verify_skip_records", []))
@@ -656,6 +703,11 @@ def summarize_generation_stats(step_stats_list):
         for item in valid_stats
         if item.get("target_ar_reference_tokens") is not None
     ]
+    evidence_trace = [
+        item["evidence_trace"]
+        for item in valid_stats
+        if item.get("evidence_trace") is not None
+    ]
 
     position_hits = {}
     position_counts = {}
@@ -912,7 +964,9 @@ def summarize_generation_stats(step_stats_list):
         "temporal_action_skip": temporal_action_skip,
         "action_token_trace": action_token_trace or None,
         "target_ar_reference_trace": target_ar_reference_trace or None,
+        "evidence_trace": evidence_trace or None,
         "stage_profile": stage_profile or None,
+        "vtpf_parity": vtpf_parity,
         "confidence_threshold": valid_stats[0].get("confidence_threshold"),
         "confidence_min_tokens": valid_stats[0].get("confidence_min_tokens"),
         "confidence_truncated_blocks": confidence_truncated_blocks,
@@ -969,10 +1023,13 @@ def write_eval_summary(
     total_successes,
     episode_times,
     generation_stats=None,
+    evidence_trace=None,
 ):
     import json
 
-    generation_summary = summarize_generation_stats(generation_stats or [])
+    generation_summary = summarize_generation_stats(generation_stats or []) or {}
+    if evidence_trace:
+        generation_summary["evidence_trace"] = evidence_trace
     payload = {
         "run_id": run_id,
         "eval_family": eval_family,
@@ -1065,6 +1122,7 @@ def write_eval_summary(
             cfg, "dflash_verify_skip_max_consecutive", None
         ),
         "dflash_profile_stages": getattr(cfg, "dflash_profile_stages", None),
+        "dflash_evidence_trace": getattr(cfg, "dflash_evidence_trace", None),
         "pretrained_checkpoint": str(cfg.pretrained_checkpoint),
         "spec_checkpoint": str(getattr(cfg, "spec_checkpoint", "")),
         "num_trials_per_task": cfg.num_trials_per_task,

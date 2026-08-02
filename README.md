@@ -107,6 +107,9 @@ PacedHarmonic 的原始日志、逐动作 timing、summary、配对统计、筛�
 | 自适应 hold 决策 | `openvla/specdecoding/model/temporal_hold.py` | 无 CUDA 依赖的固定/风险受限策略与硬上限，可独立单测 |
 | 短前缀认证消融 | `openvla/specdecoding/decode-scripts/run_dflash_vtpf_prefix_cert_goal_eval.sh` | target 精确认证短前缀后信任尾部；当前净收益很小 |
 | 时序门校准 | `openvla/specdecoding/test-speed/analyze_dflash_temporal_shadow.py` | 从 shadow summary 统计覆盖、错误和 95% 风险上界 |
+| P0 成本/持久性/验证审计 | `openvla/specdecoding/decode-scripts/run_dflash_p0_evidence.sh` | 成对生成逐阶段耗时、时序冗余、fused-vs-serial 审计和 ICLR 规格图表 |
+| P0 同状态恢复实验 | `openvla/specdecoding/decode-scripts/run_dflash_p0_counterfactual.sh` | 从同一 MuJoCo 状态分叉历史动作与控制对照，恢复冻结 target 后测量单侧伤害 |
+| 论文证据构建器 | `openvla/specdecoding/evidence/` | 保存 SHA-256 原始证据、CSV、5.5 英寸矢量 PDF 和 300 dpi PNG |
 
 正式 shell 入口已经收敛。`train-scripts` 只保留数据生成和当前训练两个入口；`decode-scripts` 只保留
 通用单项评测和少数一键工作流。旧 wrapper 已从工作树删除，需要回溯时使用 Git 历史。
@@ -2074,6 +2077,54 @@ git pull --ff-only origin main
 - 鲁棒性：checkpoint、seed、硬件、任务长度。
 - 真机：ALICIA-D 上比较成功率、动作延迟、控制频率和失败类型。
 
+P0 证据脚手架已经独立于正式 50-trial 主表落地。Goal 和 Spatial 分别显式传入各自 Draft。成本与 VTPF
+审计使用 DFlash 路径；时序动机数据来自 SpecVLA 论文口径的 wrapped AR 分母，不再用 Draft 轨迹自证。各输入
+都记录 task、initial-state index、seed、配置和 SHA-256：
+
+```bash
+# Goal：逐阶段成本、时序动作持久性、VTPF fused verifier 审计
+CUDA_VISIBLE_DEVICES=0 \
+SPEC_CKPT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/Draft_checkpoint/goal/epoch_100_step_044800 \
+P0_TRIALS=6 P0_TASKS=1 \
+bash openvla/specdecoding/decode-scripts/run_dflash_p0_evidence.sh goal
+
+# Spatial：替换成 suite 对应的 Draft，禁止跨 suite 混用
+CUDA_VISIBLE_DEVICES=0 \
+SPEC_CKPT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/Draft_checkpoint/spatial/epoch_100_step_062200 \
+P0_TRIALS=6 P0_TASKS=1 \
+bash openvla/specdecoding/decode-scripts/run_dflash_p0_evidence.sh spatial
+
+# 不依赖 Draft 的同状态反事实恢复；正式证据必须使用完整恢复 horizon
+CUDA_VISIBLE_DEVICES=0 P0_REFERENCE_EPISODES=3 P0_FORKS_PER_EPISODE=3 \
+P0_MAX_RECOVERY_STEPS=0 \
+bash openvla/specdecoding/decode-scripts/run_dflash_p0_counterfactual.sh goal
+```
+
+完整原始运行写入 `specvla-data/evidence/p0/<suite>/<UTC stamp>`；可提交的证据包写入
+`artifacts/evidence/p0/<suite>/<UTC stamp>`。证据包包含压缩原始 JSON/TXT、逐文件 SHA-256、Git 状态、CSV、
+矢量 PDF 和 PNG。图宽严格采用 ICLR 2026 模板的 `5.5 in` 正文宽度。阶段 profiler 显式同步 CUDA，只用于
+诊断成本组成，不得冒充 paper-style 端到端延迟；时序重复率只是描述性证据，不能代替闭环可恢复性；同状态
+实验通过相同 seed、初始状态和完整历史动作重放来恢复 simulator/controller 历史；只有 fork-state 差异不超过
+`1e-8` 且 `current_target_path` 正对照全部通过时才有效。
+
+2026-08-02 的 P0 pilot 得到以下结果。它们是机制证据，不是正式总体置信区间：
+
+| 证据 | Goal task-0 | Spatial task-0 | 当前含义 |
+|---|---:|---:|---|
+| wrapped-AR episode（成功数） | 6（4） | 6（5） | 同时保留成功与失败轨迹；样本仍小 |
+| lag-1 完整 7 维动作重复率（成功轨迹） | 12.68% | 13.85% | 不能声称“大多数动作完全相同” |
+| 相邻动作 L2 中位数 | 0.151 | 0.150 | 短时间差动作局部集中 |
+| 同 episode 半轨迹间隔动作 L2 中位数 | 0.734 | 2.136 | 分别是相邻距离的 4.85x、14.24x |
+| DFlash target prefill / anchor / verify | 52.60 / 63.54 / 38.14 ms | 53.09 / 53.23 / 43.48 ms | target 固定工作是主耗时 |
+| DFlash 并行 Draft | 4.85 ms/action | 4.11 ms/action | 继续增大 Draft 很难单独突破速度下界 |
+| fused-vs-serial 共同因果位置 top-1 分歧 | 39/2321 | 9/824 | BF16 计算形状会改变舍入路径 |
+| verifier 接受 token 中相对 serial AR 的分歧 | 40/1723 | 0/555 | Goal 上 strict verifier 不是位级 AR 等价 |
+
+因此，论文的可辩护观察应写成“target 动作具有显著的短时连续空间局部性”，而不是“相邻动作大多完全相同”。
+VTPF 应准确称为 `target-verifier strict`；它对 fused 序列执行 target 前缀裁决，但不能写成逐 token KV-cache
+AR 的 bitwise 等价。正式主张仍需扩展到更多 task、seed，并补齐同 target 预算的 Paced 消融、同 schedule 的
+Harmonic 消融和独立 calibration/test 风险上界。
+
 ### 11.3 OpenVLA-OFT 后续扩展
 
 OpenVLA-OFT 已经并行输出动作，不适合直接套用 action-token speculative decoding。后续可把“弱计算路径追强
@@ -2091,6 +2142,8 @@ OpenVLA-OFT 已经并行输出动作，不适合直接套用 action-token specul
 - relaxed acceptance 不是 strict lossless，必须报告阈值与成功率。
 - Golden Action-RNN 引入轻量顺序步骤；Minimal 和默认 RNN-off 推理才保持纯块并行 proposal。
 - VTPF-TD 已完成 Goal 单 seed 500-episode 正式评测；跨论文比较 HeiSD 前仍需严格统一硬件、计时和 AL 定义。
+- BF16 fused verification 与逐 token AR 可能因内核形状和舍入路径不同而产生 top-1 分歧；`strict` 指 target
+  verifier 的精确前缀规则，不自动等同于逐 token AR 的 bitwise 输出。
 
 ## 13. 参考文献
 

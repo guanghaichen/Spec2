@@ -30,6 +30,14 @@ if [[ "${DRY_RUN:-False}" == "True" ]]; then
   exit 0
 fi
 
+AR_EVIDENCE_ARGS=(
+  --trial_start_index "${TRIAL_START_INDEX:-0}"
+  --ar_evidence_trace "${AR_EVIDENCE_TRACE:-False}"
+)
+if [[ -n "${MAX_EVAL_TASKS:-}" ]]; then
+  AR_EVIDENCE_ARGS+=(--max_eval_tasks "${MAX_EVAL_TASKS}")
+fi
+
 python openvla/experiments/robot/libero/run_libero_goal_AR.py \
   --model_family openvla \
   --pretrained_checkpoint "${VLA_PATH}" \
@@ -38,6 +46,7 @@ python openvla/experiments/robot/libero/run_libero_goal_AR.py \
   --parallel_draft False \
   --task_suite_name "${TASK_SUITE_NAME}" \
   --num_trials_per_task "${NUM_TRIALS_PER_TASK}" \
+  "${AR_EVIDENCE_ARGS[@]}" \
   --center_crop True \
   --local_log_dir "${LOG_DIR}" \
   --run_id_note "${RUN_ID_NOTE}" \

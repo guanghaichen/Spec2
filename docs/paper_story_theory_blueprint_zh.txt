@@ -984,6 +984,28 @@ VLA 的大模型与自回归动作 token 生成造成控制延迟。已有 specu
 真正有说服力的 ICLR 故事，应当让实验有能力推翻理论，也让理论能够预先预测实验。本文档的全部作用，就是保证后续论文沿着这条标准继续推进。
 
 
+二十六、2026-08-02 P0 机制证据更新
+=================================
+
+本轮证据严格拆开了三条路径：DFlash 只用于成本分解，SpecVLA 论文 wrapped AR 用于时序动机，VTPF fused
+prefill 只用于有限精度审计。这样避免用本文方法产生的轨迹证明本文方法的动机。
+
+1. Goal task-0 的 6 条 wrapped-AR 轨迹有 4 条成功，Spatial task-0 有 5/6 条成功。成功轨迹 lag-1 完整
+   7 维动作重复率分别为 12.68% 和 13.85%，因此旧的“大量相邻动作完全相同”表述过强。
+2. Goal 的相邻动作 L2 中位数为 0.151，同 episode 半轨迹间隔对照为 0.734；Spatial 分别为 0.150 和
+   2.136。更准确的动机是短时连续控制局部性，而不是离散动作复制占多数。
+3. Goal 的 target prefill、重复 anchor 和 verify 每动作分别占 52.60、63.54、38.14 ms，并行 Draft 仅
+   4.85 ms；Spatial 对应为 53.09、53.23、43.48 和 4.11 ms。该结果支持从 Draft 优化转向 target-call
+   与 target-tail 工作量优化。
+4. BF16 fused verifier 与独立串行 KV-cache AR 并非位级等价。Goal 共同因果位置 top-1 分歧 39/2321，
+   verifier 接受 token 中有 40/1723 与 serial AR 不同；Spatial 对应为 9/824 和 0/555。论文只能主张
+   target-verifier strict，不能主张 bitwise AR equivalence。
+
+这些数字仍是单 task、小样本 pilot。它们足以校正论文命题和确定后续实验，但不能替代跨 task、跨 seed 的
+正式统计。同状态恢复、same-target-budget Paced、same-schedule Harmonic 和 calibration/test 风险上界仍须
+按 P0 顺序完成。
+
+
 参考起点
 ========
 
@@ -992,4 +1014,3 @@ VLA 的大模型与自回归动作 token 生成造成控制延迟。已有 specu
 3. HeiSD: Hybrid Speculative Decoding for Embodied Vision-Language-Action Models with Kinematic Awareness, arXiv:2603.17573.
 4. OpenVLA: An Open-Source Vision-Language-Action Model.
 5. Domino：其训练课程与 base/final 协同经验只作为本项目历史训练设计参考，不是当前 Minimal Draft + VTPF + PacedHarmonic 推理主线的理论来源。
-

@@ -115,6 +115,7 @@ class GenerateConfig:
     dflash_verify_skip_max_consecutive: int = 1
     dflash_profile_stages: bool = False
     dflash_debug_compare_target_ar: bool = False
+    dflash_evidence_trace: bool = False
     #################################################################################################################
     # LIBERO environment-specific parameters
     #################################################################################################################
@@ -304,7 +305,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
                         return_generation_stats=True,
                         generate_mode = ("dflash" if cfg.draft_backend == "dflash" else "speculative")
                     )
-                    episode_generation_stats.append(generation_stats)
+                    model_action = np.asarray(action, dtype=np.float64).copy()
                     # Normalize gripper action [0,1] -> [-1,+1] because the environment expects the latter
                     action = normalize_gripper_action(action, binarize=True)
 
@@ -312,6 +313,21 @@ def eval_libero(cfg: GenerateConfig) -> None:
                     # (0 = close, 1 = open), so flip it back (-1 = open, +1 = close) before executing the action
                     if cfg.model_family == "openvla":
                         action = invert_gripper_action(action)
+
+                    if cfg.dflash_evidence_trace and generation_stats is not None:
+                        generation_stats["evidence_trace"] = {
+                            "task_id": int(task_id),
+                            "episode_index": int(episode_idx),
+                            "control_step": int(t - cfg.num_steps_wait),
+                            "model_action": model_action.tolist(),
+                            "environment_action": np.asarray(
+                                action, dtype=np.float64
+                            ).tolist(),
+                            "robot_state_before_action": np.asarray(
+                                observation["state"], dtype=np.float64
+                            ).tolist(),
+                        }
+                    episode_generation_stats.append(generation_stats)
 
                     # Execute action in environment
                     obs, reward, done, info = env.step(action.tolist())
@@ -331,6 +347,17 @@ def eval_libero(cfg: GenerateConfig) -> None:
             #exit()
             task_episodes += 1
             total_episodes += 1
+            if cfg.dflash_evidence_trace:
+                for step_stats in episode_generation_stats:
+                    if step_stats and step_stats.get("evidence_trace") is not None:
+                        step_stats["evidence_trace"].update(
+                            {
+                                "episode_success": bool(done),
+                                "episode_control_steps": len(
+                                    episode_generation_stats
+                                ),
+                            }
+                        )
             total_episode_time.append(total_time)
             task_episode_time.append(total_time)
             task_generation_step_stats.extend(episode_generation_stats)

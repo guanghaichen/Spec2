@@ -1,9 +1,47 @@
+import json
+import tempfile
 import unittest
+from pathlib import Path
+from types import SimpleNamespace
 
-from openvla.experiments.robot.libero.eval_metrics import summarize_generation_stats
+from openvla.experiments.robot.libero.eval_metrics import (
+    summarize_generation_stats,
+    write_eval_summary,
+)
 
 
 class DFlashEvalMetricsTest(unittest.TestCase):
+    def test_ar_evidence_trace_can_be_written_without_generation_stats(self):
+        cfg = SimpleNamespace(
+            task_suite_name="libero_goal",
+            model_family="openvla",
+            pretrained_checkpoint="target",
+            spec_checkpoint="wrapper",
+            num_trials_per_task=1,
+            seed=7,
+            use_spec=True,
+            parallel_draft=False,
+            timing_scope="full_suite",
+            sync_cuda_timing=False,
+            ar_evidence_trace=True,
+        )
+        trace = [{"task_id": 0, "episode_index": 0, "control_step": 0}]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "summary.json"
+            write_eval_summary(
+                path,
+                cfg=cfg,
+                run_id="ar-evidence-test",
+                eval_family="openvla_ar",
+                total_episodes=1,
+                total_successes=0,
+                episode_times=[[]],
+                generation_stats=None,
+                evidence_trace=trace,
+            )
+            payload = json.loads(path.read_text())
+        self.assertEqual(payload["generation"]["evidence_trace"], trace)
+
     def test_dynamic_tree_metrics_are_aggregated_by_block_count(self):
         stats = [
             {
@@ -283,6 +321,59 @@ class DFlashEvalMetricsTest(unittest.TestCase):
         )
         self.assertEqual(temporal_hold["allowed_depth_histogram"], {1: 1, 2: 1})
         self.assertAlmostEqual(temporal_hold["avg_anchor_pixel_relative_l2"], 0.02)
+
+    def test_vtpf_parity_and_evidence_traces_remain_auditable(self):
+        stats = [
+            {
+                "backend": "dflash",
+                "block_size": 7,
+                "num_blocks": 1,
+                "generated_tokens": 7,
+                "progressed_tokens": 7,
+                "accept_lengths": [6],
+                "progress_lengths": [7],
+                "vtpf_parity_record": {
+                    "causal_comparable_positions": 2,
+                    "top1_mismatches": 0,
+                    "serial_divergent_accepted_tokens": 0,
+                    "strict_accepted_prefix_length": 2,
+                    "max_abs_logit_difference": 0.03125,
+                    "per_position": [
+                        {
+                            "position": 0,
+                            "top1_match": True,
+                            "max_abs_logit_difference": 0.0,
+                            "mean_abs_logit_difference": 0.0,
+                        },
+                        {
+                            "position": 1,
+                            "top1_match": True,
+                            "max_abs_logit_difference": 0.03125,
+                            "mean_abs_logit_difference": 0.001,
+                        },
+                    ],
+                },
+                "evidence_trace": {
+                    "task_id": 0,
+                    "episode_index": 3,
+                    "control_step": 4,
+                    "environment_action": [0.0] * 7,
+                },
+            }
+        ]
+
+        summary = summarize_generation_stats(stats)
+
+        self.assertEqual(summary["vtpf_parity"]["num_records"], 1)
+        self.assertEqual(
+            summary["vtpf_parity"]["causal_comparable_positions"], 2
+        )
+        self.assertEqual(summary["vtpf_parity"]["top1_mismatches"], 0)
+        self.assertEqual(
+            summary["vtpf_parity"]["serial_divergent_accepted_tokens"], 0
+        )
+        self.assertEqual(summary["vtpf_parity"]["strict_accepted_tokens"], 2)
+        self.assertEqual(summary["evidence_trace"][0]["episode_index"], 3)
 
 
 if __name__ == "__main__":

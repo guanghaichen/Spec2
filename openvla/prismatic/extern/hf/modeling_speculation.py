@@ -2482,7 +2482,10 @@ class SpecVLAforActionPrediction(nn.Module):
                 "per_position": [],
                 "final_action_tokens": (
                     final_action_tokens[0].detach().cpu().tolist()
-                    if self.dflash_profile_stages
+                    if (
+                        self.dflash_profile_stages
+                        or self.dflash_debug_compare_target_ar
+                    )
                     else None
                 ),
                 "target_ar_reference_tokens": None,
@@ -2764,12 +2767,46 @@ class SpecVLAforActionPrediction(nn.Module):
             }
 
         target_ar_reference_tokens = None
+        target_ar_reference_action_logits = None
+        vtpf_parity_record = None
         if self.dflash_debug_compare_target_ar:
-            reference_tokens = [first_token]
-            reference_token = first_token
-            reference_past_key_values = self._crop_past_key_values(
-                outputs.past_key_values, action_base_position
+            # Build the diagnostic AR reference from an independent, ordinary
+            # multimodal prefill. Reusing the fused call's first logit or its
+            # cropped cache would make position 0 equal by construction and
+            # would not audit the actual token-by-token target path.
+            reference_model_inputs = self.base_model.prepare_inputs_for_generation(
+                input_ids, **kwargs
             )
+            stage_started = profile_start()
+            reference_prefill_outputs, reference_prefill_logits, _, _ = self(
+                **reference_model_inputs,
+                return_dict=True,
+                output_attentions=False,
+                output_hidden_states=True,
+                output_orig=True,
+                **self._dflash_target_logit_kwargs(num_logits_to_keep=1),
+            )
+            profile_end("target_ar_reference_prefill", stage_started)
+            reference_action_base_position = self._past_key_values_length(
+                reference_prefill_outputs.past_key_values
+            )
+            if reference_action_base_position != action_base_position:
+                raise AssertionError(
+                    "Independent AR prefill cache length differs from fused prefill: "
+                    f"reference={reference_action_base_position} "
+                    f"fused={action_base_position}."
+                )
+            reference_first_token_logits = reference_prefill_logits[:, -1:, :]
+            reference_token = self._sample_dflash_target_logits(
+                reference_first_token_logits
+            )
+            reference_tokens = [reference_token]
+            reference_action_logits = [
+                self._dflash_action_logits(reference_first_token_logits)
+                .float()
+                .detach()
+            ]
+            reference_past_key_values = reference_prefill_outputs.past_key_values
             stage_started = profile_start()
             for reference_idx in range(max_new_tokens - 1):
                 reference_embeds = (
@@ -2779,7 +2816,7 @@ class SpecVLAforActionPrediction(nn.Module):
                 )
                 reference_position_ids = torch.full(
                     (1, 1),
-                    action_base_position + reference_idx,
+                    reference_action_base_position + reference_idx,
                     device=input_ids.device,
                     dtype=torch.long,
                 )
@@ -2797,9 +2834,104 @@ class SpecVLAforActionPrediction(nn.Module):
                     reference_logits[:, -1:, :]
                 )
                 reference_tokens.append(reference_token)
+                reference_action_logits.append(
+                    self._dflash_action_logits(reference_logits[:, -1:, :])
+                    .float()
+                    .detach()
+                )
                 reference_past_key_values = reference_outputs.past_key_values
-            profile_end("target_ar_reference", stage_started)
+            profile_end("target_ar_reference_tail", stage_started)
             target_ar_reference_tokens = torch.cat(reference_tokens, dim=1)
+            target_ar_reference_action_logits = torch.cat(
+                reference_action_logits, dim=1
+            )
+
+            # A fused prefill position is numerically comparable with serial AR
+            # only while every preceding candidate token equals the AR prefix.
+            # Positions after the first mismatch intentionally use different
+            # causal contexts and must not be counted as parity failures.
+            if prefill_fusion_candidate is not None:
+                candidate_tokens = prefill_fusion_candidate[:, :max_new_tokens]
+                exact_prefix_length = int(
+                    candidate_tokens.eq(target_ar_reference_tokens)
+                    .int()
+                    .cumprod(dim=1)
+                    .sum(dim=1)[0]
+                    .item()
+                )
+                comparable_positions = min(
+                    exact_prefix_length + 1,
+                    max_new_tokens,
+                    int(orig.shape[1]),
+                    int(target_ar_reference_action_logits.shape[1]),
+                )
+                fused_action_logits = self._dflash_action_logits(
+                    orig[:, :comparable_positions, :]
+                ).float()
+                serial_action_logits = target_ar_reference_action_logits[
+                    :, :comparable_positions, :
+                ]
+                absolute_difference = torch.abs(
+                    fused_action_logits - serial_action_logits
+                )
+                fused_top1 = fused_action_logits.argmax(dim=-1)
+                serial_top1 = serial_action_logits.argmax(dim=-1)
+                per_position_max_abs = absolute_difference.amax(dim=-1)[0]
+                per_position_mean_abs = absolute_difference.mean(dim=-1)[0]
+                accepted_prefix = int(
+                    (prefill_fusion_record or {}).get("accept_length", 0)
+                )
+                serial_divergent_accepted_tokens = int(
+                    candidate_tokens[:, :accepted_prefix]
+                    .ne(target_ar_reference_tokens[:, :accepted_prefix])
+                    .sum()
+                    .item()
+                )
+                fused_posterior_tokens = self._sample_dflash_target_logits(
+                    orig[:, :max_new_tokens, :]
+                )
+                vtpf_parity_record = {
+                    "mode": (prefill_fusion_record or {}).get("mode"),
+                    "candidate_exact_prefix_length": exact_prefix_length,
+                    "strict_accepted_prefix_length": accepted_prefix,
+                    "serial_divergent_accepted_tokens": (
+                        serial_divergent_accepted_tokens
+                    ),
+                    "causal_comparable_positions": comparable_positions,
+                    "top1_mismatches": int(
+                        fused_top1.ne(serial_top1).sum().item()
+                    ),
+                    "max_abs_logit_difference": float(
+                        absolute_difference.max().item()
+                    ),
+                    "mean_abs_logit_difference": float(
+                        absolute_difference.mean().item()
+                    ),
+                    "candidate_tokens": candidate_tokens[0].detach().cpu().tolist(),
+                    "fused_verifier_tokens": (
+                        fused_posterior_tokens[0].detach().cpu().tolist()
+                    ),
+                    "serial_ar_tokens": (
+                        target_ar_reference_tokens[0].detach().cpu().tolist()
+                    ),
+                    "per_position": [
+                        {
+                            "position": position,
+                            "top1_match": bool(
+                                fused_top1[0, position].eq(
+                                    serial_top1[0, position]
+                                ).item()
+                            ),
+                            "max_abs_logit_difference": float(
+                                per_position_max_abs[position].item()
+                            ),
+                            "mean_abs_logit_difference": float(
+                                per_position_mean_abs[position].item()
+                            ),
+                        }
+                        for position in range(comparable_positions)
+                    ],
+                }
 
         # These signatures reuse the target prefill that is required to obtain t0.
         # They add only vector comparisons and never run an extra target forward.
@@ -3150,7 +3282,10 @@ class SpecVLAforActionPrediction(nn.Module):
                     .detach()
                     .cpu()
                     .tolist()
-                    if self.dflash_profile_stages
+                    if (
+                        self.dflash_profile_stages
+                        or self.dflash_debug_compare_target_ar
+                    )
                     else None
                 ),
                 "target_ar_reference_tokens": (
@@ -4097,6 +4232,7 @@ class SpecVLAforActionPrediction(nn.Module):
                 self.dflash_temporal_prefill_tree_min_history
             ),
             "temporal_prefill_fusion_record": prefill_fusion_record,
+            "vtpf_parity_record": vtpf_parity_record,
             "temporal_hold_decision_record": temporal_hold_decision_record,
             "verify_skip_min_temporal_cosine": self.dflash_verify_skip_min_temporal_cosine,
             "verify_skip_min_stable_actions": self.dflash_verify_skip_min_stable_actions,
@@ -4166,7 +4302,10 @@ class SpecVLAforActionPrediction(nn.Module):
             "per_position": per_position_stats,
             "final_action_tokens": (
                 final_action_tokens[0].detach().cpu().tolist()
-                if self.dflash_profile_stages
+                if (
+                    self.dflash_profile_stages
+                    or self.dflash_debug_compare_target_ar
+                )
                 else None
             ),
             "target_ar_reference_tokens": (

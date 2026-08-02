@@ -1,0 +1,179 @@
+{
+  "schema_version": 1,
+  "git_commit": "b9704b484d63e219f760fdf8dd79643f81d9767a",
+  "git_status_porcelain": "M openvla/experiments/robot/libero/run_libero_goal_Spec.py\n M openvla/experiments/robot/libero/run_libero_goal_Spec_Relaxed.py\n M openvla/experiments/robot/openvla_utils.py\n M openvla/prismatic/extern/hf/modeling_speculation.py\n M openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh\n M openvla/specdecoding/model/temporal_hold.py\n M openvla/specdecoding/tests/test_temporal_hold.py\n?? artifacts/evidence/p0/goal/20260802T_cf_fullpilot/\n?? artifacts/evidence/p0/goal/20260802T_cf_replaypilot/\n?? artifacts/evidence/p0/goal/20260802T_cf_seededpilot/\n?? artifacts/evidence/p0/goal/20260802T_cf_smoke2/\n?? artifacts/evidence/p0/goal/20260802T_p0_goal_n3/\n?? artifacts/evidence/p0/goal/20260802T_p0_smoke3/\n?? artifacts/evidence/p0/goal/20260802T_p0_smoke4/\n?? artifacts/evidence/p0/goal/20260802T_p0_smoke4_measured/\n?? artifacts/evidence/p0/spatial/20260802T_cf_spatial_n2/\n?? artifacts/evidence/p0/spatial/20260802T_p0_spatial_n3/\n?? artifacts/evidence/p0/spatial/20260802T_temporal2x2_smoke/\n?? artifacts/evidence/p0/spatial/20260802T_temporal2x2_spatial_n10/\n?? artifacts/evidence/p0/spatial/20260802T_temporal2x2_spatial_n50/\n?? openvla/specdecoding/decode-scripts/run_dflash_calibrated_suite_eval.sh\n?? openvla/specdecoding/decode-scripts/run_dflash_p0_temporal_2x2.sh\n?? openvla/specdecoding/decode-scripts/run_recoverability_calibration.sh\n?? openvla/specdecoding/evidence/build_recoverability_profile.py\n?? openvla/specdecoding/evidence/build_temporal_schedule_evidence.py\n?? openvla/specdecoding/evidence/recoverability_calibration.py\n?? openvla/specdecoding/evidence/run_recoverability_calibration.py\n?? openvla/specdecoding/evidence/run_temporal_schedule_p0.py\n?? openvla/specdecoding/evidence/temporal_schedule_design.py\n?? openvla/specdecoding/tests/test_recoverability_calibration.py\n?? openvla/specdecoding/tests/test_temporal_schedule_design.py",
+  "run_manifest": {
+    "schema_version": 1,
+    "config": {
+      "pretrained_checkpoint": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-spatial",
+      "output_dir": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/evidence/p0/spatial/20260802T_temporal2x2_spatial_n50/temporal_2x2",
+      "task_suite_name": "libero_spatial",
+      "task_id": 0,
+      "trial_start_index": 0,
+      "num_trials": 50,
+      "num_steps_wait": 10,
+      "seed": 7,
+      "center_crop": true,
+      "load_in_8bit": false,
+      "load_in_4bit": false,
+      "model_family": "openvla",
+      "use_spec": false,
+      "accept_threshold": 0,
+      "run_id_note": "p0-spatial-20260802T_temporal2x2_spatial_n50"
+    },
+    "task_description": "pick up the black bowl between the plate and the ramekin and place it on the plate",
+    "conditions": [
+      {
+        "name": "paced_constant",
+        "intervals": [
+          3,
+          2
+        ],
+        "harmonic": false
+      },
+      {
+        "name": "paced_harmonic",
+        "intervals": [
+          3,
+          2
+        ],
+        "harmonic": true
+      },
+      {
+        "name": "clustered_constant",
+        "intervals": [
+          3,
+          3,
+          2,
+          2
+        ],
+        "harmonic": false
+      },
+      {
+        "name": "clustered_harmonic",
+        "intervals": [
+          3,
+          3,
+          2,
+          2
+        ],
+        "harmonic": true
+      }
+    ],
+    "output_jsonl": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/evidence/p0/spatial/20260802T_temporal2x2_spatial_n50/temporal_2x2/temporal-2x2-p0-spatial-20260802T_temporal2x2_spatial_n50.jsonl",
+    "status": "complete",
+    "started_at_unix": 1785661611.5005774,
+    "records": 23657,
+    "last_record": {
+      "record_type": "episode",
+      "suite": "libero_spatial",
+      "task_id": 0,
+      "episode_index": 49,
+      "episode_seed": 49448,
+      "condition": "clustered_harmonic",
+      "intervals": [
+        3,
+        3,
+        2,
+        2
+      ],
+      "harmonic": true,
+      "success": true,
+      "steps": 72,
+      "target_calls": 29,
+      "target_rate": 0.4027777777777778,
+      "hold_1_count": 29,
+      "hold_2_count": 14
+    },
+    "finished_at_unix": 1785663650.6581032
+  },
+  "inputs": [
+    {
+      "source": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/evidence/p0/spatial/20260802T_temporal2x2_spatial_n50/temporal_2x2/temporal-2x2-p0-spatial-20260802T_temporal2x2_spatial_n50.jsonl",
+      "source_bytes": 17287752,
+      "source_sha256": "a9a986b3d9d56e9ca79ce2f4d0022cf85705e6e5b5c063b46037d6355c82d984",
+      "archive": "artifacts/evidence/p0/spatial/20260802T_temporal2x2_spatial_n50/temporal_2x2/raw/temporal-2x2-p0-spatial-20260802T_temporal2x2_spatial_n50.jsonl.gz",
+      "archive_bytes": 1546595,
+      "archive_sha256": "5445b9d8563950510f90bb39673f48a3de03168094b007322fb51032fb659408"
+    },
+    {
+      "source": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/evidence/p0/spatial/20260802T_temporal2x2_spatial_n50/temporal_2x2/temporal-2x2-p0-spatial-20260802T_temporal2x2_spatial_n50-manifest.json",
+      "source_bytes": 2134,
+      "source_sha256": "ff3cd495b6ce279e43325e89d1f70ef195b77f071064b0a5403a2f0c817e72d4",
+      "archive": "artifacts/evidence/p0/spatial/20260802T_temporal2x2_spatial_n50/temporal_2x2/raw/temporal-2x2-p0-spatial-20260802T_temporal2x2_spatial_n50-manifest.json.gz",
+      "archive_bytes": 801,
+      "archive_sha256": "659b69b24c58ac81f4b86c8ce0725d32244740f83a1255999f1f5e5c46c1c786"
+    }
+  ],
+  "counts": {
+    "steps": 23457,
+    "episodes": 200
+  },
+  "conditions": [
+    {
+      "condition": "low_discrepancy_linear",
+      "condition_label": "Low-discrepancy / linear",
+      "episodes": 50,
+      "successes": 38,
+      "success_rate": 0.76,
+      "success_ci_low": 0.64,
+      "success_ci_high": 0.88,
+      "mean_steps": 120.52,
+      "mean_target_rate": 0.4019879216585291,
+      "mean_target_calls": 48.38,
+      "mean_correction_l2": 0.3421883329491758,
+      "p95_correction_l2": 0.9579199265827627,
+      "mean_h1_correction_l2": 0.2982758810795179,
+      "mean_h2_correction_l2": 0.3853291015642204
+    },
+    {
+      "condition": "low_discrepancy_critical",
+      "condition_label": "Low-discrepancy / critical",
+      "episodes": 50,
+      "successes": 43,
+      "success_rate": 0.86,
+      "success_ci_low": 0.76,
+      "success_ci_high": 0.94,
+      "mean_steps": 117.5,
+      "mean_target_rate": 0.40124012100892964,
+      "mean_target_calls": 47.12,
+      "mean_correction_l2": 0.379786472531364,
+      "p95_correction_l2": 0.817909106827211,
+      "mean_h1_correction_l2": 0.2688272018430826,
+      "mean_h2_correction_l2": 0.4884598869994576
+    },
+    {
+      "condition": "max_concentration_linear",
+      "condition_label": "Max-concentration / linear",
+      "episodes": 50,
+      "successes": 39,
+      "success_rate": 0.78,
+      "success_ci_low": 0.66,
+      "success_ci_high": 0.88,
+      "mean_steps": 120.38,
+      "mean_target_rate": 0.4006576162640246,
+      "mean_target_calls": 48.2,
+      "mean_correction_l2": 0.33658075524892617,
+      "p95_correction_l2": 0.9297238156761986,
+      "mean_h1_correction_l2": 0.297260460219577,
+      "mean_h2_correction_l2": 0.374269502766684
+    },
+    {
+      "condition": "max_concentration_critical",
+      "condition_label": "Max-concentration / critical",
+      "episodes": 50,
+      "successes": 44,
+      "success_rate": 0.88,
+      "success_ci_low": 0.78,
+      "success_ci_high": 0.96,
+      "mean_steps": 110.74,
+      "mean_target_rate": 0.40160510005843597,
+      "mean_target_calls": 44.44,
+      "mean_correction_l2": 0.3662596586027606,
+      "p95_correction_l2": 0.758417612640809,
+      "mean_h1_correction_l2": 0.27413703792017385,
+      "mean_h2_correction_l2": 0.4548871121049782
+    }
+  ],
+  "interpretation": "Temporal regularity and authority growth are paired on identical initial states. Both schedules share one target-call budget and one integer gap multiset; they are the minimum-prefix-discrepancy and maximum-concentration extremizers. Inference latency is descriptive; the mechanism endpoints are task success and next-target correction."
+}

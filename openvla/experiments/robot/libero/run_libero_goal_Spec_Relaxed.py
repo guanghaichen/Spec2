@@ -152,6 +152,12 @@ class GenerateConfig:
     dflash_temporal_adaptive_min_verified_run: int = 2
     dflash_temporal_adaptive_max_anchor_pixel_relative_l2: float = 0.03
     dflash_temporal_hold_action_decay: str = "none"
+    dflash_temporal_schedule_period: int = 1
+    dflash_temporal_schedule_target_count: int = 1
+    dflash_temporal_schedule_offsets: str = ""
+    dflash_temporal_schedule_phase: float = -1.0
+    dflash_temporal_authority_exponent: float = 1.0
+    dflash_temporal_depth_visual_bounds: str = ""
     dflash_temporal_prefill_tree: bool = False
     dflash_temporal_prefill_tree_max_candidates: int = 3
     dflash_temporal_prefill_tree_min_history: int = 2

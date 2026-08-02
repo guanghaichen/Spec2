@@ -2,7 +2,11 @@ import unittest
 
 from openvla.specdecoding.model.temporal_hold import (
     decide_temporal_hold,
+    mechanical_target_due,
     normalize_temporal_hold_policy,
+    parse_depth_visual_bounds,
+    parse_target_offsets,
+    periodic_target_due,
     settle_extension_debt,
     temporal_hold_action_scale,
 )
@@ -31,6 +35,7 @@ class TemporalHoldPolicyTest(unittest.TestCase):
             normalize_temporal_hold_policy("visual-budget"), "visual_budget"
         )
         self.assertEqual(normalize_temporal_hold_policy("paced-budget"), "paced_budget")
+        self.assertEqual(normalize_temporal_hold_policy("risk-calibrated"), "calibrated")
         with self.assertRaises(ValueError):
             normalize_temporal_hold_policy("unbounded")
 
@@ -158,6 +163,60 @@ class TemporalHoldPolicyTest(unittest.TestCase):
         self.assertEqual(temporal_hold_action_scale("inverse_age", 2), 0.5)
         with self.assertRaises(ValueError):
             temporal_hold_action_scale("learned", 2)
+
+    def test_mechanical_sequence_minimizes_prefix_discrepancy(self):
+        decisions = [
+            mechanical_target_due(control_step=step, period=10, target_count=4)
+            for step in range(10)
+        ]
+        self.assertEqual(
+            [index for index, selected in enumerate(decisions) if selected],
+            [0, 3, 5, 8],
+        )
+        self.assertEqual(sum(decisions), 4)
+
+    def test_periodic_schedule_replays_frozen_offsets(self):
+        offsets = parse_target_offsets("0,3,5,8")
+        decisions = [
+            periodic_target_due(
+                control_step=step, period=10, target_offsets=offsets
+            )
+            for step in range(20)
+        ]
+        self.assertEqual(
+            [index for index, due in enumerate(decisions) if due],
+            [0, 3, 5, 8, 10, 13, 15, 18],
+        )
+        self.assertEqual(parse_target_offsets("None"), tuple())
+
+    def test_calibrated_policy_obeys_schedule_and_visual_bound(self):
+        target = self._decide(
+            policy="calibrated",
+            schedule_target_due=True,
+            calibrated_visual_bound=0.05,
+        )
+        self.assertFalse(target.allow)
+        self.assertEqual(target.reason, "scheduled_regrounding")
+
+        hold = self._decide(
+            policy="calibrated",
+            schedule_target_due=False,
+            calibrated_visual_bound=0.05,
+            anchor_pixel_relative_l2=0.03,
+        )
+        self.assertTrue(hold.allow)
+        self.assertEqual(hold.reason, "calibrated_open_loop")
+
+    def test_power_law_authority_uses_configured_exponent(self):
+        self.assertAlmostEqual(
+            temporal_hold_action_scale("power_law", 2, exponent=0.5),
+            2 ** -0.5,
+        )
+
+    def test_depth_visual_bounds_preserve_unbounded_depths(self):
+        self.assertEqual(parse_depth_visual_bounds("inf,0.15"), (None, 0.15))
+        self.assertEqual(parse_depth_visual_bounds(""), tuple())
+        self.assertEqual(parse_depth_visual_bounds("None"), tuple())
 
 if __name__ == "__main__":
     unittest.main()

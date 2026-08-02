@@ -4,11 +4,12 @@
 前提下，提高 LIBERO 动作解码速度。
 
 当前训练主线是独立的一层 Minimal Draft：保留完整目标上下文、multi-anchor、Hidden/Cos 和小权重 Soft KL，
-不再默认依赖 Action-RNN。当前推理主线分为三档：strict 使用验证式时序 Prefill 融合（VTPF）；balanced
-relaxed 使用单步目标锚定时序降采样（VTPF-TD-Fast）；high-speed relaxed 使用 VTPF-PacedHarmonic。
-PacedHarmonic 以 `T-H-H,T-H` 节拍约束长期 target 调用密度，并把第二次 hold 的连续动作增量缩放为一半，
-从而把“多久查询 target”和“陈旧动作执行多大”解耦。动作组宽松校验、DDTree、时序多候选 Prefill 树、
-短前缀认证和单独 VisualBudget 均保留为消融。所有模块仍必须同时接受成功率、Length 和端到端 Speedup 检验。
+不再默认依赖 Action-RNN。当前推理主线由三个连续算子组成：块并行 Draft、验证式时序 Prefill 融合
+（VTPF），以及恢复风险约束的时序控制。第三个算子不在代码中固定某个 Goal 节拍：公共候选生成器从统一
+时间分辨率自动构造目标调用预算、预算等价的重锚定排列和幂律动作权限；每个 LIBERO 子集使用相同的
+配对闭环风险准则独立选择并冻结 profile，正式推理只读取该 profile。PacedHarmonic 是推动这一一般化设计的
+历史发现配置，不再作为跨子集预设。动作组宽松校验、DDTree、时序多候选 Prefill 树、短前缀认证和视觉门
+均保留为消融。所有模块仍必须同时接受成功率、Length、target 调用率和端到端 Speedup 检验。
 
 代码基于 [SpecVLA](https://github.com/PineTreeWss/SpecVLA)，而 SpecVLA 又基于
 [OpenVLA](https://github.com/openvla/openvla)。当前仓库仍是研究代码，不是已经定稿的公开复现包。
@@ -28,9 +29,9 @@ paper-wrapped AR 分母。Golden 行使用 e200，Minimal 行使用独立的一�
 | SpecVLA relaxed (`r=9`) | 近似接受 | 0.734 | 0.141228s | 1.294x | 2.361 |
 | **Golden + VTPF strict** | **target-verified** | **0.790** | **0.142036s** | **1.286x** | **2.422** |
 | **Golden + VTPF-TD-Fast** | **单步时序近似** | **0.754** | **0.070050s** | **2.608x** | **3.653** |
-| **Minimal e100 + VTPF-PacedHarmonic** | **节拍谐波时序近似** | **0.746** | **0.052448s** | **3.484x** | **3.614** |
+| **Minimal e100 + 发现配置** | **恢复式时序近似** | **0.746** | **0.052448s** | **3.484x** | **3.614** |
 
-Minimal e100 `VTPF-PacedHarmonic` 已完成 500-episode 正式评测：SR `373/500=0.746`、mean
+Minimal e100 的发现配置已完成 500-episode 评测：SR `373/500=0.746`、mean
 `0.052448s`、**3.484x**、Length `3.614`。相对相同 500 个初始状态上的 AR，成功率点估计为 `+0.4`
 个百分点，精确 McNemar `p=0.934`；严谨结论是“本次未观察到成功率下降”，不是等价性证明。相对
 VisualBudget `p=0.15`，成功率提高 `7.4` 个百分点且配对检验显著（`p=0.00215`），同时保留 3x 以上速度。
@@ -40,13 +41,64 @@ VisualBudget `p=0.15`，成功率提高 `7.4` 个百分点且配对检验显著�
 `1.295x` 的 VTPF strict 和 `2.534x` 的 VTPF-TD-Fast；这证明当前主性能并不依赖 Action-RNN、跨 Anchor
 蒸馏或 Domino 交接。完整数字和训练时长结论见 6.13。
 
-PacedHarmonic 的原始日志、逐动作 timing、summary、配对统计、筛选/留出诊断、launcher 快照、checkpoint
+该发现配置的原始日志、逐动作 timing、summary、配对统计、筛选/留出诊断、launcher 快照、checkpoint
 配置、环境身份和 SHA-256 固化在
 [`artifacts/eval/libero_goal/vtpf_paced_harmonic_e100_20260731`](artifacts/eval/libero_goal/vtpf_paced_harmonic_e100_20260731)。
 此前 Golden、SpecVLA 和 AR 证据仍保存在
 [`artifacts/eval/curated_20260720_20260728`](artifacts/eval/curated_20260720_20260728)；README 表格只是可读摘要。
 
-当前有六条必须隔离理解的实验线：
+### 当前一般化协议：候选族、校准、冻结测试
+
+同一算法在四个子集上执行以下流程，suite-specific 的只有目标权重、Draft 权重和校准后生成的 JSON：
+
+1. 公共时间分辨率 `P` 与允许的 target 密度范围自动产生合法调用数 `M`。
+2. 对每个 `(P,M)`，从最近均匀的整数间隔多重集构造最小前缀差异和最大时间聚集两个数学极值；两者
+   具有完全相同的 target 数、最大 hold 深度与深度直方图，重合时自动去重。
+3. 每个时序排列与分辨率控制的幂律权限指数网格做组合，形成对所有子集相同的有限候选族。
+4. 在相同初始状态与随机种子上成对运行 wrapped target 和每个候选，伤害事件定义为
+   `target 成功且 candidate 失败`。
+5. 对所有非参考候选计算 Bonferroni 校正的单侧 Clopper--Pearson 上界；仅在上界不超过风险预算的
+   可行配置中选择实测 target 调用率最低者。原始 JSONL、manifest、候选统计、证据 SHA-256 和最终
+   profile 一并保存。
+6. 独立测试只加载冻结 profile，禁止跨 suite 复用，也不再读取测试成功率调参。
+
+建议论文协议把每个 task 的初始状态 `0..4` 作为 calibration，`5..49` 作为 test；AR、SpecVLA 和本文方法
+都必须在相同 45 个测试状态上重算。下面在 4090 推理机执行 Spatial 示例，换 suite 时只改
+`TASK_SUITE_NAME` 和对应 `SPEC_CKPT`：
+
+```bash
+cd /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/SpecVLA-DFLASH
+source /home/asus/miniconda3/etc/profile.d/conda.sh
+conda activate specvla
+
+# 10 个 task x 每 task 5 个 calibration state；其它候选族参数默认全 suite 共用。
+CUDA_VISIBLE_DEVICES=0 TASK_SUITE_NAME=libero_spatial \
+  CALIBRATION_TASK_IDS=0,1,2,3,4,5,6,7,8,9 CALIBRATION_TRIALS=5 \
+  CALIBRATION_SCHEDULE_RESOLUTION=10 CALIBRATION_MAX_HOLD_DEPTH=2 \
+  CALIBRATION_MIN_TARGET_DENSITY=0.30 CALIBRATION_MAX_TARGET_DENSITY=0.50 \
+  CALIBRATION_MIN_AUTHORITY_EXPONENT=0 CALIBRATION_MAX_AUTHORITY_EXPONENT=1 \
+  CALIBRATION_NUM_AUTHORITY_EXPONENTS=3 CALIBRATION_RISK_BUDGET=0.10 \
+  bash openvla/specdecoding/decode-scripts/run_recoverability_calibration.sh
+
+# 找到上一步唯一生成的冻结 profile；路径中包含 suite 和 run stamp。
+PROFILE=$(find /media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/calibration/spatial \
+  -path '*/profile/libero_spatial-*.json' -type f | sort | tail -n 1)
+
+# 只评估未参与校准的 state 5..49；profile 会拒绝 suite 不一致。
+CUDA_VISIBLE_DEVICES=0 TASK_SUITE_NAME=libero_spatial \
+  SPEC_CKPT=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/Draft_checkpoint/spatial/epoch_100_step_062200 \
+  CALIBRATED_PROFILE="$PROFILE" EVAL_EPOCH=100 \
+  TRIAL_START_INDEX=5 NUM_TRIALS_PER_TASK=45 \
+  bash openvla/specdecoding/decode-scripts/run_dflash_calibrated_suite_eval.sh
+```
+
+正式 profile 的 `selected_configuration` 会完整记录 `schedule_period`、`schedule_target_count`、
+`schedule_offsets`、`authority_exponent` 和 `max_consecutive_holds`。评测 summary 也重复写入这些字段，确保
+结果可以从日志反推到唯一配置。`target_reference` 始终是保底可行点；若样本不足以证明更快候选满足风险
+预算，求解器返回 reference，而不是放宽统计规则。
+
+下面六条是发现阶段必须隔离理解的实验线，用于保存负结果与历史复现；当前一般化算法不等同于其中任一
+固定入口：
 
 - **Golden reference**：复杂版一层 Draft + Action-RNN + 跨 Anchor + Domino 交接，其 epoch 200 配合
   VTPF strict 得到目前已固化的最好正式结果。代码状态以 tag `golden-vtpf-e200-20260726` 为准，权重和旧
@@ -105,6 +157,14 @@ PacedHarmonic 的原始日志、逐动作 timing、summary、配对统计、筛�
 | VTPF-TD 节拍预算消融 | `openvla/specdecoding/decode-scripts/run_dflash_vtpf_paced_budget_goal_eval.sh` | 第二次 hold 后偿还 target 债务，形成 `T-H-H,T-H` 节拍 |
 | **VTPF-PacedHarmonic 主入口** | `openvla/specdecoding/decode-scripts/run_dflash_vtpf_paced_harmonic_goal_eval.sh` | `stable=1` 严格 prefill 候选 + 节拍预算 + 第二 hold 谐波缩放 |
 | 自适应 hold 决策 | `openvla/specdecoding/model/temporal_hold.py` | 无 CUDA 依赖的固定/风险受限策略与硬上限，可独立单测 |
+| **统一恢复校准入口** | `openvla/specdecoding/decode-scripts/run_recoverability_calibration.sh` | 在一个 suite 的配对状态上生成公共候选族、运行完整闭环并冻结风险受限 profile |
+| **冻结 profile 评测** | `openvla/specdecoding/decode-scripts/run_dflash_calibrated_suite_eval.sh` | 读取 suite-specific profile，拒绝跨子集复用，并驱动同一在线时序控制器 |
+| 通用时序调度代数 | `openvla/specdecoding/evidence/temporal_schedule_design.py` | 对任意 `(P,M)` 构造预算等价的间隔多重集与规范极值，不包含具体 suite 或固定节拍 |
+| 配对因子实验设计 | `openvla/specdecoding/evidence/temporal_factorial_design.py` | 仅保存 Spatial 机制实验的匹配预算，与在线候选生成器隔离 |
+| 候选族与风险上界 | `openvla/specdecoding/evidence/recoverability_calibration.py` | 预算导出的排列族、权限网格、Bonferroni--Clopper--Pearson 上界和可行解选择 |
+| 配对校准运行器 | `openvla/specdecoding/evidence/run_recoverability_calibration.py` | 同初始状态/种子的 target 与候选完整闭环 rollout |
+| Profile 构建器 | `openvla/specdecoding/evidence/build_recoverability_profile.py` | 汇总单侧伤害、选择最低 target-rate 可行点并记录证据哈希 |
+| P0 配对因子实验 | `openvla/specdecoding/decode-scripts/run_dflash_p0_temporal_2x2.sh` | 同 target 预算下识别时序排列与权限增长的主效应及交互效应 |
 | 短前缀认证消融 | `openvla/specdecoding/decode-scripts/run_dflash_vtpf_prefix_cert_goal_eval.sh` | target 精确认证短前缀后信任尾部；当前净收益很小 |
 | 时序门校准 | `openvla/specdecoding/test-speed/analyze_dflash_temporal_shadow.py` | 从 shadow summary 统计覆盖、错误和 95% 风险上界 |
 | P0 成本/持久性/验证审计 | `openvla/specdecoding/decode-scripts/run_dflash_p0_evidence.sh` | 成对生成逐阶段耗时、时序冗余、fused-vs-serial 审计和 ICLR 规格图表 |
@@ -2122,8 +2182,8 @@ bash openvla/specdecoding/decode-scripts/run_dflash_p0_counterfactual.sh goal
 
 因此，论文的可辩护观察应写成“target 动作具有显著的短时连续空间局部性”，而不是“相邻动作大多完全相同”。
 VTPF 应准确称为 `target-verifier strict`；它对 fused 序列执行 target 前缀裁决，但不能写成逐 token KV-cache
-AR 的 bitwise 等价。正式主张仍需扩展到更多 task、seed，并补齐同 target 预算的 Paced 消融、同 schedule 的
-Harmonic 消融和独立 calibration/test 风险上界。
+AR 的 bitwise 等价。正式主张仍需扩展到更多 task、seed；同 target 预算的时序排列与权限增长配对实验已经
+完成，下一项硬证据是四个 suite 的独立 calibration/test 风险上界。
 
 Spatial task-0 还完成了一轮确定性同状态分叉 pilot：选取 1 条 target 成功轨迹、2 个冻结状态，对
 6 种候选和深度 1–3 共执行 36 个分支。`current_target_path` 的 6 个正对照全部通过，重放到分叉点的
@@ -2132,6 +2192,21 @@ simulator-state 最大误差为 0。滞后一步 target 动作在该轨迹的所
 常幅滞后动作的末端位置/旋转偏差为 `0.00592/0.02231`，谐波缩放为 `0.00838/0.02875`。
 因此当前 P0 支持“短时可恢复域值得研究”，却暂不支持“Harmonic 必然降低物理偏移”。该负证据已原样
 固化在 `artifacts/evidence/p0/spatial/20260802T_cf_spatial_physics_n2/counterfactual/`。
+
+随后在 Spatial task-0 的相同 50 个初始状态上完成了时序排列 × 权限增长的配对因子实验。四个条件的
+target 调用率均为约 `0.40`：
+
+| 同预算排列 / 权限 | 成功数 | SR |
+|---|---:|---:|
+| 最小前缀差异 / 线性累计 | 38/50 | 0.76 |
+| 最小前缀差异 / 临界累计 | 43/50 | 0.86 |
+| 最大时间聚集 / 线性累计 | 39/50 | 0.78 |
+| 最大时间聚集 / 临界累计 | 44/50 | 0.88 |
+
+临界权限的边际配对效应为 `+0.10`，episode-cluster bootstrap 95% 区间 `[+0.02,+0.19]`；时序排列效应为
+`-0.02[-0.10,+0.05]`，交互点估计为 0。结论不是选择某条固定节拍，而是：权限增长律得到正向证据，
+重锚定排列没有跨任务普适优胜者，必须进入统一风险校准。原始记录、配对表和论文图位于
+`artifacts/evidence/p0/spatial/20260802T_temporal2x2_spatial_n50/temporal_2x2/`。
 
 本轮两个主证据包分别位于
 `artifacts/evidence/p0/goal/20260802T_p0_goal_ar_n6b/` 和
@@ -2149,7 +2224,7 @@ OpenVLA-OFT 已经并行输出动作，不适合直接套用 action-token specul
 
 ## 12. 重要限制
 
-- 当前只训练了 LIBERO-Goal draft，不能拿同一权重评测其它 suite。
+- 当前已有 Goal 与 Spatial 的独立 draft；Object 与 LIBERO-10 仍必须训练各自权重，任何 suite 都不得跨用 Draft。
 - teacher-forced accuracy 可能严重高估在线能力。
 - Length 高不保证 Speedup 高；必须计算草稿头和校验树开销。
 - relaxed acceptance 不是 strict lossless，必须报告阈值与成功率。

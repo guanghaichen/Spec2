@@ -8,6 +8,7 @@ expensive multimodal prefill starts.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Optional
 
 
@@ -35,11 +36,14 @@ def normalize_temporal_hold_policy(value) -> str:
         "visual-budget": "visual_budget",
         "paced_budget": "paced_budget",
         "paced-budget": "paced_budget",
+        "calibrated": "calibrated",
+        "risk_calibrated": "calibrated",
+        "risk-calibrated": "calibrated",
     }
     if normalized not in aliases:
         raise ValueError(
             "dflash_temporal_hold_policy must be 'fixed', 'adaptive', "
-            "'visual_budget', or 'paced_budget'."
+            "'visual_budget', 'paced_budget', or 'calibrated'."
         )
     return aliases[normalized]
 
@@ -64,16 +68,88 @@ class TemporalHoldDecision:
         }
 
 
-def temporal_hold_action_scale(mode: str, hold_depth: int) -> float:
+def mechanical_target_due(
+    *, control_step: int, period: int, target_count: int, phase: Optional[float] = None
+) -> bool:
+    """Return the minimum-prefix-discrepancy target decision at one step."""
+    period = int(period)
+    target_count = int(target_count)
+    control_step = max(0, int(control_step))
+    if period <= 0 or target_count <= 0 or target_count > period:
+        raise ValueError("Require 0 < target_count <= period.")
+    density = target_count / period
+    phase = 1.0 - density if phase is None or float(phase) < 0.0 else float(phase)
+    if not 0.0 <= phase < 1.0:
+        raise ValueError("Mechanical-sequence phase must lie in [0, 1).")
+    return math.floor((control_step + 1) * density + phase) > math.floor(
+        control_step * density + phase
+    )
+
+
+def parse_target_offsets(value) -> tuple[int, ...]:
+    """Parse one period's target-frame offsets from a comma-separated value."""
+    normalized_value = "" if value is None else str(value).strip()
+    if normalized_value.lower() in {"", "none", "null", "off", "mechanical"}:
+        return tuple()
+    offsets = tuple(
+        int(item.strip()) for item in normalized_value.split(",") if item.strip()
+    )
+    if any(offset < 0 for offset in offsets) or len(set(offsets)) != len(offsets):
+        raise ValueError("Target offsets must be distinct non-negative integers.")
+    return tuple(sorted(offsets))
+
+
+def periodic_target_due(
+    *, control_step: int, period: int, target_offsets: tuple[int, ...]
+) -> bool:
+    """Return whether a calibrated periodic schedule calls the target now."""
+    period = int(period)
+    if period <= 0:
+        raise ValueError("Schedule period must be positive.")
+    offsets = tuple(int(value) for value in target_offsets)
+    if not offsets:
+        raise ValueError("A periodic schedule needs at least one target offset.")
+    if offsets[0] < 0 or offsets[-1] >= period or len(set(offsets)) != len(offsets):
+        raise ValueError("Target offsets must be unique and lie inside the period.")
+    return max(0, int(control_step)) % period in set(offsets)
+
+
+def parse_depth_visual_bounds(value) -> tuple[Optional[float], ...]:
+    """Parse comma-separated per-depth visual bounds; `inf` disables a bound."""
+    normalized_value = "" if value is None else str(value).strip()
+    if normalized_value.lower() in {"", "none", "null", "off"}:
+        return tuple()
+    bounds = []
+    for item in normalized_value.split(","):
+        normalized = item.strip().lower()
+        if normalized in {"inf", "infinity", "none", "off"}:
+            bounds.append(None)
+            continue
+        bound = float(normalized)
+        if bound < 0.0 or not math.isfinite(bound):
+            raise ValueError("Finite visual bounds must be non-negative.")
+        bounds.append(bound)
+    return tuple(bounds)
+
+
+def temporal_hold_action_scale(
+    mode: str, hold_depth: int, exponent: float = 1.0
+) -> float:
     """Return a bounded continuous-action scale for an aged held command."""
     normalized = str(mode or "none").strip().lower()
     if normalized == "none":
         return 1.0
-    if normalized != "inverse_age":
+    if normalized == "inverse_age":
+        exponent = 1.0
+    elif normalized != "power_law":
         raise ValueError(
-            "dflash_temporal_hold_action_decay must be 'none' or 'inverse_age'."
+            "dflash_temporal_hold_action_decay must be 'none', 'inverse_age', "
+            "or 'power_law'."
         )
-    return 1.0 / max(1, int(hold_depth))
+    exponent = float(exponent)
+    if exponent < 0.0:
+        raise ValueError("Power-law authority exponent must be non-negative.")
+    return max(1, int(hold_depth)) ** (-exponent)
 
 
 def decide_temporal_hold(
@@ -87,6 +163,8 @@ def decide_temporal_hold(
     anchor_pixel_relative_l2: Optional[float],
     adaptive_max_anchor_pixel_relative_l2: float,
     extension_budget_available: bool = True,
+    schedule_target_due: bool = False,
+    calibrated_visual_bound: Optional[float] = None,
 ) -> TemporalHoldDecision:
     """Apply the fixed or risk-bounded hold policy.
 
@@ -121,6 +199,39 @@ def decide_temporal_hold(
     if consecutive_holds >= int(max_consecutive_holds):
         return TemporalHoldDecision(
             False, "max_consecutive_reached", hold_depth, False, anchor_pixel_relative_l2
+        )
+    if policy == "calibrated":
+        if schedule_target_due:
+            return TemporalHoldDecision(
+                False,
+                "scheduled_regrounding",
+                hold_depth,
+                False,
+                anchor_pixel_relative_l2,
+            )
+        if calibrated_visual_bound is not None:
+            if anchor_pixel_relative_l2 is None:
+                return TemporalHoldDecision(
+                    False,
+                    "missing_anchor_visual_signal",
+                    hold_depth,
+                    False,
+                    None,
+                )
+            if float(anchor_pixel_relative_l2) > float(calibrated_visual_bound):
+                return TemporalHoldDecision(
+                    False,
+                    "anchor_visual_drift",
+                    hold_depth,
+                    False,
+                    anchor_pixel_relative_l2,
+                )
+        return TemporalHoldDecision(
+            True,
+            "calibrated_open_loop",
+            hold_depth,
+            hold_depth > 1,
+            anchor_pixel_relative_l2,
         )
     if policy == "fixed":
         return TemporalHoldDecision(

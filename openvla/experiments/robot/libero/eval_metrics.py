@@ -1103,6 +1103,24 @@ def write_eval_summary(
         "dflash_temporal_hold_action_decay": getattr(
             cfg, "dflash_temporal_hold_action_decay", None
         ),
+        "dflash_temporal_schedule_period": getattr(
+            cfg, "dflash_temporal_schedule_period", None
+        ),
+        "dflash_temporal_schedule_target_count": getattr(
+            cfg, "dflash_temporal_schedule_target_count", None
+        ),
+        "dflash_temporal_schedule_offsets": getattr(
+            cfg, "dflash_temporal_schedule_offsets", None
+        ),
+        "dflash_temporal_schedule_phase": getattr(
+            cfg, "dflash_temporal_schedule_phase", None
+        ),
+        "dflash_temporal_authority_exponent": getattr(
+            cfg, "dflash_temporal_authority_exponent", None
+        ),
+        "dflash_temporal_depth_visual_bounds": getattr(
+            cfg, "dflash_temporal_depth_visual_bounds", None
+        ),
         "dflash_temporal_prefill_tree": getattr(
             cfg, "dflash_temporal_prefill_tree", None
         ),

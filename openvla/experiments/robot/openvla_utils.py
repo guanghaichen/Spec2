@@ -131,6 +131,24 @@ def get_vla(cfg):
             dflash_temporal_hold_action_decay=getattr(
                 cfg, "dflash_temporal_hold_action_decay", "none"
             ),
+            dflash_temporal_schedule_period=getattr(
+                cfg, "dflash_temporal_schedule_period", 1
+            ),
+            dflash_temporal_schedule_target_count=getattr(
+                cfg, "dflash_temporal_schedule_target_count", 1
+            ),
+            dflash_temporal_schedule_offsets=getattr(
+                cfg, "dflash_temporal_schedule_offsets", ""
+            ),
+            dflash_temporal_schedule_phase=getattr(
+                cfg, "dflash_temporal_schedule_phase", -1.0
+            ),
+            dflash_temporal_authority_exponent=getattr(
+                cfg, "dflash_temporal_authority_exponent", 1.0
+            ),
+            dflash_temporal_depth_visual_bounds=getattr(
+                cfg, "dflash_temporal_depth_visual_bounds", ""
+            ),
             dflash_temporal_prefill_tree=getattr(
                 cfg, "dflash_temporal_prefill_tree", False
             ),

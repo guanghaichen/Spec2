@@ -21,7 +21,11 @@ from openvla.specdecoding.model.dflash import (
 )# 导入dflash模型、从目标模型提取hidden的函数、从logits采样token的函数
 from openvla.specdecoding.model.temporal_hold import (
     decide_temporal_hold,
+    mechanical_target_due,
     normalize_temporal_hold_policy,
+    parse_depth_visual_bounds,
+    parse_target_offsets,
+    periodic_target_due,
     settle_extension_debt,
     temporal_hold_action_scale,
 )
@@ -653,6 +657,12 @@ class SpecVLAforActionPrediction(nn.Module):
             dflash_temporal_adaptive_min_verified_run=2,
             dflash_temporal_adaptive_max_anchor_pixel_relative_l2=0.03,
             dflash_temporal_hold_action_decay="none",
+            dflash_temporal_schedule_period=1,
+            dflash_temporal_schedule_target_count=1,
+            dflash_temporal_schedule_offsets="",
+            dflash_temporal_schedule_phase=-1.0,
+            dflash_temporal_authority_exponent=1.0,
+            dflash_temporal_depth_visual_bounds="",
             dflash_temporal_prefill_tree=False,
             dflash_temporal_prefill_tree_max_candidates=3,
             dflash_temporal_prefill_tree_min_history=2,
@@ -744,7 +754,49 @@ class SpecVLAforActionPrediction(nn.Module):
         self.dflash_temporal_hold_action_decay = str(
             dflash_temporal_hold_action_decay
         ).strip().lower()
-        temporal_hold_action_scale(self.dflash_temporal_hold_action_decay, 1)
+        self.dflash_temporal_schedule_period = int(
+            dflash_temporal_schedule_period
+        )
+        self.dflash_temporal_schedule_target_count = int(
+            dflash_temporal_schedule_target_count
+        )
+        self.dflash_temporal_schedule_offsets = parse_target_offsets(
+            dflash_temporal_schedule_offsets
+        )
+        self.dflash_temporal_schedule_phase = float(
+            dflash_temporal_schedule_phase
+        )
+        self.dflash_temporal_authority_exponent = float(
+            dflash_temporal_authority_exponent
+        )
+        self.dflash_temporal_depth_visual_bounds = parse_depth_visual_bounds(
+            dflash_temporal_depth_visual_bounds
+        )
+        temporal_hold_action_scale(
+            self.dflash_temporal_hold_action_decay,
+            1,
+            exponent=self.dflash_temporal_authority_exponent,
+        )
+        if self.dflash_temporal_schedule_offsets:
+            periodic_target_due(
+                control_step=0,
+                period=self.dflash_temporal_schedule_period,
+                target_offsets=self.dflash_temporal_schedule_offsets,
+            )
+            if (
+                len(self.dflash_temporal_schedule_offsets)
+                != self.dflash_temporal_schedule_target_count
+            ):
+                raise ValueError(
+                    "Schedule target count must equal the number of offsets."
+                )
+        else:
+            mechanical_target_due(
+                control_step=0,
+                period=self.dflash_temporal_schedule_period,
+                target_count=self.dflash_temporal_schedule_target_count,
+                phase=self.dflash_temporal_schedule_phase,
+            )
         if (
             self.dflash_temporal_hold_policy == "adaptive"
             and self.dflash_temporal_adaptive_min_verified_run < 2
@@ -911,6 +963,7 @@ class SpecVLAforActionPrediction(nn.Module):
         self._dflash_verified_action_run_length = 0
         self._dflash_consecutive_verify_skips = 0
         self._dflash_temporal_extension_debt = False
+        self._dflash_temporal_control_step = 0
 
         # Compute action bins
         self.bins = base_model.bins
@@ -1125,6 +1178,7 @@ class SpecVLAforActionPrediction(nn.Module):
         self._dflash_verified_action_run_length = 0
         self._dflash_consecutive_verify_skips = 0
         self._dflash_temporal_extension_debt = False
+        self._dflash_temporal_control_step = 0
 
     def _record_dflash_action_history(self, action_tokens: torch.LongTensor) -> None:
         """Keep two tiny CPU action records for the next temporal prefill."""
@@ -2260,6 +2314,7 @@ class SpecVLAforActionPrediction(nn.Module):
                 "adaptive",
                 "visual_budget",
                 "paced_budget",
+                "calibrated",
             }
         )
         current_pixel_signature = (
@@ -2302,8 +2357,12 @@ class SpecVLAforActionPrediction(nn.Module):
                 "adaptive",
                 "visual_budget",
                 "paced_budget",
+                "calibrated",
             }
-            and self._dflash_consecutive_verify_skips == 1
+            and (
+                self.dflash_temporal_hold_policy == "calibrated"
+                or self._dflash_consecutive_verify_skips == 1
+            )
             and current_pixel_signature is not None
             and self._dflash_last_target_pixel_signature is not None
             and current_pixel_signature.shape
@@ -2337,6 +2396,32 @@ class SpecVLAforActionPrediction(nn.Module):
             and self._dflash_verified_action_run_length
             >= self.dflash_verify_skip_min_stable_actions
         )
+        temporal_control_step = int(self._dflash_temporal_control_step)
+        schedule_target_due = False
+        if self.dflash_temporal_hold_policy == "calibrated":
+            if self.dflash_temporal_schedule_offsets:
+                schedule_target_due = periodic_target_due(
+                    control_step=temporal_control_step,
+                    period=self.dflash_temporal_schedule_period,
+                    target_offsets=self.dflash_temporal_schedule_offsets,
+                )
+            else:
+                schedule_target_due = mechanical_target_due(
+                    control_step=temporal_control_step,
+                    period=self.dflash_temporal_schedule_period,
+                    target_count=self.dflash_temporal_schedule_target_count,
+                    phase=self.dflash_temporal_schedule_phase,
+                )
+        self._dflash_temporal_control_step += 1
+        next_hold_depth = self._dflash_consecutive_verify_skips + 1
+        calibrated_visual_bound = None
+        if (
+            self.dflash_temporal_hold_policy == "calibrated"
+            and next_hold_depth <= len(self.dflash_temporal_depth_visual_bounds)
+        ):
+            calibrated_visual_bound = self.dflash_temporal_depth_visual_bounds[
+                next_hold_depth - 1
+            ]
         temporal_hold_decision = decide_temporal_hold(
             policy=self.dflash_temporal_hold_policy,
             base_eligible=base_temporal_hold_eligible,
@@ -2353,6 +2438,8 @@ class SpecVLAforActionPrediction(nn.Module):
             extension_budget_available=(
                 not self._dflash_temporal_extension_debt
             ),
+            schedule_target_due=schedule_target_due,
+            calibrated_visual_bound=calibrated_visual_bound,
         )
         temporal_hold_decision_record = temporal_hold_decision.as_record()
         temporal_hold_decision_record.update(
@@ -2373,6 +2460,9 @@ class SpecVLAforActionPrediction(nn.Module):
                 "extension_debt_before": bool(
                     self._dflash_temporal_extension_debt
                 ),
+                "temporal_control_step": temporal_control_step,
+                "schedule_target_due": schedule_target_due,
+                "calibrated_visual_bound": calibrated_visual_bound,
             }
         )
         temporal_prefill_bypass_active = temporal_hold_decision.allow
@@ -2416,6 +2506,18 @@ class SpecVLAforActionPrediction(nn.Module):
                 ),
                 "temporal_adaptive_max_anchor_pixel_relative_l2": (
                     self.dflash_temporal_adaptive_max_anchor_pixel_relative_l2
+                ),
+                "temporal_schedule_period": self.dflash_temporal_schedule_period,
+                "temporal_schedule_target_count": (
+                    self.dflash_temporal_schedule_target_count
+                ),
+                "temporal_schedule_offsets": self.dflash_temporal_schedule_offsets,
+                "temporal_schedule_phase": self.dflash_temporal_schedule_phase,
+                "temporal_authority_exponent": (
+                    self.dflash_temporal_authority_exponent
+                ),
+                "temporal_depth_visual_bounds": (
+                    self.dflash_temporal_depth_visual_bounds
                 ),
                 "temporal_hold_decision_record": temporal_hold_decision_record,
                 "temporal_prefill_bypass_record": {
@@ -4224,6 +4326,14 @@ class SpecVLAforActionPrediction(nn.Module):
                 self.dflash_temporal_adaptive_max_anchor_pixel_relative_l2
             ),
             "temporal_hold_action_decay": self.dflash_temporal_hold_action_decay,
+            "temporal_schedule_period": self.dflash_temporal_schedule_period,
+            "temporal_schedule_target_count": (
+                self.dflash_temporal_schedule_target_count
+            ),
+            "temporal_schedule_offsets": self.dflash_temporal_schedule_offsets,
+            "temporal_schedule_phase": self.dflash_temporal_schedule_phase,
+            "temporal_authority_exponent": self.dflash_temporal_authority_exponent,
+            "temporal_depth_visual_bounds": self.dflash_temporal_depth_visual_bounds,
             "temporal_prefill_tree": self.dflash_temporal_prefill_tree,
             "temporal_prefill_tree_max_candidates": (
                 self.dflash_temporal_prefill_tree_max_candidates
@@ -4503,6 +4613,7 @@ class SpecVLAforActionPrediction(nn.Module):
                 action_scale = temporal_hold_action_scale(
                     self.dflash_temporal_hold_action_decay,
                     hold_depth,
+                    exponent=self.dflash_temporal_authority_exponent,
                 )
                 if action_scale != 1.0:
                     actions = actions.copy()

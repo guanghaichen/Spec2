@@ -97,6 +97,33 @@ CUDA_VISIBLE_DEVICES=0 TASK_SUITE_NAME=libero_spatial \
 结果可以从日志反推到唯一配置。`target_reference` 始终是保底可行点；若样本不足以证明更快候选满足风险
 预算，求解器返回 reference，而不是放宽统计规则。
 
+四个子集正式校准使用同一条入口。该脚本不会为不同子集注入不同候选参数；它只切换对应的目标权重和
+校准初始状态，最后自动生成跨子集恢复地形与冻结配置表：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 \
+  CALIBRATION_SUITES=libero_goal,libero_object,libero_spatial,libero_10 \
+  CALIBRATION_RUN_STAMP=paper-cal-v1 \
+  bash openvla/specdecoding/decode-scripts/run_recoverability_all_suites.sh
+```
+
+四个子集 Draft 都训练完成并放入 `specvla-data/Draft_checkpoint/{goal,object,spatial,10}` 后，用同一个
+run stamp 在独立测试状态 `5..49` 上执行冻结评测：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 CALIBRATION_RUN_STAMP=paper-cal-v1 \
+  EVAL_SUITES=libero_goal,libero_object,libero_spatial,libero_10 \
+  TRIAL_START_INDEX=5 NUM_TRIALS_PER_TASK=45 \
+  bash openvla/specdecoding/decode-scripts/run_dflash_calibrated_all_suites_eval.sh
+```
+
+脚本要求每个子集恰好存在一个 `epoch_100_step_*`；若目录布局不同，可用
+`DFLASH_DRAFT_GOAL`、`DFLASH_DRAFT_OBJECT`、`DFLASH_DRAFT_SPATIAL`、`DFLASH_DRAFT_10` 分别提供绝对路径。
+
+正式运行前不得为某个子集单独覆盖 `CALIBRATION_SCHEDULE_*`、`CALIBRATION_*DENSITY*`、
+`CALIBRATION_*AUTHORITY*`、`CALIBRATION_RISK_BUDGET` 或 `CALIBRATION_ALPHA`；这些变量属于论文级公共协议。
+允许变化的只有 `TASK_SUITE_NAME` 自动选择的目标权重、校准 rollout 以及由求解器写出的 profile。
+
 下面六条是发现阶段必须隔离理解的实验线，用于保存负结果与历史复现；当前一般化算法不等同于其中任一
 固定入口：
 
@@ -158,6 +185,8 @@ CUDA_VISIBLE_DEVICES=0 TASK_SUITE_NAME=libero_spatial \
 | **VTPF-PacedHarmonic 主入口** | `openvla/specdecoding/decode-scripts/run_dflash_vtpf_paced_harmonic_goal_eval.sh` | `stable=1` 严格 prefill 候选 + 节拍预算 + 第二 hold 谐波缩放 |
 | 自适应 hold 决策 | `openvla/specdecoding/model/temporal_hold.py` | 无 CUDA 依赖的固定/风险受限策略与硬上限，可独立单测 |
 | **统一恢复校准入口** | `openvla/specdecoding/decode-scripts/run_recoverability_calibration.sh` | 在一个 suite 的配对状态上生成公共候选族、运行完整闭环并冻结风险受限 profile |
+| **四子集统一校准入口** | `openvla/specdecoding/decode-scripts/run_recoverability_all_suites.sh` | 对所有 suite 复用同一协议并自动生成跨子集恢复地形和冻结配置表 |
+| **四子集冻结测试入口** | `openvla/specdecoding/decode-scripts/run_dflash_calibrated_all_suites_eval.sh` | 自动匹配每个 suite 的 profile 与 Draft，在完全隔离的测试状态上运行 |
 | **冻结 profile 评测** | `openvla/specdecoding/decode-scripts/run_dflash_calibrated_suite_eval.sh` | 读取 suite-specific profile，拒绝跨子集复用，并驱动同一在线时序控制器 |
 | 通用时序调度代数 | `openvla/specdecoding/evidence/temporal_schedule_design.py` | 对任意 `(P,M)` 构造预算等价的间隔多重集与规范极值，不包含具体 suite 或固定节拍 |
 | 配对因子实验设计 | `openvla/specdecoding/evidence/temporal_factorial_design.py` | 仅保存 Spatial 机制实验的匹配预算，与在线候选生成器隔离 |

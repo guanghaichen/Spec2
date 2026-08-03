@@ -107,6 +107,22 @@ CUDA_VISIBLE_DEVICES=0 \
   bash openvla/specdecoding/decode-scripts/run_recoverability_all_suites.sh
 ```
 
+校准按 episode 向 JSONL 落盘，并支持停电或进程异常后的严格断点续跑。恢复时必须复用原来的
+`CALIBRATION_RUN_STAMP` 和全部协议参数，同时显式设置 `CALIBRATION_RESUME=True`：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 \
+  CALIBRATION_SUITES=libero_goal,libero_object,libero_spatial,libero_10 \
+  CALIBRATION_RUN_STAMP=paper-cal-v1 CALIBRATION_RESUME=True \
+  bash openvla/specdecoding/decode-scripts/run_recoverability_all_suites.sh
+```
+
+恢复器会先逐行校验 JSONL、拒绝残缺记录和重复的
+`(task_id, configuration, episode_index)`，再核对 manifest 中的候选族与所有不可变协议字段。已经完成的
+suite 只重建确定性的冻结 profile，不加载目标模型；未完成的 suite 从第一个缺失 episode 继续。参数或
+记录数不一致时程序直接退出，避免把两个实验静默混在同一目录。不要为恢复运行更换 run stamp，也不要手工
+删除 JSONL 中已经完成的记录。
+
 四个子集 Draft 都训练完成并放入 `specvla-data/Draft_checkpoint/{goal,object,spatial,10}` 后，用同一个
 run stamp 在独立测试状态 `5..49` 上执行冻结评测：
 

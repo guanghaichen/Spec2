@@ -14,6 +14,10 @@ export PYTHONPATH="${REPO_ROOT}:${REPO_ROOT}/openvla:${PYTHONPATH:-}"
 RUN_STAMP="${CALIBRATION_RUN_STAMP:-$(date -u +%Y%m%dT%H%M%SZ)}"
 OUTPUT_ROOT="${CALIBRATION_OUTPUT_ROOT:-$(dirname "${DEFAULT_LOG_DIR}")/calibration/${TASK_SUITE_SLUG}/${RUN_STAMP}}"
 RUN_NOTE="cal-${TASK_SUITE_SLUG}-${RUN_STAMP}"
+RESUME_ARGS=()
+if [[ "${CALIBRATION_RESUME:-False}" == "True" || "${CALIBRATION_RESUME:-False}" == "true" ]]; then
+  RESUME_ARGS+=(--resume True)
+fi
 
 python openvla/specdecoding/evidence/run_recoverability_calibration.py \
   --pretrained_checkpoint "${VLA_PATH}" \
@@ -31,7 +35,8 @@ python openvla/specdecoding/evidence/run_recoverability_calibration.py \
   --min_authority_exponent "${CALIBRATION_MIN_AUTHORITY_EXPONENT:-0.0}" \
   --max_authority_exponent "${CALIBRATION_MAX_AUTHORITY_EXPONENT:-1.0}" \
   --num_authority_exponents "${CALIBRATION_NUM_AUTHORITY_EXPONENTS:-3}" \
-  --run_id_note "${RUN_NOTE}"
+  --run_id_note "${RUN_NOTE}" \
+  "${RESUME_ARGS[@]}"
 
 RECORDS="${OUTPUT_ROOT}/raw/recoverability-calibration-${RUN_NOTE}.jsonl"
 MANIFEST="${OUTPUT_ROOT}/raw/recoverability-calibration-${RUN_NOTE}-manifest.json"

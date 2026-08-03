@@ -14,6 +14,7 @@ from libero.libero import benchmark
 from experiments.robot.libero.libero_utils import (
     get_libero_dummy_action,
     get_libero_env,
+    get_libero_image,
 )
 from experiments.robot.openvla_utils import get_processor
 from experiments.robot.robot_utils import (
@@ -60,6 +61,9 @@ class CalibrationRunConfig:
     min_authority_exponent: float = 0.0
     max_authority_exponent: float = 1.0
     num_authority_exponents: int = 3
+    reference_only: bool = False
+    context_trace: bool = False
+    context_trace_max_lag: int = 3
     run_id_note: Optional[str] = None
     resume: bool = False
 
@@ -127,12 +131,15 @@ def validate_resume_manifest(
         "min_authority_exponent",
         "max_authority_exponent",
         "num_authority_exponents",
+        "reference_only",
+        "context_trace",
+        "context_trace_max_lag",
         "run_id_note",
     )
     mismatches = {
         field: (previous.get(field), cfg_payload.get(field))
         for field in immutable_fields
-        if previous.get(field) != cfg_payload.get(field)
+        if field in previous and previous.get(field) != cfg_payload.get(field)
     }
     expected_family = json.loads(
         json.dumps([item.as_dict() for item in configurations])
@@ -154,9 +161,72 @@ def authority_exponent_grid(
     return tuple(float(value) for value in np.linspace(minimum, maximum, count))
 
 
+def compact_image_signature(obs: dict, resize_size: int) -> np.ndarray:
+    """Return a cheap image signature available before the target forward."""
+    image = np.asarray(get_libero_image(obs, resize_size), dtype=np.float32)
+    y_index = np.linspace(0, image.shape[0] - 1, 16).round().astype(np.int64)
+    x_index = np.linspace(0, image.shape[1] - 1, 16).round().astype(np.int64)
+    return image[np.ix_(y_index, x_index)].reshape(-1)
+
+
+def relative_l2(current: np.ndarray, anchor: np.ndarray) -> float:
+    return float(
+        np.linalg.norm(current - anchor) / max(float(np.linalg.norm(anchor)), 1e-6)
+    )
+
+
+def build_context_lag_records(
+    *,
+    current_signature: np.ndarray,
+    current_state: np.ndarray,
+    current_action: np.ndarray,
+    history: list[dict],
+    max_lag: int,
+) -> list[dict]:
+    """Measure target-free context drift and its target-action consequence."""
+    lag_records = []
+    for lag in range(1, min(int(max_lag), len(history)) + 1):
+        anchor = history[-lag]
+        anchor_action = anchor["action"]
+        inverse_age_action = anchor_action.copy()
+        inverse_age_action[:6] *= lag ** -1
+        anchor_action_change_l2 = 0.0
+        if len(history) > lag:
+            previous_anchor_action = history[-lag - 1]["action"]
+            anchor_action_change_l2 = float(
+                np.linalg.norm(anchor_action[:6] - previous_anchor_action[:6])
+            )
+        state_delta = current_state - anchor["state"]
+        lag_records.append(
+            {
+                "lag": lag,
+                "image_relative_l2": relative_l2(
+                    current_signature, anchor["image_signature"]
+                ),
+                "eef_position_l2": float(np.linalg.norm(state_delta[:3])),
+                "eef_rotation_l2": float(np.linalg.norm(state_delta[3:6])),
+                "gripper_state_l2": float(np.linalg.norm(state_delta[6:])),
+                "anchor_action_norm": float(np.linalg.norm(anchor_action[:6])),
+                "anchor_action_change_l2": anchor_action_change_l2,
+                "stale_action_correction_l2": float(
+                    np.linalg.norm(current_action[:6] - anchor_action[:6])
+                ),
+                "inverse_age_action_correction_l2": float(
+                    np.linalg.norm(current_action[:6] - inverse_age_action[:6])
+                ),
+                "gripper_switch": bool(current_action[6] != anchor_action[6]),
+            }
+        )
+    return lag_records
+
+
 @draccus.wrap()
 def run(cfg: CalibrationRunConfig) -> None:
     set_seed_everywhere(cfg.seed)
+    if cfg.context_trace and not cfg.reference_only:
+        raise ValueError("context_trace requires reference_only=True.")
+    if cfg.context_trace_max_lag < 1:
+        raise ValueError("context_trace_max_lag must be positive.")
     cfg.unnorm_key = cfg.task_suite_name
     reference = RecoveryConfiguration(
         name="target_reference",
@@ -179,7 +249,7 @@ def run(cfg: CalibrationRunConfig) -> None:
             cfg.num_authority_exponents,
         ),
     )
-    configurations = (reference,) + family
+    configurations = (reference,) if cfg.reference_only else (reference,) + family
     task_ids = parse_ints(cfg.task_ids)
 
     output_dir = Path(cfg.output_dir)
@@ -276,6 +346,8 @@ def run(cfg: CalibrationRunConfig) -> None:
                     last_target_step = None
                     target_calls = 0
                     hold_counts = {}
+                    context_history = []
+                    context_steps = []
                     for step in range(horizon):
                         if configuration.schedule_offsets:
                             target_due = periodic_target_due(
@@ -291,6 +363,13 @@ def run(cfg: CalibrationRunConfig) -> None:
                                 phase=configuration.schedule_phase,
                             )
                         if target_due or last_target_action is None:
+                            current_signature = None
+                            current_state = None
+                            if cfg.context_trace:
+                                current_signature = compact_image_signature(
+                                    obs, resize_size
+                                )
+                                current_state = robot_state(obs)
                             action = target_action(
                                 cfg,
                                 model,
@@ -302,6 +381,31 @@ def run(cfg: CalibrationRunConfig) -> None:
                             last_target_action = action.copy()
                             last_target_step = step
                             target_calls += 1
+                            if cfg.context_trace:
+                                context_steps.append(
+                                    {
+                                        "step": step,
+                                        "current_action_norm": float(
+                                            np.linalg.norm(action[:6])
+                                        ),
+                                        "lag_records": build_context_lag_records(
+                                            current_signature=current_signature,
+                                            current_state=current_state,
+                                            current_action=action,
+                                            history=context_history,
+                                            max_lag=cfg.context_trace_max_lag,
+                                        ),
+                                    }
+                                )
+                                context_history.append(
+                                    {
+                                        "image_signature": current_signature,
+                                        "state": current_state,
+                                        "action": action.copy(),
+                                    }
+                                )
+                                if len(context_history) > cfg.context_trace_max_lag + 1:
+                                    context_history.pop(0)
                         else:
                             hold_depth = step - last_target_step
                             action = last_target_action.copy()
@@ -332,6 +436,9 @@ def run(cfg: CalibrationRunConfig) -> None:
                         "hold_counts": hold_counts,
                         "final_robot_state": robot_state(obs).tolist(),
                     }
+                    if cfg.context_trace:
+                        payload["context_trace_schema_version"] = 1
+                        payload["context_steps"] = context_steps
                     append_jsonl(records_path, payload)
                     completed_keys.add(record_key)
                     records_written += 1

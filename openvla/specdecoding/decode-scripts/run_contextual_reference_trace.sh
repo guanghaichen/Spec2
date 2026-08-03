@@ -22,6 +22,11 @@ esac
 
 init_libero_eval_env "${TASK_SUITE_NAME}"
 
+# robosuite 1.4.x validates the physical EGL id against CUDA_VISIBLE_DEVICES
+# before CUDA renumbers visible devices. A one-GPU evidence worker therefore
+# uses the first physical id from its visibility mask.
+export MUJOCO_EGL_DEVICE_ID="${MUJOCO_EGL_DEVICE_ID:-${CUDA_VISIBLE_DEVICES%%,*}}"
+
 TASK_IDS="${TASK_IDS:?请用 TASK_IDS=0 或 TASK_IDS=0,1 指定任务分片}"
 NUM_TRIALS="${NUM_TRIALS:-1}"
 TRIAL_START_INDEX="${TRIAL_START_INDEX:-0}"
@@ -31,6 +36,7 @@ TRACE_ROOT="${TRACE_ROOT:-${LOG_DIR}/../calibration/context_traces}"
 OUTPUT_DIR="${TRACE_ROOT}/${TASK_SUITE_SLUG}/${TRACE_TAG}"
 
 echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}"
+echo "MUJOCO_EGL_DEVICE_ID=${MUJOCO_EGL_DEVICE_ID}"
 echo "TASK_SUITE_NAME=${TASK_SUITE_NAME}"
 echo "TASK_IDS=${TASK_IDS}"
 echo "NUM_TRIALS=${NUM_TRIALS}"

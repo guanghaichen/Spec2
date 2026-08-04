@@ -1,0 +1,2485 @@
+diff --git a/openvla/experiments/robot/libero/eval_metrics.py b/openvla/experiments/robot/libero/eval_metrics.py
+index 717cd47..1e6877e 100644
+--- a/openvla/experiments/robot/libero/eval_metrics.py
++++ b/openvla/experiments/robot/libero/eval_metrics.py
+@@ -200,6 +200,125 @@ def summarize_generation_stats(step_stats_list):
+         for record in temporal_hold_decision_records
+         if record.get("anchor_pixel_relative_l2") is not None
+     ]
++    contextual_hold_candidates = [
++        record
++        for record in temporal_hold_decision_records
++        if record.get("contextual_risk_estimate") is not None
++        and record.get("contextual_budget_decision") is not None
++    ]
++    contextual_selected_candidates = [
++        record
++        for record in contextual_hold_candidates
++        if bool(record.get("allow", False))
++    ]
++    contextual_rejected_candidates = [
++        record
++        for record in contextual_hold_candidates
++        if not bool(record.get("allow", False))
++    ]
++    contextual_feedback_records = [
++        record["contextual_target_feedback"]
++        for record in contextual_rejected_candidates
++        if record.get("contextual_target_feedback") is not None
++    ]
++    revealing_decisions = [
++        record
++        for record in temporal_hold_decision_records
++        if record.get("revealing_budget_decision") is not None
++    ]
++    revealing_estimated = [
++        record
++        for record in revealing_decisions
++        if record.get("revealing_risk_estimate") is not None
++        and bool(record["revealing_risk_estimate"].get("ready", False))
++    ]
++    revealing_selected = [
++        record for record in revealing_estimated if bool(record.get("allow", False))
++    ]
++    revealing_targeted = [
++        record for record in revealing_estimated if not bool(record.get("allow", False))
++    ]
++    revealing_feedback_records = [
++        record["revealing_target_feedback"]
++        for record in revealing_targeted
++        if record.get("revealing_target_feedback") is not None
++    ]
++    revealing_residual_feedback = [
++        record["residual_shadow"]
++        for record in revealing_feedback_records
++        if record.get("residual_shadow") is not None
++    ]
++    revealing_residual_estimated = [
++        record
++        for record in revealing_estimated
++        if record.get("revealing_residual_estimate") is not None
++        and bool(record["revealing_residual_estimate"].get("ready", False))
++    ]
++    revealing_authority_feedback = [
++        record["authority_shadow"]
++        for record in revealing_feedback_records
++        if record.get("authority_shadow") is not None
++    ]
++    revealing_authority_estimated = [
++        record
++        for record in revealing_estimated
++        if record.get("revealing_authority_estimate") is not None
++        and bool(record["revealing_authority_estimate"].get("ready", False))
++    ]
++    observer_ready_decisions = [
++        record
++        for record in revealing_decisions
++        if bool((record.get("transition_surprise_estimate") or {}).get("ready", False))
++    ]
++    observer_held_decisions = [
++        record for record in observer_ready_decisions if bool(record.get("allow", False))
++    ]
++    observer_targeted_decisions = [
++        record for record in observer_ready_decisions if not bool(record.get("allow", False))
++    ]
++
++    def _contextual_risk_mean(records, field):
++        values = [
++            float(record["contextual_risk_estimate"][field])
++            for record in records
++            if record.get("contextual_risk_estimate", {}).get(field) is not None
++        ]
++        return sum(values) / len(values) if values else None
++
++    def _revealing_risk_mean(records, field):
++        values = [
++            float(record["revealing_risk_estimate"][field])
++            for record in records
++            if record.get("revealing_risk_estimate", {}).get(field) is not None
++        ]
++        return sum(values) / len(values) if values else None
++
++    def _record_mean(records, field):
++        values = [
++            float(record[field])
++            for record in records
++            if record.get(field) is not None
++        ]
++        return sum(values) / len(values) if values else None
++
++    def _transition_mean(records, field):
++        values = [
++            float(record["transition_surprise_estimate"][field])
++            for record in records
++            if (record.get("transition_surprise_estimate") or {}).get(field) is not None
++        ]
++        return sum(values) / len(values) if values else None
++
++    final_contextual_budget = (
++        contextual_hold_candidates[-1]["contextual_budget_decision"]
++        if contextual_hold_candidates
++        else None
++    )
++    final_revealing_budget = (
++        revealing_decisions[-1]["revealing_budget_decision"]
++        if revealing_decisions
++        else None
++    )
+ 
+     stage_profile_totals = {}
+     stage_profile_calls = {}
+@@ -929,6 +1048,208 @@ def summarize_generation_stats(step_stats_list):
+                 if temporal_hold_anchor_pixel_l2
+                 else None
+             ),
++            "contextual_risk": {
++                "num_candidates": len(contextual_hold_candidates),
++                "selected_candidates": len(contextual_selected_candidates),
++                "rejected_candidates": len(contextual_rejected_candidates),
++                "desired_extension_fraction": (
++                    float(final_contextual_budget["desired_extension_fraction"])
++                    if final_contextual_budget is not None
++                    else None
++                ),
++                "realized_extension_fraction": (
++                    len(contextual_selected_candidates)
++                    / len(contextual_hold_candidates)
++                    if contextual_hold_candidates
++                    else None
++                ),
++                "budget_error": (
++                    len(contextual_selected_candidates)
++                    / len(contextual_hold_candidates)
++                    - float(final_contextual_budget["desired_extension_fraction"])
++                    if final_contextual_budget is not None
++                    and contextual_hold_candidates
++                    else None
++                ),
++                "final_risk_threshold": (
++                    float(final_contextual_budget["dual_threshold_after"])
++                    if final_contextual_budget is not None
++                    else None
++                ),
++                "avg_selected_risk": _contextual_risk_mean(
++                    contextual_selected_candidates, "correction_risk"
++                ),
++                "avg_rejected_risk": _contextual_risk_mean(
++                    contextual_rejected_candidates, "correction_risk"
++                ),
++                "avg_selected_risk_percentile": _contextual_risk_mean(
++                    contextual_selected_candidates, "risk_percentile"
++                ),
++                "avg_rejected_risk_percentile": _contextual_risk_mean(
++                    contextual_rejected_candidates, "risk_percentile"
++                ),
++                "target_feedback_count": len(contextual_feedback_records),
++                "avg_target_feedback_correction_l2": (
++                    sum(
++                        float(record["correction_l2"])
++                        for record in contextual_feedback_records
++                    )
++                    / len(contextual_feedback_records)
++                    if contextual_feedback_records
++                    else None
++                ),
++                "online_update_count": sum(
++                    int(bool(record.get("online_update_applied", False)))
++                    for record in contextual_feedback_records
++                ),
++                "final_online_memory_records": (
++                    int(contextual_feedback_records[-1]["online_records"])
++                    if contextual_feedback_records
++                    else 0
++                ),
++            },
++            "revealing_risk": {
++                "num_decisions": len(revealing_decisions),
++                "estimated_decisions": len(revealing_estimated),
++                "selected_holds": len(revealing_selected),
++                "selected_targets": len(revealing_targeted),
++                "desired_target_density": (
++                    float(final_revealing_budget["desired_target_density"])
++                    if final_revealing_budget is not None
++                    else None
++                ),
++                "realized_target_density": (
++                    float(
++                        final_revealing_budget["target_count"]
++                        / final_revealing_budget["decision_count"]
++                    )
++                    if final_revealing_budget is not None
++                    and final_revealing_budget["decision_count"]
++                    else None
++                ),
++                "final_hold_threshold": (
++                    float(final_revealing_budget["threshold_after"])
++                    if final_revealing_budget is not None
++                    else None
++                ),
++                "avg_held_predicted_correction": _revealing_risk_mean(
++                    revealing_selected, "predicted_correction"
++                ),
++                "avg_targeted_predicted_correction": _revealing_risk_mean(
++                    revealing_targeted, "predicted_correction"
++                ),
++                "avg_held_upper_confidence_risk": _revealing_risk_mean(
++                    revealing_selected, "upper_confidence_risk"
++                ),
++                "avg_targeted_upper_confidence_risk": _revealing_risk_mean(
++                    revealing_targeted, "upper_confidence_risk"
++                ),
++                # Prequential observer evidence. These are reporting-only
++                # aggregates and never feed back into the control decision.
++                "observer_ready_decisions": len(observer_ready_decisions),
++                "avg_held_transition_surprise": _transition_mean(
++                    observer_held_decisions, "surprise"
++                ),
++                "avg_targeted_transition_surprise": _transition_mean(
++                    observer_targeted_decisions, "surprise"
++                ),
++                "avg_held_transition_surprise_percentile": _transition_mean(
++                    observer_held_decisions, "surprise_percentile"
++                ),
++                "avg_targeted_transition_surprise_percentile": _transition_mean(
++                    observer_targeted_decisions, "surprise_percentile"
++                ),
++                "avg_held_transition_ucb": _transition_mean(
++                    observer_held_decisions, "upper_confidence_surprise"
++                ),
++                "avg_targeted_transition_ucb": _transition_mean(
++                    observer_targeted_decisions, "upper_confidence_surprise"
++                ),
++                "avg_held_transition_uncertainty": _transition_mean(
++                    observer_held_decisions, "epistemic_uncertainty"
++                ),
++                "avg_targeted_transition_uncertainty": _transition_mean(
++                    observer_targeted_decisions, "epistemic_uncertainty"
++                ),
++                "avg_held_instantaneous_risk": _record_mean(
++                    observer_held_decisions, "revealing_instantaneous_risk"
++                ),
++                "avg_targeted_instantaneous_risk": _record_mean(
++                    observer_targeted_decisions, "revealing_instantaneous_risk"
++                ),
++                "avg_held_cumulative_hazard": _record_mean(
++                    observer_held_decisions, "revealing_cumulative_hazard"
++                ),
++                "avg_targeted_cumulative_hazard": _record_mean(
++                    observer_targeted_decisions, "revealing_cumulative_hazard"
++                ),
++                "avg_held_survival_before": _record_mean(
++                    observer_held_decisions, "recoverability_survival_before"
++                ),
++                "avg_targeted_survival_before": _record_mean(
++                    observer_targeted_decisions, "recoverability_survival_before"
++                ),
++                "target_feedback_count": len(revealing_feedback_records),
++                "avg_target_feedback_correction_l2": (
++                    sum(
++                        float(record["correction_l2"])
++                        for record in revealing_feedback_records
++                    )
++                    / len(revealing_feedback_records)
++                    if revealing_feedback_records
++                    else None
++                ),
++                "final_labeled_records": (
++                    int(revealing_feedback_records[-1]["online_records"])
++                    if revealing_feedback_records
++                    else 0
++                ),
++                "residual_ready_decisions": len(revealing_residual_estimated),
++                "residual_applied_holds": sum(
++                    int(bool(record.get("revealing_residual_applied", False)))
++                    for record in revealing_selected
++                ),
++                "final_residual_authority": (
++                    float(revealing_residual_feedback[-1]["authority_after"])
++                    if revealing_residual_feedback
++                    else None
++                ),
++                "residual_prequential_records": (
++                    int(revealing_residual_feedback[-1]["prequential_records"])
++                    if revealing_residual_feedback
++                    else 0
++                ),
++                "residual_prequential_improvement": (
++                    revealing_residual_feedback[-1].get(
++                        "prequential_improvement"
++                    )
++                    if revealing_residual_feedback
++                    else None
++                ),
++                "authority_ready_decisions": len(
++                    revealing_authority_estimated
++                ),
++                "authority_applied_holds": sum(
++                    int(bool(record.get("revealing_authority_applied", False)))
++                    for record in revealing_selected
++                ),
++                "authority_prequential_records": (
++                    int(
++                        revealing_authority_feedback[-1][
++                            "prequential_records"
++                        ]
++                    )
++                    if revealing_authority_feedback
++                    else 0
++                ),
++                "authority_prequential_improvement": (
++                    revealing_authority_feedback[-1].get(
++                        "prequential_improvement"
++                    )
++                    if revealing_authority_feedback
++                    else None
++                ),
++            },
+             "records": temporal_hold_decision_records,
+         },
+         "temporal_prefill_tree_actions": len(temporal_prefill_tree_records),
+@@ -1023,13 +1344,33 @@ def write_eval_summary(
+     total_successes,
+     episode_times,
+     generation_stats=None,
++    full_generation_stats=None,
+     evidence_trace=None,
++    episode_results=None,
+ ):
++    import hashlib
+     import json
++    from pathlib import Path
+ 
+     generation_summary = summarize_generation_stats(generation_stats or []) or {}
++    full_generation_summary = (
++        summarize_generation_stats(full_generation_stats or []) or {}
++    )
++    # Preserve the upstream-compatible timing-scope summary while adding a
++    # compact all-task mechanism view. Per-step records remain only in the
++    # former to avoid multiplying large JSON logs.
++    if full_generation_summary:
++        full_temporal_hold = full_generation_summary.get("temporal_hold")
++        if full_temporal_hold is not None:
++            full_temporal_hold.pop("records", None)
+     if evidence_trace:
+         generation_summary["evidence_trace"] = evidence_trace
++    context_profile = getattr(cfg, "dflash_context_risk_profile", None)
++    context_profile_hash = None
++    if context_profile:
++        profile_path = Path(context_profile)
++        if profile_path.is_file():
++            context_profile_hash = hashlib.sha256(profile_path.read_bytes()).hexdigest()
+     payload = {
+         "run_id": run_id,
+         "eval_family": eval_family,
+@@ -1092,6 +1433,32 @@ def write_eval_summary(
+         "dflash_temporal_hold_policy": getattr(
+             cfg, "dflash_temporal_hold_policy", None
+         ),
++        "dflash_context_risk_profile": context_profile,
++        "dflash_context_risk_profile_sha256": context_profile_hash,
++        "dflash_context_target_density": getattr(
++            cfg, "dflash_context_target_density", None
++        ),
++        "dflash_context_online_update": getattr(
++            cfg, "dflash_context_online_update", None
++        ),
++        "dflash_revealing_residual_mode": getattr(
++            cfg, "dflash_revealing_residual_mode", None
++        ),
++        "dflash_revealing_authority_mode": getattr(
++            cfg, "dflash_revealing_authority_mode", None
++        ),
++        "dflash_revealing_selection_mode": getattr(
++            cfg, "dflash_revealing_selection_mode", None
++        ),
++        "dflash_revealing_authority_min_depth": getattr(
++            cfg, "dflash_revealing_authority_min_depth", None
++        ),
++        "dflash_revealing_risk_target": getattr(
++            cfg, "dflash_revealing_risk_target", None
++        ),
++        "dflash_revealing_horizon_mode": getattr(
++            cfg, "dflash_revealing_horizon_mode", None
++        ),
+         "dflash_temporal_adaptive_min_verified_run": getattr(
+             cfg, "dflash_temporal_adaptive_min_verified_run", None
+         ),
+@@ -1144,14 +1511,17 @@ def write_eval_summary(
+         "pretrained_checkpoint": str(cfg.pretrained_checkpoint),
+         "spec_checkpoint": str(getattr(cfg, "spec_checkpoint", "")),
+         "num_trials_per_task": cfg.num_trials_per_task,
++        "trial_start_index": getattr(cfg, "trial_start_index", 0),
+         "seed": cfg.seed,
+         "timing_scope": getattr(cfg, "timing_scope", None),
+         "sync_cuda_timing": getattr(cfg, "sync_cuda_timing", None),
+         "total_episodes": total_episodes,
+         "total_successes": total_successes,
+         "success_rate": (float(total_successes) / float(total_episodes)) if total_episodes else None,
++        "episode_results": list(episode_results or []),
+         "timing": summarize_timing(episode_times),
+         "generation": generation_summary,
++        "generation_full_suite": full_generation_summary,
+     }
+     with open(path, "w") as f:
+         json.dump(payload, f, indent=2)
+diff --git a/openvla/experiments/robot/libero/run_libero_goal_Spec.py b/openvla/experiments/robot/libero/run_libero_goal_Spec.py
+index 54f9037..c54164a 100755
+--- a/openvla/experiments/robot/libero/run_libero_goal_Spec.py
++++ b/openvla/experiments/robot/libero/run_libero_goal_Spec.py
+@@ -104,6 +104,15 @@ class GenerateConfig:
+     dflash_temporal_bypass_max_pixel_relative_l2: float = 0.0
+     dflash_temporal_bypass_use_pixel_guard: bool = True
+     dflash_temporal_hold_policy: str = "fixed"
++    dflash_context_risk_profile: str = ""
++    dflash_context_target_density: float = 0.4
++    dflash_context_online_update: bool = False
++    dflash_revealing_residual_mode: str = "off"
++    dflash_revealing_authority_mode: str = "off"
++    dflash_revealing_selection_mode: str = "contextual"
++    dflash_revealing_authority_min_depth: int = 1
++    dflash_revealing_risk_target: str = "inverse_age_correction"
++    dflash_revealing_horizon_mode: str = "fixed_two"
+     dflash_temporal_adaptive_min_verified_run: int = 2
+     dflash_temporal_adaptive_max_anchor_pixel_relative_l2: float = 0.03
+     dflash_temporal_hold_action_decay: str = "none"
+@@ -220,6 +229,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
+     total_episodes, total_successes = 0, 0
+     total_episode_time = []
+     total_generation_step_stats = []
++    episode_results = []
+     last_task_episode_time = []
+     last_task_generation_step_stats = []
+     for task_id in tqdm.tqdm(range(num_tasks_in_suite)):
+@@ -332,6 +342,9 @@ def eval_libero(cfg: GenerateConfig) -> None:
+                             "robot_state_before_action": np.asarray(
+                                 observation["state"], dtype=np.float64
+                             ).tolist(),
++                            "temporal_hold_decision": generation_stats.get(
++                                "temporal_hold_decision_record"
++                            ),
+                         }
+                     episode_generation_stats.append(generation_stats)
+ 
+@@ -364,6 +377,15 @@ def eval_libero(cfg: GenerateConfig) -> None:
+                                 ),
+                             }
+                         )
++            episode_results.append(
++                {
++                    "task_id": int(task_id),
++                    "task_description": str(task_description),
++                    "trial_index": int(episode_idx),
++                    "success": bool(done),
++                    "control_steps": int(len(episode_generation_stats)),
++                }
++            )
+             total_episode_time.append(total_time)
+             task_episode_time.append(total_time)
+             task_generation_step_stats.extend(episode_generation_stats)
+@@ -427,6 +449,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
+         total_successes=total_successes,
+         episode_times=timing_episode_time,
+         generation_stats=timing_generation_stats,
++        full_generation_stats=total_generation_step_stats,
++        episode_results=episode_results,
+     )
+     print(f"Saved eval summary to: {local_log_summaryfilepath}")
+     log_file.write(f"Saved eval summary to: {local_log_summaryfilepath}\n")
+diff --git a/openvla/experiments/robot/libero/run_libero_goal_Spec_Relaxed.py b/openvla/experiments/robot/libero/run_libero_goal_Spec_Relaxed.py
+index dee8b06..c1ee33e 100755
+--- a/openvla/experiments/robot/libero/run_libero_goal_Spec_Relaxed.py
++++ b/openvla/experiments/robot/libero/run_libero_goal_Spec_Relaxed.py
+@@ -149,6 +149,15 @@ class GenerateConfig:
+     dflash_temporal_bypass_max_pixel_relative_l2: float = 0.0
+     dflash_temporal_bypass_use_pixel_guard: bool = True
+     dflash_temporal_hold_policy: str = "fixed"
++    dflash_context_risk_profile: str = ""
++    dflash_context_target_density: float = 0.4
++    dflash_context_online_update: bool = False
++    dflash_revealing_residual_mode: str = "off"
++    dflash_revealing_authority_mode: str = "off"
++    dflash_revealing_selection_mode: str = "contextual"
++    dflash_revealing_authority_min_depth: int = 1
++    dflash_revealing_risk_target: str = "inverse_age_correction"
++    dflash_revealing_horizon_mode: str = "fixed_two"
+     dflash_temporal_adaptive_min_verified_run: int = 2
+     dflash_temporal_adaptive_max_anchor_pixel_relative_l2: float = 0.03
+     dflash_temporal_hold_action_decay: str = "none"
+@@ -265,6 +274,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
+     total_episodes, total_successes = 0, 0
+     total_episode_time = []
+     total_generation_step_stats = []
++    episode_results = []
+     last_task_episode_time = []
+     last_task_generation_step_stats = []
+     for task_id in tqdm.tqdm(range(num_tasks_in_suite)):
+@@ -378,6 +388,9 @@ def eval_libero(cfg: GenerateConfig) -> None:
+                             "robot_state_before_action": np.asarray(
+                                 observation["state"], dtype=np.float64
+                             ).tolist(),
++                            "temporal_hold_decision": generation_stats.get(
++                                "temporal_hold_decision_record"
++                            ),
+                         }
+                     episode_generation_stats.append(generation_stats)
+ 
+@@ -410,6 +423,15 @@ def eval_libero(cfg: GenerateConfig) -> None:
+                                 ),
+                             }
+                         )
++            episode_results.append(
++                {
++                    "task_id": int(task_id),
++                    "task_description": str(task_description),
++                    "trial_index": int(episode_idx),
++                    "success": bool(done),
++                    "control_steps": int(len(episode_generation_stats)),
++                }
++            )
+             total_episode_time.append(total_time)
+             task_episode_time.append(total_time)
+             task_generation_step_stats.extend(episode_generation_stats)
+@@ -492,6 +514,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
+         total_successes=total_successes,
+         episode_times=timing_episode_time,
+         generation_stats=timing_generation_stats,
++        full_generation_stats=total_generation_step_stats,
++        episode_results=episode_results,
+     )
+     print(f"Saved eval summary to: {local_log_summaryfilepath}")
+     log_file.write(f"Saved eval summary to: {local_log_summaryfilepath}\n")
+diff --git a/openvla/experiments/robot/openvla_utils.py b/openvla/experiments/robot/openvla_utils.py
+index d22ff77..36a24cc 100755
+--- a/openvla/experiments/robot/openvla_utils.py
++++ b/openvla/experiments/robot/openvla_utils.py
+@@ -120,6 +120,33 @@ def get_vla(cfg):
+             dflash_temporal_hold_policy=getattr(
+                 cfg, "dflash_temporal_hold_policy", "fixed"
+             ),
++            dflash_context_risk_profile=getattr(
++                cfg, "dflash_context_risk_profile", ""
++            ),
++            dflash_context_target_density=getattr(
++                cfg, "dflash_context_target_density", 0.4
++            ),
++            dflash_context_online_update=getattr(
++                cfg, "dflash_context_online_update", False
++            ),
++            dflash_revealing_residual_mode=getattr(
++                cfg, "dflash_revealing_residual_mode", "off"
++            ),
++            dflash_revealing_authority_mode=getattr(
++                cfg, "dflash_revealing_authority_mode", "off"
++            ),
++            dflash_revealing_selection_mode=getattr(
++                cfg, "dflash_revealing_selection_mode", "contextual"
++            ),
++            dflash_revealing_authority_min_depth=getattr(
++                cfg, "dflash_revealing_authority_min_depth", 1
++            ),
++            dflash_revealing_risk_target=getattr(
++                cfg, "dflash_revealing_risk_target", "inverse_age_correction"
++            ),
++            dflash_revealing_horizon_mode=getattr(
++                cfg, "dflash_revealing_horizon_mode", "fixed_two"
++            ),
+             dflash_temporal_adaptive_min_verified_run=getattr(
+                 cfg, "dflash_temporal_adaptive_min_verified_run", 2
+             ),
+@@ -263,7 +290,8 @@ def get_vla_action(vla, processor, base_vla_name, obs, task_label, unnorm_key, r
+     generate_mode控制是否用草稿
+     """
+     
+-    image = Image.fromarray(obs["full_image"])
++    raw_image = np.asarray(obs["full_image"])
++    image = Image.fromarray(raw_image)
+     image = image.convert("RGB")
+ 
+     # (If trained with image augmentations) Center crop image and then resize back up to original size.
+@@ -325,6 +353,16 @@ def get_vla_action(vla, processor, base_vla_name, obs, task_label, unnorm_key, r
+     )
+     if generate_mode in {"speculative", "dflash"}:
+         predict_kwargs["generate_mode"] = generate_mode
++    if generate_mode == "dflash":
++        if obs.get("state") is not None:
++            predict_kwargs["dflash_context_robot_state"] = np.asarray(
++                obs["state"], dtype=np.float64
++            )
++        y_index = np.linspace(0, raw_image.shape[0] - 1, 16).round().astype(np.int64)
++        x_index = np.linspace(0, raw_image.shape[1] - 1, 16).round().astype(np.int64)
++        predict_kwargs["dflash_context_image_signature"] = np.asarray(
++            raw_image[np.ix_(y_index, x_index)].reshape(-1), dtype=np.float64
++        )
+     if return_dflash_stats:
+         predict_kwargs["return_dflash_stats"] = True
+     action = vla.predict_action(**predict_kwargs)# 调用 OpenVLAForActionPrediction.predict_action()
+diff --git a/openvla/prismatic/extern/hf/modeling_speculation.py b/openvla/prismatic/extern/hf/modeling_speculation.py
+index d799c95..ebca4c1 100755
+--- a/openvla/prismatic/extern/hf/modeling_speculation.py
++++ b/openvla/prismatic/extern/hf/modeling_speculation.py
+@@ -29,6 +29,25 @@ from openvla.specdecoding.model.temporal_hold import (
+     settle_extension_debt,
+     temporal_hold_action_scale,
+ )
++from openvla.specdecoding.model.contextual_risk import (
++    ContextualRiskMemory,
++    OnlineBudgetAllocator,
++    extension_fraction_from_target_density,
++)
++from openvla.specdecoding.model.revealing_action import (
++    OnlineLocalRevealingRiskModel,
++    OnlineRevealingAuthorityModel,
++    OnlineRevealingResidualModel,
++    OnlineRevealingRiskModel,
++    OnlineTargetBudgetAllocator,
++    OnlineTransitionObserver,
++    OnlineVTPFUtilityModel,
++    accumulate_recoverability_hazard,
++    cost_aware_revealing_priority,
++    evaluate_target_grounded_reuse,
++    project_target_onto_anchor,
++    select_monotone_risk_envelope,
++)
+ from openvla.specdecoding.model.cnets import EConfig
+ from transformers import AutoTokenizer
+ import os
+@@ -654,6 +673,15 @@ class SpecVLAforActionPrediction(nn.Module):
+             dflash_temporal_bypass_max_pixel_relative_l2=0.0,
+             dflash_temporal_bypass_use_pixel_guard=True,
+             dflash_temporal_hold_policy="fixed",
++            dflash_context_risk_profile="",
++            dflash_context_target_density=0.4,
++            dflash_context_online_update=False,
++            dflash_revealing_residual_mode="off",
++            dflash_revealing_authority_mode="off",
++            dflash_revealing_selection_mode="contextual",
++            dflash_revealing_authority_min_depth=1,
++            dflash_revealing_risk_target="inverse_age_correction",
++            dflash_revealing_horizon_mode="fixed_two",
+             dflash_temporal_adaptive_min_verified_run=2,
+             dflash_temporal_adaptive_max_anchor_pixel_relative_l2=0.03,
+             dflash_temporal_hold_action_decay="none",
+@@ -745,6 +773,288 @@ class SpecVLAforActionPrediction(nn.Module):
+         self.dflash_temporal_hold_policy = normalize_temporal_hold_policy(
+             dflash_temporal_hold_policy
+         )
++        self.dflash_context_risk_profile = str(
++            dflash_context_risk_profile or ""
++        ).strip()
++        self.dflash_context_target_density = float(
++            dflash_context_target_density
++        )
++        self.dflash_context_online_update = bool(dflash_context_online_update)
++        self.dflash_revealing_residual_mode = str(
++            dflash_revealing_residual_mode
++        ).strip().lower()
++        if self.dflash_revealing_residual_mode in {"false", "0", "none"}:
++            self.dflash_revealing_residual_mode = "off"
++        if self.dflash_revealing_residual_mode not in {"off", "shadow", "active"}:
++            raise ValueError(
++                "dflash_revealing_residual_mode must be off, shadow, or active."
++            )
++        self.dflash_revealing_authority_mode = str(
++            dflash_revealing_authority_mode
++        ).strip().lower()
++        if self.dflash_revealing_authority_mode in {"false", "0", "none"}:
++            self.dflash_revealing_authority_mode = "off"
++        if self.dflash_revealing_authority_mode not in {
++            "off",
++            "shadow",
++            "active",
++            "certified",
++        }:
++            raise ValueError(
++                "dflash_revealing_authority_mode must be off, shadow, active, "
++                "or certified."
++            )
++        self.dflash_revealing_selection_mode = str(
++            dflash_revealing_selection_mode
++        ).strip().lower()
++        if self.dflash_revealing_selection_mode not in {
++            "contextual",
++            "context_free",
++        }:
++            raise ValueError(
++                "dflash_revealing_selection_mode must be contextual or context_free."
++            )
++        self.dflash_revealing_authority_min_depth = int(
++            dflash_revealing_authority_min_depth
++        )
++        if self.dflash_revealing_authority_min_depth < 1:
++            raise ValueError(
++                "dflash_revealing_authority_min_depth must be positive."
++            )
++        self.dflash_revealing_risk_target = str(
++            dflash_revealing_risk_target
++        ).strip().lower()
++        if self.dflash_revealing_risk_target not in {
++            "inverse_age_correction",
++            "inverse_age_local",
++            "inverse_age_local_costaware",
++            "inverse_age_rich",
++            "structured_innovation",
++            "post_authority_correction",
++            "post_authority_compact",
++        }:
++            raise ValueError(
++                "dflash_revealing_risk_target must be inverse_age_correction, "
++                "inverse_age_local, inverse_age_local_costaware, inverse_age_rich, "
++                "structured_innovation, post_authority_correction, or "
++                "post_authority_compact."
++            )
++        self.dflash_revealing_horizon_mode = str(
++            dflash_revealing_horizon_mode
++        ).strip().lower()
++        if self.dflash_revealing_horizon_mode not in {
++            "fixed_two",
++            "risk_adaptive",
++            "risk_adaptive_monotone",
++            "risk_survival",
++            "observer_adaptive",
++            "observer_learned_adaptive",
++            "observer_survival",
++            "observer_learned_survival",
++        }:
++            raise ValueError(
++                "dflash_revealing_horizon_mode must be fixed_two, "
++                "risk_adaptive, risk_adaptive_monotone, risk_survival, "
++                "observer_adaptive, observer_learned_adaptive, observer_survival, or "
++                "observer_learned_survival."
++            )
++        self._dflash_context_risk_memory = None
++        self._dflash_context_budget_allocator = None
++        self._dflash_revealing_risk_model = None
++        self._dflash_vtpf_utility_model = None
++        self._dflash_revealing_budget_allocator = None
++        self._dflash_revealing_residual_model = None
++        self._dflash_revealing_authority_model = None
++        self._dflash_transition_observer = None
++        self._dflash_current_transition_estimate = None
++        self._dflash_revealing_context_free_rng = np.random.default_rng(0)
++        if self.dflash_temporal_hold_policy == "contextual_budget":
++            if not self.dflash_context_risk_profile:
++                raise ValueError(
++                    "contextual_budget requires dflash_context_risk_profile."
++                )
++            self._dflash_context_risk_memory = ContextualRiskMemory.from_path(
++                self.dflash_context_risk_profile
++            )
++            if (
++                self.dflash_context_online_update
++                and self._dflash_context_risk_memory.risk_target
++                != "inverse_age_correction"
++            ):
++                raise ValueError(
++                    "Online contextual-risk feedback currently measures "
++                    "inverse_age_correction, but the loaded profile predicts "
++                    f"{self._dflash_context_risk_memory.risk_target}. Disable "
++                    "dflash_context_online_update or use a compatible profile."
++                )
++            extension_fraction = extension_fraction_from_target_density(
++                self.dflash_context_target_density
++            )
++            self._dflash_context_budget_allocator = OnlineBudgetAllocator(
++                extension_fraction,
++                effective_prior_count=self._dflash_context_risk_memory.neighbors,
++            )
++        elif self.dflash_temporal_hold_policy == "revealing_budget":
++            if self.dflash_revealing_risk_target == "inverse_age_rich":
++                risk_feature_names = list(
++                    (
++                        "image_relative_l2",
++                        "eef_position_l2",
++                        "eef_rotation_l2",
++                        "eef_delta_0",
++                        "eef_delta_1",
++                        "eef_delta_2",
++                        "eef_delta_3",
++                        "eef_delta_4",
++                        "eef_delta_5",
++                        "anchor_action_change_l2",
++                        "anchor_action_norm",
++                        "anchor_gripper",
++                        "anchor_gripper_change",
++                        "anchor_action_0",
++                        "anchor_action_1",
++                        "anchor_action_2",
++                        "anchor_action_3",
++                        "anchor_action_4",
++                        "anchor_action_5",
++                        "anchor_action_delta_0",
++                        "anchor_action_delta_1",
++                        "anchor_action_delta_2",
++                        "anchor_action_delta_3",
++                        "anchor_action_delta_4",
++                        "anchor_action_delta_5",
++                        "candidate_hold_depth",
++                        "hold_depth_x_image_relative_l2",
++                        "hold_depth_x_eef_position_l2",
++                        "hold_depth_x_eef_rotation_l2",
++                    )
++                )
++            elif self.dflash_revealing_risk_target in {
++                "structured_innovation",
++                "post_authority_correction",
++            }:
++                risk_feature_names = list(
++                    (
++                    "image_relative_l2",
++                    "eef_position_l2",
++                    "eef_rotation_l2",
++                    "eef_delta_0",
++                    "eef_delta_1",
++                    "eef_delta_2",
++                    "eef_delta_3",
++                    "eef_delta_4",
++                    "eef_delta_5",
++                    "anchor_action_change_l2",
++                    "anchor_action_norm",
++                    "anchor_gripper",
++                    "anchor_gripper_change",
++                    "candidate_hold_depth",
++                    "hold_depth_x_image_relative_l2",
++                    "hold_depth_x_eef_position_l2",
++                    "hold_depth_x_eef_rotation_l2",
++                    )
++                )
++            else:
++                risk_feature_names = list(
++                    (
++                    "image_relative_l2",
++                    "eef_position_l2",
++                    "eef_rotation_l2",
++                    "anchor_action_change_l2",
++                    "anchor_action_norm",
++                    "candidate_hold_depth",
++                    )
++                )
++            if self.dflash_revealing_horizon_mode in {
++                "observer_adaptive",
++                "observer_learned_adaptive",
++                "observer_survival",
++                "observer_learned_survival",
++            }:
++                risk_feature_names.extend(
++                    (
++                        "transition_surprise",
++                        "transition_uncertainty",
++                        "transition_risk_percentile",
++                    )
++                )
++            risk_feature_names = tuple(risk_feature_names)
++            risk_model_class = (
++                OnlineLocalRevealingRiskModel
++                if self.dflash_revealing_risk_target
++                in {"inverse_age_local", "inverse_age_local_costaware"}
++                else OnlineRevealingRiskModel
++            )
++            self._dflash_revealing_risk_model = risk_model_class(risk_feature_names)
++            if self.dflash_revealing_risk_target == "inverse_age_local_costaware":
++                self._dflash_vtpf_utility_model = OnlineVTPFUtilityModel(
++                    risk_feature_names
++                )
++            self._dflash_revealing_budget_allocator = OnlineTargetBudgetAllocator(
++                self.dflash_context_target_density
++            )
++            if self.dflash_revealing_horizon_mode in {
++                "observer_adaptive",
++                "observer_learned_adaptive",
++                "observer_survival",
++                "observer_learned_survival",
++            }:
++                self._dflash_transition_observer = OnlineTransitionObserver()
++            if self.dflash_revealing_residual_mode != "off":
++                self._dflash_revealing_residual_model = (
++                    OnlineRevealingResidualModel(
++                        (
++                            "image_relative_l2",
++                            "eef_delta_0",
++                            "eef_delta_1",
++                            "eef_delta_2",
++                            "eef_delta_3",
++                            "eef_delta_4",
++                            "eef_delta_5",
++                            "anchor_action_0",
++                            "anchor_action_1",
++                            "anchor_action_2",
++                            "anchor_action_3",
++                            "anchor_action_4",
++                            "anchor_action_5",
++                            "anchor_action_delta_0",
++                            "anchor_action_delta_1",
++                            "anchor_action_delta_2",
++                            "anchor_action_delta_3",
++                            "anchor_action_delta_4",
++                            "anchor_action_delta_5",
++                            "candidate_hold_depth",
++                        ),
++                        action_dimension=6,
++                    )
++                )
++            if self.dflash_revealing_authority_mode != "off":
++                self._dflash_revealing_authority_model = (
++                    OnlineRevealingAuthorityModel(
++                        (
++                            "image_relative_l2",
++                            "eef_delta_0",
++                            "eef_delta_1",
++                            "eef_delta_2",
++                            "eef_delta_3",
++                            "eef_delta_4",
++                            "eef_delta_5",
++                            "anchor_action_0",
++                            "anchor_action_1",
++                            "anchor_action_2",
++                            "anchor_action_3",
++                            "anchor_action_4",
++                            "anchor_action_5",
++                            "anchor_action_delta_0",
++                            "anchor_action_delta_1",
++                            "anchor_action_delta_2",
++                            "anchor_action_delta_3",
++                            "anchor_action_delta_4",
++                            "anchor_action_delta_5",
++                            "candidate_hold_depth",
++                        )
++                    )
++                )
+         self.dflash_temporal_adaptive_min_verified_run = int(
+             dflash_temporal_adaptive_min_verified_run
+         )
+@@ -859,6 +1169,21 @@ class SpecVLAforActionPrediction(nn.Module):
+             raise ValueError("dflash_verify_skip_max_consecutive must be >= 1.")
+         if self.dflash_verify_skip_min_stable_actions < 1:
+             raise ValueError("dflash_verify_skip_min_stable_actions must be >= 1.")
++        if self.dflash_temporal_hold_policy in {
++            "contextual_budget",
++            "revealing_budget",
++        }:
++            # Revealed correction labels are evaluated with the configured
++            # deployment scale below, so contextual policies remain label-
++            # consistent for both attenuated and unscaled action reuse.
++            if (
++                self.dflash_revealing_horizon_mode == "fixed_two"
++                and self.dflash_verify_skip_max_consecutive != 2
++            ):
++                raise ValueError(
++                    "fixed_two context-adaptive policies require exactly two "
++                    "possible holds."
++                )
+         if self.dflash_verify_skip_mode != "off" and self.dflash_tree_mode != "off":
+             raise ValueError(
+                 "Verification-skip calibration currently requires dflash_tree_mode='off' "
+@@ -963,7 +1288,16 @@ class SpecVLAforActionPrediction(nn.Module):
+         self._dflash_verified_action_run_length = 0
+         self._dflash_consecutive_verify_skips = 0
+         self._dflash_temporal_extension_debt = False
++        self._dflash_recoverability_survival = 1.0
+         self._dflash_temporal_control_step = 0
++        self._dflash_current_context_state = None
++        self._dflash_current_context_image_signature = None
++        self._dflash_last_target_context_state = None
++        self._dflash_last_target_context_image_signature = None
++        self._dflash_previous_target_action = None
++        self._dflash_last_target_action = None
++        self._dflash_pending_context_features = None
++        self._dflash_pending_context_hold_depth = None
+ 
+         # Compute action bins
+         self.bins = base_model.bins
+@@ -1164,6 +1498,30 @@ class SpecVLAforActionPrediction(nn.Module):
+             )
+         )
+ 
++    @staticmethod
++    def _dflash_action_distribution_features(
++        action_probs: Optional[torch.Tensor],
++    ) -> dict[str, float]:
++        """Summarize a Target action distribution without another forward pass."""
++        if action_probs is None:
++            return {}
++        probabilities = action_probs.detach().float().reshape(-1)
++        if probabilities.numel() < 2:
++            return {}
++        probabilities = probabilities / probabilities.sum().clamp_min(1e-12)
++        top_probs = torch.topk(probabilities, k=2).values
++        normalized_entropy = -(
++            probabilities * probabilities.clamp_min(1e-12).log()
++        ).sum() / float(np.log(probabilities.numel()))
++        top1, top2, entropy = torch.stack(
++            (top_probs[0], top_probs[1], normalized_entropy)
++        ).detach().cpu().tolist()
++        return {
++            "anchor_target_top1_prob": float(top1),
++            "anchor_target_top1_margin": float(top1 - top2),
++            "anchor_target_normalized_entropy": float(entropy),
++        }
++
+     def reset_dflash_runtime_state(self):
+         """Reset temporal calibration state at every environment episode boundary."""
+         self._dflash_previous_anchor_signature = None
+@@ -1178,7 +1536,119 @@ class SpecVLAforActionPrediction(nn.Module):
+         self._dflash_verified_action_run_length = 0
+         self._dflash_consecutive_verify_skips = 0
+         self._dflash_temporal_extension_debt = False
++        self._dflash_recoverability_survival = 1.0
+         self._dflash_temporal_control_step = 0
++        self._dflash_current_context_state = None
++        self._dflash_current_context_image_signature = None
++        self._dflash_last_target_context_state = None
++        self._dflash_last_target_context_image_signature = None
++        self._dflash_previous_target_action = None
++        self._dflash_last_target_action = None
++        self._dflash_pending_context_features = None
++        self._dflash_pending_context_hold_depth = None
++        self._dflash_current_transition_estimate = None
++        if self._dflash_transition_observer is not None:
++            self._dflash_transition_observer.reset_episode()
++        if self._dflash_context_risk_memory is not None:
++            self._dflash_context_risk_memory.reset_online()
++        if self._dflash_context_budget_allocator is not None:
++            self._dflash_context_budget_allocator.reset()
++        # Revealing-action labels come only from target calls.  Both posterior
++        # and dual budget state persist across episodes so adaptation and compute
++        # accounting remain chronological instead of restarting a hand-crafted
++        # per-episode schedule.
++
++    def _dflash_context_features(self) -> Optional[dict[str, float]]:
++        """Build pre-target features aligned with target-only trace collection."""
++        current_state = self._dflash_current_context_state
++        anchor_state = self._dflash_last_target_context_state
++        current_image = self._dflash_current_context_image_signature
++        anchor_image = self._dflash_last_target_context_image_signature
++        anchor_action = self._dflash_last_target_action
++        if (
++            current_state is None
++            or anchor_state is None
++            or current_image is None
++            or anchor_image is None
++            or anchor_action is None
++        ):
++            return None
++        state_delta = np.asarray(current_state) - np.asarray(anchor_state)
++        if state_delta.size < 6:
++            return None
++        image_relative_l2 = float(
++            np.linalg.norm(np.asarray(current_image) - np.asarray(anchor_image))
++            / max(float(np.linalg.norm(anchor_image)), 1e-6)
++        )
++        previous_action = self._dflash_previous_target_action
++        anchor_action_array = np.asarray(anchor_action, dtype=np.float64)[:6]
++        previous_action_array = (
++            None
++            if previous_action is None
++            else np.asarray(previous_action, dtype=np.float64)[:6]
++        )
++        action_delta = (
++            np.zeros(6, dtype=np.float64)
++            if previous_action_array is None
++            else anchor_action_array - previous_action_array
++        )
++        action_change = (
++            0.0
++            if previous_action_array is None
++            else float(np.linalg.norm(action_delta))
++        )
++        features = {
++            "image_relative_l2": image_relative_l2,
++            "eef_position_l2": float(np.linalg.norm(state_delta[:3])),
++            "eef_rotation_l2": float(np.linalg.norm(state_delta[3:6])),
++            "anchor_action_change_l2": action_change,
++            "anchor_action_norm": float(np.linalg.norm(np.asarray(anchor_action)[:6])),
++            "anchor_gripper": float(np.asarray(anchor_action)[6]),
++            "anchor_gripper_change": (
++                0.0
++                if previous_action is None
++                else float(np.asarray(anchor_action)[6] - np.asarray(previous_action)[6])
++            ),
++        }
++        features.update(
++            {f"eef_delta_{index}": float(state_delta[index]) for index in range(6)}
++        )
++        features.update(
++            {
++                f"anchor_action_{index}": float(anchor_action_array[index])
++                for index in range(6)
++            }
++        )
++        features.update(
++            {
++                f"anchor_action_delta_{index}": float(action_delta[index])
++                for index in range(6)
++            }
++        )
++        features.update(
++            self._dflash_action_distribution_features(
++                self._dflash_previous_first_action_probs
++            )
++        )
++        transition = self._dflash_current_transition_estimate
++        features.update(
++            {
++                "transition_surprise": (
++                    float(transition.surprise) if transition is not None else 0.0
++                ),
++                "transition_uncertainty": (
++                    float(transition.epistemic_uncertainty)
++                    if transition is not None
++                    else 0.0
++                ),
++                "transition_risk_percentile": (
++                    float(transition.surprise_percentile)
++                    if transition is not None
++                    else 1.0
++                ),
++            }
++        )
++        return features
+ 
+     def _record_dflash_action_history(self, action_tokens: torch.LongTensor) -> None:
+         """Keep two tiny CPU action records for the next temporal prefill."""
+@@ -2314,6 +2784,8 @@ class SpecVLAforActionPrediction(nn.Module):
+                 "adaptive",
+                 "visual_budget",
+                 "paced_budget",
++                "contextual_budget",
++                "revealing_budget",
+                 "calibrated",
+             }
+         )
+@@ -2357,6 +2829,8 @@ class SpecVLAforActionPrediction(nn.Module):
+                 "adaptive",
+                 "visual_budget",
+                 "paced_budget",
++                "contextual_budget",
++                "revealing_budget",
+                 "calibrated",
+             }
+             and (
+@@ -2414,6 +2888,255 @@ class SpecVLAforActionPrediction(nn.Module):
+                 )
+         self._dflash_temporal_control_step += 1
+         next_hold_depth = self._dflash_consecutive_verify_skips + 1
++        contextual_risk_estimate = None
++        contextual_budget_decision = None
++        contextual_budget_allow = None
++        contextual_features = None
++        revealing_risk_estimate = None
++        revealing_budget_decision = None
++        revealing_budget_allow = None
++        revealing_features = None
++        revealing_residual_estimate = None
++        revealing_authority_estimate = None
++        revealing_monotone_envelope_depth = None
++        revealing_selection_risk = None
++        revealing_raw_selection_risk = None
++        vtpf_utility_estimate = None
++        revealing_instantaneous_risk = None
++        revealing_cumulative_hazard = None
++        if (
++            self.dflash_temporal_hold_policy == "contextual_budget"
++            and base_temporal_hold_eligible
++            and next_hold_depth == 2
++            and self._dflash_context_risk_memory is not None
++            and self._dflash_context_budget_allocator is not None
++        ):
++            contextual_features = self._dflash_context_features()
++            if contextual_features is not None:
++                contextual_risk_estimate = (
++                    self._dflash_context_risk_memory.estimate(
++                        contextual_features
++                    )
++                )
++                contextual_budget_decision = (
++                    self._dflash_context_budget_allocator.decide(
++                        contextual_risk_estimate.risk_percentile
++                    )
++                )
++                contextual_budget_allow = contextual_budget_decision.allow
++                self._dflash_pending_context_features = (
++                    None
++                    if contextual_budget_allow
++                    else dict(contextual_features)
++                )
++                self._dflash_pending_context_hold_depth = (
++                    None if contextual_budget_allow else next_hold_depth
++                )
++        if (
++            self.dflash_temporal_hold_policy == "revealing_budget"
++            and self._dflash_revealing_risk_model is not None
++            and self._dflash_revealing_budget_allocator is not None
++        ):
++            revealing_eligible = bool(
++                base_temporal_hold_eligible
++                and (
++                    self.dflash_revealing_horizon_mode
++                    in {
++                        "risk_adaptive",
++                        "risk_adaptive_monotone",
++                        "risk_survival",
++                        "observer_adaptive",
++                        "observer_learned_adaptive",
++                        "observer_survival",
++                        "observer_learned_survival",
++                    }
++                    or next_hold_depth <= self.dflash_verify_skip_max_consecutive
++                )
++            )
++            if revealing_eligible:
++                revealing_features = self._dflash_context_features()
++                if revealing_features is not None:
++                    revealing_features = dict(revealing_features)
++                    revealing_features["candidate_hold_depth"] = float(
++                        next_hold_depth
++                    )
++                    revealing_features["hold_depth_x_image_relative_l2"] = float(
++                        next_hold_depth
++                        * revealing_features["image_relative_l2"]
++                    )
++                    revealing_features["hold_depth_x_eef_position_l2"] = float(
++                        next_hold_depth
++                        * revealing_features["eef_position_l2"]
++                    )
++                    revealing_features["hold_depth_x_eef_rotation_l2"] = float(
++                        next_hold_depth
++                        * revealing_features["eef_rotation_l2"]
++                    )
++            if revealing_features is not None:
++                if (
++                    self.dflash_revealing_horizon_mode
++                    == "risk_adaptive_monotone"
++                ):
++                    prefix_estimates = []
++                    for prefix_depth in range(1, next_hold_depth + 1):
++                        prefix_features = dict(revealing_features)
++                        prefix_features["candidate_hold_depth"] = float(
++                            prefix_depth
++                        )
++                        prefix_features[
++                            "hold_depth_x_image_relative_l2"
++                        ] = float(
++                            prefix_depth
++                            * prefix_features["image_relative_l2"]
++                        )
++                        prefix_features[
++                            "hold_depth_x_eef_position_l2"
++                        ] = float(
++                            prefix_depth
++                            * prefix_features["eef_position_l2"]
++                        )
++                        prefix_features[
++                            "hold_depth_x_eef_rotation_l2"
++                        ] = float(
++                            prefix_depth
++                            * prefix_features["eef_rotation_l2"]
++                        )
++                        prefix_estimates.append(
++                            self._dflash_revealing_risk_model.estimate(
++                                prefix_features
++                            )
++                        )
++                    (
++                        revealing_monotone_envelope_depth,
++                        revealing_risk_estimate,
++                    ) = select_monotone_risk_envelope(prefix_estimates)
++                else:
++                    revealing_risk_estimate = (
++                        self._dflash_revealing_risk_model.estimate(
++                            revealing_features
++                        )
++                    )
++                if self._dflash_revealing_residual_model is not None:
++                    revealing_residual_estimate = (
++                        self._dflash_revealing_residual_model.estimate(
++                            revealing_features
++                        )
++                    )
++                if self._dflash_revealing_authority_model is not None:
++                    revealing_authority_estimate = (
++                        self._dflash_revealing_authority_model.estimate(
++                            revealing_features
++                        )
++                    )
++            revealing_selection_risk = (
++                float(self._dflash_revealing_context_free_rng.random())
++                if self.dflash_revealing_selection_mode == "context_free"
++                else (
++                    revealing_risk_estimate.risk_percentile
++                    if revealing_risk_estimate is not None
++                    else 1.0
++                )
++            )
++            transition_ready = bool(
++                self._dflash_current_transition_estimate is not None
++                and self._dflash_current_transition_estimate.ready
++            )
++            if self.dflash_revealing_horizon_mode == "risk_survival":
++                revealing_instantaneous_risk = revealing_selection_risk
++                revealing_cumulative_hazard, _ = (
++                    accumulate_recoverability_hazard(
++                        self._dflash_recoverability_survival,
++                        revealing_instantaneous_risk,
++                    )
++                )
++                revealing_selection_risk = revealing_cumulative_hazard
++            observer_mode = self.dflash_revealing_horizon_mode in {
++                "observer_adaptive",
++                "observer_learned_adaptive",
++                "observer_survival",
++                "observer_learned_survival",
++            }
++            if (
++                observer_mode
++                and self.dflash_revealing_selection_mode == "contextual"
++                and transition_ready
++            ):
++                if (
++                    self.dflash_revealing_horizon_mode
++                    in {
++                        "observer_learned_adaptive",
++                        "observer_learned_survival",
++                    }
++                ):
++                    # Transition statistics are already features of the online
++                    # target-error model.  Let revealed target corrections learn
++                    # their relevance instead of imposing a hand-written max.
++                    revealing_instantaneous_risk = revealing_selection_risk
++                else:
++                    revealing_instantaneous_risk = max(
++                        revealing_selection_risk,
++                        float(
++                            self._dflash_current_transition_estimate.surprise_percentile
++                        ),
++                    )
++                revealing_selection_risk = revealing_instantaneous_risk
++                if self.dflash_revealing_horizon_mode in {
++                    "observer_survival",
++                    "observer_learned_survival",
++                }:
++                    revealing_cumulative_hazard, _ = (
++                        accumulate_recoverability_hazard(
++                            self._dflash_recoverability_survival,
++                            revealing_instantaneous_risk,
++                        )
++                    )
++                    revealing_selection_risk = revealing_cumulative_hazard
++            revealing_raw_selection_risk = revealing_selection_risk
++            if (
++                self._dflash_vtpf_utility_model is not None
++                and revealing_features is not None
++            ):
++                vtpf_utility_estimate = self._dflash_vtpf_utility_model.estimate(
++                    revealing_features
++                )
++                revealing_selection_risk = cost_aware_revealing_priority(
++                    revealing_selection_risk,
++                    vtpf_utility_estimate,
++                )
++            revealing_budget_decision = (
++                self._dflash_revealing_budget_allocator.decide(
++                    revealing_selection_risk,
++                    eligible=bool(
++                        revealing_eligible and revealing_features is not None
++                    ),
++                    model_ready=bool(
++                        revealing_risk_estimate is not None
++                        and revealing_risk_estimate.ready
++                        and (
++                            self.dflash_revealing_horizon_mode
++                            not in {
++                                "observer_adaptive",
++                                "observer_learned_adaptive",
++                                "observer_survival",
++                                "observer_learned_survival",
++                            }
++                            or transition_ready
++                        )
++                    ),
++                )
++            )
++            revealing_budget_allow = (
++                revealing_budget_decision.allow_hold
++            )
++            if (
++                not revealing_budget_allow
++                and revealing_eligible
++                and revealing_features is not None
++            ):
++                self._dflash_pending_context_features = dict(
++                    revealing_features
++                )
++                self._dflash_pending_context_hold_depth = next_hold_depth
+         calibrated_visual_bound = None
+         if (
+             self.dflash_temporal_hold_policy == "calibrated"
+@@ -2440,6 +3163,21 @@ class SpecVLAforActionPrediction(nn.Module):
+             ),
+             schedule_target_due=schedule_target_due,
+             calibrated_visual_bound=calibrated_visual_bound,
++            contextual_budget_allow=contextual_budget_allow,
++            revealing_budget_allow=revealing_budget_allow,
++            enforce_max_consecutive=not (
++                self.dflash_temporal_hold_policy == "revealing_budget"
++                and self.dflash_revealing_horizon_mode
++                in {
++                    "risk_adaptive",
++                    "risk_adaptive_monotone",
++                    "risk_survival",
++                    "observer_adaptive",
++                    "observer_learned_adaptive",
++                    "observer_survival",
++                    "observer_learned_survival",
++                }
++            ),
+         )
+         temporal_hold_decision_record = temporal_hold_decision.as_record()
+         temporal_hold_decision_record.update(
+@@ -2463,6 +3201,63 @@ class SpecVLAforActionPrediction(nn.Module):
+                 "temporal_control_step": temporal_control_step,
+                 "schedule_target_due": schedule_target_due,
+                 "calibrated_visual_bound": calibrated_visual_bound,
++                "contextual_features": contextual_features,
++                "contextual_risk_estimate": (
++                    contextual_risk_estimate.as_record()
++                    if contextual_risk_estimate is not None
++                    else None
++                ),
++                "contextual_budget_decision": (
++                    contextual_budget_decision.as_record()
++                    if contextual_budget_decision is not None
++                    else None
++                ),
++                "revealing_features": revealing_features,
++                "revealing_risk_estimate": (
++                    revealing_risk_estimate.as_record()
++                    if revealing_risk_estimate is not None
++                    else None
++                ),
++                "revealing_budget_decision": (
++                    revealing_budget_decision.as_record()
++                    if revealing_budget_decision is not None
++                    else None
++                ),
++                "revealing_residual_estimate": (
++                    revealing_residual_estimate.as_record()
++                    if revealing_residual_estimate is not None
++                    else None
++                ),
++                "revealing_authority_estimate": (
++                    revealing_authority_estimate.as_record()
++                    if revealing_authority_estimate is not None
++                    else None
++                ),
++                "revealing_selection_mode": (
++                    self.dflash_revealing_selection_mode
++                ),
++                "revealing_risk_target": self.dflash_revealing_risk_target,
++                "revealing_horizon_mode": self.dflash_revealing_horizon_mode,
++                "revealing_monotone_envelope_depth": (
++                    revealing_monotone_envelope_depth
++                ),
++                "revealing_selection_risk": revealing_selection_risk,
++                "revealing_raw_selection_risk": revealing_raw_selection_risk,
++                "vtpf_utility_estimate": (
++                    vtpf_utility_estimate.as_record()
++                    if vtpf_utility_estimate is not None
++                    else None
++                ),
++                "revealing_instantaneous_risk": revealing_instantaneous_risk,
++                "revealing_cumulative_hazard": revealing_cumulative_hazard,
++                "recoverability_survival_before": float(
++                    self._dflash_recoverability_survival
++                ),
++                "transition_surprise_estimate": (
++                    self._dflash_current_transition_estimate.as_record()
++                    if self._dflash_current_transition_estimate is not None
++                    else None
++                ),
+             }
+         )
+         temporal_prefill_bypass_active = temporal_hold_decision.allow
+@@ -2475,6 +3270,24 @@ class SpecVLAforActionPrediction(nn.Module):
+             ].detach().clone()
+             self._dflash_previous_pixel_signature = current_pixel_signature
+             self._dflash_consecutive_verify_skips += 1
++            if (
++                self.dflash_revealing_horizon_mode
++                in {
++                    "risk_survival",
++                    "observer_survival",
++                    "observer_learned_survival",
++                }
++                and revealing_cumulative_hazard is not None
++            ):
++                _, self._dflash_recoverability_survival = (
++                    accumulate_recoverability_hazard(
++                        self._dflash_recoverability_survival,
++                        float(revealing_instantaneous_risk),
++                    )
++                )
++            temporal_hold_decision_record["recoverability_survival_after"] = float(
++                self._dflash_recoverability_survival
++            )
+             if (
+                 self.dflash_temporal_hold_policy
+                 == "paced_budget"
+@@ -2501,6 +3314,7 @@ class SpecVLAforActionPrediction(nn.Module):
+                 "target_logit_shadow_mismatches": self._target_logit_shadow_mismatches,
+                 "verify_skip_mode": self.dflash_verify_skip_mode,
+                 "temporal_hold_policy": self.dflash_temporal_hold_policy,
++                "context_target_density": self.dflash_context_target_density,
+                 "temporal_adaptive_min_verified_run": (
+                     self.dflash_temporal_adaptive_min_verified_run
+                 ),
+@@ -2596,6 +3410,8 @@ class SpecVLAforActionPrediction(nn.Module):
+             self.last_generation_stats = generation_stats
+             return final_action_tokens
+ 
++        self._dflash_recoverability_survival = 1.0
++        temporal_hold_decision_record["recoverability_survival_after"] = 1.0
+         stage_started = profile_start()
+         prefill_active = (
+             prefill_fusion_candidate is not None
+@@ -3044,12 +3860,16 @@ class SpecVLAforActionPrediction(nn.Module):
+             if collect_temporal_diagnostics
+             else None
+         )
++        collect_target_distribution = bool(
++            collect_temporal_diagnostics
++            or self.dflash_temporal_hold_policy == "contextual_budget"
++        )
+         current_first_action_probs = (
+             F.softmax(
+                 self._dflash_action_logits(first_token_logits[:, 0, :]).float(),
+                 dim=-1,
+             ).detach()
+-            if collect_temporal_diagnostics
++            if collect_target_distribution
+             else None
+         )
+         temporal_action_skip_record = None
+@@ -4319,6 +5139,8 @@ class SpecVLAforActionPrediction(nn.Module):
+                 self.dflash_temporal_bypass_use_pixel_guard
+             ),
+             "temporal_hold_policy": self.dflash_temporal_hold_policy,
++            "context_target_density": self.dflash_context_target_density,
++            "context_online_update": self.dflash_context_online_update,
+             "temporal_adaptive_min_verified_run": (
+                 self.dflash_temporal_adaptive_min_verified_run
+             ),
+@@ -4517,6 +5339,30 @@ class SpecVLAforActionPrediction(nn.Module):
+         self._pending_generation_stats = None
+         self._target_logit_shadow_checks = 0
+         self._target_logit_shadow_mismatches = 0
++        context_state = kwargs.pop("dflash_context_robot_state", None)
++        context_image_signature = kwargs.pop(
++            "dflash_context_image_signature", None
++        )
++        self._dflash_current_context_state = (
++            None
++            if context_state is None
++            else np.asarray(context_state, dtype=np.float64).copy()
++        )
++        self._dflash_current_context_image_signature = (
++            None
++            if context_image_signature is None
++            else np.asarray(context_image_signature, dtype=np.float64).copy()
++        )
++        self._dflash_current_transition_estimate = None
++        if (
++            self._dflash_transition_observer is not None
++            and self._dflash_current_context_state is not None
++        ):
++            self._dflash_current_transition_estimate = (
++                self._dflash_transition_observer.observe(
++                    self._dflash_current_context_state
++                )
++            )
+ 
+         # 设置generate方法的参数
+         if return_hidden_states:
+@@ -4608,19 +5454,377 @@ class SpecVLAforActionPrediction(nn.Module):
+             hold_record = self.last_dflash_stats.get(
+                 "temporal_hold_decision_record"
+             )
+-            if hold_record is not None and bool(hold_record.get("allow", False)):
++            temporal_hold_active = bool(
++                hold_record is not None and hold_record.get("allow", False)
++            )
++            if temporal_hold_active:
+                 hold_depth = int(hold_record.get("hold_depth", 1))
+                 action_scale = temporal_hold_action_scale(
+                     self.dflash_temporal_hold_action_decay,
+                     hold_depth,
+                     exponent=self.dflash_temporal_authority_exponent,
+                 )
++                authority_estimate = hold_record.get(
++                    "revealing_authority_estimate"
++                )
++                if (
++                    self.dflash_revealing_authority_mode
++                    in {"active", "certified"}
++                    and authority_estimate is not None
++                    and authority_estimate.get(
++                        (
++                            "certified"
++                            if self.dflash_revealing_authority_mode
++                            == "certified"
++                            else "ready"
++                        ),
++                        False,
++                    )
++                    and hold_depth >= self.dflash_revealing_authority_min_depth
++                ):
++                    action_scale = float(
++                        authority_estimate["predicted_authority"]
++                    )
++                    hold_record["revealing_authority_applied"] = True
++                else:
++                    hold_record["revealing_authority_applied"] = False
+                 if action_scale != 1.0:
+                     actions = actions.copy()
+                     actions[: min(6, actions.shape[0])] *= action_scale
+                 hold_record["executed_continuous_action_scale"] = float(
+                     action_scale
+                 )
++                residual_estimate = hold_record.get(
++                    "revealing_residual_estimate"
++                )
++                if (
++                    self.dflash_revealing_residual_mode == "active"
++                    and residual_estimate is not None
++                    and residual_estimate.get("ready", False)
++                ):
++                    predicted_residual = np.asarray(
++                        residual_estimate["predicted_residual"],
++                        dtype=np.float64,
++                    )
++                    authority = float(
++                        residual_estimate.get("learned_authority", 0.0)
++                    )
++                    if predicted_residual.shape == (6,) and authority > 0.0:
++                        actions = actions.copy()
++                        corrected = actions[:6] + authority * predicted_residual
++                        clipped = np.clip(corrected, action_low[:6], action_high[:6])
++                        actions[:6] = clipped
++                        hold_record["revealing_residual_applied"] = True
++                        hold_record["revealing_residual_authority"] = authority
++                        hold_record["revealing_residual_clip_l2"] = float(
++                            np.linalg.norm(corrected - clipped)
++                        )
++                    else:
++                        hold_record["revealing_residual_applied"] = False
++            if self.dflash_temporal_hold_policy in {
++                "contextual_budget",
++                "revealing_budget",
++            }:
++                if self.dflash_temporal_hold_policy == "contextual_budget":
++                    profile_suite = self._dflash_context_risk_memory.task_suite_name
++                    current_suite = str(unnorm_key).removesuffix("_no_noops")
++                    if profile_suite != current_suite:
++                        raise ValueError(
++                            "Contextual-risk profile suite mismatch: "
++                            f"profile={profile_suite}, action_stats={current_suite}."
++                        )
++                if not temporal_hold_active:
++                    feedback_record = None
++                    if (
++                        self._dflash_pending_context_features is not None
++                        and self._dflash_last_target_action is not None
++                    ):
++                        hypothetical_hold = np.asarray(
++                            self._dflash_last_target_action, dtype=np.float64
++                        ).copy()
++                        pending_hold_depth = int(
++                            self._dflash_pending_context_hold_depth or 1
++                        )
++                        hypothetical_hold[:6] *= temporal_hold_action_scale(
++                            self.dflash_temporal_hold_action_decay,
++                            pending_hold_depth,
++                            exponent=self.dflash_temporal_authority_exponent,
++                        )
++                        target_action = np.asarray(actions, dtype=np.float64)
++                        inverse_age_correction_l2 = float(
++                            np.linalg.norm(
++                                target_action[:6] - hypothetical_hold[:6]
++                            )
++                        )
++                        target_residual = target_action[:6] - hypothetical_hold[:6]
++
++                        anchor_action = np.asarray(
++                            self._dflash_last_target_action, dtype=np.float64
++                        )
++                        action_span = np.where(
++                            np.asarray(mask, dtype=bool),
++                            np.asarray(action_high) - np.asarray(action_low),
++                            2.0,
++                        )
++                        action_span = np.maximum(action_span, 1e-6)
++                        projection_scale = (
++                            action_span
++                            if self.dflash_revealing_risk_target
++                            in {
++                                "structured_innovation",
++                                "post_authority_correction",
++                                "post_authority_compact",
++                            }
++                            else np.ones_like(action_span)
++                        )
++                        projection = project_target_onto_anchor(
++                            anchor_action,
++                            target_action,
++                            projection_scale,
++                            scaled_dimensions=6,
++                        )
++                        optimal_authority = projection.optimal_authority
++                        structured_innovation_l2 = projection.innovation_l2
++                        pending_authority = (hold_record or {}).get(
++                            "revealing_authority_estimate"
++                        )
++                        pending_authority_ready = bool(
++                            pending_authority is not None
++                            and pending_authority.get(
++                                (
++                                    "certified"
++                                    if self.dflash_revealing_authority_mode
++                                    == "certified"
++                                    else "ready"
++                                ),
++                                False,
++                            )
++                        )
++                        deployment_authority = (
++                            float(pending_authority["predicted_authority"])
++                            if pending_authority_ready
++                            else temporal_hold_action_scale(
++                                self.dflash_temporal_hold_action_decay,
++                                pending_hold_depth,
++                                exponent=self.dflash_temporal_authority_exponent,
++                            )
++                        )
++                        deployment_error = evaluate_target_grounded_reuse(
++                            anchor_action,
++                            target_action,
++                            projection_scale,
++                            authority=deployment_authority,
++                            scaled_dimensions=6,
++                        )
++                        post_authority_correction_l2 = deployment_error.error_l2
++                        authority_anchor = anchor_action[:6] / projection_scale[:6]
++                        authority_target = target_action[:6] / projection_scale[:6]
++                        correction_l2 = {
++                            "inverse_age_correction": inverse_age_correction_l2,
++                            "inverse_age_local": inverse_age_correction_l2,
++                            "inverse_age_local_costaware": inverse_age_correction_l2,
++                            "inverse_age_rich": inverse_age_correction_l2,
++                            "structured_innovation": structured_innovation_l2,
++                            "post_authority_correction": (
++                                post_authority_correction_l2
++                            ),
++                            "post_authority_compact": (
++                                post_authority_correction_l2
++                            ),
++                        }[self.dflash_revealing_risk_target]
++                        online_update_applied = False
++                        online_records = 0
++                        residual_shadow_record = None
++                        authority_shadow_record = None
++                        vtpf_utility_feedback = None
++                        if (
++                            self.dflash_temporal_hold_policy
++                            == "contextual_budget"
++                            and self.dflash_context_online_update
++                        ):
++                            self._dflash_context_risk_memory.observe(
++                                self._dflash_pending_context_features,
++                                correction_l2,
++                            )
++                            online_update_applied = True
++                            online_records = int(
++                                self._dflash_context_risk_memory.online_records
++                            )
++                        elif (
++                            self.dflash_temporal_hold_policy
++                            == "revealing_budget"
++                        ):
++                            self._dflash_revealing_risk_model.observe(
++                                self._dflash_pending_context_features,
++                                correction_l2,
++                            )
++                            online_update_applied = True
++                            online_records = int(
++                                self._dflash_revealing_risk_model.labeled_records
++                            )
++                            prefill_record = self.last_dflash_stats.get(
++                                "temporal_prefill_fusion_record"
++                            )
++                            if (
++                                self._dflash_vtpf_utility_model is not None
++                                and prefill_record is not None
++                            ):
++                                vtpf_full_match = bool(
++                                    prefill_record.get("full_match", False)
++                                )
++                                self._dflash_vtpf_utility_model.observe(
++                                    self._dflash_pending_context_features,
++                                    full_match=vtpf_full_match,
++                                )
++                                vtpf_utility_feedback = {
++                                    "full_match": vtpf_full_match,
++                                    "accept_length": int(
++                                        prefill_record.get("accept_length", 0)
++                                    ),
++                                    "online_records": int(
++                                        self._dflash_vtpf_utility_model.labeled_records
++                                    ),
++                                }
++                            if self._dflash_revealing_residual_model is not None:
++                                pending_estimate = hold_record.get(
++                                    "revealing_residual_estimate"
++                                )
++                                residual_shadow_record = (
++                                    self._dflash_revealing_residual_model.observe(
++                                        self._dflash_pending_context_features,
++                                        target_residual,
++                                        prequential_prediction=(
++                                            pending_estimate.get(
++                                                "predicted_residual"
++                                            )
++                                            if pending_estimate is not None
++                                            else None
++                                        ),
++                                        prequential_ready=bool(
++                                            pending_estimate is not None
++                                            and pending_estimate.get(
++                                                "ready", False
++                                            )
++                                        ),
++                                    )
++                                )
++                            if self._dflash_revealing_authority_model is not None:
++                                authority_ready = bool(
++                                    pending_authority is not None
++                                    and pending_authority.get("ready", False)
++                                )
++                                predicted_authority = (
++                                    float(
++                                        pending_authority[
++                                            "predicted_authority"
++                                        ]
++                                    )
++                                    if pending_authority is not None
++                                    else None
++                                )
++                                predicted_error = (
++                                    authority_target
++                                    - predicted_authority * authority_anchor
++                                    if authority_ready
++                                    else None
++                                )
++                                inverse_age_scale = temporal_hold_action_scale(
++                                    self.dflash_temporal_hold_action_decay,
++                                    pending_hold_depth,
++                                    exponent=self.dflash_temporal_authority_exponent,
++                                )
++                                authority_baseline_error = (
++                                    authority_target
++                                    - inverse_age_scale * authority_anchor
++                                )
++                                authority_shadow_record = (
++                                    self._dflash_revealing_authority_model.observe(
++                                        self._dflash_pending_context_features,
++                                        optimal_authority,
++                                        prequential_prediction=(
++                                            predicted_authority
++                                        ),
++                                        prequential_ready=authority_ready,
++                                        baseline_squared_error=(
++                                            float(
++                                                authority_baseline_error
++                                                @ authority_baseline_error
++                                            )
++                                            if authority_ready
++                                            else None
++                                        ),
++                                        predicted_squared_error=(
++                                            float(predicted_error @ predicted_error)
++                                            if authority_ready
++                                            else None
++                                        ),
++                                    )
++                                )
++                        feedback_record = {
++                            "correction_l2": correction_l2,
++                            "inverse_age_correction_l2": (
++                                inverse_age_correction_l2
++                            ),
++                            "structured_innovation_l2": (
++                                structured_innovation_l2
++                            ),
++                            "post_authority_correction_l2": (
++                                post_authority_correction_l2
++                            ),
++                            "deployment_authority": deployment_error.authority,
++                            "risk_target": self.dflash_revealing_risk_target,
++                            "correction_vector": target_residual.tolist(),
++                            "hold_depth": pending_hold_depth,
++                            "online_update_applied": online_update_applied,
++                            "online_records": online_records,
++                            "residual_shadow": residual_shadow_record,
++                            "authority_shadow": authority_shadow_record,
++                            "vtpf_utility_feedback": vtpf_utility_feedback,
++                        }
++                    if hold_record is not None:
++                        feedback_key = (
++                            "contextual_target_feedback"
++                            if self.dflash_temporal_hold_policy
++                            == "contextual_budget"
++                            else "revealing_target_feedback"
++                        )
++                        hold_record[feedback_key] = feedback_record
++                    self._dflash_previous_target_action = (
++                        None
++                        if self._dflash_last_target_action is None
++                        else np.asarray(
++                            self._dflash_last_target_action, dtype=np.float64
++                        ).copy()
++                    )
++                    self._dflash_last_target_action = np.asarray(
++                        actions, dtype=np.float64
++                    ).copy()
++                    self._dflash_last_target_context_state = (
++                        None
++                        if self._dflash_current_context_state is None
++                        else np.asarray(
++                            self._dflash_current_context_state, dtype=np.float64
++                        ).copy()
++                    )
++                    self._dflash_last_target_context_image_signature = (
++                        None
++                        if self._dflash_current_context_image_signature is None
++                        else np.asarray(
++                            self._dflash_current_context_image_signature,
++                            dtype=np.float64,
++                        ).copy()
++                    )
++                    self._dflash_pending_context_features = None
++                    self._dflash_pending_context_hold_depth = None
++
++        if (
++            self._dflash_transition_observer is not None
++            and self._dflash_current_context_state is not None
++        ):
++            self._dflash_transition_observer.stage(
++                self._dflash_current_context_state,
++                actions,
++            )
+         
+         # 如果需要返回隐藏状态
+         if return_hidden_states:
+diff --git a/openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh b/openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh
+index 9f27945..e4f37f1 100755
+--- a/openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh
++++ b/openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh
+@@ -53,6 +53,15 @@ DFLASH_TEMPORAL_PREFIX_CERT_TOKENS="${DFLASH_TEMPORAL_PREFIX_CERT_TOKENS:-0}"
+ DFLASH_TEMPORAL_BYPASS_MAX_PIXEL_RELATIVE_L2="${DFLASH_TEMPORAL_BYPASS_MAX_PIXEL_RELATIVE_L2:-0.0}"
+ DFLASH_TEMPORAL_BYPASS_USE_PIXEL_GUARD="${DFLASH_TEMPORAL_BYPASS_USE_PIXEL_GUARD:-True}"
+ DFLASH_TEMPORAL_HOLD_POLICY="${DFLASH_TEMPORAL_HOLD_POLICY:-fixed}"
++DFLASH_CONTEXT_RISK_PROFILE="${DFLASH_CONTEXT_RISK_PROFILE:-}"
++DFLASH_CONTEXT_TARGET_DENSITY="${DFLASH_CONTEXT_TARGET_DENSITY:-0.4}"
++DFLASH_CONTEXT_ONLINE_UPDATE="${DFLASH_CONTEXT_ONLINE_UPDATE:-False}"
++DFLASH_REVEALING_RESIDUAL_MODE="${DFLASH_REVEALING_RESIDUAL_MODE:-off}"
++DFLASH_REVEALING_AUTHORITY_MODE="${DFLASH_REVEALING_AUTHORITY_MODE:-off}"
++DFLASH_REVEALING_SELECTION_MODE="${DFLASH_REVEALING_SELECTION_MODE:-contextual}"
++DFLASH_REVEALING_AUTHORITY_MIN_DEPTH="${DFLASH_REVEALING_AUTHORITY_MIN_DEPTH:-1}"
++DFLASH_REVEALING_RISK_TARGET="${DFLASH_REVEALING_RISK_TARGET:-inverse_age_correction}"
++DFLASH_REVEALING_HORIZON_MODE="${DFLASH_REVEALING_HORIZON_MODE:-fixed_two}"
+ DFLASH_TEMPORAL_ADAPTIVE_MIN_VERIFIED_RUN="${DFLASH_TEMPORAL_ADAPTIVE_MIN_VERIFIED_RUN:-2}"
+ DFLASH_TEMPORAL_ADAPTIVE_MAX_ANCHOR_PIXEL_RELATIVE_L2="${DFLASH_TEMPORAL_ADAPTIVE_MAX_ANCHOR_PIXEL_RELATIVE_L2:-0.03}"
+ DFLASH_TEMPORAL_HOLD_ACTION_DECAY="${DFLASH_TEMPORAL_HOLD_ACTION_DECAY:-none}"
+@@ -95,6 +104,9 @@ echo "DFLASH_TEMPORAL_PREFIX_CERT_TOKENS=${DFLASH_TEMPORAL_PREFIX_CERT_TOKENS} (
+ echo "DFLASH_TEMPORAL_BYPASS_MAX_PIXEL_RELATIVE_L2=${DFLASH_TEMPORAL_BYPASS_MAX_PIXEL_RELATIVE_L2} (0=关闭完整 prefill 跳过)"
+ echo "DFLASH_TEMPORAL_BYPASS_USE_PIXEL_GUARD=${DFLASH_TEMPORAL_BYPASS_USE_PIXEL_GUARD}"
+ echo "DFLASH_TEMPORAL_HOLD_POLICY=${DFLASH_TEMPORAL_HOLD_POLICY}"
++echo "DFLASH_CONTEXT_RISK_PROFILE=${DFLASH_CONTEXT_RISK_PROFILE:-disabled}"
++echo "DFLASH_CONTEXT_TARGET_DENSITY=${DFLASH_CONTEXT_TARGET_DENSITY}"
++echo "DFLASH_CONTEXT_ONLINE_UPDATE=${DFLASH_CONTEXT_ONLINE_UPDATE}"
+ if [[ "${DFLASH_TEMPORAL_HOLD_POLICY}" == "adaptive" ]]; then
+   echo "DFLASH_TEMPORAL_ADAPTIVE_HOLD=first_hold_always, second_hold_requires verified_run>=${DFLASH_TEMPORAL_ADAPTIVE_MIN_VERIFIED_RUN} and anchor_pixel_l2<=${DFLASH_TEMPORAL_ADAPTIVE_MAX_ANCHOR_PIXEL_RELATIVE_L2}"
+ fi
+@@ -106,12 +118,20 @@ echo "DFLASH_TEMPORAL_PREFILL_TREE=${DFLASH_TEMPORAL_PREFILL_TREE}"
+ echo "DFLASH_TEMPORAL_PREFILL_TREE_MAX_CANDIDATES=${DFLASH_TEMPORAL_PREFILL_TREE_MAX_CANDIDATES}"
+ echo "DFLASH_TEMPORAL_PREFILL_TREE_MIN_HISTORY=${DFLASH_TEMPORAL_PREFILL_TREE_MIN_HISTORY}"
+ if [[ "${DFLASH_VERIFY_SKIP_MODE}" == "active" && "${DFLASH_TEMPORAL_BYPASS_MAX_PIXEL_RELATIVE_L2}" != "0" && "${DFLASH_TEMPORAL_BYPASS_MAX_PIXEL_RELATIVE_L2}" != "0.0" ]]; then
+-  if [[ "${DFLASH_TEMPORAL_BYPASS_USE_PIXEL_GUARD}" == "True" ]]; then
+-    echo "DFLASH_TEMPORAL_BYPASS=pixel_relative_l2<=${DFLASH_TEMPORAL_BYPASS_MAX_PIXEL_RELATIVE_L2}, target_verified_history>=${DFLASH_VERIFY_SKIP_MIN_STABLE_ACTIONS}, max_hold=${DFLASH_VERIFY_SKIP_MAX_CONSECUTIVE}"
+-  else
+-    echo "DFLASH_TEMPORAL_BYPASS=target-keyframe interleave, target_verified_history>=${DFLASH_VERIFY_SKIP_MIN_STABLE_ACTIONS}, max_hold=${DFLASH_VERIFY_SKIP_MAX_CONSECUTIVE}"
+-  fi
+-  echo "DFLASH_TEMPORAL_SKIP=skip complete target prefill; next target keyframe is forced after max_hold"
++  case "${DFLASH_TEMPORAL_HOLD_POLICY}:${DFLASH_REVEALING_HORIZON_MODE}" in
++    revealing_budget:risk_adaptive|revealing_budget:risk_adaptive_monotone|revealing_budget:risk_survival|revealing_budget:observer_adaptive|revealing_budget:observer_learned_adaptive|revealing_budget:observer_survival|revealing_budget:observer_learned_survival)
++      echo "DFLASH_TEMPORAL_BYPASS=online recoverability gate, target_verified_history>=${DFLASH_VERIFY_SKIP_MIN_STABLE_ACTIONS}, horizon=context-dependent"
++      echo "DFLASH_TEMPORAL_SKIP=skip complete target prefill; Target regrounding is selected from online risk"
++      ;;
++    *)
++      if [[ "${DFLASH_TEMPORAL_BYPASS_USE_PIXEL_GUARD}" == "True" ]]; then
++        echo "DFLASH_TEMPORAL_BYPASS=pixel_relative_l2<=${DFLASH_TEMPORAL_BYPASS_MAX_PIXEL_RELATIVE_L2}, target_verified_history>=${DFLASH_VERIFY_SKIP_MIN_STABLE_ACTIONS}, max_hold=${DFLASH_VERIFY_SKIP_MAX_CONSECUTIVE}"
++      else
++        echo "DFLASH_TEMPORAL_BYPASS=target-keyframe interleave, target_verified_history>=${DFLASH_VERIFY_SKIP_MIN_STABLE_ACTIONS}, max_hold=${DFLASH_VERIFY_SKIP_MAX_CONSECUTIVE}"
++      fi
++      echo "DFLASH_TEMPORAL_SKIP=skip complete target prefill; next target keyframe is forced after max_hold"
++      ;;
++  esac
+ elif [[ "${DFLASH_VERIFY_SKIP_MODE}" == "active" && "${DFLASH_TEMPORAL_PREFIX_CERT_TOKENS}" != "0" ]]; then
+   echo "DFLASH_PREFIX_CERT=exact_prefix_tokens=${DFLASH_TEMPORAL_PREFIX_CERT_TOKENS}, verified_history>=${DFLASH_VERIFY_SKIP_MIN_STABLE_ACTIONS}, max_consecutive=${DFLASH_VERIFY_SKIP_MAX_CONSECUTIVE}"
+   echo "DFLASH_TEMPORAL_SKIP=prefix-certified suffix trust; probability/cosine gates are not used"
+@@ -171,6 +191,15 @@ python "${EVAL_ENTRY}" \
+   --dflash_temporal_bypass_max_pixel_relative_l2 "${DFLASH_TEMPORAL_BYPASS_MAX_PIXEL_RELATIVE_L2}" \
+   --dflash_temporal_bypass_use_pixel_guard "${DFLASH_TEMPORAL_BYPASS_USE_PIXEL_GUARD}" \
+   --dflash_temporal_hold_policy "${DFLASH_TEMPORAL_HOLD_POLICY}" \
++  --dflash_context_risk_profile "${DFLASH_CONTEXT_RISK_PROFILE}" \
++  --dflash_context_target_density "${DFLASH_CONTEXT_TARGET_DENSITY}" \
++  --dflash_context_online_update "${DFLASH_CONTEXT_ONLINE_UPDATE}" \
++  --dflash_revealing_residual_mode "${DFLASH_REVEALING_RESIDUAL_MODE}" \
++  --dflash_revealing_authority_mode "${DFLASH_REVEALING_AUTHORITY_MODE}" \
++  --dflash_revealing_selection_mode "${DFLASH_REVEALING_SELECTION_MODE}" \
++  --dflash_revealing_authority_min_depth "${DFLASH_REVEALING_AUTHORITY_MIN_DEPTH}" \
++  --dflash_revealing_risk_target "${DFLASH_REVEALING_RISK_TARGET}" \
++  --dflash_revealing_horizon_mode "${DFLASH_REVEALING_HORIZON_MODE}" \
+   --dflash_temporal_adaptive_min_verified_run "${DFLASH_TEMPORAL_ADAPTIVE_MIN_VERIFIED_RUN}" \
+   --dflash_temporal_adaptive_max_anchor_pixel_relative_l2 "${DFLASH_TEMPORAL_ADAPTIVE_MAX_ANCHOR_PIXEL_RELATIVE_L2}" \
+   --dflash_temporal_hold_action_decay "${DFLASH_TEMPORAL_HOLD_ACTION_DECAY}" \
+diff --git a/openvla/specdecoding/evidence/README.md b/openvla/specdecoding/evidence/README.md
+index dc61a42..69892bf 100644
+--- a/openvla/specdecoding/evidence/README.md
++++ b/openvla/specdecoding/evidence/README.md
+@@ -41,3 +41,33 @@ each branch to JSONL.  A target-continuation positive control must pass before
+ the result is considered valid.  The paired inverse-age branch uses the same
+ historical target action and hold depth as the unscaled branch, changing only
+ the continuous control scale at ages two and three.
++
++## Context-adaptive grounding evidence
++
++Collect target-only traces before evaluating a context-dependent hold gate. A
++single GPU worker owns one output directory, so task or seed workers can run in
++parallel without concurrent writes:
++
++```bash
++CUDA_VISIBLE_DEVICES=0 TASK_IDS=0,1,2,3,4,5,6,7,8,9 \
++NUM_TRIALS=1 SEED=7 TRACE_TAG=ctxref-goal-all-s7 \
++bash openvla/specdecoding/decode-scripts/run_contextual_reference_trace.sh goal
++```
++
++Use a distinct seed for held-out evaluation. The evidence builder defaults to
++seed 7 for calibration and every other available seed for evaluation:
++
++```bash
++python -m openvla.specdecoding.evidence.build_contextual_risk_evidence \
++  --trace_root /data/wulin/c/specvla-data/calibration/context_traces \
++  --output_dir /data/wulin/c/specvla-data/calibration/context_risk_evidence \
++  --lag 2 \
++  --calibration_seed 7 \
++  --extension_fraction 0.48
++```
++
++The output includes source hashes, every flattened candidate, discrimination
++statistics, equal-budget allocation statistics, and vector/PNG figures. These
++are target-only correction-demand proxies, not closed-loop success or speedup
++claims. A gate must still pass a paired closed-loop pilot and an independently
++seeded full evaluation.
+diff --git a/openvla/specdecoding/model/temporal_hold.py b/openvla/specdecoding/model/temporal_hold.py
+index 57a720b..b2deea3 100644
+--- a/openvla/specdecoding/model/temporal_hold.py
++++ b/openvla/specdecoding/model/temporal_hold.py
+@@ -36,6 +36,12 @@ def normalize_temporal_hold_policy(value) -> str:
+         "visual-budget": "visual_budget",
+         "paced_budget": "paced_budget",
+         "paced-budget": "paced_budget",
++        "contextual_budget": "contextual_budget",
++        "contextual-budget": "contextual_budget",
++        "revealing_budget": "revealing_budget",
++        "revealing-budget": "revealing_budget",
++        "online_revealing": "revealing_budget",
++        "online-revealing": "revealing_budget",
+         "calibrated": "calibrated",
+         "risk_calibrated": "calibrated",
+         "risk-calibrated": "calibrated",
+@@ -43,7 +49,8 @@ def normalize_temporal_hold_policy(value) -> str:
+     if normalized not in aliases:
+         raise ValueError(
+             "dflash_temporal_hold_policy must be 'fixed', 'adaptive', "
+-            "'visual_budget', 'paced_budget', or 'calibrated'."
++            "'visual_budget', 'paced_budget', 'contextual_budget', "
++            "'revealing_budget', or 'calibrated'."
+         )
+     return aliases[normalized]
+ 
+@@ -165,6 +172,9 @@ def decide_temporal_hold(
+     extension_budget_available: bool = True,
+     schedule_target_due: bool = False,
+     calibrated_visual_bound: Optional[float] = None,
++    contextual_budget_allow: Optional[bool] = None,
++    revealing_budget_allow: Optional[bool] = None,
++    enforce_max_consecutive: bool = True,
+ ) -> TemporalHoldDecision:
+     """Apply the fixed or risk-bounded hold policy.
+ 
+@@ -187,6 +197,10 @@ def decide_temporal_hold(
+     hold. This caps the long-run target cadence at T-H-H, T-H without relying
+     on a learned confidence score.
+ 
++    ``revealing_budget`` delegates each eligible hold to an online risk learner.
++    Its caller may disable the legacy maximum so the realized horizon follows
++    sequential recoverability evidence rather than a fixed depth.
++
+     """
+     policy = normalize_temporal_hold_policy(policy)
+     consecutive_holds = max(0, int(consecutive_holds))
+@@ -196,7 +210,7 @@ def decide_temporal_hold(
+         return TemporalHoldDecision(
+             False, "base_gate_rejected", hold_depth, False, anchor_pixel_relative_l2
+         )
+-    if consecutive_holds >= int(max_consecutive_holds):
++    if enforce_max_consecutive and consecutive_holds >= int(max_consecutive_holds):
+         return TemporalHoldDecision(
+             False, "max_consecutive_reached", hold_depth, False, anchor_pixel_relative_l2
+         )
+@@ -237,6 +251,30 @@ def decide_temporal_hold(
+         return TemporalHoldDecision(
+             True, "fixed_budget", hold_depth, False, anchor_pixel_relative_l2
+         )
++    if policy == "revealing_budget":
++        if revealing_budget_allow is None:
++            return TemporalHoldDecision(
++                False,
++                "missing_revealing_risk",
++                hold_depth,
++                False,
++                anchor_pixel_relative_l2,
++            )
++        if not bool(revealing_budget_allow):
++            return TemporalHoldDecision(
++                False,
++                "revealing_regrounding",
++                hold_depth,
++                False,
++                anchor_pixel_relative_l2,
++            )
++        return TemporalHoldDecision(
++            True,
++            "revealing_context_hold",
++            hold_depth,
++            hold_depth > 1,
++            anchor_pixel_relative_l2,
++        )
+     if hold_depth == 1:
+         return TemporalHoldDecision(
+             True, "base_hold", hold_depth, False, anchor_pixel_relative_l2
+@@ -249,6 +287,30 @@ def decide_temporal_hold(
+         return TemporalHoldDecision(
+             False, "extension_debt", hold_depth, False, anchor_pixel_relative_l2
+         )
++    if policy == "contextual_budget":
++        if contextual_budget_allow is None:
++            return TemporalHoldDecision(
++                False,
++                "missing_contextual_risk",
++                hold_depth,
++                False,
++                anchor_pixel_relative_l2,
++            )
++        if not bool(contextual_budget_allow):
++            return TemporalHoldDecision(
++                False,
++                "contextual_regrounding",
++                hold_depth,
++                False,
++                anchor_pixel_relative_l2,
++            )
++        return TemporalHoldDecision(
++            True,
++            "contextual_extension",
++            hold_depth,
++            True,
++            anchor_pixel_relative_l2,
++        )
+     if (
+         policy == "adaptive"
+         and int(verified_action_run_length) < int(adaptive_min_verified_run)
+diff --git a/openvla/specdecoding/tests/test_dflash_eval_metrics.py b/openvla/specdecoding/tests/test_dflash_eval_metrics.py
+index 343765a..63856c9 100644
+--- a/openvla/specdecoding/tests/test_dflash_eval_metrics.py
++++ b/openvla/specdecoding/tests/test_dflash_eval_metrics.py
+@@ -38,9 +38,110 @@ class DFlashEvalMetricsTest(unittest.TestCase):
+                 episode_times=[[]],
+                 generation_stats=None,
+                 evidence_trace=trace,
++                episode_results=[
++                    {
++                        "task_id": 0,
++                        "trial_index": 3,
++                        "success": False,
++                    }
++                ],
+             )
+             payload = json.loads(path.read_text())
+         self.assertEqual(payload["generation"]["evidence_trace"], trace)
++        self.assertIsNone(payload["dflash_context_risk_profile_sha256"])
++        self.assertEqual(payload["generation_full_suite"], {})
++        self.assertEqual(payload["trial_start_index"], 0)
++        self.assertEqual(payload["episode_results"][0]["trial_index"], 3)
++
++    def test_contextual_profile_identity_is_written_to_summary(self):
++        with tempfile.TemporaryDirectory() as directory:
++            profile = Path(directory) / "risk.json"
++            profile.write_text('{"schema_version": 1}')
++            cfg = SimpleNamespace(
++                task_suite_name="libero_goal",
++                model_family="openvla",
++                pretrained_checkpoint="target",
++                spec_checkpoint="draft",
++                num_trials_per_task=1,
++                seed=7,
++                use_spec=True,
++                parallel_draft=False,
++                timing_scope="last_task",
++                sync_cuda_timing=False,
++                dflash_context_risk_profile=str(profile),
++                dflash_context_target_density=0.4,
++                dflash_context_online_update=True,
++            )
++            path = Path(directory) / "summary.json"
++            write_eval_summary(
++                path,
++                cfg=cfg,
++                run_id="context-profile-test",
++                eval_family="dflash_relaxed",
++                total_episodes=0,
++                total_successes=0,
++                episode_times=[],
++                generation_stats=[],
++            )
++            payload = json.loads(path.read_text())
++
++        self.assertEqual(payload["dflash_context_risk_profile"], str(profile))
++        self.assertEqual(len(payload["dflash_context_risk_profile_sha256"]), 64)
++        self.assertEqual(payload["dflash_context_target_density"], 0.4)
++        self.assertTrue(payload["dflash_context_online_update"])
++
++    def test_full_suite_generation_is_compact_and_independent_of_timing_scope(self):
++        cfg = SimpleNamespace(
++            task_suite_name="libero_goal",
++            model_family="openvla",
++            pretrained_checkpoint="target",
++            spec_checkpoint="draft",
++            num_trials_per_task=1,
++            seed=7,
++            use_spec=True,
++            parallel_draft=False,
++            timing_scope="last_task",
++            sync_cuda_timing=False,
++        )
++        stat = {
++            "backend": "dflash",
++            "block_size": 7,
++            "num_blocks": 1,
++            "generated_tokens": 7,
++            "progressed_tokens": 7,
++            "accept_lengths": [0],
++            "progress_lengths": [7],
++            "temporal_hold_policy": "contextual_budget",
++            "temporal_hold_decision_record": {
++                "allow": True,
++                "reason": "base_hold",
++                "hold_depth": 1,
++                "adaptive_extension": False,
++                "consecutive_holds_before": 0,
++            },
++        }
++        with tempfile.TemporaryDirectory() as directory:
++            path = Path(directory) / "summary.json"
++            write_eval_summary(
++                path,
++                cfg=cfg,
++                run_id="full-suite-test",
++                eval_family="dflash_relaxed",
++                total_episodes=2,
++                total_successes=2,
++                episode_times=[[]],
++                generation_stats=[stat],
++                full_generation_stats=[stat, stat],
++            )
++            payload = json.loads(path.read_text())
++
++        self.assertEqual(payload["generation"]["temporal_hold"]["num_decisions"], 1)
++        self.assertEqual(
++            payload["generation_full_suite"]["temporal_hold"]["num_decisions"], 2
++        )
++        self.assertNotIn(
++            "records", payload["generation_full_suite"]["temporal_hold"]
++        )
+ 
+     def test_dynamic_tree_metrics_are_aggregated_by_block_count(self):
+         stats = [
+@@ -322,6 +423,76 @@ class DFlashEvalMetricsTest(unittest.TestCase):
+         self.assertEqual(temporal_hold["allowed_depth_histogram"], {1: 1, 2: 1})
+         self.assertAlmostEqual(temporal_hold["avg_anchor_pixel_relative_l2"], 0.02)
+ 
++    def test_contextual_hold_reports_budget_risk_separation_and_feedback(self):
++        common = {
++            "backend": "dflash",
++            "block_size": 7,
++            "num_blocks": 1,
++            "generated_tokens": 7,
++            "progressed_tokens": 7,
++            "accept_lengths": [0],
++            "progress_lengths": [7],
++            "temporal_hold_policy": "contextual_budget",
++        }
++
++        def record(
++            *, allow, risk, percentile, selected, candidate_count=1, feedback=None
++        ):
++            return {
++                **common,
++                "temporal_hold_decision_record": {
++                    "allow": allow,
++                    "reason": (
++                        "contextual_extension" if allow else "contextual_regrounding"
++                    ),
++                    "hold_depth": 2,
++                    "adaptive_extension": allow,
++                    "consecutive_holds_before": 1,
++                    "contextual_risk_estimate": {
++                        "correction_risk": risk,
++                        "risk_percentile": percentile,
++                    },
++                    "contextual_budget_decision": {
++                        "desired_extension_fraction": 0.5,
++                        "candidate_count": candidate_count,
++                        "selected_count": selected,
++                        "dual_threshold_after": 0.45,
++                    },
++                    "contextual_target_feedback": feedback,
++                },
++            }
++
++        stats = [
++            # Budget counters reset at each episode. The suite-level metric must
++            # aggregate decisions rather than report the final episode's ratio.
++            record(allow=True, risk=0.1, percentile=0.2, selected=1),
++            record(
++                allow=False,
++                risk=0.8,
++                percentile=0.9,
++                selected=0,
++                feedback={
++                    "correction_l2": 0.75,
++                    "online_update_applied": True,
++                    "online_records": 1,
++                },
++            ),
++        ]
++
++        contextual = summarize_generation_stats(stats)["temporal_hold"][
++            "contextual_risk"
++        ]
++        self.assertEqual(contextual["num_candidates"], 2)
++        self.assertEqual(contextual["selected_candidates"], 1)
++        self.assertEqual(contextual["rejected_candidates"], 1)
++        self.assertAlmostEqual(contextual["realized_extension_fraction"], 0.5)
++        self.assertAlmostEqual(contextual["budget_error"], 0.0)
++        self.assertAlmostEqual(contextual["avg_selected_risk"], 0.1)
++        self.assertAlmostEqual(contextual["avg_rejected_risk"], 0.8)
++        self.assertEqual(contextual["target_feedback_count"], 1)
++        self.assertEqual(contextual["online_update_count"], 1)
++        self.assertEqual(contextual["final_online_memory_records"], 1)
++
+     def test_vtpf_parity_and_evidence_traces_remain_auditable(self):
+         stats = [
+             {
+diff --git a/openvla/specdecoding/tests/test_temporal_hold.py b/openvla/specdecoding/tests/test_temporal_hold.py
+index 8816364..55c7c6f 100644
+--- a/openvla/specdecoding/tests/test_temporal_hold.py
++++ b/openvla/specdecoding/tests/test_temporal_hold.py
+@@ -13,6 +13,49 @@ from openvla.specdecoding.model.temporal_hold import (
+ 
+ 
+ class TemporalHoldPolicyTest(unittest.TestCase):
++    def test_revealing_budget_controls_first_and_second_holds(self):
++        first = decide_temporal_hold(
++            policy="revealing_budget",
++            base_eligible=True,
++            consecutive_holds=0,
++            max_consecutive_holds=2,
++            verified_action_run_length=1,
++            adaptive_min_verified_run=2,
++            anchor_pixel_relative_l2=0.01,
++            adaptive_max_anchor_pixel_relative_l2=0.03,
++            revealing_budget_allow=False,
++        )
++        second = decide_temporal_hold(
++            policy="online_revealing",
++            base_eligible=True,
++            consecutive_holds=1,
++            max_consecutive_holds=2,
++            verified_action_run_length=1,
++            adaptive_min_verified_run=2,
++            anchor_pixel_relative_l2=0.01,
++            adaptive_max_anchor_pixel_relative_l2=0.03,
++            revealing_budget_allow=True,
++        )
++        self.assertFalse(first.allow)
++        self.assertTrue(second.allow)
++        self.assertTrue(second.adaptive_extension)
++
++    def test_revealing_budget_can_learn_beyond_a_fixed_horizon(self):
++        third = decide_temporal_hold(
++            policy="revealing_budget",
++            base_eligible=True,
++            consecutive_holds=2,
++            max_consecutive_holds=2,
++            verified_action_run_length=1,
++            adaptive_min_verified_run=2,
++            anchor_pixel_relative_l2=0.01,
++            adaptive_max_anchor_pixel_relative_l2=0.03,
++            revealing_budget_allow=True,
++            enforce_max_consecutive=False,
++        )
++        self.assertTrue(third.allow)
++        self.assertEqual(third.hold_depth, 3)
++
+     def _decide(self, **overrides):
+         values = {
+             "policy": "adaptive",
+@@ -164,6 +207,29 @@ class TemporalHoldPolicyTest(unittest.TestCase):
+         with self.assertRaises(ValueError):
+             temporal_hold_action_scale("learned", 2)
+ 
++    def test_contextual_budget_only_routes_second_hold(self):
++        first = self._decide(
++            policy="contextual_budget",
++            consecutive_holds=0,
++            contextual_budget_allow=None,
++        )
++        accepted = self._decide(
++            policy="contextual_budget",
++            consecutive_holds=1,
++            contextual_budget_allow=True,
++        )
++        rejected = self._decide(
++            policy="contextual_budget",
++            consecutive_holds=1,
++            contextual_budget_allow=False,
++        )
++        self.assertTrue(first.allow)
++        self.assertEqual(first.reason, "base_hold")
++        self.assertTrue(accepted.allow)
++        self.assertEqual(accepted.reason, "contextual_extension")
++        self.assertFalse(rejected.allow)
++        self.assertEqual(rejected.reason, "contextual_regrounding")
++
+     def test_mechanical_sequence_minimizes_prefix_discrepancy(self):
+         decisions = [
+             mechanical_target_due(control_step=step, period=10, target_count=4)

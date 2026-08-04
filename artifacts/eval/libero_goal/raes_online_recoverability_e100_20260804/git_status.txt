@@ -1,0 +1,21 @@
+ M openvla/experiments/robot/libero/eval_metrics.py
+ M openvla/experiments/robot/libero/run_libero_goal_Spec.py
+ M openvla/experiments/robot/libero/run_libero_goal_Spec_Relaxed.py
+ M openvla/experiments/robot/openvla_utils.py
+ M openvla/prismatic/extern/hf/modeling_speculation.py
+ M openvla/specdecoding/decode-scripts/run_dflash_goal_eval.sh
+ M openvla/specdecoding/evidence/README.md
+ M openvla/specdecoding/model/temporal_hold.py
+ M openvla/specdecoding/tests/test_dflash_eval_metrics.py
+ M openvla/specdecoding/tests/test_temporal_hold.py
+?? openvla/specdecoding/decode-scripts/run_dflash_vtpf_contextual_goal_eval.sh
+?? openvla/specdecoding/decode-scripts/run_dflash_vtpf_online_revealing_goal_eval.sh
+?? openvla/specdecoding/decode-scripts/run_dflash_vtpf_revealing_goal_eval.sh
+?? openvla/specdecoding/evidence/analyze_contextual_pilots.py
+?? openvla/specdecoding/evidence/build_contextual_risk_evidence.py
+?? openvla/specdecoding/evidence/replay_revealing_action.py
+?? openvla/specdecoding/model/contextual_risk.py
+?? openvla/specdecoding/model/revealing_action.py
+?? openvla/specdecoding/tests/test_contextual_risk.py
+?? openvla/specdecoding/tests/test_contextual_risk_evidence.py
+?? openvla/specdecoding/tests/test_revealing_action.py

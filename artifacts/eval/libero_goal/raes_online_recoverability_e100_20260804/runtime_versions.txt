@@ -1,0 +1,6 @@
+python 3.10.20
+torch 2.2.0+cu121
+cuda 12.1
+transformers 4.40.1
+mujoco 3.3.2
+robosuite 1.4.1

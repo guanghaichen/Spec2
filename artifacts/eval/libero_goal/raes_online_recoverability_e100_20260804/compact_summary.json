@@ -1,0 +1,3793 @@
+{
+  "run_id": "EVAL-libero_goal-openvla-2026_08_04-14_22_47--local400-main-table-full500-goal-e100",
+  "eval_family": "dflash_relaxed",
+  "task_suite_name": "libero_goal",
+  "model_family": "openvla",
+  "draft_backend": "dflash",
+  "use_spec": true,
+  "accept_threshold": 0,
+  "dflash_block_size": 7,
+  "dflash_num_draft_layers": 1,
+  "dflash_use_causal_residual_sampling": false,
+  "dflash_acceptance_mode": "token",
+  "dflash_tree_mode": "off",
+  "dflash_target_logits_mode": "action_only",
+  "dflash_verify_skip_mode": "active",
+  "dflash_temporal_prefill_fusion": true,
+  "dflash_temporal_hold_policy": "revealing_budget",
+  "dflash_context_target_density": 0.4,
+  "dflash_revealing_selection_mode": "contextual",
+  "dflash_revealing_risk_target": "inverse_age_local",
+  "dflash_revealing_horizon_mode": "observer_learned_survival",
+  "dflash_temporal_hold_action_decay": "inverse_age",
+  "pretrained_checkpoint": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/hf_files/openvla-7b-finetuned-libero-goal",
+  "spec_checkpoint": "/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/Draft_checkpoint/goal/epoch_100_step_044800",
+  "num_trials_per_task": 50,
+  "trial_start_index": 0,
+  "seed": 7,
+  "timing_scope": "last_task",
+  "sync_cuda_timing": false,
+  "total_episodes": 500,
+  "total_successes": 375,
+  "success_rate": 0.75,
+  "episode_results": [
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 0,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 1,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 2,
+      "success": true,
+      "control_steps": 125
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 3,
+      "success": true,
+      "control_steps": 132
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 4,
+      "success": true,
+      "control_steps": 132
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 5,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 6,
+      "success": true,
+      "control_steps": 155
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 7,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 8,
+      "success": true,
+      "control_steps": 149
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 9,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 10,
+      "success": true,
+      "control_steps": 151
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 11,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 12,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 13,
+      "success": true,
+      "control_steps": 129
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 14,
+      "success": true,
+      "control_steps": 120
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 15,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 16,
+      "success": true,
+      "control_steps": 192
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 17,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 18,
+      "success": true,
+      "control_steps": 137
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 19,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 20,
+      "success": true,
+      "control_steps": 125
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 21,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 22,
+      "success": true,
+      "control_steps": 130
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 23,
+      "success": true,
+      "control_steps": 151
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 24,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 25,
+      "success": true,
+      "control_steps": 189
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 26,
+      "success": true,
+      "control_steps": 180
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 27,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 28,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 29,
+      "success": true,
+      "control_steps": 104
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 30,
+      "success": true,
+      "control_steps": 186
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 31,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 32,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 33,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 34,
+      "success": true,
+      "control_steps": 147
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 35,
+      "success": true,
+      "control_steps": 117
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 36,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 37,
+      "success": true,
+      "control_steps": 121
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 38,
+      "success": true,
+      "control_steps": 176
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 39,
+      "success": true,
+      "control_steps": 179
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 40,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 41,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 42,
+      "success": true,
+      "control_steps": 165
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 43,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 44,
+      "success": true,
+      "control_steps": 122
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 45,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 46,
+      "success": true,
+      "control_steps": 147
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 47,
+      "success": true,
+      "control_steps": 137
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 48,
+      "success": true,
+      "control_steps": 124
+    },
+    {
+      "task_id": 0,
+      "task_description": "open the middle drawer of the cabinet",
+      "trial_index": 49,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 0,
+      "success": true,
+      "control_steps": 89
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 1,
+      "success": true,
+      "control_steps": 101
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 2,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 3,
+      "success": true,
+      "control_steps": 97
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 4,
+      "success": true,
+      "control_steps": 99
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 5,
+      "success": true,
+      "control_steps": 171
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 6,
+      "success": true,
+      "control_steps": 169
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 7,
+      "success": true,
+      "control_steps": 84
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 8,
+      "success": true,
+      "control_steps": 103
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 9,
+      "success": true,
+      "control_steps": 100
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 10,
+      "success": true,
+      "control_steps": 98
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 11,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 12,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 13,
+      "success": true,
+      "control_steps": 83
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 14,
+      "success": true,
+      "control_steps": 90
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 15,
+      "success": true,
+      "control_steps": 105
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 16,
+      "success": true,
+      "control_steps": 97
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 17,
+      "success": true,
+      "control_steps": 101
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 18,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 19,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 20,
+      "success": true,
+      "control_steps": 90
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 21,
+      "success": true,
+      "control_steps": 94
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 22,
+      "success": true,
+      "control_steps": 91
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 23,
+      "success": true,
+      "control_steps": 126
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 24,
+      "success": true,
+      "control_steps": 113
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 25,
+      "success": true,
+      "control_steps": 128
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 26,
+      "success": true,
+      "control_steps": 89
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 27,
+      "success": true,
+      "control_steps": 117
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 28,
+      "success": true,
+      "control_steps": 106
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 29,
+      "success": true,
+      "control_steps": 124
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 30,
+      "success": true,
+      "control_steps": 132
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 31,
+      "success": true,
+      "control_steps": 111
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 32,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 33,
+      "success": true,
+      "control_steps": 104
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 34,
+      "success": true,
+      "control_steps": 94
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 35,
+      "success": true,
+      "control_steps": 92
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 36,
+      "success": true,
+      "control_steps": 87
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 37,
+      "success": true,
+      "control_steps": 93
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 38,
+      "success": true,
+      "control_steps": 117
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 39,
+      "success": true,
+      "control_steps": 102
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 40,
+      "success": true,
+      "control_steps": 123
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 41,
+      "success": true,
+      "control_steps": 88
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 42,
+      "success": true,
+      "control_steps": 97
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 43,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 44,
+      "success": true,
+      "control_steps": 110
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 45,
+      "success": true,
+      "control_steps": 87
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 46,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 47,
+      "success": true,
+      "control_steps": 91
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 48,
+      "success": true,
+      "control_steps": 102
+    },
+    {
+      "task_id": 1,
+      "task_description": "put the bowl on the stove",
+      "trial_index": 49,
+      "success": true,
+      "control_steps": 95
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 0,
+      "success": true,
+      "control_steps": 93
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 1,
+      "success": true,
+      "control_steps": 94
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 2,
+      "success": true,
+      "control_steps": 132
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 3,
+      "success": true,
+      "control_steps": 153
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 4,
+      "success": true,
+      "control_steps": 86
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 5,
+      "success": true,
+      "control_steps": 89
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 6,
+      "success": true,
+      "control_steps": 93
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 7,
+      "success": true,
+      "control_steps": 120
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 8,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 9,
+      "success": true,
+      "control_steps": 105
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 10,
+      "success": true,
+      "control_steps": 99
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 11,
+      "success": true,
+      "control_steps": 91
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 12,
+      "success": true,
+      "control_steps": 86
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 13,
+      "success": true,
+      "control_steps": 172
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 14,
+      "success": true,
+      "control_steps": 99
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 15,
+      "success": true,
+      "control_steps": 202
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 16,
+      "success": true,
+      "control_steps": 119
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 17,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 18,
+      "success": true,
+      "control_steps": 99
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 19,
+      "success": true,
+      "control_steps": 89
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 20,
+      "success": true,
+      "control_steps": 101
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 21,
+      "success": true,
+      "control_steps": 122
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 22,
+      "success": true,
+      "control_steps": 182
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 23,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 24,
+      "success": true,
+      "control_steps": 89
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 25,
+      "success": true,
+      "control_steps": 90
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 26,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 27,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 28,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 29,
+      "success": true,
+      "control_steps": 81
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 30,
+      "success": true,
+      "control_steps": 122
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 31,
+      "success": true,
+      "control_steps": 111
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 32,
+      "success": true,
+      "control_steps": 105
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 33,
+      "success": true,
+      "control_steps": 99
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 34,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 35,
+      "success": true,
+      "control_steps": 128
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 36,
+      "success": true,
+      "control_steps": 112
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 37,
+      "success": true,
+      "control_steps": 112
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 38,
+      "success": true,
+      "control_steps": 137
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 39,
+      "success": true,
+      "control_steps": 278
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 40,
+      "success": true,
+      "control_steps": 89
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 41,
+      "success": true,
+      "control_steps": 110
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 42,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 43,
+      "success": true,
+      "control_steps": 112
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 44,
+      "success": true,
+      "control_steps": 86
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 45,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 46,
+      "success": true,
+      "control_steps": 80
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 47,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 48,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 2,
+      "task_description": "put the wine bottle on top of the cabinet",
+      "trial_index": 49,
+      "success": true,
+      "control_steps": 127
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 0,
+      "success": true,
+      "control_steps": 197
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 1,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 2,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 3,
+      "success": true,
+      "control_steps": 239
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 4,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 5,
+      "success": true,
+      "control_steps": 235
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 6,
+      "success": true,
+      "control_steps": 259
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 7,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 8,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 9,
+      "success": true,
+      "control_steps": 230
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 10,
+      "success": true,
+      "control_steps": 237
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 11,
+      "success": true,
+      "control_steps": 226
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 12,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 13,
+      "success": true,
+      "control_steps": 196
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 14,
+      "success": true,
+      "control_steps": 228
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 15,
+      "success": true,
+      "control_steps": 270
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 16,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 17,
+      "success": true,
+      "control_steps": 208
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 18,
+      "success": true,
+      "control_steps": 224
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 19,
+      "success": true,
+      "control_steps": 244
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 20,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 21,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 22,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 23,
+      "success": true,
+      "control_steps": 187
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 24,
+      "success": true,
+      "control_steps": 249
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 25,
+      "success": true,
+      "control_steps": 217
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 26,
+      "success": true,
+      "control_steps": 197
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 27,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 28,
+      "success": true,
+      "control_steps": 202
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 29,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 30,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 31,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 32,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 33,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 34,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 35,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 36,
+      "success": true,
+      "control_steps": 187
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 37,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 38,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 39,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 40,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 41,
+      "success": true,
+      "control_steps": 208
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 42,
+      "success": true,
+      "control_steps": 223
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 43,
+      "success": true,
+      "control_steps": 209
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 44,
+      "success": true,
+      "control_steps": 216
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 45,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 46,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 47,
+      "success": true,
+      "control_steps": 275
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 48,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 3,
+      "task_description": "open the top drawer and put the bowl inside",
+      "trial_index": 49,
+      "success": true,
+      "control_steps": 272
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 0,
+      "success": true,
+      "control_steps": 103
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 1,
+      "success": true,
+      "control_steps": 109
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 2,
+      "success": true,
+      "control_steps": 173
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 3,
+      "success": true,
+      "control_steps": 121
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 4,
+      "success": true,
+      "control_steps": 92
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 5,
+      "success": true,
+      "control_steps": 95
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 6,
+      "success": true,
+      "control_steps": 105
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 7,
+      "success": true,
+      "control_steps": 100
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 8,
+      "success": true,
+      "control_steps": 94
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 9,
+      "success": true,
+      "control_steps": 135
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 10,
+      "success": true,
+      "control_steps": 108
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 11,
+      "success": true,
+      "control_steps": 109
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 12,
+      "success": true,
+      "control_steps": 126
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 13,
+      "success": true,
+      "control_steps": 109
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 14,
+      "success": true,
+      "control_steps": 117
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 15,
+      "success": true,
+      "control_steps": 101
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 16,
+      "success": true,
+      "control_steps": 94
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 17,
+      "success": true,
+      "control_steps": 211
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 18,
+      "success": true,
+      "control_steps": 137
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 19,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 20,
+      "success": true,
+      "control_steps": 89
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 21,
+      "success": true,
+      "control_steps": 158
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 22,
+      "success": true,
+      "control_steps": 99
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 23,
+      "success": true,
+      "control_steps": 90
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 24,
+      "success": true,
+      "control_steps": 133
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 25,
+      "success": true,
+      "control_steps": 186
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 26,
+      "success": true,
+      "control_steps": 125
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 27,
+      "success": true,
+      "control_steps": 145
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 28,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 29,
+      "success": true,
+      "control_steps": 95
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 30,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 31,
+      "success": true,
+      "control_steps": 269
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 32,
+      "success": true,
+      "control_steps": 96
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 33,
+      "success": true,
+      "control_steps": 90
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 34,
+      "success": true,
+      "control_steps": 97
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 35,
+      "success": true,
+      "control_steps": 122
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 36,
+      "success": true,
+      "control_steps": 121
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 37,
+      "success": true,
+      "control_steps": 95
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 38,
+      "success": true,
+      "control_steps": 164
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 39,
+      "success": true,
+      "control_steps": 129
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 40,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 41,
+      "success": true,
+      "control_steps": 88
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 42,
+      "success": true,
+      "control_steps": 102
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 43,
+      "success": true,
+      "control_steps": 88
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 44,
+      "success": true,
+      "control_steps": 98
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 45,
+      "success": true,
+      "control_steps": 109
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 46,
+      "success": true,
+      "control_steps": 98
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 47,
+      "success": true,
+      "control_steps": 130
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 48,
+      "success": true,
+      "control_steps": 151
+    },
+    {
+      "task_id": 4,
+      "task_description": "put the bowl on top of the cabinet",
+      "trial_index": 49,
+      "success": true,
+      "control_steps": 118
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 0,
+      "success": true,
+      "control_steps": 143
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 1,
+      "success": true,
+      "control_steps": 147
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 2,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 3,
+      "success": true,
+      "control_steps": 124
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 4,
+      "success": true,
+      "control_steps": 155
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 5,
+      "success": true,
+      "control_steps": 128
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 6,
+      "success": true,
+      "control_steps": 154
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 7,
+      "success": true,
+      "control_steps": 165
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 8,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 9,
+      "success": true,
+      "control_steps": 142
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 10,
+      "success": true,
+      "control_steps": 147
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 11,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 12,
+      "success": true,
+      "control_steps": 137
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 13,
+      "success": true,
+      "control_steps": 170
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 14,
+      "success": true,
+      "control_steps": 145
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 15,
+      "success": true,
+      "control_steps": 169
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 16,
+      "success": true,
+      "control_steps": 160
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 17,
+      "success": true,
+      "control_steps": 192
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 18,
+      "success": true,
+      "control_steps": 146
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 19,
+      "success": true,
+      "control_steps": 130
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 20,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 21,
+      "success": true,
+      "control_steps": 145
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 22,
+      "success": true,
+      "control_steps": 160
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 23,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 24,
+      "success": true,
+      "control_steps": 151
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 25,
+      "success": true,
+      "control_steps": 151
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 26,
+      "success": true,
+      "control_steps": 142
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 27,
+      "success": true,
+      "control_steps": 148
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 28,
+      "success": true,
+      "control_steps": 124
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 29,
+      "success": true,
+      "control_steps": 142
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 30,
+      "success": true,
+      "control_steps": 169
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 31,
+      "success": true,
+      "control_steps": 171
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 32,
+      "success": true,
+      "control_steps": 171
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 33,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 34,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 35,
+      "success": true,
+      "control_steps": 161
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 36,
+      "success": true,
+      "control_steps": 148
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 37,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 38,
+      "success": true,
+      "control_steps": 139
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 39,
+      "success": true,
+      "control_steps": 149
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 40,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 41,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 42,
+      "success": true,
+      "control_steps": 185
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 43,
+      "success": true,
+      "control_steps": 177
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 44,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 45,
+      "success": true,
+      "control_steps": 146
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 46,
+      "success": true,
+      "control_steps": 134
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 47,
+      "success": true,
+      "control_steps": 151
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 48,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 5,
+      "task_description": "push the plate to the front of the stove",
+      "trial_index": 49,
+      "success": true,
+      "control_steps": 184
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 0,
+      "success": true,
+      "control_steps": 136
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 1,
+      "success": true,
+      "control_steps": 126
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 2,
+      "success": true,
+      "control_steps": 198
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 3,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 4,
+      "success": true,
+      "control_steps": 97
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 5,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 6,
+      "success": true,
+      "control_steps": 96
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 7,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 8,
+      "success": true,
+      "control_steps": 122
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 9,
+      "success": true,
+      "control_steps": 98
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 10,
+      "success": true,
+      "control_steps": 108
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 11,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 12,
+      "success": true,
+      "control_steps": 117
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 13,
+      "success": true,
+      "control_steps": 83
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 14,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 15,
+      "success": true,
+      "control_steps": 115
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 16,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 17,
+      "success": true,
+      "control_steps": 92
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 18,
+      "success": true,
+      "control_steps": 118
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 19,
+      "success": true,
+      "control_steps": 103
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 20,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 21,
+      "success": true,
+      "control_steps": 131
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 22,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 23,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 24,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 25,
+      "success": true,
+      "control_steps": 91
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 26,
+      "success": true,
+      "control_steps": 104
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 27,
+      "success": true,
+      "control_steps": 240
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 28,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 29,
+      "success": true,
+      "control_steps": 113
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 30,
+      "success": true,
+      "control_steps": 134
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 31,
+      "success": true,
+      "control_steps": 113
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 32,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 33,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 34,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 35,
+      "success": true,
+      "control_steps": 119
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 36,
+      "success": true,
+      "control_steps": 101
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 37,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 38,
+      "success": true,
+      "control_steps": 122
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 39,
+      "success": true,
+      "control_steps": 116
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 40,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 41,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 42,
+      "success": true,
+      "control_steps": 97
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 43,
+      "success": true,
+      "control_steps": 239
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 44,
+      "success": true,
+      "control_steps": 98
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 45,
+      "success": true,
+      "control_steps": 100
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 46,
+      "success": true,
+      "control_steps": 127
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 47,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 48,
+      "success": true,
+      "control_steps": 104
+    },
+    {
+      "task_id": 6,
+      "task_description": "put the cream cheese in the bowl",
+      "trial_index": 49,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 0,
+      "success": true,
+      "control_steps": 155
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 1,
+      "success": true,
+      "control_steps": 96
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 2,
+      "success": true,
+      "control_steps": 101
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 3,
+      "success": true,
+      "control_steps": 81
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 4,
+      "success": true,
+      "control_steps": 80
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 5,
+      "success": true,
+      "control_steps": 94
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 6,
+      "success": true,
+      "control_steps": 105
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 7,
+      "success": true,
+      "control_steps": 99
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 8,
+      "success": true,
+      "control_steps": 158
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 9,
+      "success": true,
+      "control_steps": 75
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 10,
+      "success": true,
+      "control_steps": 83
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 11,
+      "success": true,
+      "control_steps": 82
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 12,
+      "success": true,
+      "control_steps": 64
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 13,
+      "success": true,
+      "control_steps": 107
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 14,
+      "success": true,
+      "control_steps": 91
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 15,
+      "success": true,
+      "control_steps": 65
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 16,
+      "success": true,
+      "control_steps": 98
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 17,
+      "success": true,
+      "control_steps": 84
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 18,
+      "success": true,
+      "control_steps": 84
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 19,
+      "success": true,
+      "control_steps": 84
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 20,
+      "success": true,
+      "control_steps": 105
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 21,
+      "success": true,
+      "control_steps": 80
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 22,
+      "success": true,
+      "control_steps": 86
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 23,
+      "success": true,
+      "control_steps": 98
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 24,
+      "success": true,
+      "control_steps": 122
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 25,
+      "success": true,
+      "control_steps": 118
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 26,
+      "success": true,
+      "control_steps": 79
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 27,
+      "success": true,
+      "control_steps": 85
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 28,
+      "success": true,
+      "control_steps": 85
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 29,
+      "success": true,
+      "control_steps": 82
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 30,
+      "success": true,
+      "control_steps": 83
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 31,
+      "success": true,
+      "control_steps": 111
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 32,
+      "success": true,
+      "control_steps": 104
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 33,
+      "success": true,
+      "control_steps": 82
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 34,
+      "success": true,
+      "control_steps": 70
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 35,
+      "success": true,
+      "control_steps": 84
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 36,
+      "success": true,
+      "control_steps": 78
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 37,
+      "success": true,
+      "control_steps": 77
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 38,
+      "success": true,
+      "control_steps": 80
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 39,
+      "success": true,
+      "control_steps": 100
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 40,
+      "success": true,
+      "control_steps": 84
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 41,
+      "success": true,
+      "control_steps": 95
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 42,
+      "success": true,
+      "control_steps": 68
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 43,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 44,
+      "success": true,
+      "control_steps": 83
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 45,
+      "success": true,
+      "control_steps": 66
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 46,
+      "success": true,
+      "control_steps": 100
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 47,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 48,
+      "success": true,
+      "control_steps": 77
+    },
+    {
+      "task_id": 7,
+      "task_description": "turn on the stove",
+      "trial_index": 49,
+      "success": true,
+      "control_steps": 90
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 0,
+      "success": true,
+      "control_steps": 90
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 1,
+      "success": true,
+      "control_steps": 100
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 2,
+      "success": true,
+      "control_steps": 90
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 3,
+      "success": true,
+      "control_steps": 72
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 4,
+      "success": true,
+      "control_steps": 81
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 5,
+      "success": true,
+      "control_steps": 94
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 6,
+      "success": true,
+      "control_steps": 88
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 7,
+      "success": true,
+      "control_steps": 231
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 8,
+      "success": true,
+      "control_steps": 89
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 9,
+      "success": true,
+      "control_steps": 87
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 10,
+      "success": true,
+      "control_steps": 90
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 11,
+      "success": true,
+      "control_steps": 84
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 12,
+      "success": true,
+      "control_steps": 100
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 13,
+      "success": true,
+      "control_steps": 79
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 14,
+      "success": true,
+      "control_steps": 80
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 15,
+      "success": true,
+      "control_steps": 86
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 16,
+      "success": true,
+      "control_steps": 82
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 17,
+      "success": true,
+      "control_steps": 93
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 18,
+      "success": true,
+      "control_steps": 87
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 19,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 20,
+      "success": true,
+      "control_steps": 92
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 21,
+      "success": true,
+      "control_steps": 83
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 22,
+      "success": true,
+      "control_steps": 110
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 23,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 24,
+      "success": true,
+      "control_steps": 79
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 25,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 26,
+      "success": true,
+      "control_steps": 90
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 27,
+      "success": true,
+      "control_steps": 77
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 28,
+      "success": true,
+      "control_steps": 73
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 29,
+      "success": true,
+      "control_steps": 92
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 30,
+      "success": true,
+      "control_steps": 79
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 31,
+      "success": true,
+      "control_steps": 81
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 32,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 33,
+      "success": true,
+      "control_steps": 78
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 34,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 35,
+      "success": true,
+      "control_steps": 78
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 36,
+      "success": true,
+      "control_steps": 72
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 37,
+      "success": true,
+      "control_steps": 87
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 38,
+      "success": true,
+      "control_steps": 82
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 39,
+      "success": true,
+      "control_steps": 80
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 40,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 41,
+      "success": true,
+      "control_steps": 81
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 42,
+      "success": true,
+      "control_steps": 106
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 43,
+      "success": true,
+      "control_steps": 78
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 44,
+      "success": true,
+      "control_steps": 98
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 45,
+      "success": true,
+      "control_steps": 215
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 46,
+      "success": true,
+      "control_steps": 89
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 47,
+      "success": true,
+      "control_steps": 104
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 48,
+      "success": true,
+      "control_steps": 105
+    },
+    {
+      "task_id": 8,
+      "task_description": "put the bowl on the plate",
+      "trial_index": 49,
+      "success": true,
+      "control_steps": 122
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 0,
+      "success": true,
+      "control_steps": 175
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 1,
+      "success": true,
+      "control_steps": 160
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 2,
+      "success": true,
+      "control_steps": 160
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 3,
+      "success": true,
+      "control_steps": 130
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 4,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 5,
+      "success": true,
+      "control_steps": 126
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 6,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 7,
+      "success": true,
+      "control_steps": 174
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 8,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 9,
+      "success": true,
+      "control_steps": 174
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 10,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 11,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 12,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 13,
+      "success": true,
+      "control_steps": 159
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 14,
+      "success": true,
+      "control_steps": 142
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 15,
+      "success": true,
+      "control_steps": 150
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 16,
+      "success": true,
+      "control_steps": 146
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 17,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 18,
+      "success": true,
+      "control_steps": 144
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 19,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 20,
+      "success": true,
+      "control_steps": 245
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 21,
+      "success": true,
+      "control_steps": 131
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 22,
+      "success": true,
+      "control_steps": 279
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 23,
+      "success": true,
+      "control_steps": 245
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 24,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 25,
+      "success": true,
+      "control_steps": 153
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 26,
+      "success": true,
+      "control_steps": 182
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 27,
+      "success": true,
+      "control_steps": 208
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 28,
+      "success": true,
+      "control_steps": 234
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 29,
+      "success": true,
+      "control_steps": 283
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 30,
+      "success": true,
+      "control_steps": 293
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 31,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 32,
+      "success": true,
+      "control_steps": 263
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 33,
+      "success": true,
+      "control_steps": 167
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 34,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 35,
+      "success": true,
+      "control_steps": 153
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 36,
+      "success": true,
+      "control_steps": 191
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 37,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 38,
+      "success": true,
+      "control_steps": 152
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 39,
+      "success": true,
+      "control_steps": 154
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 40,
+      "success": true,
+      "control_steps": 198
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 41,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 42,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 43,
+      "success": true,
+      "control_steps": 163
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 44,
+      "success": true,
+      "control_steps": 299
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 45,
+      "success": true,
+      "control_steps": 128
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 46,
+      "success": false,
+      "control_steps": 300
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 47,
+      "success": true,
+      "control_steps": 247
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 48,
+      "success": true,
+      "control_steps": 149
+    },
+    {
+      "task_id": 9,
+      "task_description": "put the wine bottle on the rack",
+      "trial_index": 49,
+      "success": true,
+      "control_steps": 192
+    }
+  ],
+  "timing": {
+    "steps": 11014,
+    "mean": 0.06228550001694759,
+    "median": 0.009037375450134277,
+    "min": 0.0019960403442382812,
+    "max": 0.18590927124023438,
+    "p95": 0.17758287191390992,
+    "p99": 0.1814116191864014,
+    "total": 686.0124971866608
+  },
+  "generation": {
+    "length": 3.386295971978984,
+    "avg_accept_length": 0.8220227670753065,
+    "num_blocks": 22840,
+    "overall_hit_rate": 0.25917285552579994,
+    "temporal_prefill_avg_accept_length": 1.5457834049287813,
+    "temporal_prefill_full_match_actions": 530,
+    "temporal_prefill_fused_actions": 4423,
+    "temporal_fallback_draft_blocks": 0,
+    "temporal_hold": {
+      "policy": "revealing_budget",
+      "num_decisions": 11049,
+      "allowed_holds": 6576,
+      "hold_rate": 0.5951669834374151,
+      "target_prefill_actions": 4473,
+      "target_prefill_rate": 0.40483301656258486,
+      "base_holds": 4090,
+      "adaptive_extension_candidates": 4071,
+      "adaptive_extended_holds": 2486,
+      "adaptive_extension_rate": 0.6106607713092607,
+      "extension_candidates": 4071,
+      "extended_holds": 2486,
+      "extension_rate": 0.6106607713092607,
+      "forced_target_after_hold": 4063,
+      "extension_debt_forced_targets": 0,
+      "executed_action_scale_histogram": {
+        "0.111111": 1,
+        "0.125": 6,
+        "0.142857": 14,
+        "0.166667": 29,
+        "0.2": 91,
+        "0.25": 257,
+        "0.333333": 534,
+        "0.5": 1554,
+        "1": 4090
+      },
+      "allowed_depth_histogram": {
+        "1": 4090,
+        "2": 1554,
+        "3": 534,
+        "4": 257,
+        "5": 91,
+        "6": 29,
+        "7": 14,
+        "8": 6,
+        "9": 1
+      },
+      "reason_histogram": {
+        "base_gate_rejected": 50,
+        "revealing_context_hold": 6576,
+        "revealing_regrounding": 4423
+      },
+      "avg_anchor_pixel_relative_l2": 0.05904728914779474,
+      "contextual_risk": {
+        "num_candidates": 0,
+        "selected_candidates": 0,
+        "rejected_candidates": 0,
+        "desired_extension_fraction": null,
+        "realized_extension_fraction": null,
+        "budget_error": null,
+        "final_risk_threshold": null,
+        "avg_selected_risk": null,
+        "avg_rejected_risk": null,
+        "avg_selected_risk_percentile": null,
+        "avg_rejected_risk_percentile": null,
+        "target_feedback_count": 0,
+        "avg_target_feedback_correction_l2": null,
+        "online_update_count": 0,
+        "final_online_memory_records": 0
+      },
+      "revealing_risk": {
+        "num_decisions": 11049,
+        "estimated_decisions": 10999,
+        "selected_holds": 6576,
+        "selected_targets": 4423,
+        "desired_target_density": 0.4,
+        "realized_target_density": 0.4044570445936839,
+        "final_hold_threshold": 0.8944841930901074,
+        "avg_held_predicted_correction": 0.2011789988641741,
+        "avg_targeted_predicted_correction": 0.263278061385704,
+        "avg_held_upper_confidence_risk": 0.3117391873820233,
+        "avg_targeted_upper_confidence_risk": 0.3568340588839841,
+        "observer_ready_decisions": 10999,
+        "avg_held_transition_surprise": 47.87151059263796,
+        "avg_targeted_transition_surprise": 83.13365300571245,
+        "avg_held_transition_surprise_percentile": 0.7854191021327555,
+        "avg_targeted_transition_surprise_percentile": 0.8016259997456477,
+        "avg_held_transition_ucb": 85.99303701151385,
+        "avg_targeted_transition_ucb": 138.16984517696304,
+        "avg_held_transition_uncertainty": 38.1215264188759,
+        "avg_targeted_transition_uncertainty": 55.036192171250285,
+        "avg_held_instantaneous_risk": 0.6129560261747263,
+        "avg_targeted_instantaneous_risk": 0.6891956816640289,
+        "avg_held_cumulative_hazard": 0.7555046529409958,
+        "avg_targeted_cumulative_hazard": 0.9323728231360244,
+        "avg_held_survival_before": 0.7470466938684434,
+        "avg_targeted_survival_before": 0.25757155202226234,
+        "target_feedback_count": 4423,
+        "avg_target_feedback_correction_l2": 0.2660557514812539,
+        "final_labeled_records": 512,
+        "residual_ready_decisions": 0,
+        "residual_applied_holds": 0,
+        "final_residual_authority": null,
+        "residual_prequential_records": 0,
+        "residual_prequential_improvement": null,
+        "authority_ready_decisions": 0,
+        "authority_applied_holds": 0,
+        "authority_prequential_records": 0,
+        "authority_prequential_improvement": null
+      }
+    }
+  },
+  "generation_full_suite": {
+    "length": 3.4049328013202365,
+    "avg_accept_length": 0.8436231900439702,
+    "num_blocks": 176938,
+    "overall_hit_rate": 0.257029751388731,
+    "temporal_prefill_avg_accept_length": 1.2267851938210435,
+    "temporal_prefill_full_match_actions": 3620,
+    "temporal_prefill_fused_actions": 34310,
+    "temporal_fallback_draft_blocks": 0,
+    "temporal_hold": {
+      "policy": "revealing_budget",
+      "num_decisions": 86066,
+      "allowed_holds": 51256,
+      "hold_rate": 0.5955429554063161,
+      "target_prefill_actions": 34810,
+      "target_prefill_rate": 0.4044570445936839,
+      "base_holds": 32594,
+      "adaptive_extension_candidates": 32388,
+      "adaptive_extended_holds": 18662,
+      "adaptive_extension_rate": 0.5762010621217735,
+      "extension_candidates": 32388,
+      "extended_holds": 18662,
+      "extension_rate": 0.5762010621217735,
+      "forced_target_after_hold": 32298,
+      "extension_debt_forced_targets": 0,
+      "executed_action_scale_histogram": {
+        "0.047619": 1,
+        "0.05": 1,
+        "0.0526316": 2,
+        "0.0555556": 3,
+        "0.0588235": 3,
+        "0.0625": 3,
+        "0.0666667": 3,
+        "0.0714286": 4,
+        "0.0769231": 9,
+        "0.0833333": 14,
+        "0.0909091": 20,
+        "0.1": 31,
+        "0.111111": 52,
+        "0.125": 96,
+        "0.142857": 158,
+        "0.166667": 312,
+        "0.2": 641,
+        "0.25": 1520,
+        "0.333333": 3482,
+        "0.5": 12307,
+        "1": 32594
+      },
+      "allowed_depth_histogram": {
+        "1": 32594,
+        "2": 12307,
+        "3": 3482,
+        "4": 1520,
+        "5": 641,
+        "6": 312,
+        "7": 158,
+        "8": 96,
+        "9": 52,
+        "10": 31,
+        "11": 20,
+        "12": 14,
+        "13": 9,
+        "14": 4,
+        "15": 3,
+        "16": 3,
+        "17": 3,
+        "18": 3,
+        "19": 2,
+        "20": 1,
+        "21": 1
+      },
+      "reason_histogram": {
+        "base_gate_rejected": 500,
+        "revealing_context_hold": 51256,
+        "revealing_regrounding": 34310
+      },
+      "avg_anchor_pixel_relative_l2": 0.07433544769351234,
+      "contextual_risk": {
+        "num_candidates": 0,
+        "selected_candidates": 0,
+        "rejected_candidates": 0,
+        "desired_extension_fraction": null,
+        "realized_extension_fraction": null,
+        "budget_error": null,
+        "final_risk_threshold": null,
+        "avg_selected_risk": null,
+        "avg_rejected_risk": null,
+        "avg_selected_risk_percentile": null,
+        "avg_rejected_risk_percentile": null,
+        "target_feedback_count": 0,
+        "avg_target_feedback_correction_l2": null,
+        "online_update_count": 0,
+        "final_online_memory_records": 0
+      },
+      "revealing_risk": {
+        "num_decisions": 86066,
+        "estimated_decisions": 85555,
+        "selected_holds": 51256,
+        "selected_targets": 34299,
+        "desired_target_density": 0.4,
+        "realized_target_density": 0.4044570445936839,
+        "final_hold_threshold": 0.8944841930901074,
+        "avg_held_predicted_correction": 0.317494739460477,
+        "avg_targeted_predicted_correction": 0.38906753830532137,
+        "avg_held_upper_confidence_risk": 0.4587120572360425,
+        "avg_targeted_upper_confidence_risk": 0.5075058215220728,
+        "observer_ready_decisions": 85552,
+        "avg_held_transition_surprise": 55.60351802029432,
+        "avg_targeted_transition_surprise": 95.87842610919255,
+        "avg_held_transition_surprise_percentile": 0.8020177902911864,
+        "avg_targeted_transition_surprise_percentile": 0.7991912733599634,
+        "avg_held_transition_ucb": 104.68241262493214,
+        "avg_targeted_transition_ucb": 159.8667405131872,
+        "avg_held_transition_uncertainty": 49.07889460463716,
+        "avg_targeted_transition_uncertainty": 63.98831440399361,
+        "avg_held_instantaneous_risk": 0.6373311214528394,
+        "avg_targeted_instantaneous_risk": 0.724649638361491,
+        "avg_held_cumulative_hazard": 0.761302846657025,
+        "avg_targeted_cumulative_hazard": 0.9361772523309373,
+        "avg_held_survival_before": 0.756012833193584,
+        "avg_targeted_survival_before": 0.23353132285729442,
+        "target_feedback_count": 34299,
+        "avg_target_feedback_correction_l2": 0.3862122417342347,
+        "final_labeled_records": 512,
+        "residual_ready_decisions": 0,
+        "residual_applied_holds": 0,
+        "final_residual_authority": null,
+        "residual_prequential_records": 0,
+        "residual_prequential_improvement": null,
+        "authority_ready_decisions": 0,
+        "authority_applied_holds": 0,
+        "authority_prequential_records": 0,
+        "authority_prequential_improvement": null
+      }
+    }
+  }
+}

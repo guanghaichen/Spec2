@@ -2009,22 +2009,33 @@ EVAL_EPOCH=100 REPEAT_SEEDS="7 8 9 10 11" \
 *_summary.json    SR、timing、Length、接受统计
 ```
 
-4090 当前按“模型结构 + 推理机制”整理正式文件，禁止再把所有实验堆在 `eval_logs` 根目录：
+`eval_logs/`、`main_table/`、`evidence/` 和 `paper_archive/` 是历史原始目录，保留原样用于审计；论文取数统一从
+4090 的以下目录进入：
 
 ```text
-eval_logs/
-├── baseline/{openvla_ar,specvla_strict,specvla_relaxed}/
-├── dflash_strict/
-│   ├── 复杂版Draft/
-│   ├── 复杂版Draft+VTPF/
-│   └── 复杂版去掉RNN的Draft+VTPF/
-└── dflash_relaxed/
-    └── 复杂版去掉RNN的Draft+VTPF-TD/
+specvla-data/paper_results/
+├── main_table/<suite>/<method>/<run_tag>/   # 正式 500-episode 主表结果
+├── ablation/<suite>/<method>/<run_tag>/     # 与主表共享同一份原始文件
+├── evidence/{p0,calibration}/               # 机制和校准证据入口
+├── reproducibility/                         # 冻结代码、配置与校验材料
+└── manifest/
+    ├── runs.csv                             # 论文表格的唯一首选输入
+    └── runs.json                            # 保留完整字段类型的清单
 ```
 
-现有正式日志已按上面目录人工归档并同步到
-[`artifacts/eval/curated_20260720_20260728`](artifacts/eval/curated_20260720_20260728)。新实验可在启动时直接
-覆盖 `LOG_DIR`，避免事后移动，例如简化版 VTPF：
+规范目录不移动、不改名和不删除历史日志。每个正式 run 通过硬链接保留原始三件套，并新增 `metrics.json`、
+`SOURCE.txt` 与 `MANIFEST.sha256`；因此不会重复占用一份大文件空间，也能反查原始目录。`run_tag` 必须显式
+包含 Draft epoch、episode 数和 seed，例如 `minimal-e100-500-s7`。Object 当前使用 e60，必须写成
+`minimal-e060-500-s7`，不得伪装成 e100。
+
+新增正式运行后，先在整理器的 `RUNS` 注册，再重建 manifest：
+
+```bash
+python openvla/specdecoding/evidence/organize_paper_results.py
+```
+
+整理器只创建硬链接和清单，遇到缺失源文件或同名异物时会直接退出。它不会覆盖正式日志。新实验仍应在启动时
+直接覆盖 `LOG_DIR`，避免事后移动，例如简化版 VTPF：
 
 ```bash
 LOG_DIR=/media/asus/1070ecbd-49b3-49fc-a60e-1a5d109d9f55/cgh/specvla-data/eval_logs/dflash_strict/简化版Draft+VTPF \
@@ -2166,21 +2177,38 @@ git pull --ff-only origin main
 
 按优先级：
 
-1. 以 Minimal e100 为其它三个 LIBERO 子集的干净训练基线；保留 Golden tag 和权重，只作回退与消融。
-2. 为 object/spatial/10 分别生成同格式教师数据、训练独立 Draft，禁止跨子集混用 Draft 或动作统计量。
-3. 保存 e60/e80/e100，并用小规模在线 VTPF strict 筛选；不要用离线 loss 直接决定早停。
-4. 固定 TD-Fast 为 relaxed 主方案；Adaptive 已完成正式消融但没有净胜 Golden TD-Fast，不进入主表。
-5. 在其它 suite 的各自权重和真实机械臂上验证短时保持的稳定性。
+1. Goal 与 Spatial 已完成 Minimal e100；Object 已完成 e60 strict 正式评测；LIBERO-10 继续使用独立 Draft，
+   禁止跨子集混用权重或动作统计量。
+2. 补齐 Object 的 VTPF/RAES 与 LIBERO-10 的 DFlash strict/VTPF/RAES，所有数字先进入 `paper_results` 清单，
+   再进入论文。
+3. Spatial 在约 40% target 率下达到 2.74x，但 SR 从 87.0% 降到 75.4%；下一步不是继续扫固定周期，
+   而是检查上下文风险排序和 suite-level 风险校准为何未把危险状态留给 target。
+4. 保存 e60/e80/e100，并用小规模在线 strict 结果筛选；不要用离线 loss 直接决定早停，也不能把 e60 改写成 e100。
+5. 在四个 suite 和真实机械臂上验证短时局部可恢复性的边界。
 
 ### 11.2 论文需要的完整证据
 
-- 主表：paper AR、SpecVLA strict/relaxed、DFlash strict/relaxed。
+- 主表：同机 OpenVLA AR、SpecVLA strict/relaxed、DFlash strict 与完整风险门方法；跨论文数字只比较各自
+  AR 归一化 Speedup，不混用绝对延迟。
 - 训练到在线的诊断图：teacher-forced、self-rollout、online hit rate。
 - 前缀图：条件接受概率与 expected prefix length。
 - 速度分解：target prefill、DFlash transformer、target verify、保持帧和环境外开销。
 - 消融：Minimal/Golden、Action-RNN、跨 anchor、树、动作组、PrefixCert、VTPF-TD Guard/Fast。
 - 鲁棒性：checkpoint、seed、硬件、任务长度。
 - 真机：ALICIA-D 上比较成功率、动作延迟、控制频率和失败类型。
+
+截至 2026-08-05，已进入规范清单的本文正式结果如下（均为 500 episodes、seed 7、RTX 4090、
+`TIMING_SCOPE=last_task`、`SYNC_CUDA_TIMING=False`）：
+
+| suite | 方法 | SR | Speedup | Length | target 率 |
+|---|---|---:|---:|---:|---:|
+| Goal | DFlash strict e100 | 79.2% | 1.14x | 2.172 | 100.00% |
+| Spatial | DFlash strict e100 | 85.8% | 1.15x | 2.170 | 100.00% |
+| Object | DFlash strict e60 | 88.2% | 1.18x | 2.407 | 100.00% |
+| Goal | VTPF strict e100 | 77.6% | 1.30x | 2.432 | 100.00% |
+| Spatial | VTPF strict e100 | 86.4% | 1.17x | 2.196 | 100.00% |
+| Goal | RAES $\rho=0.40$ e100 | 75.0% | 2.93x | 3.386 | 40.48% |
+| Spatial | RAES $\rho=0.40$ e100 | 75.4% | 2.74x | 3.187 | 40.28% |
 
 P0 证据脚手架已经独立于正式 50-trial 主表落地。Goal 和 Spatial 分别显式传入各自 Draft。成本与 VTPF
 审计使用 DFlash 路径；时序动机数据来自 SpecVLA 论文口径的 wrapped AR 分母，不再用 Draft 轨迹自证。各输入
@@ -2269,7 +2297,8 @@ OpenVLA-OFT 已经并行输出动作，不适合直接套用 action-token specul
 
 ## 12. 重要限制
 
-- 当前已有 Goal 与 Spatial 的独立 draft；Object 与 LIBERO-10 仍必须训练各自权重，任何 suite 都不得跨用 Draft。
+- 当前已有 Goal/Spatial 的 e100 Draft 与 Object 的 e60 Draft；LIBERO-10 仍必须使用自己的权重，任何 suite
+  都不得跨用 Draft。
 - teacher-forced accuracy 可能严重高估在线能力。
 - Length 高不保证 Speedup 高；必须计算草稿头和校验树开销。
 - relaxed acceptance 不是 strict lossless，必须报告阈值与成功率。

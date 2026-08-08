@@ -3,19 +3,17 @@ set -euo pipefail
 
 # DFlash 主训练的唯一入口。
 #
-#   bash openvla/specdecoding/train-scripts/run_dflash_train.sh joint
 #   bash openvla/specdecoding/train-scripts/run_dflash_train.sh minimal
+#   bash openvla/specdecoding/train-scripts/run_dflash_train.sh joint
 #
-# joint 是当前主实验：Hidden/Cos 始终训练 Draft；Soft 与 hard CE 按 Domino 式
-# Base->Final 线性交接；跨 Anchor 直接约束 Draft；Action-RNN 辅助项随 Final 渐入。
-# minimal 是与主实验完全隔离的简化对照：只保留一层并行 Draft、完整目标上下文、
+# minimal 是当前正式训练协议：只保留一层并行 Draft、完整目标上下文、
 # multi-anchor 覆盖、Hidden/Cos 与轻量 Soft-KL；不创建 Action-RNN，也不启用跨
 # Anchor 蒸馏、Domino 交接、hard CE、L1 或 Prefix Survival。
 # 当前 Minimal 正式协议固定为 100 epoch、2 卡、每卡 batch 32、不做梯度累积，
 # 即 global batch=64，与 Goal 正式实验保持一致；TASK_SUITE_NAME 选择四个 LIBERO 子集。
-# stage1/stage2 仅保留用于复现实验历程，不再是推荐主线。
+# joint、stage1、stage2 仅保留用于复现实验历程，不再是推荐主线。
 
-PHASE="${1:-joint}"
+PHASE="${1:-minimal}"
 case "${PHASE}" in
   joint)
     TRAINING_PHASE=joint
@@ -30,7 +28,7 @@ case "${PHASE}" in
     TRAINING_PHASE=refinement
     ;;
   *)
-    echo "用法: bash $0 [joint|minimal|stage1|stage2]" >&2
+    echo "用法: bash $0 [minimal|joint|stage1|stage2]" >&2
     exit 1
     ;;
 esac

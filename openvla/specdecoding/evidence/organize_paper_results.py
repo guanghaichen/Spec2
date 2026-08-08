@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Build a canonical, non-destructive index of paper evaluation results.
+"""Build the immutable paper-result index for the finalized method.
 
-The historical evaluation directories remain immutable.  Each canonical run
-contains hard links to the original log triplet, a compact metrics file, and a
-SOURCE.txt pointer.  Hard links avoid copying large summary JSON files while
-surviving accidental removal of an old directory entry.
+Historical evaluation directories remain untouched. Each canonical run stores
+hard links to the original log triplet, compact metrics, provenance, and file
+checksums. The registry below is intentionally explicit: adding a paper number
+requires naming its exact source run.
 """
 
 from __future__ import annotations
@@ -22,33 +22,53 @@ DATA_ROOT = Path(
 OUT_ROOT = DATA_ROOT / "paper_results"
 
 
-RUNS = [
-    # Same-machine baselines.
-    ("main_table", "goal", "openvla_ar", "official-500-s7", "eval_logs/baseline/openvla_ar/EVAL-libero_goal-openvla-2026_07_20-13_15_47--specvla-paper-ar-goal-openvla_ar_summary.json"),
-    ("main_table", "spatial", "openvla_ar", "official-500-s7", "eval_logs/baseline/openvla_ar/EVAL-libero_spatial-openvla-2026_07_20-22_53_00--specvla-paper-ar-spatial-openvla_ar_summary.json"),
-    ("main_table", "object", "openvla_ar", "official-500-s7", "eval_logs/baseline/openvla_ar/EVAL-libero_object-openvla-2026_07_20-18_04_58--specvla-paper-ar-object-openvla_ar_summary.json"),
-    ("main_table", "libero_10", "openvla_ar", "official-500-s7", "eval_logs/baseline/openvla_ar/EVAL-libero_10-openvla-2026_07_21-02_38_04--specvla-paper-ar-10-openvla_ar_summary.json"),
-    ("main_table", "goal", "specvla_strict", "official-500-s7-r0", "eval_logs/baseline/specvla_strict/EVAL-libero_goal-openvla-2026_07_21-14_20_56--specvla-strict-goal-r0-specvla_strict_summary.json"),
-    ("main_table", "spatial", "specvla_strict", "official-500-s7-r0", "eval_logs/baseline/specvla_strict/EVAL-libero_spatial-openvla-2026_07_22-07_15_20--specvla-strict-spatial-r0-specvla_strict_summary.json"),
-    ("main_table", "object", "specvla_strict", "official-500-s7-r0", "eval_logs/baseline/specvla_strict/EVAL-libero_object-openvla-2026_07_21-22_35_09--specvla-strict-object-r0-specvla_strict_summary.json"),
-    ("main_table", "libero_10", "specvla_strict", "official-500-s7-r0", "eval_logs/baseline/specvla_strict/EVAL-libero_10-openvla-2026_07_22-14_20_15--specvla-strict-10-r0-specvla_strict_summary.json"),
-    ("main_table", "goal", "specvla_relaxed", "official-500-s7-r9", "eval_logs/baseline/specvla_relaxed/EVAL-libero_goal-openvla-2026_07_21-18_45_47--specvla-relaxed-goal-r9-specvla_relaxed_summary.json"),
-    ("main_table", "spatial", "specvla_relaxed", "official-500-s7-r9", "eval_logs/baseline/specvla_relaxed/EVAL-libero_spatial-openvla-2026_07_22-11_01_28--specvla-relaxed-spatial-r9-specvla_relaxed_summary.json"),
-    ("main_table", "object", "specvla_relaxed", "official-500-s7-r9", "eval_logs/baseline/specvla_relaxed/EVAL-libero_object-openvla-2026_07_22-03_09_28--specvla-relaxed-object-r9-specvla_relaxed_summary.json"),
-    ("main_table", "libero_10", "specvla_relaxed", "official-500-s7-r5", "eval_logs/baseline/specvla_relaxed/EVAL-libero_10-openvla-2026_07_23-01_33_12--specvla-relaxed-10-r5-specvla_relaxed_summary.json"),
-    # Paper method: parallel block, strict temporal fusion, and RAES.
-    ("main_table", "goal", "dflash_strict", "minimal-e100-500-s7", "main_table/goal/dflash_strict/parallel-block-e100-r7/dflash_strict/EVAL-libero_goal-openvla-2026_08_04-19_19_47--main-table-goal-parallel-block-strict-e100-r7-dflash_strict_summary.json"),
-    ("main_table", "spatial", "dflash_strict", "minimal-e100-500-s7", "eval_logs/spatial/dflash_strict/DFlash-e100/dflash_strict/EVAL-libero_spatial-openvla-2026_08_01-13_13_32--dflash-minimal-spatial-e100-s7-strict-dflash_strict_summary.json"),
-    ("main_table", "object", "dflash_strict", "minimal-e060-500-s7", "main_table/object/dflash_strict/parallel-block-e60-r7/dflash_strict/EVAL-libero_object-openvla-2026_08_05-02_37_46--main-table-object-parallel-block-strict-e60-r7-dflash_strict_summary.json"),
-    ("main_table", "goal", "vtpf_strict", "minimal-e100-500-s7", "eval_logs/goal/dflash_strict/简化版Draft+VTPF-e100/EVAL-libero_goal-openvla-2026_07_29-17_58_54--dflash-minimal-goal-e100-s7-vtpf-strict-dflash_strict_summary.json"),
-    ("main_table", "spatial", "vtpf_strict", "minimal-e100-500-s7", "eval_logs/spatial/dflash_strict/DFlash+VTPF-e100/dflash_strict/EVAL-libero_spatial-openvla-2026_08_01-16_33_58--dflash-minimal-spatial-e100-s7-vtpf-strict-dflash_strict_summary.json"),
-    ("main_table", "goal", "raes_rho040", "minimal-e100-500-s7", "main_table/online_local_rho400_full500_goal_4090/dflash_relaxed/简化版Draft+VTPF-TD-RevealingBudget-e100/dflash_relaxed/EVAL-libero_goal-openvla-2026_08_04-14_22_47--local400-main-table-full500-goal-e100-dflash_relaxed_summary.json"),
-    ("main_table", "spatial", "raes_rho040", "minimal-e100-500-s7", "main_table/online_local_rho400_full500_spatial_4090/dflash_relaxed/简化版Draft+VTPF-TD-RevealingBudget-e100/dflash_relaxed/EVAL-libero_spatial-openvla-2026_08_04-23_22_54--local400-main-table-full500-spatial-e100-dflash_relaxed_summary.json"),
+# (table, suite, method, run_tag, summary path relative to DATA_ROOT)
+BASELINES = [
+    ("goal", "openvla_ar", "official-500-s7", "eval_logs/baseline/openvla_ar/EVAL-libero_goal-openvla-2026_07_20-13_15_47--specvla-paper-ar-goal-openvla_ar_summary.json"),
+    ("spatial", "openvla_ar", "official-500-s7", "eval_logs/baseline/openvla_ar/EVAL-libero_spatial-openvla-2026_07_20-22_53_00--specvla-paper-ar-spatial-openvla_ar_summary.json"),
+    ("object", "openvla_ar", "official-500-s7", "eval_logs/baseline/openvla_ar/EVAL-libero_object-openvla-2026_07_20-18_04_58--specvla-paper-ar-object-openvla_ar_summary.json"),
+    ("libero_10", "openvla_ar", "official-500-s7", "eval_logs/baseline/openvla_ar/EVAL-libero_10-openvla-2026_07_21-02_38_04--specvla-paper-ar-10-openvla_ar_summary.json"),
+    ("goal", "specvla_strict", "official-500-s7-r0", "eval_logs/baseline/specvla_strict/EVAL-libero_goal-openvla-2026_07_21-14_20_56--specvla-strict-goal-r0-specvla_strict_summary.json"),
+    ("spatial", "specvla_strict", "official-500-s7-r0", "eval_logs/baseline/specvla_strict/EVAL-libero_spatial-openvla-2026_07_22-07_15_20--specvla-strict-spatial-r0-specvla_strict_summary.json"),
+    ("object", "specvla_strict", "official-500-s7-r0", "eval_logs/baseline/specvla_strict/EVAL-libero_object-openvla-2026_07_21-22_35_09--specvla-strict-object-r0-specvla_strict_summary.json"),
+    ("libero_10", "specvla_strict", "official-500-s7-r0", "eval_logs/baseline/specvla_strict/EVAL-libero_10-openvla-2026_07_22-14_20_15--specvla-strict-10-r0-specvla_strict_summary.json"),
+    ("goal", "specvla_relaxed", "official-500-s7-r9", "eval_logs/baseline/specvla_relaxed/EVAL-libero_goal-openvla-2026_07_21-18_45_47--specvla-relaxed-goal-r9-specvla_relaxed_summary.json"),
+    ("spatial", "specvla_relaxed", "official-500-s7-r9", "eval_logs/baseline/specvla_relaxed/EVAL-libero_spatial-openvla-2026_07_22-11_01_28--specvla-relaxed-spatial-r9-specvla_relaxed_summary.json"),
+    ("object", "specvla_relaxed", "official-500-s7-r9", "eval_logs/baseline/specvla_relaxed/EVAL-libero_object-openvla-2026_07_22-03_09_28--specvla-relaxed-object-r9-specvla_relaxed_summary.json"),
+    ("libero_10", "specvla_relaxed", "official-500-s7-r5", "eval_logs/baseline/specvla_relaxed/EVAL-libero_10-openvla-2026_07_23-01_33_12--specvla-relaxed-10-r5-specvla_relaxed_summary.json"),
 ]
+
+CURRENT_METHODS = [
+    ("goal", "dflash_strict", "minimal-e100-500-s7", "main_table/goal/dflash_strict/parallel-block-e100-r7/dflash_strict/EVAL-libero_goal-openvla-2026_08_04-19_19_47--main-table-goal-parallel-block-strict-e100-r7-dflash_strict_summary.json"),
+    ("spatial", "dflash_strict", "minimal-e100-500-s7", "eval_logs/spatial/dflash_strict/DFlash-e100/dflash_strict/EVAL-libero_spatial-openvla-2026_08_01-13_13_32--dflash-minimal-spatial-e100-s7-strict-dflash_strict_summary.json"),
+    ("object", "dflash_strict", "minimal-e060-500-s7", "eval_logs/object/dflash_strict/DFlash-e60/dflash_strict/EVAL-libero_object-openvla-2026_08_06-17_21_08--dflash-minimal-object-e60-s7-strict-dflash_strict_summary.json"),
+    ("libero_10", "dflash_strict", "minimal-e100-500-s7", "eval_logs/10/dflash_strict/DFlash-e100/dflash_strict/EVAL-libero_10-openvla-2026_08_07-19_20_24--dflash-minimal-10-e100-s7-strict-dflash_strict_summary.json"),
+    ("goal", "vtpf_strict", "minimal-e100-500-s7", "eval_logs/goal/dflash_strict/简化版Draft+VTPF-e100/EVAL-libero_goal-openvla-2026_07_29-17_58_54--dflash-minimal-goal-e100-s7-vtpf-strict-dflash_strict_summary.json"),
+    ("spatial", "vtpf_strict", "minimal-e100-500-s7", "eval_logs/spatial/dflash_strict/DFlash+VTPF-e100/dflash_strict/EVAL-libero_spatial-openvla-2026_08_01-16_33_58--dflash-minimal-spatial-e100-s7-vtpf-strict-dflash_strict_summary.json"),
+    ("object", "vtpf_strict", "minimal-e060-500-s7", "eval_logs/object/dflash_strict/DFlash+VTPF-e60/dflash_strict/EVAL-libero_object-openvla-2026_08_06-21_34_54--dflash-minimal-object-e60-s7-vtpf-strict-dflash_strict_summary.json"),
+    ("libero_10", "vtpf_strict", "minimal-e100-500-s7", "eval_logs/10/dflash_strict/DFlash+VTPF-e100/dflash_strict/EVAL-libero_10-openvla-2026_08_08-05_18_42--dflash-minimal-10-e100-s7-vtpf-strict-dflash_strict_summary.json"),
+    ("goal", "paced_harmonic", "minimal-e100-500-s7", "eval_logs/goal/dflash_relaxed/paced_harmonic_formal/EVAL-libero_goal-openvla-2026_07_31-12_50_22--dflash-vtpf-paced-harmonic-goal-e100-s7-formal-dflash_relaxed_summary.json"),
+    ("spatial", "paced_harmonic", "minimal-e100-500-s7", "eval_logs/spatial/dflash_relaxed/简化版Draft+VTPF-TD-PacedHarmonic-e100/dflash_relaxed/EVAL-libero_spatial-openvla-2026_08_01-19_50_33--dflash-minimal-spatial-e100-s7-vtpf-paced-harmonic-dflash_relaxed_summary.json"),
+    ("object", "paced_harmonic", "minimal-e060-500-s7", "eval_logs/object/dflash_relaxed/简化版Draft+VTPF-TD-PacedHarmonic-e60/dflash_relaxed/EVAL-libero_object-openvla-2026_08_07-01_40_57--dflash-minimal-object-e60-s7-vtpf-paced-harmonic-dflash_relaxed_summary.json"),
+    ("libero_10", "paced_harmonic", "minimal-e100-500-s7", "eval_logs/10/dflash_relaxed/简化版Draft+VTPF-TD-PacedHarmonic-e100/dflash_relaxed/EVAL-libero_10-openvla-2026_08_08-14_29_50--dflash-minimal-10-e100-s7-vtpf-paced-harmonic-dflash_relaxed_summary.json"),
+]
+
+PACE_HARMONIC_ABLATION = [
+    ("goal", "no_pace_no_harmonic", "minimal-e100-500-s7", "eval_logs/goal/ablation_paced_harmonic_2x2/no_paced_no_harmonic/dflash_relaxed/简化版Draft+VTPF-TD-VisualBudget-e100/dflash_relaxed/EVAL-libero_goal-openvla-2026_08_07-03_52_01--goal-e100-s7-no_paced_no_harmonic-dflash_relaxed_summary.json"),
+    ("goal", "pace_only", "minimal-e100-500-s7", "eval_logs/goal/ablation_paced_harmonic_2x2/paced_only/dflash_relaxed/简化版Draft+VTPF-TD-PacedBudget-e100/dflash_relaxed/EVAL-libero_goal-openvla-2026_08_07-15_07_15--goal-e100-s7-paced_only-dflash_relaxed_summary.json"),
+    ("goal", "harmonic_only", "minimal-e100-500-s7", "eval_logs/goal/ablation_paced_harmonic_2x2/harmonic_only/dflash_relaxed/简化版Draft+VTPF-TD-VisualBudget-e100/dflash_relaxed/EVAL-libero_goal-openvla-2026_08_07-17_18_35--goal-e100-s7-harmonic_only-dflash_relaxed_summary.json"),
+    ("goal", "paced_harmonic", "minimal-e100-500-s7", "eval_logs/goal/dflash_relaxed/paced_harmonic_formal/EVAL-libero_goal-openvla-2026_07_31-12_50_22--dflash-vtpf-paced-harmonic-goal-e100-s7-formal-dflash_relaxed_summary.json"),
+]
+
+RUNS = (
+    [("main_table", *run) for run in BASELINES]
+    + [("main_table", *run) for run in CURRENT_METHODS]
+    + [("ablation", suite, method, tag, path) for suite, method, tag, path in CURRENT_METHODS]
+    + [("pace_harmonic_ablation", *run) for run in PACE_HARMONIC_ABLATION]
+)
 
 
 def run_prefix(summary: Path) -> str:
-    name = summary.name
     for suffix in (
         "-openvla_ar_summary.json",
         "-specvla_strict_summary.json",
@@ -56,8 +76,8 @@ def run_prefix(summary: Path) -> str:
         "-dflash_strict_summary.json",
         "-dflash_relaxed_summary.json",
     ):
-        if name.endswith(suffix):
-            return name[: -len(suffix)]
+        if summary.name.endswith(suffix):
+            return summary.name[: -len(suffix)]
     raise ValueError(f"Unrecognized summary suffix: {summary}")
 
 
@@ -90,7 +110,7 @@ def scalar_metrics(data: dict) -> dict:
 def hardlink_run(summary: Path, destination: Path) -> list[Path]:
     destination.mkdir(parents=True, exist_ok=True)
     prefix = run_prefix(summary)
-    sources = sorted(p for p in summary.parent.glob(prefix + "*") if p.is_file())
+    sources = sorted(path for path in summary.parent.glob(prefix + "*") if path.is_file())
     if not sources:
         raise FileNotFoundError(f"No run files found for {summary}")
     linked = []
@@ -113,23 +133,20 @@ def write_text(path: Path, text: str) -> None:
 
 def main() -> None:
     OUT_ROOT.mkdir(parents=True, exist_ok=True)
-    rows = []
     loaded = []
-
     for table, suite, method, tag, relative_summary in RUNS:
         summary = DATA_ROOT / relative_summary
         if not summary.is_file():
             raise FileNotFoundError(summary)
         data = json.loads(summary.read_text(encoding="utf-8"))
-        metrics = scalar_metrics(data)
-        loaded.append((table, suite, method, tag, summary, metrics))
+        loaded.append((table, suite, method, tag, summary, scalar_metrics(data)))
 
     ar_latency = {
         suite: metrics["mean_latency_s"]
-        for _, suite, method, _, _, metrics in loaded
-        if method == "openvla_ar"
+        for table, suite, method, _, _, metrics in loaded
+        if table == "main_table" and method == "openvla_ar"
     }
-
+    rows = []
     for table, suite, method, tag, summary, metrics in loaded:
         destination = OUT_ROOT / table / suite / method / tag
         linked = hardlink_run(summary, destination)
@@ -147,31 +164,12 @@ def main() -> None:
         )
         write_text(destination / "metrics.json", json.dumps(metrics, ensure_ascii=False, indent=2) + "\n")
         write_text(destination / "SOURCE.txt", str(summary.parent) + "\n")
-        checksums = []
-        for path in linked:
-            digest = hashlib.sha256(path.read_bytes()).hexdigest()
-            checksums.append(f"{digest}  {path.name}")
+        checksums = [
+            f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}"
+            for path in linked
+        ]
         write_text(destination / "MANIFEST.sha256", "\n".join(checksums) + "\n")
         rows.append(metrics)
-
-    # The ablation view reuses the exact same immutable runs.
-    for suite in ("goal", "spatial"):
-        for method in ("openvla_ar", "dflash_strict", "vtpf_strict", "raes_rho040"):
-            matches = [r for r in rows if r["suite_slug"] == suite and r["method"] == method]
-            if len(matches) != 1:
-                raise RuntimeError(f"Expected one {suite}/{method} run, got {len(matches)}")
-            source_dir = Path(matches[0]["canonical_directory"])
-            target = OUT_ROOT / "ablation" / suite / method / matches[0]["run_tag"]
-            target.mkdir(parents=True, exist_ok=True)
-            for source in source_dir.iterdir():
-                if not source.is_file():
-                    continue
-                destination = target / source.name
-                if destination.exists():
-                    if os.path.samefile(source, destination):
-                        continue
-                    raise FileExistsError(destination)
-                os.link(source, destination)
 
     manifest_dir = OUT_ROOT / "manifest"
     manifest_dir.mkdir(parents=True, exist_ok=True)
@@ -183,28 +181,26 @@ def main() -> None:
         "sync_cuda_timing", "source_summary", "canonical_directory",
     ]
     with (manifest_dir / "runs.csv").open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=fieldnames,
+            extrasaction="ignore",
+            lineterminator="\n",
+        )
         writer.writeheader()
         writer.writerows(rows)
     write_text(manifest_dir / "runs.json", json.dumps(rows, ensure_ascii=False, indent=2) + "\n")
 
-    # Evidence and reproducibility remain directory-level links because they contain
-    # many small paired artifacts rather than one formal evaluation triplet.
-    links = {
-        OUT_ROOT / "evidence" / "p0": DATA_ROOT / "evidence" / "p0",
-        OUT_ROOT / "evidence" / "calibration": DATA_ROOT / "calibration",
-        OUT_ROOT / "reproducibility" / "goal_raes_rho040_e100_s7":
-            DATA_ROOT / "paper_archive" / "goal_raes_rho0400_full500_20260804",
-    }
-    for link, source in links.items():
-        link.parent.mkdir(parents=True, exist_ok=True)
-        if link.is_symlink():
-            if link.resolve() != source.resolve():
-                raise RuntimeError(f"Unexpected link target: {link}")
-        elif link.exists():
-            raise FileExistsError(link)
-        else:
-            link.symlink_to(source, target_is_directory=True)
+    evidence_link = OUT_ROOT / "evidence" / "p0"
+    evidence_source = DATA_ROOT / "evidence" / "p0"
+    evidence_link.parent.mkdir(parents=True, exist_ok=True)
+    if evidence_link.is_symlink():
+        if evidence_link.resolve() != evidence_source.resolve():
+            raise RuntimeError(f"Unexpected link target: {evidence_link}")
+    elif evidence_link.exists():
+        raise FileExistsError(evidence_link)
+    else:
+        evidence_link.symlink_to(evidence_source, target_is_directory=True)
 
 
 if __name__ == "__main__":

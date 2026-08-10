@@ -5,8 +5,11 @@
 当前正式方法固定为：
 
 ```text
-Minimal DFlash + VTPF + PacedHarmonic
+Minimal DFlash + VTPF + PacedHarmonic (shared Target anchor)
 ```
+
+PacedHarmonic 的 H1 与 H2 都相对最近一次 Target 关键帧计算视觉漂移。正式配置只暴露单位深度
+预算 `beta=0.075`，第 `d` 层 Hold 使用 `d * beta`，因此 H1/H2 的界分别为 `0.075/0.15`。
 
 ## 正式入口
 
@@ -16,7 +19,8 @@ Minimal DFlash + VTPF + PacedHarmonic
 | `run_dflash_goal_eval.sh` | DFlash strict/relaxed 底层单项入口；通常由上层脚本调用 |
 | `run_dflash_minimal_suite_main_3way_eval.sh` | 同一 suite Draft 串行评测 DFlash strict、VTPF strict、完整 PacedHarmonic |
 | `run_dflash_temporal_cascade_goal_eval.sh` | VTPF strict 的底层入口 |
-| `run_dflash_vtpf_paced_harmonic_goal_eval.sh` | 当前完整时序方法 |
+| `run_dflash_vtpf_paced_harmonic_dual_anchor_eval.sh` | 当前完整时序方法；H1/H2 共用最近 Target 锚点 |
+| `run_dflash_vtpf_paced_harmonic_goal_eval.sh` | Paced 与 Harmonic 的兼容组合层；由正式入口调用 |
 | `run_dflash_vtpf_paced_budget_goal_eval.sh` | PacedHarmonic 的 Pace 依赖入口 |
 | `run_dflash_vtpf_adaptive_decimation_goal_eval.sh` | Paced/VisualBudget 共用的底层 Hold 入口 |
 | `run_specvla_paper_ar_eval.sh` | OpenVLA AR 分母 |
@@ -40,7 +44,7 @@ SEED=7 SYNC_CUDA_TIMING=False TIMING_SCOPE=last_task \
 | 无 Pace、无 Harmonic | `run_dflash_vtpf_visual_budget_goal_eval.sh` | `none` |
 | 仅 Pace | `run_dflash_vtpf_paced_budget_goal_eval.sh` | `none` |
 | 仅 Harmonic | `run_dflash_vtpf_age_decayed_goal_eval.sh` | `inverse_age` |
-| 完整方法 | `run_dflash_vtpf_paced_harmonic_goal_eval.sh` | `inverse_age` |
+| 完整方法 | `run_dflash_vtpf_paced_harmonic_dual_anchor_eval.sh` | `inverse_age` |
 
 `run_dflash_p0_temporal_2x2.sh` 是匹配 target 调用预算的机制实验，不等同于上述闭环 2×2。
 

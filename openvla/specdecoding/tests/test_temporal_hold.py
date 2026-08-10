@@ -157,6 +157,45 @@ class TemporalHoldPolicyTest(unittest.TestCase):
 
         self.assertEqual(interval_holds, [2, 1, 2, 1])
 
+    def test_paced_budget_can_gate_h1_against_target_anchor(self):
+        accepted = self._decide(
+            policy="paced_budget",
+            consecutive_holds=0,
+            anchor_pixel_relative_l2=0.07,
+            calibrated_visual_bound=0.075,
+        )
+        self.assertTrue(accepted.allow)
+        self.assertEqual(accepted.reason, "base_hold")
+
+        rejected = self._decide(
+            policy="paced_budget",
+            consecutive_holds=0,
+            anchor_pixel_relative_l2=0.08,
+            calibrated_visual_bound=0.075,
+        )
+        self.assertFalse(rejected.allow)
+        self.assertEqual(rejected.reason, "anchor_visual_drift")
+
+    def test_paced_budget_can_gate_h2_against_same_target_anchor(self):
+        accepted = self._decide(
+            policy="paced_budget",
+            consecutive_holds=1,
+            anchor_pixel_relative_l2=0.14,
+            adaptive_max_anchor_pixel_relative_l2=1.0,
+            calibrated_visual_bound=0.15,
+        )
+        self.assertTrue(accepted.allow)
+
+        rejected = self._decide(
+            policy="paced_budget",
+            consecutive_holds=1,
+            anchor_pixel_relative_l2=0.16,
+            adaptive_max_anchor_pixel_relative_l2=1.0,
+            calibrated_visual_bound=0.15,
+        )
+        self.assertFalse(rejected.allow)
+        self.assertEqual(rejected.reason, "anchor_visual_drift")
+
     def test_inverse_age_decay_preserves_first_hold_and_damps_second(self):
         self.assertEqual(temporal_hold_action_scale("none", 2), 1.0)
         self.assertEqual(temporal_hold_action_scale("inverse_age", 1), 1.0)

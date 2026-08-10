@@ -2362,6 +2362,7 @@ class SpecVLAforActionPrediction(nn.Module):
             and (
                 self.dflash_temporal_hold_policy == "calibrated"
                 or self._dflash_consecutive_verify_skips == 1
+                or bool(self.dflash_temporal_depth_visual_bounds)
             )
             and current_pixel_signature is not None
             and self._dflash_last_target_pixel_signature is not None
@@ -2415,10 +2416,7 @@ class SpecVLAforActionPrediction(nn.Module):
         self._dflash_temporal_control_step += 1
         next_hold_depth = self._dflash_consecutive_verify_skips + 1
         calibrated_visual_bound = None
-        if (
-            self.dflash_temporal_hold_policy == "calibrated"
-            and next_hold_depth <= len(self.dflash_temporal_depth_visual_bounds)
-        ):
+        if next_hold_depth <= len(self.dflash_temporal_depth_visual_bounds):
             calibrated_visual_bound = self.dflash_temporal_depth_visual_bounds[
                 next_hold_depth - 1
             ]

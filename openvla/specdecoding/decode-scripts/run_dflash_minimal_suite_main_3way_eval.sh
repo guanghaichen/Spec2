@@ -106,13 +106,13 @@ if (( START_CASE <= 2 )); then
 fi
 
 if (( START_CASE <= 3 )); then
-  echo "[3/3] DFlash + VTPF + PacedHarmonic"
+  echo "[3/3] DFlash + VTPF + PacedHarmonic (shared Target anchor)"
   (
     # PacedHarmonic launcher 自己追加方法目录，故这里只传 suite 日志根目录。
     export LOG_DIR="${LOG_ROOT}"
-    export RUN_ID_NOTE="${RUN_ID_PREFIX}-vtpf-paced-harmonic"
-    export DFLASH_TEMPORAL_VISUAL_BUDGET="${DFLASH_TEMPORAL_VISUAL_BUDGET:-0.15}"
-    bash "${SCRIPT_DIR}/run_dflash_vtpf_paced_harmonic_goal_eval.sh"
+    export RUN_ID_NOTE="${RUN_ID_PREFIX}-vtpf-paced-harmonic-dual-anchor"
+    export DFLASH_TEMPORAL_UNIT_VISUAL_BUDGET="${DFLASH_TEMPORAL_UNIT_VISUAL_BUDGET:-0.075}"
+    bash "${SCRIPT_DIR}/run_dflash_vtpf_paced_harmonic_dual_anchor_eval.sh"
   )
 fi
 

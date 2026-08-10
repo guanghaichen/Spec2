@@ -200,32 +200,37 @@ def decide_temporal_hold(
         return TemporalHoldDecision(
             False, "max_consecutive_reached", hold_depth, False, anchor_pixel_relative_l2
         )
-    if policy == "calibrated":
-        if schedule_target_due:
+    if policy == "calibrated" and schedule_target_due:
+        return TemporalHoldDecision(
+            False,
+            "scheduled_regrounding",
+            hold_depth,
+            False,
+            anchor_pixel_relative_l2,
+        )
+
+    # A configured per-depth bound always refers to the most recent Target
+    # keyframe. This lets H1 and H2 share one causal anchor while retaining
+    # different admissible drift budgets.
+    if calibrated_visual_bound is not None:
+        if anchor_pixel_relative_l2 is None:
             return TemporalHoldDecision(
                 False,
-                "scheduled_regrounding",
+                "missing_anchor_visual_signal",
+                hold_depth,
+                False,
+                None,
+            )
+        if float(anchor_pixel_relative_l2) > float(calibrated_visual_bound):
+            return TemporalHoldDecision(
+                False,
+                "anchor_visual_drift",
                 hold_depth,
                 False,
                 anchor_pixel_relative_l2,
             )
-        if calibrated_visual_bound is not None:
-            if anchor_pixel_relative_l2 is None:
-                return TemporalHoldDecision(
-                    False,
-                    "missing_anchor_visual_signal",
-                    hold_depth,
-                    False,
-                    None,
-                )
-            if float(anchor_pixel_relative_l2) > float(calibrated_visual_bound):
-                return TemporalHoldDecision(
-                    False,
-                    "anchor_visual_drift",
-                    hold_depth,
-                    False,
-                    anchor_pixel_relative_l2,
-                )
+
+    if policy == "calibrated":
         return TemporalHoldDecision(
             True,
             "calibrated_open_loop",
@@ -260,9 +265,12 @@ def decide_temporal_hold(
         return TemporalHoldDecision(
             False, "missing_anchor_visual_signal", hold_depth, False, None
         )
-    if float(anchor_pixel_relative_l2) > float(
-        adaptive_max_anchor_pixel_relative_l2
-    ):
+    effective_visual_bound = (
+        float(calibrated_visual_bound)
+        if calibrated_visual_bound is not None
+        else float(adaptive_max_anchor_pixel_relative_l2)
+    )
+    if float(anchor_pixel_relative_l2) > effective_visual_bound:
         return TemporalHoldDecision(
             False, "anchor_visual_drift", hold_depth, False, anchor_pixel_relative_l2
         )

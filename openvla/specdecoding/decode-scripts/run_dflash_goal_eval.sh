@@ -71,7 +71,10 @@ DFLASH_VERIFY_SKIP_MAX_CONSECUTIVE="${DFLASH_VERIFY_SKIP_MAX_CONSECUTIVE:-1}"
 DFLASH_PROFILE_STAGES="${DFLASH_PROFILE_STAGES:-False}"
 DFLASH_DEBUG_COMPARE_TARGET_AR="${DFLASH_DEBUG_COMPARE_TARGET_AR:-False}"
 DFLASH_EVIDENCE_TRACE="${DFLASH_EVIDENCE_TRACE:-False}"
+SAVE_ROLLOUT_VIDEOS="${SAVE_ROLLOUT_VIDEOS:-False}"
+ROLLOUT_VIDEO_DIR="${ROLLOUT_VIDEO_DIR:-}"
 MAX_EVAL_TASKS="${MAX_EVAL_TASKS:-}"
+TASK_START_INDEX="${TASK_START_INDEX:-0}"
 RUN_ID_NOTE="${RUN_ID_NOTE:-dflash-${MODE}-${TASK_SUITE_SLUG}-e${EVAL_EPOCH}-r${ACCEPT_THRESHOLD}}"
 
 print_common_eval_config
@@ -124,7 +127,10 @@ fi
 echo "DFLASH_PROFILE_STAGES=${DFLASH_PROFILE_STAGES}"
 echo "DFLASH_DEBUG_COMPARE_TARGET_AR=${DFLASH_DEBUG_COMPARE_TARGET_AR}"
 echo "DFLASH_EVIDENCE_TRACE=${DFLASH_EVIDENCE_TRACE}"
+echo "SAVE_ROLLOUT_VIDEOS=${SAVE_ROLLOUT_VIDEOS}"
+echo "ROLLOUT_VIDEO_DIR=${ROLLOUT_VIDEO_DIR:-default}"
 echo "MAX_EVAL_TASKS=${MAX_EVAL_TASKS:-all}"
+echo "TASK_START_INDEX=${TASK_START_INDEX}"
 echo "TRIAL_START_INDEX=${TRIAL_START_INDEX:-0}"
 
 if [[ "${DRY_RUN:-False}" == "True" ]]; then
@@ -147,6 +153,7 @@ python "${EVAL_ENTRY}" \
   --task_suite_name "${TASK_SUITE_NAME}" \
   --num_trials_per_task "${NUM_TRIALS_PER_TASK}" \
   --trial_start_index "${TRIAL_START_INDEX:-0}" \
+  --task_start_index "${TASK_START_INDEX}" \
   --center_crop True \
   --accept_threshold "${ACCEPT_THRESHOLD}" \
   --dflash_block_size 7 \
@@ -189,6 +196,8 @@ python "${EVAL_ENTRY}" \
   --dflash_profile_stages "${DFLASH_PROFILE_STAGES}" \
   --dflash_debug_compare_target_ar "${DFLASH_DEBUG_COMPARE_TARGET_AR}" \
   --dflash_evidence_trace "${DFLASH_EVIDENCE_TRACE}" \
+  --save_rollout_videos "${SAVE_ROLLOUT_VIDEOS}" \
+  --rollout_video_dir "${ROLLOUT_VIDEO_DIR}" \
   --local_log_dir "${LOG_DIR}" \
   --run_id_note "${RUN_ID_NOTE}" \
   --sync_cuda_timing "${SYNC_CUDA_TIMING}" \

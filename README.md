@@ -195,6 +195,21 @@ Override the unit drift budget only for controlled sensitivity studies:
 DFLASH_TEMPORAL_UNIT_VISUAL_BUDGET=0.075 ...
 ```
 
+### Capture frame-aligned qualitative evidence
+
+The qualitative launcher records one fixed successful initial state per suite. It saves the rollout MP4 together with the
+frame-aligned Target/H1/H2 decision trace and action/state records used to produce the paper's robot-frame figures:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 \
+OUTPUT_ROOT=/absolute/path/to/qualitative_rollouts \
+  bash openvla/specdecoding/decode-scripts/run_chapter5_qualitative_rollouts.sh
+```
+
+This path is disabled during ordinary evaluation. `TASK_START_INDEX`, `TRIAL_START_INDEX`, `SAVE_ROLLOUT_VIDEOS`, and
+`ROLLOUT_VIDEO_DIR` can also be set on the generic suite launcher for a targeted audit. Video encoding requires the optional
+`imageio-ffmpeg` package; model inference and quantitative evaluation do not.
+
 ## Output Metrics
 
 Each evaluation produces a text log, a timing JSON, and a summary JSON. Important fields are:

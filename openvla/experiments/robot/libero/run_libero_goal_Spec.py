@@ -122,6 +122,8 @@ class GenerateConfig:
     dflash_profile_stages: bool = False
     dflash_debug_compare_target_ar: bool = False
     dflash_evidence_trace: bool = False
+    save_rollout_videos: bool = False
+    rollout_video_dir: Optional[str] = None
     #################################################################################################################
     # LIBERO environment-specific parameters
     #################################################################################################################
@@ -130,6 +132,7 @@ class GenerateConfig:
     num_steps_wait: int = 10                         # Number of steps to wait for objects to stabilize in sim
     num_trials_per_task: int = 50                    # Number of rollouts per task
     trial_start_index: int = 0                       # Diagnostic offset into LIBERO's fixed initial-state list.
+    task_start_index: int = 0                        # Diagnostic offset into the suite's task list.
     max_eval_tasks: Optional[int] = None              # Diagnostic smoke limit; None evaluates all tasks.
 
     #################################################################################################################
@@ -205,11 +208,13 @@ def eval_libero(cfg: GenerateConfig) -> None:
     # Initialize LIBERO task suite
     benchmark_dict = benchmark.get_benchmark_dict()
     task_suite = benchmark_dict[cfg.task_suite_name]()
-    num_tasks_in_suite = task_suite.n_tasks
+    if cfg.task_start_index < 0 or cfg.task_start_index >= task_suite.n_tasks:
+        raise ValueError("task_start_index must select a task in the requested suite.")
+    task_stop_index = task_suite.n_tasks
     if cfg.max_eval_tasks is not None:
         if cfg.max_eval_tasks <= 0:
             raise ValueError("max_eval_tasks must be positive when provided.")
-        num_tasks_in_suite = min(num_tasks_in_suite, cfg.max_eval_tasks)
+        task_stop_index = min(task_stop_index, cfg.task_start_index + cfg.max_eval_tasks)
     print(f"Task suite: {cfg.task_suite_name}")
     log_file.write(f"Task suite: {cfg.task_suite_name}\n")
 
@@ -222,7 +227,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
     total_generation_step_stats = []
     last_task_episode_time = []
     last_task_generation_step_stats = []
-    for task_id in tqdm.tqdm(range(num_tasks_in_suite)):
+    for task_id in tqdm.tqdm(range(cfg.task_start_index, task_stop_index)):
         # Get task
         task = task_suite.get_task(task_id)
 
@@ -369,10 +374,15 @@ def eval_libero(cfg: GenerateConfig) -> None:
             task_generation_step_stats.extend(episode_generation_stats)
             total_generation_step_stats.extend(episode_generation_stats)
 
-            # Save a replay video of the episode
-            # save_rollout_video(
-            #     replay_images, total_episodes, success=done, task_description=task_description, log_file=log_file
-            # )
+            if cfg.save_rollout_videos:
+                save_rollout_video(
+                    replay_images,
+                    total_episodes,
+                    success=done,
+                    task_description=task_description,
+                    log_file=log_file,
+                    output_dir=cfg.rollout_video_dir,
+                )
 
             # Log current results
             print(f"Success: {done}")
